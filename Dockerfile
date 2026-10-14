@@ -1,0 +1,14 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY UltimateParser.slnx ./
+COPY UltimateParser/UltimateParser.csproj UltimateParser/
+COPY UltimateParser.Tests/UltimateParser.Tests.csproj UltimateParser.Tests/
+RUN dotnet restore UltimateParser.slnx
+COPY . .
+RUN dotnet test UltimateParser.slnx -c Release --no-restore
+RUN dotnet publish UltimateParser/UltimateParser.csproj -c Release -o /app --no-restore
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0
+WORKDIR /app
+COPY --from=build /app .
+ENTRYPOINT ["dotnet", "UltimateParser.dll"]
