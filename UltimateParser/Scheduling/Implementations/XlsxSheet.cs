@@ -16,13 +16,23 @@ public static class XlsxSheet
     private static readonly XNamespace Spreadsheet = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
     /// <summary>
+    /// Пространство имён связей пакета, где лежат адреса гиперссылок
+    /// </summary>
+    private static readonly XNamespace PackageRelationships = "http://schemas.openxmlformats.org/package/2006/relationships";
+
+    /// <summary>
+    /// Пространство имён атрибута <c>r:id</c> у гиперссылки ячейки
+    /// </summary>
+    private static readonly XNamespace OfficeRelationships = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+    /// <summary>
     /// Превращает книгу в CSV, копируя значение левой верхней ячейки на весь объединённый диапазон
     /// </summary>
     /// <param name="xlsx">
     /// Байты файла xlsx
     /// </param>
     /// <returns>
-    /// Текст CSV. Числовые даты Excel записываются как <c>DD.MM</c>
+    /// Текст CSV. Числовые даты Excel записываются как <c>DD.MM</c>. Адрес гиперссылки ячейки дописывается отдельной строкой
     /// </returns>
     /// <exception cref="FormatException">
     /// В книге нет листа
@@ -37,6 +47,9 @@ public static class XlsxSheet
         var document = XDocument.Load(sheetStream);
         var cells = ReadCells(document, strings);
         ApplyMerges(document, cells);
+        var links = ReadHyperlinks(archive, document);
+        ApplyMergeLinks(document, links);
+        AppendLinks(cells, links);
         return WriteCsv(cells);
     }
 
@@ -161,6 +174,166 @@ public static class XlsxSheet
 
         return builder.ToString();
     }
+
+    #region Hyperlinks
+
+    /// <summary>
+    /// Читает внешние гиперссылки листа
+    /// </summary>
+    /// <param name="archive">
+    /// Открытая книга xlsx
+    /// </param>
+    /// <param name="document">
+    /// Документ листа
+    /// </param>
+    /// <returns>
+    /// Адрес ссылки по координатам ячейки с нуля. Внутренние ссылки пропускаются
+    /// </returns>
+    private static Dictionary<(int Row, int Column), string> ReadHyperlinks(ZipArchive archive, XDocument document)
+    {
+        var targets = ReadHyperlinkTargets(archive);
+        var links = new Dictionary<(int Row, int Column), string>();
+        foreach (var link in document.Descendants(Spreadsheet + "hyperlink"))
+        {
+            var reference = (string?)link.Attribute("ref");
+            var id = (string?)link.Attribute(OfficeRelationships + "id");
+            if (reference is null || id is null || !targets.TryGetValue(id, out var target))
+                continue;
+
+            if (!target.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                && !target.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            foreach (var cell in CellsInReference(reference))
+                links[cell] = target;
+        }
+
+        return links;
+    }
+
+    /// <summary>
+    /// Читает цели внешних гиперссылок из связей листа
+    /// </summary>
+    /// <param name="archive">
+    /// Открытая книга xlsx
+    /// </param>
+    /// <returns>
+    /// Адрес по идентификатору связи. Пустой словарь, если файла связей нет
+    /// </returns>
+    private static Dictionary<string, string> ReadHyperlinkTargets(ZipArchive archive)
+    {
+        var entry = archive.GetEntry("xl/worksheets/_rels/sheet1.xml.rels");
+        if (entry is null)
+            return [];
+
+        using var stream = entry.Open();
+        var document = XDocument.Load(stream);
+        var targets = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var relationship in document.Descendants(PackageRelationships + "Relationship"))
+        {
+            var id = (string?)relationship.Attribute("Id");
+            var type = (string?)relationship.Attribute("Type");
+            var target = (string?)relationship.Attribute("Target");
+            if (id is null || target is null || type is null || !type.EndsWith("/hyperlink", StringComparison.Ordinal))
+                continue;
+
+            targets[id] = target;
+        }
+
+        return targets;
+    }
+
+    /// <summary>
+    /// Копирует ссылку левой верхней ячейки на пустые позиции объединения
+    /// </summary>
+    /// <param name="document">
+    /// Документ листа
+    /// </param>
+    /// <param name="links">
+    /// Уже прочитанные ссылки. Пустые позиции объединения заполняются на месте
+    /// </param>
+    private static void ApplyMergeLinks(XDocument document, Dictionary<(int Row, int Column), string> links)
+    {
+        foreach (var merge in document.Descendants(Spreadsheet + "mergeCell"))
+        {
+            var range = (string?)merge.Attribute("ref");
+            if (range is null)
+                continue;
+
+            var bounds = range.Split(':');
+            if (bounds.Length != 2
+                || !TryReference(bounds[0], out var startRow, out var startColumn)
+                || !TryReference(bounds[1], out var endRow, out var endColumn)
+                || !links.TryGetValue((startRow, startColumn), out var value))
+            {
+                continue;
+            }
+
+            for (var row = startRow; row <= endRow; row++)
+            {
+                for (var column = startColumn; column <= endColumn; column++)
+                {
+                    if (!links.ContainsKey((row, column)))
+                        links[(row, column)] = value;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Дописывает адрес ссылки отдельной строкой, если его ещё нет в тексте ячейки
+    /// </summary>
+    /// <param name="cells">
+    /// Текст ячеек. Строка со ссылкой добавляется на месте
+    /// </param>
+    /// <param name="links">
+    /// Ссылки по координатам
+    /// </param>
+    private static void AppendLinks(Dictionary<(int Row, int Column), string> cells, Dictionary<(int Row, int Column), string> links)
+    {
+        foreach (var (cell, url) in links)
+        {
+            if (!cells.TryGetValue(cell, out var text) || text.Length == 0)
+            {
+                cells[cell] = url;
+                continue;
+            }
+
+            if (!text.Contains(url, StringComparison.Ordinal))
+                cells[cell] = text + "\n" + url;
+        }
+    }
+
+    /// <summary>
+    /// Перечисляет ячейки адреса <c>H3</c> или диапазона <c>G3:H3</c>
+    /// </summary>
+    /// <param name="reference">
+    /// Адрес гиперссылки
+    /// </param>
+    /// <returns>
+    /// Координаты с нуля. Пустая последовательность, если адрес не разбирается
+    /// </returns>
+    private static IEnumerable<(int Row, int Column)> CellsInReference(string reference)
+    {
+        var bounds = reference.Split(':');
+        if (!TryReference(bounds[0], out var startRow, out var startColumn))
+            yield break;
+
+        var endRow = startRow;
+        var endColumn = startColumn;
+        if (bounds.Length == 2 && !TryReference(bounds[1], out endRow, out endColumn))
+            yield break;
+
+        for (var row = startRow; row <= endRow; row++)
+        {
+            for (var column = startColumn; column <= endColumn; column++)
+                yield return (row, column);
+        }
+    }
+
+    #endregion Hyperlinks
 
     /// <summary>
     /// Возвращает видимый текст ячейки

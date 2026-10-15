@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using UltimateParser.Common.Helpers;
 using UltimateParser.Common.Models;
 using UltimateParser.Scheduling.Implementations;
 using UltimateParser.Scheduling.Interfaces;
@@ -85,7 +86,7 @@ public sealed class ScheduleSync
         #region Load
 
         var csv = await _source.ReadCsvAsync(cancellationToken);
-        var timeZone = SyncOptions.ResolveTimeZone(_options.TimeZoneId);
+        var timeZone = TimeHelper.ResolveTimeZone(_options.TimeZoneId);
         var slots = ScheduleParser.Parse(csv, _options.GroupColumn, timeZone, _clock.Today);
         var lessons = slots.Count(slot => slot.Lesson is not null);
         _logger.LogInformation(

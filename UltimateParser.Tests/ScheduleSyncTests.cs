@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Globalization;
+using UltimateParser.Common.Helpers;
 using UltimateParser.Common.Models;
 using UltimateParser.Scheduling.Interfaces;
 using UltimateParser.Singularity.Implementations;
@@ -39,7 +40,7 @@ public class ScheduleSyncTests
 
         var source = new FakeSource(csv);
         var client = new FakeClient();
-        var kept = SampleLesson("up:rki-2-26:2026-10-01:2010", "Старый предмет", "Старый предмет, Петров");
+        var kept = SampleLesson("up:rki-2-26:2026-10-01:2010", "Старый предмет", "Преподаватель: Петров");
         client.Tasks.Add(TaskFrom(kept, "T-same", checkState: 0));
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Убрали", "Убрали, преподаватель"),
@@ -128,9 +129,12 @@ public class ScheduleSyncTests
         var options = new SyncOptions
         {
             SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
             GroupColumn = "РКИ-2-26",
             ProjectTitle = "Расписание",
             TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
             RunOnce = true,
         };
         var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
@@ -161,9 +165,12 @@ public class ScheduleSyncTests
         var options = new SyncOptions
         {
             SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
             GroupColumn = "РКИ-2-26",
             ProjectTitle = "Расписание",
             TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
             RunOnce = true,
         };
         var clock = new FixedClock(new DateOnly(2026, 10, 8), new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.FromHours(3)));
@@ -183,7 +190,7 @@ public class ScheduleSyncTests
     [Fact]
     public async Task Run_does_not_update_when_the_stored_note_is_the_same_delta()
     {
-        const string note = "Предмет, Иванов";
+        const string note = "Преподаватель: Иванов";
         const string csv = """
             ,Дата,время,РКИ-2-26
             чт,01.10,17.20-18.40,"Предмет, Иванов"
@@ -191,12 +198,57 @@ public class ScheduleSyncTests
 
         var client = new FakeClient();
         var task = TaskFrom(SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", note), "T-1", checkState: 0);
-        client.Tasks.Add(task with { Note = """{"ops":[{"insert":"Предмет, Иванов\n"}]}""" });
+        client.Tasks.Add(task with { Note = """{"ops":[{"insert":"Преподаватель: Иванов\n"}]}""" });
 
         var report = await Sync(new FakeSource(csv), client);
 
         Assert.Equal(new SyncReport(0, 0, 0, 0, 0, 0), report);
         Assert.Empty(client.Updated);
+    }
+
+    /// <summary>
+    /// Уже записанная гиперссылка «Ссылка» не вызывает повторного обновления
+    /// </summary>
+    [Fact]
+    public async Task Run_does_not_update_when_the_stored_note_is_already_a_link()
+    {
+        const string lessonNote = "Преподаватель: Иванов\n---\nhttps://telemost.360.yandex.ru/j/1";
+        var csv = ",Дата,время,РКИ-2-26\nчт,01.10,17.20-18.40,\"Предмет, Иванов\nhttps://telemost.360.yandex.ru/j/1\"\n";
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", lessonNote),
+            "T-1",
+            checkState: 0) with
+        { Note = NoteTextHelper.Format(lessonNote) });
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(0, 0, 0, 0, 0, 0), report);
+        Assert.Empty(client.Updated);
+    }
+
+    /// <summary>
+    /// Задача без напоминания за 15 минут обновляется
+    /// </summary>
+    [Fact]
+    public async Task Run_updates_a_task_that_has_no_reminder()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,"Предмет, Иванов"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Предмет, Иванов"),
+            "T-1",
+            checkState: 0,
+            withReminder: false));
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(0, 1, 0, 0, 0, 0), report);
+        Assert.Equal("Предмет", client.Updated.Single().Title);
     }
 
     #endregion Facts
@@ -220,9 +272,12 @@ public class ScheduleSyncTests
         var options = new SyncOptions
         {
             SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
             GroupColumn = "РКИ-2-26",
             ProjectTitle = "РКИ-2-26",
             TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
             RunOnce = true,
         };
         var sync = new ScheduleSync(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSync>.Instance);
@@ -270,10 +325,13 @@ public class ScheduleSyncTests
     /// <param name="journalDate">
     /// Дата архивации или <see langword="null"/>, если задача активна
     /// </param>
+    /// <param name="withReminder">
+    /// <see langword="false"/>, если у снимка нет напоминания за 15 минут
+    /// </param>
     /// <returns>
     /// Снимок
     /// </returns>
-    private static SingularityTask TaskFrom(Lesson lesson, string id, int checkState, string? journalDate = null) =>
+    private static SingularityTask TaskFrom(Lesson lesson, string id, int checkState, string? journalDate = null, bool withReminder = true) =>
         new(
             id,
             lesson.ExternalId,
@@ -284,7 +342,8 @@ public class ScheduleSyncTests
             lesson.TimeLengthMinutes,
             checkState,
             journalDate,
-            false);
+            false,
+            withReminder ? [15] : null);
 
     #endregion Helpers
 

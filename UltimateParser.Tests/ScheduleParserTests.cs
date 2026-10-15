@@ -1,4 +1,4 @@
-using UltimateParser.Common.Models;
+using UltimateParser.Common.Helpers;
 using UltimateParser.Scheduling.Implementations;
 
 namespace UltimateParser.Tests;
@@ -11,7 +11,7 @@ public class ScheduleParserTests
     /// <summary>
     /// Московский часовой пояс, которым проставляется смещение начала
     /// </summary>
-    private static readonly TimeZoneInfo Moscow = SyncOptions.ResolveTimeZone("Europe/Moscow");
+    private static readonly TimeZoneInfo Moscow = TimeHelper.ResolveTimeZone("Europe/Moscow");
 
     /// <summary>
     /// Фрагмент реальной октябрьской сетки со слитыми датами и многострочной ячейкой
@@ -50,11 +50,11 @@ public class ScheduleParserTests
         Assert.Equal("Иностранный язык делового и профессионального общения", language.Title);
         Assert.Equal(80, language.TimeLengthMinutes);
         Assert.Equal(new DateTimeOffset(2026, 10, 1, 20, 10, 0, TimeSpan.FromHours(3)), language.Start);
-        Assert.Contains("Будник Екатерина Александровна", language.Note, StringComparison.Ordinal);
+        Assert.Equal("Преподаватель: Будник Екатерина Александровна", language.Note);
 
         var practice = lessons.Single(lesson => lesson.ExternalId == "up:rki-2-26:2026-10-05:2010");
         Assert.Equal("Философские проблемы науки и техники (Практика)", practice.Title);
-        Assert.Contains("д-р социол. наук", practice.Note, StringComparison.Ordinal);
+        Assert.Equal("Преподаватель: Каптерев Андрей Игоревич", practice.Note);
 
         var project = lessons.Single(lesson => lesson.ExternalId == "up:rki-2-26:2026-10-06:1720");
         Assert.Equal("Индивидуальный творческий проект (Практика)", project.Title);

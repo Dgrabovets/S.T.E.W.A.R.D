@@ -38,6 +38,9 @@ public sealed record SingularityTask
     /// <param name="removed">
     /// <see langword="true"/>, если задача в корзине
     /// </param>
+    /// <param name="notifies">
+    /// Минуты до начала, за которые стоит напоминание, или <see langword="null"/>, если API их не прислал
+    /// </param>
     public SingularityTask(
         string id,
         string? externalId,
@@ -48,7 +51,8 @@ public sealed record SingularityTask
         int? timeLength,
         int? @checked,
         string? journalDate,
-        bool removed)
+        bool removed,
+        int[]? notifies = null)
     {
         Id = id;
         ExternalId = externalId;
@@ -60,6 +64,7 @@ public sealed record SingularityTask
         Checked = @checked;
         JournalDate = journalDate;
         Removed = removed;
+        Notifies = notifies;
     }
 
     /// <summary>
@@ -111,6 +116,11 @@ public sealed record SingularityTask
     /// <see langword="true"/>, если задача отправлена в корзину
     /// </summary>
     public bool Removed { get; init; }
+
+    /// <summary>
+    /// Минуты до начала, за которые у задачи стоят напоминания
+    /// </summary>
+    public int[]? Notifies { get; init; }
 
     /// <summary>
     /// <see langword="true"/>, если пользователь отметил задачу выполненной
