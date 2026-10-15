@@ -2,17 +2,17 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
-namespace UltimateParser.Common;
+namespace UltimateParser.Common.Helpers;
 
 /// <summary>
 /// Читает и записывает заметку Singularity: обычный текст, Markdown и дельту Quill
 /// </summary>
-public static class NoteText
+public static class NoteTextHelper
 {
     /// <summary>
     /// Видимый текст гиперссылки в описании задачи
     /// </summary>
-    private const string LinkLabel = "Ссылка";
+    private const string LINK_LABEL = "Ссылка";
 
     /// <summary>
     /// Сериализатор дельты. Кириллица остаётся символами, а не кодами <c>\u</c>
@@ -33,10 +33,10 @@ public static class NoteText
     /// <returns>
     /// Обычный текст. Завершающий перевод строки, который добавляет Quill, отбрасывается. Нечитаемый JSON возвращается как есть
     /// </returns>
-    public static string Plain(string? note)
+    public static string GetPlainText(string? note)
     {
         if (string.IsNullOrWhiteSpace(note))
-            return "";
+            return string.Empty;
 
         var trimmed = note.Trim();
         if (!trimmed.StartsWith('{') && !trimmed.StartsWith('['))
@@ -46,8 +46,7 @@ public static class NoteText
         {
             using var document = JsonDocument.Parse(trimmed);
             var text = new StringBuilder();
-            if (document.RootElement.ValueKind == JsonValueKind.Object
-                && document.RootElement.TryGetProperty("ops", out var ops))
+            if (document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty("ops", out var ops))
             {
                 AppendInserts(ops, text);
             }
@@ -84,13 +83,13 @@ public static class NoteText
     {
         if (!TrySplitLink(expected, out var body, out var url))
             return ExtractLink(stored) is null
-                && string.Equals(Plain(stored), expected, StringComparison.Ordinal);
+                && string.Equals(GetPlainText(stored), expected, StringComparison.Ordinal);
 
         if (!IsOperationArray(stored))
             return false;
 
-        var visible = body.Length == 0 ? LinkLabel : body + "\n" + LinkLabel;
-        return string.Equals(Plain(stored), visible, StringComparison.Ordinal)
+        var visible = body.Length == 0 ? LINK_LABEL : body + "\n" + LINK_LABEL;
+        return string.Equals(GetPlainText(stored), visible, StringComparison.Ordinal)
             && string.Equals(ExtractLink(stored), url, StringComparison.Ordinal);
     }
 
@@ -110,9 +109,7 @@ public static class NoteText
 
         foreach (var operation in ops.EnumerateArray())
         {
-            if (operation.ValueKind == JsonValueKind.Object
-                && operation.TryGetProperty("insert", out var insert)
-                && insert.ValueKind == JsonValueKind.String)
+            if (operation.ValueKind == JsonValueKind.Object && operation.TryGetProperty("insert", out var insert) && insert.ValueKind == JsonValueKind.String)
             {
                 text.Append(insert.GetString());
             }
@@ -221,7 +218,8 @@ public static class NoteText
         if (body.Length > 0)
             ops.Add(new { insert = body + "\n" });
 
-        ops.Add(new { insert = LinkLabel, attributes = new { link = url } });
+        ops.Add(new { insert = "\n" });
+        ops.Add(new { insert = LINK_LABEL, attributes = new { link = url } });
         ops.Add(new { insert = "\n" });
         return JsonSerializer.Serialize(ops, DeltaJson);
     }
@@ -244,12 +242,13 @@ public static class NoteText
     private static bool TrySplitLink(string note, out string body, out string url)
     {
         body = note;
-        url = "";
+        url = string.Empty;
+
         var normalized = note.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n');
         var lineBreak = normalized.LastIndexOf('\n');
         var last = lineBreak < 0 ? normalized : normalized[(lineBreak + 1)..];
-        if (!last.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            && !last.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+
+        if (!last.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !last.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }

@@ -1,6 +1,6 @@
 using System.IO.Compression;
 using System.Text;
-using UltimateParser.Common.Models;
+using UltimateParser.Common.Helpers;
 using UltimateParser.Scheduling.Implementations;
 
 namespace UltimateParser.Tests;
@@ -17,7 +17,7 @@ public class XlsxSheetTests
     public void ToCsv_copies_a_merged_lesson_into_the_group_column()
     {
         var csv = XlsxSheet.ToCsv(Workbook());
-        var slots = ScheduleParser.Parse(csv, "РКИ-2-26", SyncOptions.ResolveTimeZone("Europe/Moscow"), new DateOnly(2026, 10, 8));
+        var slots = ScheduleParser.Parse(csv, "РКИ-2-26", TimeHelper.ResolveTimeZone("Europe/Moscow"), new DateOnly(2026, 10, 8));
         var lesson = Assert.Single(slots, slot => slot.Lesson is not null).Lesson;
 
         Assert.NotNull(lesson);
@@ -32,7 +32,7 @@ public class XlsxSheetTests
     public void ToCsv_appends_a_merged_cell_hyperlink_to_the_group_note()
     {
         var csv = XlsxSheet.ToCsv(WorkbookWithLink());
-        var slots = ScheduleParser.Parse(csv, "РКИ-2-26", SyncOptions.ResolveTimeZone("Europe/Moscow"), new DateOnly(2026, 10, 8));
+        var slots = ScheduleParser.Parse(csv, "РКИ-2-26", TimeHelper.ResolveTimeZone("Europe/Moscow"), new DateOnly(2026, 10, 8));
         var lesson = Assert.Single(slots, slot => slot.Lesson is not null).Lesson;
 
         Assert.NotNull(lesson);

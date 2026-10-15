@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using UltimateParser.Common.Models;
+using UltimateParser.Common.Helpers;
 using UltimateParser.Scheduling.Implementations;
 using UltimateParser.Scheduling.Interfaces;
 using UltimateParser.Singularity.Implementations;
@@ -27,7 +27,7 @@ public static class Program
     public static async Task Main(string[] args)
     {
         var runOnce = args.Any(arg => arg == "--once");
-        var options = SyncOptions.FromEnvironment(runOnce);
+        var options = EnviromentalHelper.GetSyndOptionsFromEnvironment(runOnce);
 
         var builder = Host.CreateApplicationBuilder(args.Where(arg => arg != "--once").ToArray());
         builder.Services.AddSingleton(options);

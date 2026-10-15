@@ -1,4 +1,4 @@
-using UltimateParser.Common;
+using UltimateParser.Common.Helpers;
 
 namespace UltimateParser.Tests;
 
@@ -15,8 +15,8 @@ public class NoteTextTests
     {
         const string delta = """{"ops":[{"insert":"Предмет, преподаватель\n"}]}""";
 
-        Assert.Equal("Предмет, преподаватель", NoteText.Plain(delta));
-        Assert.Equal("обычный текст", NoteText.Plain("обычный текст"));
+        Assert.Equal("Предмет, преподаватель", NoteTextHelper.GetPlainText(delta));
+        Assert.Equal("обычный текст", NoteTextHelper.GetPlainText("обычный текст"));
     }
 
     /// <summary>
@@ -27,13 +27,13 @@ public class NoteTextTests
     {
         const string note = "Предмет, Иванов\nhttps://telemost.360.yandex.ru/j/1";
 
-        var formatted = NoteText.Format(note);
+        var formatted = NoteTextHelper.Format(note);
 
         Assert.StartsWith("[", formatted, StringComparison.Ordinal);
         Assert.Contains("\"insert\":\"Ссылка\"", formatted, StringComparison.Ordinal);
         Assert.Contains("\"link\":\"https://telemost.360.yandex.ru/j/1\"", formatted, StringComparison.Ordinal);
-        Assert.True(NoteText.Same(formatted, note));
-        Assert.False(NoteText.Same(note, note));
-        Assert.False(NoteText.Same("""{"ops":[{"insert":"Ссылка","attributes":{"link":"https://telemost.360.yandex.ru/j/1"}},{"insert":"\n"}]}""", note));
+        Assert.True(NoteTextHelper.Same(formatted, note));
+        Assert.False(NoteTextHelper.Same(note, note));
+        Assert.False(NoteTextHelper.Same("""{"ops":[{"insert":"Ссылка","attributes":{"link":"https://telemost.360.yandex.ru/j/1"}},{"insert":"\n"}]}""", note));
     }
 }

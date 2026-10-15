@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using UltimateParser.Common;
+using UltimateParser.Common.Helpers;
 using UltimateParser.Common.Models;
 using UltimateParser.Singularity.Dtos;
 using UltimateParser.Singularity.Interfaces;
@@ -310,7 +310,7 @@ public sealed class SingularityClient : ISingularityClient
     /// </returns>
     internal static bool NeedsUpdate(SingularityTask task, Lesson lesson) =>
         !string.Equals(task.Title, lesson.Title, StringComparison.Ordinal)
-        || !NoteText.Same(task.Note, lesson.Note)
+        || !NoteTextHelper.Same(task.Note, lesson.Note)
         || !task.UseTime
         || task.TimeLength != lesson.TimeLengthMinutes
         || !SameStart(task.Start, lesson.Start)
@@ -347,7 +347,7 @@ public sealed class SingularityClient : ISingularityClient
     private static object WriteBody(string projectId, Lesson lesson, bool includeExternalId) => new
     {
         title = lesson.Title,
-        note = NoteText.Format(lesson.Note),
+        note = NoteTextHelper.Format(lesson.Note),
         projectId,
         start = FormatStart(lesson.Start),
         useTime = true,

@@ -1,6 +1,6 @@
-using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
-using UltimateParser.Common;
+using System.Globalization;
+using UltimateParser.Common.Helpers;
 using UltimateParser.Common.Models;
 using UltimateParser.Scheduling.Interfaces;
 using UltimateParser.Singularity.Implementations;
@@ -129,9 +129,12 @@ public class ScheduleSyncTests
         var options = new SyncOptions
         {
             SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
             GroupColumn = "РКИ-2-26",
             ProjectTitle = "Расписание",
             TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
             RunOnce = true,
         };
         var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
@@ -162,9 +165,12 @@ public class ScheduleSyncTests
         var options = new SyncOptions
         {
             SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
             GroupColumn = "РКИ-2-26",
             ProjectTitle = "Расписание",
             TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
             RunOnce = true,
         };
         var clock = new FixedClock(new DateOnly(2026, 10, 8), new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.FromHours(3)));
@@ -213,7 +219,7 @@ public class ScheduleSyncTests
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", lessonNote),
             "T-1",
             checkState: 0) with
-        { Note = NoteText.Format(lessonNote) });
+        { Note = NoteTextHelper.Format(lessonNote) });
 
         var report = await Sync(new FakeSource(csv), client);
 
@@ -266,9 +272,12 @@ public class ScheduleSyncTests
         var options = new SyncOptions
         {
             SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
             GroupColumn = "РКИ-2-26",
             ProjectTitle = "РКИ-2-26",
             TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
             RunOnce = true,
         };
         var sync = new ScheduleSync(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSync>.Instance);

@@ -1,3 +1,4 @@
+using UltimateParser.Common.Helpers;
 using UltimateParser.Common.Models;
 using UltimateParser.Sync.Interfaces;
 
@@ -21,7 +22,7 @@ public sealed class TimeZoneClock : IScheduleClock
     /// </param>
     public TimeZoneClock(SyncOptions options)
     {
-        _timeZone = SyncOptions.ResolveTimeZone(options.TimeZoneId);
+        _timeZone = TimeHelper.ResolveTimeZone(options.TimeZoneId);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using UltimateParser.Common.Models;
+using UltimateParser.Common.Helpers;
 using UltimateParser.Scheduling.Implementations;
 
 namespace UltimateParser.Tests;
@@ -11,7 +11,7 @@ public class ScheduleParserTests
     /// <summary>
     /// Московский часовой пояс, которым проставляется смещение начала
     /// </summary>
-    private static readonly TimeZoneInfo Moscow = SyncOptions.ResolveTimeZone("Europe/Moscow");
+    private static readonly TimeZoneInfo Moscow = TimeHelper.ResolveTimeZone("Europe/Moscow");
 
     /// <summary>
     /// Фрагмент реальной октябрьской сетки со слитыми датами и многострочной ячейкой
