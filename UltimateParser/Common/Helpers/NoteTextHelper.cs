@@ -88,9 +88,11 @@ public static class NoteTextHelper
         if (!IsOperationArray(stored))
             return false;
 
-        var visible = body.Length == 0 ? LINK_LABEL : body + "\n" + LINK_LABEL;
+        var comparable = StripDividerLines(body);
+        var visible = comparable.Length == 0 ? LINK_LABEL : comparable + "\n" + LINK_LABEL;
         return string.Equals(GetPlainText(stored), visible, StringComparison.Ordinal)
-            && string.Equals(ExtractLink(stored), url, StringComparison.Ordinal);
+            && string.Equals(ExtractLink(stored), url, StringComparison.Ordinal)
+            && (!HasDividerLine(body) || HasDividerEmbed(stored));
     }
 
     /// <summary>
@@ -201,7 +203,7 @@ public static class NoteTextHelper
     #region Writing
 
     /// <summary>
-    /// Готовит заметку для API. Последняя строка-адрес становится словом <c>Ссылка</c> в массиве операций Quill
+    /// Готовит заметку для API. Строка <c>---</c> становится разделителем, а последняя строка-адрес — словом <c>Ссылка</c>
     /// </summary>
     /// <param name="note">
     /// Текст ячейки. Адрес, прикреплённый к ячейке, стоит последней строкой
@@ -215,13 +217,132 @@ public static class NoteTextHelper
             return note;
 
         var ops = new List<object>();
-        if (body.Length > 0)
-            ops.Add(new { insert = body + "\n" });
-
-        ops.Add(new { insert = "\n" });
+        AppendBody(ops, body);
         ops.Add(new { insert = LINK_LABEL, attributes = new { link = url } });
         ops.Add(new { insert = "\n" });
         return JsonSerializer.Serialize(ops, DeltaJson);
+    }
+
+    /// <summary>
+    /// Пишет текст и превращает строку <c>---</c> во вставку разделителя Quill
+    /// </summary>
+    /// <param name="ops">
+    /// Операции заметки
+    /// </param>
+    /// <param name="body">
+    /// Текст до адреса. Строка из трёх дефисов означает горизонтальную линию
+    /// </param>
+    private static void AppendBody(List<object> ops, string body)
+    {
+        if (body.Length == 0)
+            return;
+
+        var text = new StringBuilder();
+        foreach (var line in body.Split('\n'))
+        {
+            if (line == "---")
+            {
+                FlushText(ops, text);
+                ops.Add(new { insert = new { divider = true } });
+                continue;
+            }
+
+            if (text.Length > 0)
+                text.Append('\n');
+
+            text.Append(line);
+        }
+
+        FlushText(ops, text);
+    }
+
+    /// <summary>
+    /// Добавляет накопленный текст отдельной операцией и закрывает его переводом строки
+    /// </summary>
+    /// <param name="ops">
+    /// Операции заметки
+    /// </param>
+    /// <param name="text">
+    /// Буфер текста. После записи очищается
+    /// </param>
+    private static void FlushText(List<object> ops, StringBuilder text)
+    {
+        if (text.Length == 0)
+            return;
+
+        if (text[^1] != '\n')
+            text.Append('\n');
+
+        ops.Add(new { insert = text.ToString() });
+        text.Clear();
+    }
+
+    /// <summary>
+    /// Убирает строки разделителя из ожидаемого текста, чтобы сравнивать его с видимыми вставками
+    /// </summary>
+    /// <param name="body">
+    /// Текст до адреса
+    /// </param>
+    /// <returns>
+    /// Тот же текст без строк <c>---</c>
+    /// </returns>
+    private static string StripDividerLines(string body)
+    {
+        if (!HasDividerLine(body))
+            return body;
+
+        return string.Join('\n', body.Split('\n').Where(line => line != "---")).TrimEnd('\n');
+    }
+
+    /// <summary>
+    /// Сообщает, что в тексте есть строка горизонтального разделителя
+    /// </summary>
+    /// <param name="body">
+    /// Текст до адреса
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/>, если одна из строк равна <c>---</c>
+    /// </returns>
+    private static bool HasDividerLine(string body) =>
+        body.Split('\n').Any(line => line == "---");
+
+    /// <summary>
+    /// Сообщает, что заметка содержит вставку разделителя Quill
+    /// </summary>
+    /// <param name="note">
+    /// Заметка из API
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/>, если среди операций есть объект <c>divider</c>
+    /// </returns>
+    private static bool HasDividerEmbed(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+            return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(note);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+                return false;
+
+            foreach (var operation in document.RootElement.EnumerateArray())
+            {
+                if (operation.ValueKind == JsonValueKind.Object
+                    && operation.TryGetProperty("insert", out var insert)
+                    && insert.ValueKind == JsonValueKind.Object
+                    && insert.TryGetProperty("divider", out _))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        return false;
     }
 
     /// <summary>

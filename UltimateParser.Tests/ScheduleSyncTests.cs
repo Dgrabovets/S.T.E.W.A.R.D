@@ -40,7 +40,7 @@ public class ScheduleSyncTests
 
         var source = new FakeSource(csv);
         var client = new FakeClient();
-        var kept = SampleLesson("up:rki-2-26:2026-10-01:2010", "Старый предмет", "Старый предмет, Петров");
+        var kept = SampleLesson("up:rki-2-26:2026-10-01:2010", "Старый предмет", "Преподаватель: Петров");
         client.Tasks.Add(TaskFrom(kept, "T-same", checkState: 0));
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Убрали", "Убрали, преподаватель"),
@@ -190,7 +190,7 @@ public class ScheduleSyncTests
     [Fact]
     public async Task Run_does_not_update_when_the_stored_note_is_the_same_delta()
     {
-        const string note = "Предмет, Иванов";
+        const string note = "Преподаватель: Иванов";
         const string csv = """
             ,Дата,время,РКИ-2-26
             чт,01.10,17.20-18.40,"Предмет, Иванов"
@@ -198,7 +198,7 @@ public class ScheduleSyncTests
 
         var client = new FakeClient();
         var task = TaskFrom(SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", note), "T-1", checkState: 0);
-        client.Tasks.Add(task with { Note = """{"ops":[{"insert":"Предмет, Иванов\n"}]}""" });
+        client.Tasks.Add(task with { Note = """{"ops":[{"insert":"Преподаватель: Иванов\n"}]}""" });
 
         var report = await Sync(new FakeSource(csv), client);
 
@@ -212,7 +212,7 @@ public class ScheduleSyncTests
     [Fact]
     public async Task Run_does_not_update_when_the_stored_note_is_already_a_link()
     {
-        const string lessonNote = "Предмет, Иванов\nhttps://telemost.360.yandex.ru/j/1";
+        const string lessonNote = "Преподаватель: Иванов\n---\nhttps://telemost.360.yandex.ru/j/1";
         var csv = ",Дата,время,РКИ-2-26\nчт,01.10,17.20-18.40,\"Предмет, Иванов\nhttps://telemost.360.yandex.ru/j/1\"\n";
         var client = new FakeClient();
         client.Tasks.Add(TaskFrom(

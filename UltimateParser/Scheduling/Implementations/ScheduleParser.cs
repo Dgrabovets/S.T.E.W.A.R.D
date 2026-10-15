@@ -88,6 +88,8 @@ public static partial class ScheduleParser
                 continue;
             }
 
+            note = BuildDescription(note);
+
             var localStart = new DateTime(date.Year,
                                           date.Month,
                                           date.Day,
@@ -305,6 +307,75 @@ public static partial class ScheduleParser
     }
 
     /// <summary>
+    /// Собирает описание: имя преподавателя, разделитель и адрес ячейки последней строкой
+    /// </summary>
+    /// <param name="note">
+    /// Нормализованный текст ячейки. Адрес, если он есть, стоит последней строкой
+    /// </param>
+    /// <returns>
+    /// Текст вида <c>Преподаватель: Имя</c>, затем <c>---</c> и адрес. Без адреса остаётся только строка преподавателя
+    /// </returns>
+    private static string BuildDescription(string note)
+    {
+        var lines = note.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        string? url = null;
+        if (lines.Count > 0 && IsHttpAddress(lines[^1]))
+        {
+            url = lines[^1];
+            lines.RemoveAt(lines.Count - 1);
+        }
+
+        var teacher = TeacherName(lines);
+        if (teacher.Length == 0)
+            return url ?? note;
+
+        var description = $"Преподаватель: {teacher}";
+        return url is null ? description : description + "\n---\n" + url;
+    }
+
+    /// <summary>
+    /// Берёт имя преподавателя со следующей строки после предмета или после первой запятой
+    /// </summary>
+    /// <param name="lines">
+    /// Строки ячейки без адреса
+    /// </param>
+    /// <returns>
+    /// Имя без должности и без типа занятия. Пустая строка, если имени нет
+    /// </returns>
+    private static string TeacherName(List<string> lines)
+    {
+        if (lines.Count == 0)
+            return "";
+
+        var comma = lines[0].IndexOf(',');
+        var tail = comma < 0 ? "" : lines[0][(comma + 1)..].Trim().Trim(',');
+        var name = tail.Length > 0
+            ? tail.Split(',')[0].Trim()
+            : lines.Count > 1 ? lines[1].Trim().Trim(',') : "";
+
+        name = ParentheticalLessonType().Replace(name, "").Trim().Trim(',');
+        if (name.Length == 0 || name.Equals("преподаватель", StringComparison.OrdinalIgnoreCase))
+            return "";
+
+        return name;
+    }
+
+    /// <summary>
+    /// Сообщает, что строка является адресом http или https
+    /// </summary>
+    /// <param name="line">
+    /// Одна строка ячейки
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/>, если строка начинается с <c>http://</c> или <c>https://</c> и не содержит пробелов
+    /// </returns>
+    private static bool IsHttpAddress(string line) =>
+        (line.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || line.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        && !line.Contains(' ')
+        && !line.Contains('\t');
+
+    /// <summary>
     /// Находит первое слово типа занятия в <paramref name="text"/>
     /// </summary>
     /// <param name="text">
@@ -465,6 +536,12 @@ public static partial class ScheduleParser
     /// </returns>
     [GeneratedRegex(@"(?i)\b(лекция|практика)\b")]
     private static partial Regex LessonTypePattern();
+
+    /// <summary>
+    /// Тип занятия в скобках в конце имени, например <c>(Практика)</c>
+    /// </summary>
+    [GeneratedRegex(@"(?i)\s*\((лекция|практика)\)")]
+    private static partial Regex ParentheticalLessonType();
 
     /// <summary>
     /// Совпадает с подряд идущими пробелами или табуляциями, которые схлопываются в один пробел

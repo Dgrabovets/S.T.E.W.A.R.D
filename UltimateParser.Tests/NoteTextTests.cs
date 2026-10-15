@@ -36,4 +36,23 @@ public class NoteTextTests
         Assert.False(NoteTextHelper.Same(note, note));
         Assert.False(NoteTextHelper.Same("""{"ops":[{"insert":"Ссылка","attributes":{"link":"https://telemost.360.yandex.ru/j/1"}},{"insert":"\n"}]}""", note));
     }
+
+    /// <summary>
+    /// Строка из трёх дефисов становится разделителем Quill, а не текстом
+    /// </summary>
+    [Fact]
+    public void Format_turns_a_dash_line_into_a_divider_embed()
+    {
+        const string note = "Преподаватель: Иванов\n---\nhttps://telemost.360.yandex.ru/j/1";
+
+        var formatted = NoteTextHelper.Format(note);
+
+        Assert.Contains("\"divider\":true", formatted, StringComparison.Ordinal);
+        Assert.DoesNotContain("---", formatted, StringComparison.Ordinal);
+        Assert.Equal("Преподаватель: Иванов\nСсылка", NoteTextHelper.GetPlainText(formatted));
+        Assert.True(NoteTextHelper.Same(formatted, note));
+        Assert.False(NoteTextHelper.Same(
+            """[{"insert":"Преподаватель: Иванов\n---\n"},{"insert":"Ссылка","attributes":{"link":"https://telemost.360.yandex.ru/j/1"}},{"insert":"\n"}]""",
+            note));
+    }
 }
