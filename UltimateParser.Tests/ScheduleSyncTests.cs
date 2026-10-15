@@ -1,5 +1,6 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using System.Globalization;
+using Microsoft.Extensions.Logging.Abstractions;
+using UltimateParser.Common;
 using UltimateParser.Common.Models;
 using UltimateParser.Scheduling.Interfaces;
 using UltimateParser.Singularity.Implementations;
@@ -199,6 +200,51 @@ public class ScheduleSyncTests
         Assert.Empty(client.Updated);
     }
 
+    /// <summary>
+    /// Уже записанная гиперссылка «Ссылка» не вызывает повторного обновления
+    /// </summary>
+    [Fact]
+    public async Task Run_does_not_update_when_the_stored_note_is_already_a_link()
+    {
+        const string lessonNote = "Предмет, Иванов\nhttps://telemost.360.yandex.ru/j/1";
+        var csv = ",Дата,время,РКИ-2-26\nчт,01.10,17.20-18.40,\"Предмет, Иванов\nhttps://telemost.360.yandex.ru/j/1\"\n";
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", lessonNote),
+            "T-1",
+            checkState: 0) with
+        { Note = NoteText.Format(lessonNote) });
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(0, 0, 0, 0, 0, 0), report);
+        Assert.Empty(client.Updated);
+    }
+
+    /// <summary>
+    /// Задача без напоминания за 15 минут обновляется
+    /// </summary>
+    [Fact]
+    public async Task Run_updates_a_task_that_has_no_reminder()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,"Предмет, Иванов"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Предмет, Иванов"),
+            "T-1",
+            checkState: 0,
+            withReminder: false));
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(0, 1, 0, 0, 0, 0), report);
+        Assert.Equal("Предмет", client.Updated.Single().Title);
+    }
+
     #endregion Facts
 
     #region Helpers
@@ -270,10 +316,13 @@ public class ScheduleSyncTests
     /// <param name="journalDate">
     /// Дата архивации или <see langword="null"/>, если задача активна
     /// </param>
+    /// <param name="withReminder">
+    /// <see langword="false"/>, если у снимка нет напоминания за 15 минут
+    /// </param>
     /// <returns>
     /// Снимок
     /// </returns>
-    private static SingularityTask TaskFrom(Lesson lesson, string id, int checkState, string? journalDate = null) =>
+    private static SingularityTask TaskFrom(Lesson lesson, string id, int checkState, string? journalDate = null, bool withReminder = true) =>
         new(
             id,
             lesson.ExternalId,
@@ -284,7 +333,8 @@ public class ScheduleSyncTests
             lesson.TimeLengthMinutes,
             checkState,
             journalDate,
-            false);
+            false,
+            withReminder ? [15] : null);
 
     #endregion Helpers
 

@@ -54,4 +54,9 @@ internal sealed class TaskResponse
     /// Признак того, что задача в корзине
     /// </summary>
     public bool? Removed { get; set; }
+
+    /// <summary>
+    /// Минуты до начала, за которые стоят напоминания
+    /// </summary>
+    public int[]? Notifies { get; set; }
 }

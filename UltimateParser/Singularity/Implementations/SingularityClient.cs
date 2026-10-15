@@ -22,6 +22,11 @@ public sealed class SingularityClient : ISingularityClient
     private const int PageSize = 1000;
 
     /// <summary>
+    /// Напоминание за 15 минут до начала пары
+    /// </summary>
+    private const int ReminderMinutes = 15;
+
+    /// <summary>
     /// Сериализатор, который пишет JSON в camelCase и пропускает null
     /// </summary>
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
@@ -292,7 +297,7 @@ public sealed class SingularityClient : ISingularityClient
     #region Comparison
 
     /// <summary>
-    /// Сообщает, отличается ли сохранённая задача от занятия названием, заметкой, временем или длительностью
+    /// Сообщает, отличается ли сохранённая задача от занятия названием, заметкой, временем, длительностью или напоминанием
     /// </summary>
     /// <param name="task">
     /// Задача, которая сейчас хранится в Singularity
@@ -305,10 +310,12 @@ public sealed class SingularityClient : ISingularityClient
     /// </returns>
     internal static bool NeedsUpdate(SingularityTask task, Lesson lesson) =>
         !string.Equals(task.Title, lesson.Title, StringComparison.Ordinal)
-        || !string.Equals(NoteText.Plain(task.Note), lesson.Note, StringComparison.Ordinal)
+        || !NoteText.Same(task.Note, lesson.Note)
         || !task.UseTime
         || task.TimeLength != lesson.TimeLengthMinutes
-        || !SameStart(task.Start, lesson.Start);
+        || !SameStart(task.Start, lesson.Start)
+        || task.Notifies is null
+        || !task.Notifies.Contains(ReminderMinutes);
 
     /// <summary>
     /// Форматирует момент начала так, как в примерах API, с числовым смещением
@@ -340,11 +347,12 @@ public sealed class SingularityClient : ISingularityClient
     private static object WriteBody(string projectId, Lesson lesson, bool includeExternalId) => new
     {
         title = lesson.Title,
-        note = lesson.Note,
+        note = NoteText.Format(lesson.Note),
         projectId,
         start = FormatStart(lesson.Start),
         useTime = true,
         timeLength = lesson.TimeLengthMinutes,
+        notifies = new[] { ReminderMinutes },
         externalId = includeExternalId ? lesson.ExternalId : null,
     };
 
@@ -392,7 +400,8 @@ public sealed class SingularityClient : ISingularityClient
         task.TimeLength is null ? null : (int)Math.Round(task.TimeLength.Value),
         task.Checked,
         task.JournalDate,
-        task.Removed == true);
+        task.Removed == true,
+        task.Notifies);
 
     #endregion Comparison
 
