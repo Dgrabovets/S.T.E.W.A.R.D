@@ -98,7 +98,7 @@ public sealed class TrayHost : IDisposable
         var menu = new ContextMenuStrip
         {
             Renderer = new MenuRenderer(),
-            Font = new System.Drawing.Font("Segoe UI", 10F),
+            Font = new Font("Segoe UI", 10F),
             BackColor = TrayPalette.Surface,
             ForeColor = TrayPalette.Text,
             ShowImageMargin = false,
@@ -183,21 +183,21 @@ public sealed class TrayHost : IDisposable
     /// <returns>
     /// Иконка 32 на 32
     /// </returns>
-    private static Icon CreateIcon(System.Drawing.Color color)
+    private static Icon CreateIcon(Color color)
     {
         using var bitmap = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
-        using var graphics = System.Drawing.Graphics.FromImage(bitmap);
+        using var graphics = Graphics.FromImage(bitmap);
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        graphics.Clear(System.Drawing.Color.Transparent);
+        graphics.Clear(Color.Transparent);
 
-        var bounds = new System.Drawing.Rectangle(1, 1, 30, 30);
+        var bounds = new Rectangle(1, 1, 30, 30);
         using (var shape = TrayPalette.Rounded(bounds, 8))
-        using (var brush = new System.Drawing.SolidBrush(color))
+        using (var brush = new SolidBrush(color))
             graphics.FillPath(brush, shape);
 
-        using var white = new System.Drawing.SolidBrush(System.Drawing.Color.White);
+        using var white = new SolidBrush(Color.White);
         graphics.FillRectangle(white, 9, 12, 14, 12);
-        using var band = new System.Drawing.SolidBrush(color);
+        using var band = new SolidBrush(color);
         graphics.FillRectangle(band, 9, 12, 14, 4);
         graphics.FillRectangle(white, 12, 8, 2, 6);
         graphics.FillRectangle(white, 18, 8, 2, 6);
@@ -371,9 +371,9 @@ public sealed class TrayHost : IDisposable
         /// </param>
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
         {
-            var bounds = new System.Drawing.Rectangle(4, 0, e.Item.Width - 8, e.Item.Height);
+            var bounds = new Rectangle(4, 0, e.Item.Width - 8, e.Item.Height);
             var color = e.Item.Selected ? TrayPalette.SurfaceRaised : TrayPalette.Surface;
-            using var brush = new System.Drawing.SolidBrush(color);
+            using var brush = new SolidBrush(color);
             e.Graphics.FillRectangle(brush, bounds);
         }
     }
@@ -386,47 +386,47 @@ public sealed class TrayHost : IDisposable
         /// <summary>
         /// Фон меню
         /// </summary>
-        public override System.Drawing.Color ToolStripDropDownBackground => TrayPalette.Surface;
+        public override Color ToolStripDropDownBackground => TrayPalette.Surface;
 
         /// <summary>
         /// Фон пункта под курсором
         /// </summary>
-        public override System.Drawing.Color MenuItemSelected => TrayPalette.SurfaceRaised;
+        public override Color MenuItemSelected => TrayPalette.SurfaceRaised;
 
         /// <summary>
         /// Рамка пункта под курсором
         /// </summary>
-        public override System.Drawing.Color MenuItemBorder => TrayPalette.SurfaceRaised;
+        public override Color MenuItemBorder => TrayPalette.SurfaceRaised;
 
         /// <summary>
         /// Рамка меню
         /// </summary>
-        public override System.Drawing.Color MenuBorder => TrayPalette.Line;
+        public override Color MenuBorder => TrayPalette.Line;
 
         /// <summary>
         /// Левое поле меню
         /// </summary>
-        public override System.Drawing.Color ImageMarginGradientBegin => TrayPalette.Surface;
+        public override Color ImageMarginGradientBegin => TrayPalette.Surface;
 
         /// <summary>
         /// Середина левого поля меню
         /// </summary>
-        public override System.Drawing.Color ImageMarginGradientMiddle => TrayPalette.Surface;
+        public override Color ImageMarginGradientMiddle => TrayPalette.Surface;
 
         /// <summary>
         /// Конец левого поля меню
         /// </summary>
-        public override System.Drawing.Color ImageMarginGradientEnd => TrayPalette.Surface;
+        public override Color ImageMarginGradientEnd => TrayPalette.Surface;
 
         /// <summary>
         /// Тёмная линия разделителя
         /// </summary>
-        public override System.Drawing.Color SeparatorDark => TrayPalette.Line;
+        public override Color SeparatorDark => TrayPalette.Line;
 
         /// <summary>
         /// Светлая линия разделителя
         /// </summary>
-        public override System.Drawing.Color SeparatorLight => TrayPalette.Line;
+        public override Color SeparatorLight => TrayPalette.Line;
     }
 
     #endregion Menu

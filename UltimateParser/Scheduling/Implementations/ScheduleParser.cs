@@ -39,7 +39,7 @@ public static partial class ScheduleParser
                                                     TimeZoneInfo timeZone,
                                                     DateOnly today)
     {
-        var rows = CsvTable.Parse(csv);
+        var rows = CsvTableParser.Parse(csv);
         if (rows.Count == 0)
             throw new FormatException("The schedule CSV is empty.");
 

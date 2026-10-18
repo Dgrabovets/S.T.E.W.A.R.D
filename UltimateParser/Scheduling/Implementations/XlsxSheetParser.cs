@@ -8,7 +8,7 @@ namespace UltimateParser.Scheduling.Implementations;
 /// <summary>
 /// Читает первый лист книги xlsx и раскрывает объединённые ячейки
 /// </summary>
-public static class XlsxSheet
+public static class XlsxSheetParser
 {
     /// <summary>
     /// Пространство имён разметки листа Office Open XML

@@ -222,7 +222,7 @@ public class ScheduleSyncTests
             RunOnce = true,
         };
         var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
-        var sync = new ScheduleSync(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSync>.Instance);
+        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
 
         var report = await sync.RunAsync(CancellationToken.None);
 
@@ -261,7 +261,7 @@ public class ScheduleSyncTests
         };
         var clock = new FixedClock(new DateOnly(2026, 10, 8), new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.FromHours(3)));
         var client = new FakeClient();
-        var sync = new ScheduleSync(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSync>.Instance);
+        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
 
         var report = await sync.RunAsync(CancellationToken.None);
 
@@ -399,7 +399,7 @@ public class ScheduleSyncTests
             SampleLesson("up:rki-2-26:2026-10-01:2010", "Предмет", "Преподаватель: Иванов"),
             "T-kept",
             checkState: 0));
-        var sync = new ScheduleSync(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSync>.Instance);
+        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
 
         var report = await sync.RunAsync(CancellationToken.None);
 
@@ -437,7 +437,7 @@ public class ScheduleSyncTests
             "T-past",
             checkState: 0,
             journalDate: "2026-10-07"));
-        var sync = new ScheduleSync(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSync>.Instance);
+        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
 
         var report = await sync.RunAsync(CancellationToken.None);
 
@@ -512,7 +512,7 @@ public class ScheduleSyncTests
             IntervalMinutes = 30,
             RunOnce = true,
         };
-        var sync = new ScheduleSync(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSync>.Instance);
+        var sync = new ScheduleSyncer(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSyncer>.Instance);
         return sync.RunAsync(CancellationToken.None);
     }
 

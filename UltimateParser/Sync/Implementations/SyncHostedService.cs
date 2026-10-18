@@ -5,14 +5,14 @@ using UltimateParser.Common.Models;
 namespace UltimateParser.Sync.Implementations;
 
 /// <summary>
-/// Запускает <see cref="ScheduleSync"/> один раз или в цикле, пока процесс не остановят
+/// Запускает <see cref="ScheduleSyncer"/> один раз или в цикле, пока процесс не остановят
 /// </summary>
 public sealed class SyncHostedService : BackgroundService
 {
     /// <summary>
     /// Операция, которая читает таблицу и пишет задачи в Singularity
     /// </summary>
-    private readonly ScheduleSync _sync;
+    private readonly ScheduleSyncer _sync;
 
     /// <summary>
     /// Выбирает одиночный прогон и паузу между повторами
@@ -45,7 +45,7 @@ public sealed class SyncHostedService : BackgroundService
     /// Принимает ошибки, которые иначе оборвали бы цикл
     /// </param>
     public SyncHostedService(
-        ScheduleSync sync,
+        ScheduleSyncer sync,
         SyncOptions options,
         IHostApplicationLifetime lifetime,
         ILogger<SyncHostedService> logger)

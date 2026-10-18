@@ -16,7 +16,7 @@ public class XlsxSheetTests
     [Fact]
     public void ToCsv_copies_a_merged_lesson_into_the_group_column()
     {
-        var csv = XlsxSheet.ToCsv(Workbook());
+        var csv = XlsxSheetParser.ToCsv(Workbook());
         var slots = ScheduleParser.Parse(csv, "РКИ-2-26", TimeHelper.ResolveTimeZone("Europe/Moscow"), new DateOnly(2026, 10, 8));
         var lesson = Assert.Single(slots, slot => slot.Lesson is not null).Lesson;
 
@@ -31,7 +31,7 @@ public class XlsxSheetTests
     [Fact]
     public void ToCsv_appends_a_merged_cell_hyperlink_to_the_group_note()
     {
-        var csv = XlsxSheet.ToCsv(WorkbookWithLink());
+        var csv = XlsxSheetParser.ToCsv(WorkbookWithLink());
         var slots = ScheduleParser.Parse(csv, "РКИ-2-26", TimeHelper.ResolveTimeZone("Europe/Moscow"), new DateOnly(2026, 10, 8));
         var lesson = Assert.Single(slots, slot => slot.Lesson is not null).Lesson;
 

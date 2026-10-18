@@ -42,7 +42,7 @@ public static class Program
             client.Timeout = TimeSpan.FromSeconds(60);
         });
         builder.Services.AddSingleton<IScheduleClock, TimeZoneClock>();
-        builder.Services.AddSingleton<ScheduleSync>();
+        builder.Services.AddSingleton<ScheduleSyncer>();
         builder.Services.AddHostedService<SyncHostedService>();
 
         await builder.Build().RunAsync();

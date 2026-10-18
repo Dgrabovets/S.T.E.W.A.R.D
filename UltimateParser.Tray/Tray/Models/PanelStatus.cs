@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Globalization;
 using UltimateParser.Tray.Monitoring.Models;
 
@@ -30,13 +29,12 @@ public sealed class PanelStatus
     /// <param name="cards">
     /// Карточки журнала
     /// </param>
-    private PanelStatus(
-        string subtitle,
-        string summary,
-        string label,
-        PanelTone tone,
-        string emptyText,
-        IReadOnlyList<JournalCard> cards)
+    private PanelStatus(string subtitle, 
+                        string summary, 
+                        string label, 
+                        PanelTone tone, 
+                        string emptyText, 
+                        IReadOnlyList<JournalCard> cards)
     {
         Subtitle = subtitle;
         Summary = summary;

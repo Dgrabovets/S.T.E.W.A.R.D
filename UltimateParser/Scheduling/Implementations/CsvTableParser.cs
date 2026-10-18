@@ -5,7 +5,7 @@ namespace UltimateParser.Scheduling.Implementations;
 /// <summary>
 /// Разбирает CSV по RFC 4180, включая кавычки, запятые и переносы строк внутри ячейки
 /// </summary>
-public static class CsvTable
+public static class CsvTableParser
 {
     /// <summary>
     /// Делит текст CSV на строки полей

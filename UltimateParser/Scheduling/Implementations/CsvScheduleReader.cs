@@ -57,6 +57,6 @@ public sealed class CsvScheduleReader : IScheduleSource
                 $"Google Sheets returned {(int)response.StatusCode}. Share the spreadsheet so anyone with the link can view it.");
         }
 
-        return XlsxSheet.ToCsv(body);
+        return XlsxSheetParser.ToCsv(body);
     }
 }

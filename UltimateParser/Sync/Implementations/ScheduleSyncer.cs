@@ -14,7 +14,7 @@ namespace UltimateParser.Sync.Implementations;
 /// <summary>
 /// Копирует одну колонку группы из таблицы в проект Singularity
 /// </summary>
-public sealed class ScheduleSync
+public sealed class ScheduleSyncer
 {
     /// <summary>
     /// Читает таблицу
@@ -39,7 +39,7 @@ public sealed class ScheduleSync
     /// <summary>
     /// Принимает строку на каждое изменение и итоговую сводку
     /// </summary>
-    private readonly ILogger<ScheduleSync> _logger;
+    private readonly ILogger<ScheduleSyncer> _logger;
 
     /// <summary>
     /// Создаёт прогон синхронизации
@@ -59,12 +59,12 @@ public sealed class ScheduleSync
     /// <param name="logger">
     /// Принимает строку на каждое изменение и итоговую сводку
     /// </param>
-    public ScheduleSync(
+    public ScheduleSyncer(
         IScheduleSource source,
         ISingularityClient client,
         IScheduleClock clock,
         SyncOptions options,
-        ILogger<ScheduleSync> logger)
+        ILogger<ScheduleSyncer> logger)
     {
         _source = source;
         _client = client;
