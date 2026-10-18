@@ -25,7 +25,7 @@ public class ScheduleSyncTests
     #region Facts
 
     /// <summary>
-    /// Новые ячейки создаются, пустые архивируются, выполненные остаются, чужие задачи игнорируются
+    /// Новые ячейки создаются, удалённые отмечаются выполненными, а следующая пара получает пометку
     /// </summary>
     [Fact]
     public async Task Run_creates_updates_archives_and_skips_completed_tasks()
@@ -35,7 +35,7 @@ public class ScheduleSyncTests
             чт,01.10,17.20-18.40,
             ,,18.50-20.10,"Новый предмет, Иванов"
             ,,20.10-21.30,"Старый предмет, Петров"
-            пт,02.10,17.20-18.40,"Выполненный предмет, Сидоров"
+            ср,30.09,17.20-18.40,"Выполненный предмет, Сидоров"
             """;
 
         var source = new FakeSource(csv);
@@ -47,7 +47,7 @@ public class ScheduleSyncTests
             "T-empty",
             checkState: 0));
         client.Tasks.Add(TaskFrom(
-            SampleLesson("up:rki-2-26:2026-10-02:1720", "Выполненный предмет", "Выполненный предмет, Сидоров"),
+            SampleLesson("up:rki-2-26:2026-09-30:1720", "Выполненный предмет", "Выполненный предмет, Сидоров"),
             "T-done",
             checkState: 1));
         client.Tasks.Add(new SingularityTask(
@@ -75,12 +75,96 @@ public class ScheduleSyncTests
 
         var report = await Sync(source, client);
 
-        Assert.Equal(new SyncReport(1, 0, 1, 0, 0, 1), report);
+        Assert.Equal(new SyncReport(1, 0, 0, 0, 1, 1), report);
         Assert.Equal("Новый предмет", client.Created.Single().Title);
-        Assert.Equal("T-empty", client.Archived.Single());
+        Assert.Contains("Отмена или перенос: Убрали, 01.10 17:20", client.Created.Single().Note, StringComparison.Ordinal);
+        Assert.Equal("T-empty", client.Completed.Single());
+        Assert.Empty(client.Archived);
         Assert.Empty(client.Updated);
         Assert.Empty(client.Unarchived);
         Assert.Equal("РКИ-2-26", client.ProjectTitle);
+    }
+
+    /// <summary>
+    /// Удалённая пара того же предмета сегодня закрывается, а оставшаяся задача того дня помечается как перенос
+    /// </summary>
+    [Fact]
+    public async Task Run_completes_a_removed_lesson_and_marks_the_same_subject_today_as_moved()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,
+            ,,20.10-21.30,"Предмет, Иванов"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Преподаватель: Иванов"),
+            "T-removed",
+            checkState: 0));
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:2010", "Предмет", "Преподаватель: Иванов"),
+            "T-kept",
+            checkState: 0));
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(0, 1, 0, 0, 1, 0), report);
+        Assert.Equal("T-removed", client.Completed.Single());
+        Assert.Empty(client.Archived);
+        Assert.StartsWith("Перенос с 01.10 17:20", client.Updated.Single().Note, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Выполненная задача занятия, которое ещё не закончилось, удаляется и создаётся снова
+    /// </summary>
+    [Fact]
+    public async Task Run_deletes_a_completed_task_whose_lesson_has_not_ended()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            пн,19.10,17.20-18.40,"Перенесённый предмет, Иванов"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-19:1720", "Перенесённый предмет", "Преподаватель: Иванов"),
+            "T-moved",
+            checkState: 1));
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(1, 0, 0, 0, 0, 0, 1), report);
+        Assert.Equal("T-moved", client.Deleted.Single());
+        Assert.Equal("Перенесённый предмет", client.Created.Single().Title);
+        Assert.Empty(client.Completed);
+    }
+
+    /// <summary>
+    /// Уже спрятанная задача опустевшей ячейки возвращается из архива и отмечается выполненной
+    /// </summary>
+    [Fact]
+    public async Task Run_completes_a_removed_lesson_that_was_already_archived()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,
+            ,,18.50-20.10,"Другой предмет, Петров"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Убрали", "Преподаватель: Иванов"),
+            "T-archived-empty",
+            checkState: 0,
+            journalDate: "2026-10-07"));
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(1, 0, 0, 1, 1, 0), report);
+        Assert.Equal("T-archived-empty", client.Unarchived.Single());
+        Assert.Equal("T-archived-empty", client.Completed.Single());
+        Assert.Contains("Отмена или перенос: Убрали, 01.10 17:20", client.Created.Single().Note, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -109,7 +193,7 @@ public class ScheduleSyncTests
     }
 
     /// <summary>
-    /// Занятие, которое уже закончилось, отмечается выполненным, а ещё не начавшееся создаётся
+    /// Занятие, которое уже закончилось, сначала получает текст из таблицы, затем отмечается выполненным. Ещё не начавшееся создаётся
     /// </summary>
     [Fact]
     public async Task Run_archives_a_lesson_that_has_already_ended()
@@ -138,12 +222,14 @@ public class ScheduleSyncTests
             RunOnce = true,
         };
         var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
-        var sync = new ScheduleSync(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSync>.Instance);
+        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
 
         var report = await sync.RunAsync(CancellationToken.None);
 
-        Assert.Equal(new SyncReport(1, 0, 0, 0, 1, 0), report);
+        Assert.Equal(new SyncReport(1, 1, 0, 0, 1, 0), report);
         Assert.Equal("T-past", client.Completed.Single());
+        Assert.Equal("Прошедший предмет", client.Updated.Single().Title);
+        Assert.StartsWith("Преподаватель: Иванов", client.Updated.Single().Note, StringComparison.Ordinal);
         Assert.Empty(client.Archived);
         Assert.Equal("Будущий предмет", client.Created.Single().Title);
         Assert.Equal("Расписание", client.ProjectTitle);
@@ -175,7 +261,7 @@ public class ScheduleSyncTests
         };
         var clock = new FixedClock(new DateOnly(2026, 10, 8), new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.FromHours(3)));
         var client = new FakeClient();
-        var sync = new ScheduleSync(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSync>.Instance);
+        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
 
         var report = await sync.RunAsync(CancellationToken.None);
 
@@ -251,6 +337,152 @@ public class ScheduleSyncTests
         Assert.Equal("Предмет", client.Updated.Single().Title);
     }
 
+    /// <summary>
+    /// Уже выполненная задача опустевшей будущей ячейки остаётся, а пометка на следующей паре пишется снова
+    /// </summary>
+    [Fact]
+    public async Task Run_keeps_a_completed_removed_lesson_so_the_notice_survives()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,
+            ,,18.50-20.10,"Другой предмет, Петров"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Убрали", "Преподаватель: Иванов"),
+            "T-empty",
+            checkState: 1));
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1850", "Другой предмет", "Преподаватель: Петров"),
+            "T-next",
+            checkState: 0));
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(0, 1, 0, 0, 0, 1), report);
+        Assert.Empty(client.Deleted);
+        Assert.Contains("Отмена или перенос: Убрали, 01.10 17:20", client.Updated.Single().Note, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Пометка о переносе попадает в прошедшую пару до того, как та отмечается выполненной
+    /// </summary>
+    [Fact]
+    public async Task Run_writes_the_notice_before_completing_a_lesson_that_has_ended()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,
+            ,,20.10-21.30,"Предмет, Иванов"
+            """;
+
+        var options = new SyncOptions
+        {
+            SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
+            GroupColumn = "РКИ-2-26",
+            ProjectTitle = "Расписание",
+            TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
+            RunOnce = true,
+        };
+        var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Преподаватель: Иванов"),
+            "T-removed",
+            checkState: 0));
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:2010", "Предмет", "Преподаватель: Иванов"),
+            "T-kept",
+            checkState: 0));
+        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
+
+        var report = await sync.RunAsync(CancellationToken.None);
+
+        Assert.Equal(new SyncReport(0, 1, 0, 0, 2, 0), report);
+        Assert.StartsWith("Перенос с 01.10 17:20", client.Updated.Single().Note, StringComparison.Ordinal);
+        Assert.Equal(["T-removed", "T-kept"], client.Completed);
+    }
+
+    /// <summary>
+    /// Прошедшая архивная задача сначала возвращается и обновляется, потом отмечается выполненной
+    /// </summary>
+    [Fact]
+    public async Task Run_unarchives_and_updates_a_past_lesson_before_completing_it()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,"Новое название, Иванов"
+            """;
+
+        var options = new SyncOptions
+        {
+            SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
+            GroupColumn = "РКИ-2-26",
+            ProjectTitle = "Расписание",
+            TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
+            RunOnce = true,
+        };
+        var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Старое название", "Старое название, Иванов"),
+            "T-past",
+            checkState: 0,
+            journalDate: "2026-10-07"));
+        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
+
+        var report = await sync.RunAsync(CancellationToken.None);
+
+        Assert.Equal(new SyncReport(0, 1, 0, 1, 1, 0), report);
+        Assert.Equal("T-past", client.Unarchived.Single());
+        Assert.Equal("Новое название", client.Updated.Single().Title);
+        Assert.Equal("T-past", client.Completed.Single());
+    }
+
+    /// <summary>
+    /// Отмена пишется в пару, которую этот же прогон удалит и создаст заново
+    /// </summary>
+    [Fact]
+    public async Task Run_puts_the_notice_on_a_completed_lesson_that_will_be_recreated()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,
+            ,,18.50-20.10,"Предмет, Иванов"
+            ,,20.10-21.30,"Другой предмет, Петров"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Убрали", "Преподаватель: Иванов"),
+            "T-empty",
+            checkState: 0));
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1850", "Предмет", "Преподаватель: Иванов"),
+            "T-mid",
+            checkState: 1));
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:2010", "Другой предмет", "Преподаватель: Петров"),
+            "T-late",
+            checkState: 0));
+
+        var report = await Sync(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(1, 0, 0, 0, 1, 0, 1), report);
+        Assert.Equal("T-mid", client.Deleted.Single());
+        Assert.Equal("T-empty", client.Completed.Single());
+        Assert.Contains("Отмена или перенос: Убрали, 01.10 17:20", client.Created.Single().Note, StringComparison.Ordinal);
+        Assert.Empty(client.Updated);
+    }
+
     #endregion Facts
 
     #region Helpers
@@ -280,7 +512,7 @@ public class ScheduleSyncTests
             IntervalMinutes = 30,
             RunOnce = true,
         };
-        var sync = new ScheduleSync(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSync>.Instance);
+        var sync = new ScheduleSyncer(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSyncer>.Instance);
         return sync.RunAsync(CancellationToken.None);
     }
 
@@ -422,6 +654,11 @@ public class ScheduleSyncTests
         public List<string> Completed { get; } = [];
 
         /// <summary>
+        /// Идентификаторы удалённых задач
+        /// </summary>
+        public List<string> Deleted { get; } = [];
+
+        /// <summary>
         /// Идентификаторы задач, переданные в возврат из архива
         /// </summary>
         public List<string> Unarchived { get; } = [];
@@ -531,6 +768,24 @@ public class ScheduleSyncTests
         }
 
         /// <summary>
+        /// Записывает удаление
+        /// </summary>
+        /// <param name="taskId">
+        /// Идентификатор удаляемой задачи
+        /// </param>
+        /// <param name="cancellationToken">
+        /// Не используется
+        /// </param>
+        /// <returns>
+        /// Завершённая задача
+        /// </returns>
+        public Task DeleteTaskAsync(string taskId, CancellationToken cancellationToken)
+        {
+            Deleted.Add(taskId);
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
         /// Записывает архивацию
         /// </summary>
         /// <param name="taskId">
@@ -545,7 +800,7 @@ public class ScheduleSyncTests
         /// <returns>
         /// Завершённая задача
         /// </returns>
-        public Task ArchiveTaskAsync(string taskId, DateOnly journalDate, CancellationToken cancellationToken)
+        public Task ArchiveTaskAsync(string taskId, DateTimeOffset journalDate, CancellationToken cancellationToken)
         {
             Archived.Add(taskId);
             return Task.CompletedTask;

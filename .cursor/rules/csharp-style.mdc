@@ -1,0 +1,41 @@
+---
+description: Общие правила стиля кода UltimateParser. Файл пополняется по мере договорённостей
+alwaysApply: true
+---
+
+# Стиль кода
+
+Список пополняется. Новое правило добавляется сюда, когда оно согласовано.
+
+## Список параметров
+
+Параметры метода и конструктора пишутся в одну строку либо столбцом, в котором имена стоят друг под другом.
+
+Нельзя переносить каждый параметр на новую строку с обычным отступом:
+
+```csharp
+private PanelStatus(
+    string subtitle,
+    string summary,
+    string label,
+    PanelTone tone,
+    string emptyText,
+    IReadOnlyList<JournalCard> cards)
+```
+
+Можно в одну строку:
+
+```csharp
+private PanelStatus(string subtitle, string summary, string label, PanelTone tone, string emptyText, IReadOnlyList<JournalCard> cards)
+```
+
+Можно столбцом, имена друг под другом:
+
+```csharp
+private PanelStatus(string subtitle,
+                    string summary,
+                    string label,
+                    PanelTone tone,
+                    string emptyText,
+                    IReadOnlyList<JournalCard> cards)
+```

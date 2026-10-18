@@ -4,6 +4,9 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Project Path="UltimateParser.Shared/UltimateParser.Shared.csproj" />
+  <Project Path="UltimateParser.Core/UltimateParser.Core.csproj" />
   <Project Path="UltimateParser/UltimateParser.csproj" />
   <Project Path="UltimateParser.Tests/UltimateParser.Tests.csproj" />
+  <Project Path="UltimateParser.Tray/UltimateParser.Tray.csproj" />
 </Solution>
