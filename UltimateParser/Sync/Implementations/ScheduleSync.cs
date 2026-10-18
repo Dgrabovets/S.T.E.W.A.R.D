@@ -27,7 +27,7 @@ public sealed class ScheduleSync
     private readonly ISingularityClient _client;
 
     /// <summary>
-    /// Дата для выбора года и отметки архивации
+    /// Дата для выбора года и текущего момента
     /// </summary>
     private readonly IScheduleClock _clock;
 
@@ -51,7 +51,7 @@ public sealed class ScheduleSync
     /// Пишет задачи в Singularity
     /// </param>
     /// <param name="clock">
-    /// Дата для выбора года и отметки архивации
+    /// Дата для выбора года и текущего момента
     /// </param>
     /// <param name="options">
     /// Колонка, проект и часовой пояс
@@ -74,13 +74,13 @@ public sealed class ScheduleSync
     }
 
     /// <summary>
-    /// Читает таблицу и создаёт, обновляет, архивирует, возвращает из архива или отмечает выполненными подходящие задачи
+    /// Читает таблицу и создаёт, обновляет, возвращает из архива, отмечает выполненными или удаляет подходящие задачи
     /// </summary>
     /// <param name="cancellationToken">
     /// Отменяет прогон
     /// </param>
     /// <returns>
-    /// Счётчики каждого действия. Выполненные задачи считаются пропущенными и не меняются
+    /// Счётчики каждого действия. Уже выполненная задача прошедшего занятия не меняется
     /// </returns>
     public async Task<SyncReport> RunAsync(CancellationToken cancellationToken)
     {
@@ -135,7 +135,7 @@ public sealed class ScheduleSync
         var completed = 0;
         var skipped = 0;
         var deleted = 0;
-        var notices = RemovalNotices(slots, byExternalId);
+        var notices = RemovalNotices(slots, byExternalId, _clock.Now);
 
         foreach (var slot in slots)
         {
@@ -163,6 +163,21 @@ public sealed class ScheduleSync
                     continue;
                 }
 
+                if (existing.IsArchived)
+                {
+                    await _client.UnarchiveTaskAsync(existing.Id, cancellationToken);
+                    unarchived++;
+                    _logger.LogInformation("Unarchived past lesson {ExternalId}", slot.ExternalId);
+                }
+
+                var pastLesson = WithNotices(slot.Lesson, notices);
+                if (!targetTaskIds.Contains(existing.Id) || SingularityClient.NeedsUpdate(existing, pastLesson))
+                {
+                    await _client.UpdateTaskAsync(existing.Id, projectId, pastLesson, cancellationToken);
+                    updated++;
+                    _logger.LogInformation("Updated past lesson {ExternalId} {Title}", slot.ExternalId, slot.Lesson.Title);
+                }
+
                 await _client.CompleteTaskAsync(existing.Id, cancellationToken);
                 completed++;
                 _logger.LogInformation("Completed past lesson {ExternalId}", slot.ExternalId);
@@ -176,18 +191,8 @@ public sealed class ScheduleSync
 
                 if (existing.IsCompleted)
                 {
-                    if (TaskHasNotEnded(existing, _clock.Now))
-                    {
-                        await _client.DeleteTaskAsync(existing.Id, cancellationToken);
-                        deleted++;
-                        _logger.LogInformation("Deleted completed future task {ExternalId}", slot.ExternalId);
-                    }
-                    else
-                    {
-                        skipped++;
-                        _logger.LogInformation("Skipped completed task {ExternalId}", slot.ExternalId);
-                    }
-
+                    skipped++;
+                    _logger.LogInformation("Skipped completed removed lesson {ExternalId}", slot.ExternalId);
                     continue;
                 }
 
@@ -262,12 +267,16 @@ public sealed class ScheduleSync
     /// <param name="byExternalId">
     /// Уже сохранённые задачи группы
     /// </param>
+    /// <param name="now">
+    /// Текущий момент. По нему видно, какое выполненное занятие этот прогон создаст заново
+    /// </param>
     /// <returns>
     /// Строки заметки по внешнему идентификатору занятия, которое их получит
     /// </returns>
     private static Dictionary<string, List<string>> RemovalNotices(
         IReadOnlyList<Scheduling.Models.ScheduleSlot> slots,
-        Dictionary<string, Singularity.Models.SingularityTask> byExternalId)
+        Dictionary<string, Singularity.Models.SingularityTask> byExternalId,
+        DateTimeOffset now)
     {
         var live = slots
             .Where(slot => slot.Lesson is not null)
@@ -286,7 +295,7 @@ public sealed class ScheduleSync
                 continue;
             }
 
-            var target = NoticeTarget(live, byExternalId, existing.Title, removedStart);
+            var target = NoticeTarget(live, byExternalId, existing.Title, removedStart, now);
             if (target is null)
                 continue;
 
@@ -313,13 +322,16 @@ public sealed class ScheduleSync
     /// Занятия, которые ещё есть в таблице
     /// </param>
     /// <param name="byExternalId">
-    /// Сохранённые задачи. Уже выполненная задача не получает новую пометку
+    /// Сохранённые задачи. Выполненная задача прошедшего занятия не получает новую пометку
     /// </param>
     /// <param name="title">
     /// Название удалённого занятия
     /// </param>
     /// <param name="removedStart">
     /// Начало удалённого занятия
+    /// </param>
+    /// <param name="now">
+    /// Текущий момент
     /// </param>
     /// <returns>
     /// Занятие для пометки или <see langword="null"/>, если писать некуда
@@ -328,11 +340,12 @@ public sealed class ScheduleSync
         IReadOnlyList<Lesson> live,
         Dictionary<string, Singularity.Models.SingularityTask> byExternalId,
         string title,
-        DateTimeOffset removedStart)
+        DateTimeOffset removedStart,
+        DateTimeOffset now)
     {
         var day = DateOnly.FromDateTime(removedStart.Date);
         var sameDay = live
-            .Where(lesson => Open(lesson, byExternalId)
+            .Where(lesson => Open(lesson, byExternalId, now)
                 && string.Equals(lesson.Title, title, StringComparison.Ordinal)
                 && DateOnly.FromDateTime(lesson.Start.Date) == day
                 && lesson.Start != removedStart)
@@ -341,7 +354,7 @@ public sealed class ScheduleSync
         if (sameDay is not null)
             return sameDay;
 
-        return live.FirstOrDefault(lesson => Open(lesson, byExternalId) && lesson.Start > removedStart);
+        return live.FirstOrDefault(lesson => Open(lesson, byExternalId, now) && lesson.Start > removedStart);
     }
 
     /// <summary>
@@ -353,11 +366,19 @@ public sealed class ScheduleSync
     /// <param name="byExternalId">
     /// Сохранённые задачи
     /// </param>
+    /// <param name="now">
+    /// Текущий момент. Выполненная задача занятия, которое ещё не закончилось, будет создана заново в этом прогоне
+    /// </param>
     /// <returns>
-    /// <see langword="true"/>, если задачи нет или она не отмечена выполненной
+    /// <see langword="true"/>, если задачи нет, она не выполнена или этот прогон создаст её заново
     /// </returns>
-    private static bool Open(Lesson lesson, Dictionary<string, Singularity.Models.SingularityTask> byExternalId) =>
-        !byExternalId.TryGetValue(lesson.ExternalId, out var task) || !task.IsCompleted;
+    private static bool Open(
+        Lesson lesson,
+        Dictionary<string, Singularity.Models.SingularityTask> byExternalId,
+        DateTimeOffset now) =>
+        !byExternalId.TryGetValue(lesson.ExternalId, out var task)
+        || !task.IsCompleted
+        || lesson.Start.AddMinutes(lesson.TimeLengthMinutes) > now;
 
     /// <summary>
     /// Добавляет в начало заметки строки об отмене и переносе, не трогая адрес в конце
@@ -384,27 +405,6 @@ public sealed class ScheduleSync
     #endregion Removal notices
 
     #region Week
-
-    /// <summary>
-    /// Сообщает, что сохранённое занятие ещё не закончилось
-    /// </summary>
-    /// <param name="task">
-    /// Задача с началом и длительностью
-    /// </param>
-    /// <param name="now">
-    /// Текущий момент в часовом поясе расписания
-    /// </param>
-    /// <returns>
-    /// <see langword="true"/>, если начало читается и момент окончания ещё впереди
-    /// </returns>
-    private static bool TaskHasNotEnded(Singularity.Models.SingularityTask task, DateTimeOffset now)
-    {
-        if (!DateTimeOffset.TryParse(task.Start, CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
-            return false;
-
-        var duration = task.TimeLength ?? 0;
-        return start.AddMinutes(duration) > now;
-    }
 
     /// <summary>
     /// Сообщает, попадает ли день занятия в текущую календарную неделю

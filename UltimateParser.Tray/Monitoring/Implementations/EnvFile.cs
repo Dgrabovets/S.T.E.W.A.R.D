@@ -88,6 +88,9 @@ public sealed class EnvFile
     /// </param>
     public void Set(string key, string value)
     {
+        if (value.Contains('\r') || value.Contains('\n'))
+            throw new InvalidOperationException("Значение настройки не должно содержать перевод строки");
+
         var rendered = key + "=" + Quote(value);
         for (var index = 0; index < _lines.Count; index++)
         {
@@ -150,7 +153,7 @@ public sealed class EnvFile
     }
 
     /// <summary>
-    /// Берёт значение в кавычки, если в нём есть пробел или решётка
+    /// Берёт значение в кавычки, если в нём есть пробел, решётка или знак равенства. Перевод строки сюда не доходит
     /// </summary>
     /// <param name="value">
     /// Исходный текст

@@ -283,11 +283,7 @@ public sealed class StatusViewModel : Bindable
             if (!Set(ref _minutesText, value))
                 return;
 
-            if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes))
-                return;
-
-            minutes = Math.Clamp(minutes, SyncSettings.MIN_INTERVAL, SyncSettings.MAX_INTERVAL);
-            if (_interval == minutes)
+            if (!SyncSettings.TryInterval(value, out var minutes) || _interval == minutes)
                 return;
 
             _interval = minutes;
@@ -414,7 +410,9 @@ public sealed class StatusViewModel : Bindable
     private void LoadSettings()
     {
         var settings = SyncSettings.Load(_envPath);
-        IntervalMinutes = settings.IntervalMinutes;
+        MinutesText = settings.IntervalText;
+        if (SyncSettings.TryInterval(settings.IntervalText, out var minutes))
+            IntervalMinutes = minutes;
         ProjectTitle = settings.ProjectTitle;
         GroupColumn = settings.GroupColumn;
         TimeZone = settings.TimeZone;

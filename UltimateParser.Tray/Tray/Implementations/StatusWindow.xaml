@@ -210,7 +210,7 @@
 
                             <TextBlock Text="Название проекта" Style="{StaticResource FieldTitle}"/>
                             <TextBlock Style="{StaticResource Hint}"
-                                       Text="Имя проекта в Singularity, куда записываются занятия. Сервис ищет проект с этим названием и не создаёт новый, если такого нет."/>
+                                       Text="Имя проекта в Singularity, куда записываются занятия. Сервис ищет проект с этим названием и создаёт его, если такого нет."/>
                             <TextBox Style="{StaticResource Field}" Text="{Binding ProjectTitle, UpdateSourceTrigger=PropertyChanged}"/>
 
                             <TextBlock Text="Колонка группы" Style="{StaticResource FieldTitle}"/>

@@ -19,7 +19,7 @@ public sealed class SyncSettings
     public const int MAX_INTERVAL = 180;
 
     /// <summary>
-    /// Интервал, если в файле его нет
+    /// Начальное положение ползунка до чтения файла
     /// </summary>
     public const int DEFAULT_INTERVAL = 5;
 
@@ -59,9 +59,14 @@ public sealed class SyncSettings
     private const string SINGULARITY_TOKEN = "SINGULARITY_TOKEN";
 
     /// <summary>
-    /// Пауза между сверками, в минутах
+    /// Пауза между сверками, в минутах. Ноль, если в файле нет целого числа
     /// </summary>
-    public int IntervalMinutes { get; init; } = DEFAULT_INTERVAL;
+    public int IntervalMinutes { get; init; }
+
+    /// <summary>
+    /// Текст интервала ровно как в файле
+    /// </summary>
+    public string IntervalText { get; init; } = string.Empty;
 
     /// <summary>
     /// Имя проекта в Singularity
@@ -102,17 +107,19 @@ public sealed class SyncSettings
     /// Полный путь к <c>.env</c>
     /// </param>
     /// <returns>
-    /// Значения как в файле. Интервал приводится к допустимым границам
+    /// Значения как в файле. Недостающий или нецелый интервал не подменяется
     /// </returns>
     public static SyncSettings Load(string path)
     {
         var file = EnvFile.Load(path);
-        var minutes = int.TryParse(file.Get(SYNC_INTERVAL_MINUTES), NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
+        var intervalText = file.Get(SYNC_INTERVAL_MINUTES).Trim();
+        var minutes = int.TryParse(intervalText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
             ? parsed
-            : DEFAULT_INTERVAL;
+            : 0;
         return new SyncSettings
         {
-            IntervalMinutes = Math.Clamp(minutes, MIN_INTERVAL, MAX_INTERVAL),
+            IntervalText = intervalText,
+            IntervalMinutes = minutes,
             ProjectTitle = file.Get(PROJECT_TITLE),
             GroupColumn = file.Get(GROUP_COLUMN),
             TimeZone = file.Get(TIME_ZONE),
@@ -176,6 +183,10 @@ public sealed class SyncSettings
     /// </returns>
     public string? Rejection()
     {
+        if (HasLineBreak(ProjectTitle) || HasLineBreak(GroupColumn) || HasLineBreak(TimeZone)
+            || HasLineBreak(SpreadsheetId) || HasLineBreak(SheetGid) || HasLineBreak(Token))
+            return "В значениях не должно быть переноса строки";
+
         if (ProjectTitle.Trim().Length == 0 || GroupColumn.Trim().Length == 0 || TimeZone.Trim().Length == 0
             || SpreadsheetId.Trim().Length == 0 || SheetGid.Trim().Length == 0)
             return "Заполните проект, колонку, пояс, таблицу и лист";
@@ -188,6 +199,18 @@ public sealed class SyncSettings
 
         return null;
     }
+
+    /// <summary>
+    /// Сообщает, что в тексте есть перевод строки
+    /// </summary>
+    /// <param name="value">
+    /// Поле, которое попадёт в файл настроек
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/>, если значение разбило бы файл на несколько строк
+    /// </returns>
+    private static bool HasLineBreak(string value) =>
+        value.Contains('\r') || value.Contains('\n');
 
     #endregion Checks
 }
