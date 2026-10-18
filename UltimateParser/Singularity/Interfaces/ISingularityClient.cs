@@ -100,7 +100,7 @@ public interface ISingularityClient
     /// Идентификатор задачи
     /// </param>
     /// <param name="journalDate">
-    /// Дата архивации, которая записывается в <c>journalDate</c>
+    /// Момент архивации со смещением часового пояса
     /// </param>
     /// <param name="cancellationToken">
     /// Токен отмены запроса
@@ -108,7 +108,7 @@ public interface ISingularityClient
     /// <returns>
     /// Задача, которая завершается после архивации
     /// </returns>
-    Task ArchiveTaskAsync(string taskId, DateOnly journalDate, CancellationToken cancellationToken);
+    Task ArchiveTaskAsync(string taskId, DateTimeOffset journalDate, CancellationToken cancellationToken);
 
     /// <summary>
     /// Отмечает задачу выполненной
@@ -137,4 +137,18 @@ public interface ISingularityClient
     /// Задача, которая завершается, когда задача снова активна
     /// </returns>
     Task UnarchiveTaskAsync(string taskId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Удаляет задачу
+    /// </summary>
+    /// <param name="taskId">
+    /// Идентификатор задачи
+    /// </param>
+    /// <param name="cancellationToken">
+    /// Токен отмены запроса
+    /// </param>
+    /// <returns>
+    /// Задача, которая завершается, когда API удаляет задачу
+    /// </returns>
+    Task DeleteTaskAsync(string taskId, CancellationToken cancellationToken);
 }

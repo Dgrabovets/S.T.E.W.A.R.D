@@ -11,5 +11,18 @@ while ((Get-Date) -lt $deadline) {
 }
 
 Set-Location $root
-docker compose up -d
-exit $LASTEXITCODE
+docker compose up -d --force-recreate --no-build
+if ($LASTEXITCODE -ne 0) {
+    docker compose up -d
+}
+
+$publish = Join-Path $root "publish\tray"
+dotnet publish (Join-Path $root "UltimateParser.Tray\UltimateParser.Tray.csproj") -c Release -o $publish
+if ($LASTEXITCODE -eq 0) {
+    $already = Get-Process -Name "UltimateParser.Tray" -ErrorAction SilentlyContinue
+    if (-not $already) {
+        Start-Process (Join-Path $publish "UltimateParser.Tray.exe") -WorkingDirectory $root
+    }
+}
+
+exit 0

@@ -239,7 +239,7 @@ public sealed class SingularityClient : ISingularityClient
     /// Идентификатор задачи
     /// </param>
     /// <param name="journalDate">
-    /// Дата в виде <c>yyyy-MM-dd</c>
+    /// Момент архивации. API принимает его только с явным смещением, например <c>2026-10-16T18:00:00+03:00</c>
     /// </param>
     /// <param name="cancellationToken">
     /// Токен отмены запроса
@@ -247,11 +247,11 @@ public sealed class SingularityClient : ISingularityClient
     /// <returns>
     /// Задача, которая завершается, когда API архивирует задачу
     /// </returns>
-    public Task ArchiveTaskAsync(string taskId, DateOnly journalDate, CancellationToken cancellationToken) =>
+    public Task ArchiveTaskAsync(string taskId, DateTimeOffset journalDate, CancellationToken cancellationToken) =>
         SendAsync<TaskResponse>(
             HttpMethod.Post,
             $"/v2/task/{Uri.EscapeDataString(taskId)}/archive",
-            new { journalDate = journalDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+            new { journalDate = FormatStart(journalDate) },
             cancellationToken);
 
     /// <summary>
@@ -291,6 +291,35 @@ public sealed class SingularityClient : ISingularityClient
             $"/v2/task/{Uri.EscapeDataString(taskId)}/unarchive",
             null,
             cancellationToken);
+
+    /// <summary>
+    /// Удаляет задачу. Ответ API пустой
+    /// </summary>
+    /// <param name="taskId">
+    /// Идентификатор задачи
+    /// </param>
+    /// <param name="cancellationToken">
+    /// Токен отмены запроса
+    /// </param>
+    /// <returns>
+    /// Задача, которая завершается после ответа <c>204</c>
+    /// </returns>
+    public async Task DeleteTaskAsync(string taskId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Delete,
+            $"/v2/task/{Uri.EscapeDataString(taskId)}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.SingularityToken);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var detail = responseBody.Length <= 500 ? responseBody : responseBody[..500];
+        throw new InvalidOperationException(
+            $"Singularity {(int)response.StatusCode} DELETE /v2/task/{taskId}: {detail}");
+    }
 
     #endregion Tasks
 

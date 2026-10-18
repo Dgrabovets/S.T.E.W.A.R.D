@@ -28,7 +28,7 @@ public sealed record ScheduleSlot
     public string ExternalId { get; init; }
 
     /// <summary>
-    /// Занятие в слоте. <see langword="null"/> означает, что соответствующую задачу нужно отправить в архив
+    /// Занятие в слоте. <see langword="null"/> означает, что соответствующую задачу нужно отметить выполненной
     /// </summary>
     public Lesson? Lesson { get; init; }
 }

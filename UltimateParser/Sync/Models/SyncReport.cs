@@ -26,7 +26,10 @@ public sealed record SyncReport
     /// <param name="skipped">
     /// Уже выполненные задачи, которые не менялись
     /// </param>
-    public SyncReport(int created, int updated, int archived, int unarchived, int completed, int skipped)
+    /// <param name="deleted">
+    /// Выполненные задачи, удалённые потому что время занятия ещё не прошло
+    /// </param>
+    public SyncReport(int created, int updated, int archived, int unarchived, int completed, int skipped, int deleted = 0)
     {
         Created = created;
         Updated = updated;
@@ -34,6 +37,7 @@ public sealed record SyncReport
         Unarchived = unarchived;
         Completed = completed;
         Skipped = skipped;
+        Deleted = deleted;
     }
 
     /// <summary>
@@ -65,4 +69,9 @@ public sealed record SyncReport
     /// Число уже выполненных задач, которые оставлены как есть
     /// </summary>
     public int Skipped { get; init; }
+
+    /// <summary>
+    /// Число удалённых задач, чьё занятие ещё не закончилось
+    /// </summary>
+    public int Deleted { get; init; }
 }
