@@ -1,5 +1,3 @@
-using System.Drawing;
-using System.Windows.Forms;
 using UltimateParser.Tray.Models;
 
 namespace UltimateParser.Tray.Shell;

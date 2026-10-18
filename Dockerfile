@@ -2,6 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY UltimateParser.slnx ./
 COPY UltimateParser.Shared/UltimateParser.Shared.csproj UltimateParser.Shared/
+COPY UltimateParser.Core/UltimateParser.Core.csproj UltimateParser.Core/
 COPY UltimateParser/UltimateParser.csproj UltimateParser/
 COPY UltimateParser.Tests/UltimateParser.Tests.csproj UltimateParser.Tests/
 COPY UltimateParser.Tray/UltimateParser.Tray.csproj UltimateParser.Tray/
