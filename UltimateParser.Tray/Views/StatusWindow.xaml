@@ -1,9 +1,10 @@
-<Window x:Class="UltimateParser.Tray.Tray.Implementations.StatusWindow"
+<Window x:Class="UltimateParser.Tray.Views.StatusWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:UltimateParser.Tray.Behaviors"
+        xmlns:controls="clr-namespace:UltimateParser.Tray.Controls"
         xmlns:models="clr-namespace:UltimateParser.Tray.Monitoring.Models"
-        xmlns:ui="clr-namespace:UltimateParser.Tray.Tray.Models"
-        xmlns:views="clr-namespace:UltimateParser.Tray.Tray.Views"
+        xmlns:ui="clr-namespace:UltimateParser.Tray.Models"
         Title="Расписание"
         Width="540"
         Height="720"
@@ -202,7 +203,7 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="72"/>
                                 </Grid.ColumnDefinitions>
-                                <views:IntervalBar VerticalAlignment="Center" Margin="0,0,12,0"
+                                <controls:IntervalBar VerticalAlignment="Center" Margin="0,0,12,0"
                                                    Value="{Binding IntervalMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                 <TextBox Grid.Column="1" Style="{StaticResource Field}" TextAlignment="Center"
                                          Text="{Binding MinutesText, UpdateSourceTrigger=PropertyChanged}"/>
@@ -237,7 +238,7 @@
                             <TextBlock Style="{StaticResource Hint}"
                                        Text="Ключ, по которому сервис входит в ваш аккаунт. Здесь уже лежит значение из файла настроек, на экране оно закрыто точками. Если выпустите новый ключ, вставьте его вместо текущего и сохраните."/>
                             <PasswordBox Style="{StaticResource SecretField}"
-                                         views:PasswordBinding.Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                         behaviors:PasswordBinding.Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>
                     </ScrollViewer>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="20,4,20,10">

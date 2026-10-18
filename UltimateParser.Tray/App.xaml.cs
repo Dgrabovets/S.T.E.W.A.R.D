@@ -1,4 +1,4 @@
-using UltimateParser.Tray.Tray.Implementations;
+using UltimateParser.Tray.Shell;
 
 namespace UltimateParser.Tray;
 

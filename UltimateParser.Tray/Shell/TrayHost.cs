@@ -2,11 +2,12 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using UltimateParser.Tray.Models;
 using UltimateParser.Tray.Monitoring.Implementations;
 using UltimateParser.Tray.Monitoring.Models;
-using UltimateParser.Tray.Tray.Models;
+using UltimateParser.Tray.Views;
 
-namespace UltimateParser.Tray.Tray.Implementations;
+namespace UltimateParser.Tray.Shell;
 
 /// <summary>
 /// Иконка в области уведомлений и опрос контейнера
@@ -191,7 +192,7 @@ public sealed class TrayHost : IDisposable
         graphics.Clear(Color.Transparent);
 
         var bounds = new Rectangle(1, 1, 30, 30);
-        using (var shape = TrayPalette.Rounded(bounds, 8))
+        using (var shape = Rounded(bounds, 8))
         using (var brush = new SolidBrush(color))
             graphics.FillPath(brush, shape);
 
@@ -212,6 +213,34 @@ public sealed class TrayHost : IDisposable
         {
             DestroyIcon(handle);
         }
+    }
+
+    /// <summary>
+    /// Строит скруглённый контур значка
+    /// </summary>
+    /// <param name="bounds">
+    /// Прямоугольник контура
+    /// </param>
+    /// <param name="radius">
+    /// Радиус угла в пикселях
+    /// </param>
+    /// <returns>
+    /// Контур, который нужно освободить
+    /// </returns>
+    private static GraphicsPath Rounded(Rectangle bounds, int radius)
+    {
+        var path = new GraphicsPath();
+        var diameter = Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height));
+        var arc = new Rectangle(bounds.X, bounds.Y, diameter, diameter);
+        path.AddArc(arc, 180, 90);
+        arc.X = bounds.Right - diameter;
+        path.AddArc(arc, 270, 90);
+        arc.Y = bounds.Bottom - diameter;
+        path.AddArc(arc, 0, 90);
+        arc.X = bounds.Left;
+        path.AddArc(arc, 90, 90);
+        path.CloseFigure();
+        return path;
     }
 
     #endregion Icon
@@ -376,57 +405,6 @@ public sealed class TrayHost : IDisposable
             using var brush = new SolidBrush(color);
             e.Graphics.FillRectangle(brush, bounds);
         }
-    }
-
-    /// <summary>
-    /// Цвета выпадающего меню
-    /// </summary>
-    private sealed class MenuColors : ProfessionalColorTable
-    {
-        /// <summary>
-        /// Фон меню
-        /// </summary>
-        public override Color ToolStripDropDownBackground => TrayPalette.Surface;
-
-        /// <summary>
-        /// Фон пункта под курсором
-        /// </summary>
-        public override Color MenuItemSelected => TrayPalette.SurfaceRaised;
-
-        /// <summary>
-        /// Рамка пункта под курсором
-        /// </summary>
-        public override Color MenuItemBorder => TrayPalette.SurfaceRaised;
-
-        /// <summary>
-        /// Рамка меню
-        /// </summary>
-        public override Color MenuBorder => TrayPalette.Line;
-
-        /// <summary>
-        /// Левое поле меню
-        /// </summary>
-        public override Color ImageMarginGradientBegin => TrayPalette.Surface;
-
-        /// <summary>
-        /// Середина левого поля меню
-        /// </summary>
-        public override Color ImageMarginGradientMiddle => TrayPalette.Surface;
-
-        /// <summary>
-        /// Конец левого поля меню
-        /// </summary>
-        public override Color ImageMarginGradientEnd => TrayPalette.Surface;
-
-        /// <summary>
-        /// Тёмная линия разделителя
-        /// </summary>
-        public override Color SeparatorDark => TrayPalette.Line;
-
-        /// <summary>
-        /// Светлая линия разделителя
-        /// </summary>
-        public override Color SeparatorLight => TrayPalette.Line;
     }
 
     #endregion Menu

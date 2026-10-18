@@ -1,6 +1,6 @@
 using System.Windows.Input;
 
-namespace UltimateParser.Tray.Tray.ViewModels;
+namespace UltimateParser.Tray.Mvvm;
 
 /// <summary>
 /// Команда кнопки: вызывает действие модели представления

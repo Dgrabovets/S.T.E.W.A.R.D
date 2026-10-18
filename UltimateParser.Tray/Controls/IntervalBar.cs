@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Media;
 
-namespace UltimateParser.Tray.Tray.Views;
+namespace UltimateParser.Tray.Controls;
 
 /// <summary>
 /// Горизонтальный ползунок интервала в цветах панели

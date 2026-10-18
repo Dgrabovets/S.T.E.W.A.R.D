@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace UltimateParser.Tray.Tray.ViewModels;
+namespace UltimateParser.Tray.Mvvm;
 
 /// <summary>
 /// Основа модели представления: сообщает окну, что свойство изменилось

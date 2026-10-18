@@ -1,6 +1,4 @@
-using System.Drawing.Drawing2D;
-
-namespace UltimateParser.Tray.Tray.Models;
+namespace UltimateParser.Tray.Models;
 
 /// <summary>
 /// Цвета значка в трее. Окно берёт палитру из разметки
@@ -50,36 +48,4 @@ public static class TrayPalette
     public static readonly System.Drawing.Color Idle = System.Drawing.Color.FromArgb(132, 122, 158);
 
     #endregion Colors
-
-    #region Shape
-
-    /// <summary>
-    /// Строит скруглённый контур значка
-    /// </summary>
-    /// <param name="bounds">
-    /// Прямоугольник контура
-    /// </param>
-    /// <param name="radius">
-    /// Радиус угла в пикселях
-    /// </param>
-    /// <returns>
-    /// Контур, который нужно освободить
-    /// </returns>
-    public static GraphicsPath Rounded(System.Drawing.Rectangle bounds, int radius)
-    {
-        var path = new GraphicsPath();
-        var diameter = Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height));
-        var arc = new System.Drawing.Rectangle(bounds.X, bounds.Y, diameter, diameter);
-        path.AddArc(arc, 180, 90);
-        arc.X = bounds.Right - diameter;
-        path.AddArc(arc, 270, 90);
-        arc.Y = bounds.Bottom - diameter;
-        path.AddArc(arc, 0, 90);
-        arc.X = bounds.Left;
-        path.AddArc(arc, 90, 90);
-        path.CloseFigure();
-        return path;
-    }
-
-    #endregion Shape
 }

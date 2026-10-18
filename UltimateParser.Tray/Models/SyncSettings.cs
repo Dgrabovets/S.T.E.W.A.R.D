@@ -1,7 +1,8 @@
 using System.Globalization;
+using UltimateParser.Common.Constants;
 using UltimateParser.Tray.Monitoring.Implementations;
 
-namespace UltimateParser.Tray.Tray.Models;
+namespace UltimateParser.Tray.Models;
 
 /// <summary>
 /// Параметры сверки, которые лежат в файле настроек
@@ -22,41 +23,6 @@ public sealed class SyncSettings
     /// Начальное положение ползунка до чтения файла
     /// </summary>
     public const int DEFAULT_INTERVAL = 5;
-
-    /// <summary>
-    /// Имя параметра с паузой между сверками
-    /// </summary>
-    private const string SYNC_INTERVAL_MINUTES = "SYNC_INTERVAL_MINUTES";
-
-    /// <summary>
-    /// Имя параметра с названием проекта
-    /// </summary>
-    private const string PROJECT_TITLE = "PROJECT_TITLE";
-
-    /// <summary>
-    /// Имя параметра с заголовком колонки группы
-    /// </summary>
-    private const string GROUP_COLUMN = "GROUP_COLUMN";
-
-    /// <summary>
-    /// Имя параметра с часовым поясом таблицы
-    /// </summary>
-    private const string TIME_ZONE = "TIME_ZONE";
-
-    /// <summary>
-    /// Имя параметра с идентификатором таблицы
-    /// </summary>
-    private const string SPREADSHEET_ID = "SPREADSHEET_ID";
-
-    /// <summary>
-    /// Имя параметра с номером листа
-    /// </summary>
-    private const string SHEET_GID = "SHEET_GID";
-
-    /// <summary>
-    /// Имя параметра с ключом доступа
-    /// </summary>
-    private const string SINGULARITY_TOKEN = "SINGULARITY_TOKEN";
 
     /// <summary>
     /// Пауза между сверками, в минутах. Ноль, если в файле нет целого числа
@@ -112,7 +78,7 @@ public sealed class SyncSettings
     public static SyncSettings Load(string path)
     {
         var file = EnvFile.Load(path);
-        var intervalText = file.Get(SYNC_INTERVAL_MINUTES).Trim();
+        var intervalText = file.Get(EnviromentalParamsNames.SYNC_INTERVAL_MINUTES).Trim();
         var minutes = int.TryParse(intervalText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
             ? parsed
             : 0;
@@ -120,12 +86,12 @@ public sealed class SyncSettings
         {
             IntervalText = intervalText,
             IntervalMinutes = minutes,
-            ProjectTitle = file.Get(PROJECT_TITLE),
-            GroupColumn = file.Get(GROUP_COLUMN),
-            TimeZone = file.Get(TIME_ZONE),
-            SpreadsheetId = file.Get(SPREADSHEET_ID),
-            SheetGid = file.Get(SHEET_GID),
-            Token = file.Get(SINGULARITY_TOKEN),
+            ProjectTitle = file.Get(EnviromentalParamsNames.PROJECT_TITLE),
+            GroupColumn = file.Get(EnviromentalParamsNames.GROUP_COLUMN),
+            TimeZone = file.Get(EnviromentalParamsNames.TIME_ZONE),
+            SpreadsheetId = file.Get(EnviromentalParamsNames.SPREADSHEET_ID),
+            SheetGid = file.Get(EnviromentalParamsNames.SHEET_GID),
+            Token = file.Get(EnviromentalParamsNames.SINGULARITY_TOKEN),
         };
     }
 
@@ -138,13 +104,13 @@ public sealed class SyncSettings
     public void Save(string path)
     {
         var file = EnvFile.Load(path);
-        file.Set(SYNC_INTERVAL_MINUTES, IntervalMinutes.ToString(CultureInfo.InvariantCulture));
-        file.Set(PROJECT_TITLE, ProjectTitle.Trim());
-        file.Set(GROUP_COLUMN, GroupColumn.Trim());
-        file.Set(TIME_ZONE, TimeZone.Trim());
-        file.Set(SPREADSHEET_ID, SpreadsheetId.Trim());
-        file.Set(SHEET_GID, SheetGid.Trim());
-        file.Set(SINGULARITY_TOKEN, Token.Trim());
+        file.Set(EnviromentalParamsNames.SYNC_INTERVAL_MINUTES, IntervalMinutes.ToString(CultureInfo.InvariantCulture));
+        file.Set(EnviromentalParamsNames.PROJECT_TITLE, ProjectTitle.Trim());
+        file.Set(EnviromentalParamsNames.GROUP_COLUMN, GroupColumn.Trim());
+        file.Set(EnviromentalParamsNames.TIME_ZONE, TimeZone.Trim());
+        file.Set(EnviromentalParamsNames.SPREADSHEET_ID, SpreadsheetId.Trim());
+        file.Set(EnviromentalParamsNames.SHEET_GID, SheetGid.Trim());
+        file.Set(EnviromentalParamsNames.SINGULARITY_TOKEN, Token.Trim());
         file.Save();
     }
 

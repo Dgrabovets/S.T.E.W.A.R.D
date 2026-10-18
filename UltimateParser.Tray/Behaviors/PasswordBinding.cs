@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 
-namespace UltimateParser.Tray.Tray.Views;
+namespace UltimateParser.Tray.Behaviors;
 
 /// <summary>
 /// Связывает скрытое поле пароля со свойством модели представления

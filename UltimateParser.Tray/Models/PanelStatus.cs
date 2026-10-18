@@ -1,7 +1,7 @@
 using System.Globalization;
 using UltimateParser.Tray.Monitoring.Models;
 
-namespace UltimateParser.Tray.Tray.Models;
+namespace UltimateParser.Tray.Models;
 
 /// <summary>
 /// Тексты шапки и плашки, собранные из снимка контейнера

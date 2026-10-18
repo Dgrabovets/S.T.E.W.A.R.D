@@ -5,9 +5,9 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using UltimateParser.Tray.Monitoring.Models;
-using UltimateParser.Tray.Tray.ViewModels;
+using UltimateParser.Tray.ViewModels;
 
-namespace UltimateParser.Tray.Tray.Implementations;
+namespace UltimateParser.Tray.Views;
 
 /// <summary>
 /// Окно панели. Рисует то, что отдаёт модель представления, и само только открывается и прячется

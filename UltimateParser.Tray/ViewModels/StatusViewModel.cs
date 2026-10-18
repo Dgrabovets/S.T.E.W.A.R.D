@@ -1,10 +1,11 @@
 using System.Globalization;
 using System.IO;
+using UltimateParser.Tray.Models;
 using UltimateParser.Tray.Monitoring.Implementations;
 using UltimateParser.Tray.Monitoring.Models;
-using UltimateParser.Tray.Tray.Models;
+using UltimateParser.Tray.Mvvm;
 
-namespace UltimateParser.Tray.Tray.ViewModels;
+namespace UltimateParser.Tray.ViewModels;
 
 /// <summary>
 /// Состояние панели: журнал, плашка и поля файла настроек

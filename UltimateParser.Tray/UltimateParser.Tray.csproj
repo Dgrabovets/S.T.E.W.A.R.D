@@ -12,4 +12,8 @@
     <ApplicationIcon />
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\UltimateParser.Shared\UltimateParser.Shared.csproj" />
+  </ItemGroup>
+
 </Project>

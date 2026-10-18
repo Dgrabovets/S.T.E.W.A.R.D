@@ -1,4 +1,4 @@
-namespace UltimateParser.Tray.Tray.Models;
+namespace UltimateParser.Tray.Models;
 
 /// <summary>
 /// Цвет плашки состояния на панели
