@@ -4,9 +4,18 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="UltimateParser.Shared/UltimateParser.Shared.csproj" />
-  <Project Path="UltimateParser.Core/UltimateParser.Core.csproj" />
-  <Project Path="UltimateParser/UltimateParser.csproj" />
-  <Project Path="UltimateParser.Tests/UltimateParser.Tests.csproj" />
-  <Project Path="UltimateParser.Tray/UltimateParser.Tray.csproj" />
+  <Folder Name="/UltimateParser/">
+    <Project Path="UltimateParser/UltimateParser.Shared/UltimateParser.Shared.csproj" />
+    <Project Path="UltimateParser/UltimateParser.Core/UltimateParser.Core.csproj" />
+    <Project Path="UltimateParser/UltimateParser/UltimateParser.csproj" />
+    <Project Path="UltimateParser/UltimateParser.Tests/UltimateParser.Tests.csproj" />
+    <Project Path="UltimateParser/UltimateParser.Tray/UltimateParser.Tray.csproj" />
+  </Folder>
+  <Folder Name="/MailToSingularity/">
+    <Project Path="MailToSingularity/MailToSingularity.csproj" />
+  </Folder>
+  <Folder Name="/Status/">
+    <Project Path="Status/SingularityTools.Status.csproj" />
+    <Project Path="Status.Tests/SingularityTools.Status.Tests.csproj" />
+  </Folder>
 </Solution>

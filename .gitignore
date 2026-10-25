@@ -426,3 +426,15 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Whisper: окружение и модель не коммитятся
+Whisper/.venv/
+Whisper/models/
+__pycache__/
+*.transcript.json
+*.transcript.txt
+Whisper/.cache/
+Whisper/samples/
+
+# Данные приложения: статусы процессов, журнал запусков, временные файлы
+data/
