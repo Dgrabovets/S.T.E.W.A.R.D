@@ -164,15 +164,21 @@ public sealed class JobHost : IDisposable
     public bool HasTranscript(Lesson lesson) => File.Exists(_homework.TranscriptPath(lesson.Id));
 
     /// <summary>
-    /// Собирает просьбу к Claude найти домашние задания занятия. Папка для результата создаётся здесь, чтобы агенту не пришлось её делать
+    /// Просит Claude в фоне найти в расшифровке домашние задания и ждёт, пока он запишет их в файл. Чат при этом не создаётся
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    /// <returns>Текст просьбы</returns>
-    public string HomeworkPrompt(Lesson lesson)
+    /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <returns>Сколько заданий найдено и текст ошибки, если не получилось</returns>
+    public async Task<(int Count, string Error)> PrepareHomeworkAsync(Lesson lesson, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_homework.ItemsPath(lesson.Id))!);
 
-        return HomeworkExtractionPrompt.Build(lesson, _homework.TranscriptPath(lesson.Id), _homework.ItemsPath(lesson.Id));
+        var prompt = HomeworkExtractionPrompt.Build(lesson, _homework.TranscriptPath(lesson.Id), _homework.ItemsPath(lesson.Id));
+        var error = await ClaudeAgent.RunAsync(prompt, _homework.Root, cancellationToken);
+        if (error.Length > 0)
+            return (0, error);
+
+        return _homework.ReadItems(lesson.Id) is { } items ? (items.Count, string.Empty) : (0, "Claude не записал файл заданий");
     }
 
     /// <summary>

@@ -43,7 +43,7 @@ public static class SnapshotRenderer
         }
         else if (string.Equals(parts[0], "formats", StringComparison.OrdinalIgnoreCase))
         {
-            window = new HomeworkFormatsWindow(new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => { }));
+            window = new HomeworkFormatsWindow(new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty))));
         }
         else if (string.Equals(parts[0], "popup", StringComparison.OrdinalIgnoreCase))
         {

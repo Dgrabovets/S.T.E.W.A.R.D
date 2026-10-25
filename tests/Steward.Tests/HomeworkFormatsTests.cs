@@ -1,4 +1,6 @@
 using Steward.Homework.Models;
+using Steward.Hosting;
+using Steward.Models;
 using Steward.Homework.Storage;
 using Steward.ViewModels;
 
@@ -63,7 +65,7 @@ public class HomeworkFormatsTests
     public void Picking_a_format_moves_the_selection_and_reports_it()
     {
         var picked = new List<(string, HomeworkFormatEnum)>();
-        var model = new HomeworkFormatsViewModel([(new Lesson("a", "А", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word)], (id, format) => picked.Add((id, format)), _ => true, _ => { });
+        var model = new HomeworkFormatsViewModel([(new Lesson("a", "А", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word)], (id, format) => picked.Add((id, format)), _ => true, _ => Task.FromResult((0, string.Empty)));
         var options = model.Lessons.Single().Options;
 
         options.Single(option => option.Format == HomeworkFormatEnum.Code).SelectCommand.Execute(null);
@@ -82,12 +84,48 @@ public class HomeworkFormatsTests
         var prepared = new List<string>();
         var withText = new Lesson("a", "А", new DateOnly(2026, 10, 25));
         var without = new Lesson("b", "Б", new DateOnly(2026, 10, 24));
-        var model = new HomeworkFormatsViewModel([(withText, HomeworkFormatEnum.Word), (without, HomeworkFormatEnum.Word)], (_, _) => { }, lesson => lesson.Id == "a", lesson => prepared.Add(lesson.Id));
+        var model = new HomeworkFormatsViewModel([(withText, HomeworkFormatEnum.Word), (without, HomeworkFormatEnum.Word)], (_, _) => { }, lesson => lesson.Id == "a", lesson =>
+        {
+            prepared.Add(lesson.Id);
+
+            return Task.FromResult((2, string.Empty));
+        });
 
         model.Lessons[0].PrepareCommand.Execute(null);
 
         Assert.True(model.Lessons[0].HasTranscript);
         Assert.False(model.Lessons[1].HasTranscript);
         Assert.Equal(["a"], prepared);
+        Assert.Equal(ActivityStateEnum.Done, model.Lessons[0].Activity);
+        Assert.Equal("Найдено заданий: 2", model.Lessons[0].Status);
+    }
+
+    /// <summary>
+    /// Ошибка подготовки показывается текстом, а галочка не рисуется
+    /// </summary>
+    [Fact]
+    public void A_failed_preparation_shows_the_error_and_no_tick()
+    {
+        var model = new HomeworkFormatsViewModel([(new Lesson("a", "А", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, _ => Task.FromResult((0, "Claude не ответил")));
+
+        model.Lessons[0].PrepareCommand.Execute(null);
+
+        Assert.True(model.Lessons[0].Failed);
+        Assert.Equal(ActivityStateEnum.None, model.Lessons[0].Activity);
+        Assert.Equal("Claude не ответил", model.Lessons[0].Status);
+    }
+
+    /// <summary>
+    /// Запуск Claude идёт без сохранения сессии, только с чтением и записью файлов и только в рабочей папке
+    /// </summary>
+    [Fact]
+    public void The_background_run_keeps_no_chat_and_limits_the_tools()
+    {
+        var arguments = ClaudeAgent.Arguments("просьба", @"D:\data\homework");
+
+        Assert.Contains("--no-session-persistence", arguments);
+        Assert.Equal("Read,Write", arguments[arguments.ToList().IndexOf("--tools") + 1]);
+        Assert.Equal(@"D:\data\homework", arguments[arguments.ToList().IndexOf("--add-dir") + 1]);
+        Assert.Equal("просьба", arguments[arguments.ToList().IndexOf("-p") + 1]);
     }
 }

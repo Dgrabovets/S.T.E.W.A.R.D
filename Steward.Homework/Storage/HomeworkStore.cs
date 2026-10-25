@@ -21,6 +21,11 @@ public sealed class HomeworkStore(string directory)
     };
 
     /// <summary>
+    /// Папка домашних заданий
+    /// </summary>
+    public string Root => directory;
+
+    /// <summary>
     /// Файл со списком занятий
     /// </summary>
     private string LessonsFile => Path.Combine(directory, "lessons.json");

@@ -463,18 +463,7 @@ public sealed class TrayHost : IDisposable
     /// Открывает окно, где для каждого занятия выбирается формат ДЗ
     /// </summary>
     private void ShowFormats() =>
-        new HomeworkFormatsWindow(new HomeworkFormatsViewModel(_jobs.Lessons(), _jobs.SetHomeworkFormat, _jobs.HasTranscript, PrepareHomework)) { Owner = _main }.ShowDialog();
-
-    /// <summary>
-    /// Открывает Claude с просьбой найти в расшифровке домашние задания. Если приложение не открылось, говорит об этом уведомлением
-    /// </summary>
-    /// <param name="lesson">Занятие</param>
-    private void PrepareHomework(Lesson lesson)
-    {
-        var error = ClaudeLauncher.Open(_jobs.HomeworkPrompt(lesson));
-        if (error.Length > 0)
-            _icon.ShowBalloonTip(BALLOON_MS, "Домашние задания", error, ToolTipIcon.None);
-    }
+        new HomeworkFormatsWindow(new HomeworkFormatsViewModel(_jobs.Lessons(), _jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None))) { Owner = _main }.ShowDialog();
 
     /// <summary>
     /// Убирает иконку и завершает процесс
