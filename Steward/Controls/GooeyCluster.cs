@@ -71,6 +71,11 @@ public sealed class GooeyCluster : FrameworkElement
     private const double MAX_STEP = 1.0 / 120;
 
     /// <summary>
+    /// С какого раскрытия кнопка считается стоящей на месте: от него и выше перемычка с главной каплей не рисуется
+    /// </summary>
+    private const double SETTLED = 0.97;
+
+    /// <summary>
     /// Значение «ничего не выбрано»
     /// </summary>
     private const int NONE = -2;
@@ -235,16 +240,6 @@ public sealed class GooeyCluster : FrameworkElement
     }
 
     /// <summary>
-    /// Ставит клавиатурный выбор на первую кнопку
-    /// </summary>
-    public void FocusFirst()
-    {
-        Focus();
-        _focusIndex = Items.Count > 0 ? 0 : NONE;
-        InvalidateVisual();
-    }
-
-    /// <summary>
     /// Сразу ставит кнопки на места без анимации: для снимков и для тех, кто отключил анимацию
     /// </summary>
     public void SnapToState()
@@ -277,7 +272,6 @@ public sealed class GooeyCluster : FrameworkElement
         var shapes = new GeometryGroup { FillRule = FillRule.Nonzero };
         shapes.Children.Add(new EllipseGeometry(main, MAIN_RADIUS, MAIN_RADIUS));
 
-        var previous = (Center: main, Radius: MAIN_RADIUS);
         for (var index = 0; index < Items.Count; index++)
         {
             var reach = _open[index];
@@ -289,9 +283,8 @@ public sealed class GooeyCluster : FrameworkElement
             shapes.Children.Add(new EllipseGeometry(center, radius, radius));
             circles.Add((center, radius));
 
-            AddBridge(shapes, main, MAIN_RADIUS, center, radius);
-            AddBridge(shapes, previous.Center, previous.Radius, center, radius);
-            previous = (center, radius);
+            if (reach < SETTLED)
+                AddBridge(shapes, main, MAIN_RADIUS, center, radius);
         }
 
         drawingContext.DrawGeometry(null, new Pen(Outline, 2.4), shapes);
@@ -355,10 +348,10 @@ public sealed class GooeyCluster : FrameworkElement
         switch (e.Key)
         {
             case Key.Left:
-                _focusIndex = Math.Min(Items.Count - 1, Math.Max(0, _focusIndex) + (_focusIndex == NONE ? 0 : 1));
+                _focusIndex = _focusIndex == NONE ? 0 : Math.Min(Items.Count - 1, _focusIndex + 1);
                 break;
             case Key.Right:
-                _focusIndex = Math.Max(0, _focusIndex - 1);
+                _focusIndex = _focusIndex == NONE ? 0 : Math.Max(0, _focusIndex - 1);
                 break;
             case Key.Enter or Key.Space when _focusIndex >= 0:
                 Items[_focusIndex].Activate();

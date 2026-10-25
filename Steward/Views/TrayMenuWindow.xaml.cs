@@ -59,7 +59,7 @@ public partial class TrayMenuWindow : TrayPopupWindow
         if (!animate)
             Cluster.SnapToState();
 
-        Cluster.FocusFirst();
+        Cluster.Focus();
     }
 
     /// <summary>
