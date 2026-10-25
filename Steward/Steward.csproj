@@ -10,6 +10,9 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationIcon />
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Окна WPF, поэтому DPI задан в манифесте, а не через WinForms-свойство, о котором предупреждает WFO0003 -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
