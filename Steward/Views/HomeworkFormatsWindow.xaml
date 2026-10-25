@@ -1,0 +1,61 @@
+<Window x:Class="Steward.Views.HomeworkFormatsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Форматы ДЗ"
+        Width="760"
+        Height="560"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource WindowBrush}"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        FontFamily="{StaticResource FontBase}">
+    <Grid Margin="24">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="Форматы домашних заданий" Style="{StaticResource TextHeadline}"/>
+                <TextBlock Style="{StaticResource TextSecondary}" Margin="0,4,0,16" TextWrapping="Wrap"
+                           Text="Выбери, в каком виде готовить ДЗ по каждому занятию. По умолчанию — Word. Выбор сохраняется сразу."/>
+                <Border Style="{StaticResource Card}" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap"
+                               Text="Занятий пока нет. Они появятся после выгрузки расшифровок из MTS Link."/>
+                </Border>
+                <ItemsControl ItemsSource="{Binding Lessons}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" Style="{StaticResource TextTitle}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Date}" Style="{StaticResource TextSecondary}" Margin="0,2,0,10"/>
+                                    <ItemsControl ItemsSource="{Binding Options}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Content="{Binding Title}" Command="{Binding SelectCommand}" Margin="0,0,8,0">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                                    <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

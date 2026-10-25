@@ -34,4 +34,5 @@
   <Project Path="Steward.Schedule.Core/Steward.Schedule.Core.csproj" />
   <Project Path="Steward.Schedule.Shared/Steward.Schedule.Shared.csproj" />
   <Project Path="Steward.Mail/Steward.Mail.csproj" />
+  <Project Path="Steward.Homework/Steward.Homework.csproj" />
 </Solution>

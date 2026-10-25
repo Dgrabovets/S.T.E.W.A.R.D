@@ -170,6 +170,7 @@
                         <StackPanel>
                             <TextBlock Text="Домашние задания" Style="{StaticResource PageTitle}"/>
                             <TextBlock Text="Черновики, которые подготовил агент. Сдаёшь работу всегда ты сам." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
+                            <Button Content="Форматы ДЗ" Command="{Binding OpenFormatsCommand}" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="Черновиков пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>

@@ -37,6 +37,7 @@ public sealed class MainViewModel : PanelViewModel
     public MainViewModel() : base("Проверка")
     {
         ClearJournalCommand = new RelayCommand(() => ClearJournalRequested?.Invoke(this, EventArgs.Empty));
+        OpenFormatsCommand = new RelayCommand(() => FormatsRequested?.Invoke(this, EventArgs.Empty));
     }
 
     /// <summary>
@@ -55,9 +56,19 @@ public sealed class MainViewModel : PanelViewModel
     public event EventHandler? ClearJournalRequested;
 
     /// <summary>
+    /// Просит открыть окно выбора форматов ДЗ
+    /// </summary>
+    public event EventHandler? FormatsRequested;
+
+    /// <summary>
     /// Стирает журнал запусков
     /// </summary>
     public RelayCommand ClearJournalCommand { get; }
+
+    /// <summary>
+    /// Открывает окно выбора форматов ДЗ
+    /// </summary>
+    public RelayCommand OpenFormatsCommand { get; }
 
     #region State
 

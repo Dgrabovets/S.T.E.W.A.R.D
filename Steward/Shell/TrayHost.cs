@@ -9,6 +9,7 @@ using Steward.Models;
 using Steward.Monitoring.Implementations;
 using Steward.Monitoring.Models;
 using Steward.Status.Rows;
+using Steward.ViewModels;
 using Steward.Views;
 
 namespace Steward.Shell;
@@ -438,6 +439,7 @@ public sealed class TrayHost : IDisposable
             _main.Model.RunRequested += id => _jobs.RunNow(id);
             _main.Model.FixRequested += OpenFix;
             _main.Model.ClearJournalRequested += (_, _) => _jobs.ClearRecords();
+            _main.Model.FormatsRequested += (_, _) => ShowFormats();
             _main.Model.ExitRequested += (_, _) => Exit();
         }
 
@@ -456,6 +458,12 @@ public sealed class TrayHost : IDisposable
         if (error.Length > 0)
             _icon.ShowBalloonTip(BALLOON_MS, "Починка", error, ToolTipIcon.None);
     }
+    /// <summary>
+    /// Открывает окно, где для каждого занятия выбирается формат ДЗ
+    /// </summary>
+    private void ShowFormats() =>
+        new HomeworkFormatsWindow(new HomeworkFormatsViewModel(_jobs.Lessons(), _jobs.SetHomeworkFormat)) { Owner = _main }.ShowDialog();
+
     /// <summary>
     /// Убирает иконку и завершает процесс
     /// </summary>

@@ -8,6 +8,7 @@
 | [`Steward.Status/`](Steward.Status/README.md) | Общий формат статуса процессов, реестр задач и раннер, который их запускает |
 | [`Steward.Schedule/`](Steward.Schedule/README.md) | Переносит расписание из Google Таблицы в задачи. Работает в Docker. Библиотеки: `Steward.Schedule.Core` и `Steward.Schedule.Shared` |
 | [`Steward.Mail/`](Steward.Mail/README.md) | Проверяет учебную почту и ставит задачи на письма, которые требуют ответа или содержат отзыв |
+| `Steward.Homework/` | Занятия и выбранный для каждого формат ДЗ (Word, презентация, текст, код, не готовить). Выбор делается в окне «Форматы ДЗ» на странице «ДЗ» |
 | [`Whisper/`](Whisper/README.md) | Локальная расшифровка речи из видео, пока для рилсов (Python) |
 | `tests/` | Тесты: `Steward.Tests`, `Steward.Status.Tests`, `Steward.Schedule.Tests` |
 | [`config/jobs.json`](config/jobs.json) | Список задач, которые приложение запускает само |

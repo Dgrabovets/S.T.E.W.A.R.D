@@ -1,5 +1,7 @@
 using System.IO;
 using System.Windows.Threading;
+using Steward.Homework.Models;
+using Steward.Homework.Storage;
 using Steward.Status.Common;
 using Steward.Status.Registry;
 using Steward.Status.Rows;
@@ -45,6 +47,11 @@ public sealed class JobHost : IDisposable
     private readonly StatusStore _store;
 
     /// <summary>
+    /// Папка домашних заданий: занятия и выбранные форматы
+    /// </summary>
+    private readonly HomeworkStore _homework;
+
+    /// <summary>
     /// Запускает процессы и ведёт журнал
     /// </summary>
     private readonly JobRunner _runner;
@@ -66,6 +73,7 @@ public sealed class JobHost : IDisposable
     {
         var dataDirectory = DataLocation.DataDirectory();
         _store = new StatusStore(Path.Combine(dataDirectory, "status"));
+        _homework = new HomeworkStore(Path.Combine(dataDirectory, "homework"));
 
         var registry = JobRegistry.Load(DataLocation.JobsFile(), DataLocation.FindRepoRoot());
         _jobs = registry.Jobs;
@@ -137,6 +145,20 @@ public sealed class JobHost : IDisposable
     /// </summary>
     /// <returns>Записи от новых к старым</returns>
     public IReadOnlyList<RunRecord> Records() => _runner.History.Load(RECORD_COUNT);
+
+    /// <summary>
+    /// Читает занятия и формат ДЗ, выбранный для каждого
+    /// </summary>
+    /// <returns>Занятия от свежих к старым с их форматами</returns>
+    public IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> Lessons() =>
+        [.. _homework.LoadLessons().Select(lesson => (lesson, _homework.FormatFor(lesson.Id)))];
+
+    /// <summary>
+    /// Запоминает формат ДЗ для занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="format">Выбранный формат</param>
+    public void SetHomeworkFormat(string lessonId, HomeworkFormatEnum format) => _homework.SetFormat(lessonId, format);
 
     /// <summary>
     /// Стирает журнал запусков и сообщает панелям

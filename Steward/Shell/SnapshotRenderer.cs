@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows.Media.Imaging;
 using System.Windows.Media;
 using System.Windows;
+using Steward.Homework.Models;
 using Steward.Monitoring.Models;
 using Steward.Status.Registry;
 using Steward.Status.Rows;
@@ -38,6 +39,10 @@ public static class SnapshotRenderer
         if (string.Equals(parts[0], "design", StringComparison.OrdinalIgnoreCase))
         {
             window = new DesignWindow();
+        }
+        else if (string.Equals(parts[0], "formats", StringComparison.OrdinalIgnoreCase))
+        {
+            window = new HomeworkFormatsWindow(new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }));
         }
         else if (string.Equals(parts[0], "popup", StringComparison.OrdinalIgnoreCase))
         {
@@ -111,6 +116,17 @@ public static class SnapshotRenderer
         new JobRow("mts", "MTS Link", "Не удалось", "Нет доступа к LMS: войдите заново (вчера в 19:00)", RowToneEnum.Problem, 0, true),
         new JobRow("telegram", "Telegram-бот", "Выполняется", "Запущена сегодня в 12:00", RowToneEnum.Working, 0, true),
         new JobRow("homework", "Домашние задания", "Отключена", "Включается полем enabled в config/jobs.json", RowToneEnum.Idle, 0, false),
+    ];
+
+    /// <summary>
+    /// Выдуманные занятия с выбранными форматами ДЗ
+    /// </summary>
+    /// <returns>Занятия от свежих к старым</returns>
+    private static IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> SampleLessons() =>
+    [
+        (new Lesson("ux-1025", "Гейм-дизайн: игровые механики", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Presentation),
+        (new Lesson("db-1022", "Базы данных: нормализация", new DateOnly(2026, 10, 22)), HomeworkFormatEnum.Word),
+        (new Lesson("en-1020", "Английский: эссе", new DateOnly(2026, 10, 20)), HomeworkFormatEnum.Skip),
     ];
 
     /// <summary>

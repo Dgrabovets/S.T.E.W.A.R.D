@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Steward.Schedule.Shared\Steward.Schedule.Shared.csproj" />
+    <ProjectReference Include="..\Steward.Homework\Steward.Homework.csproj" />
     <ProjectReference Include="..\Steward.Status\Steward.Status.csproj" />
   </ItemGroup>
 
