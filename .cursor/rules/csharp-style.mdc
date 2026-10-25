@@ -1,5 +1,5 @@
 ---
-description: Общие правила стиля кода UltimateParser. Файл пополняется по мере договорённостей
+description: Общие правила стиля кода Steward. Файл пополняется по мере договорённостей
 alwaysApply: true
 ---
 
@@ -18,7 +18,7 @@ private PanelStatus(
     string subtitle,
     string summary,
     string label,
-    PanelTone tone,
+    PanelToneEnum tone,
     string emptyText,
     IReadOnlyList<JournalCard> cards)
 ```
@@ -26,7 +26,7 @@ private PanelStatus(
 Можно в одну строку:
 
 ```csharp
-private PanelStatus(string subtitle, string summary, string label, PanelTone tone, string emptyText, IReadOnlyList<JournalCard> cards)
+private PanelStatus(string subtitle, string summary, string label, PanelToneEnum tone, string emptyText, IReadOnlyList<JournalCard> cards)
 ```
 
 Можно столбцом, имена друг под другом:
@@ -35,7 +35,99 @@ private PanelStatus(string subtitle, string summary, string label, PanelTone ton
 private PanelStatus(string subtitle,
                     string summary,
                     string label,
-                    PanelTone tone,
+                    PanelToneEnum tone,
                     string emptyText,
                     IReadOnlyList<JournalCard> cards)
 ```
+
+## Комментарии параметров
+
+Если описание параметра или возвращаемого значения умещается в одну строку, тег пишется целиком в одну строку:
+
+```csharp
+/// <param name="reader">Читатель JSON</param>
+/// <returns>Состояние или <see cref="ProcessStateEnum.Unknown"/></returns>
+```
+
+Тег раскрывается на несколько строк только для длинного описания.
+
+## Перечисления
+
+Имя перечисления заканчивается на `Enum`: `ProcessStateEnum`, `PanelToneEnum`. Файл называется так же.
+
+## Файлы настроек
+
+В корне лежат `.editorconfig` (`insert_final_newline`, `charset = utf-8` для `*.cs`) и `.gitattributes` (`* text=auto`).
+## Пустые строки между блоками
+
+Блоки кода по смыслу разделяются пустой строкой. Не должны липнуть друг к другу:
+
+- подряд идущие охранные `if` с `return`, `continue` или `throw`, а также охранный `if` и следующий за ним код;
+- закрытый блок (`}`, `};`, `});`) и следующий за ним оператор;
+- многострочный оператор и следующий за ним оператор;
+- объявления переменных, затем действие (`await`, вызов), затем `return`.
+
+Объявление и охранный `if`, который проверяет только что объявленную переменную, остаются вместе:
+
+```csharp
+var line = ContainerPrefix().Replace(raw.Trim(), string.Empty);
+if (line.Length == 0 || CategoryPattern().IsMatch(StripTimestamp(line)))
+    continue;
+
+var body = StripTimestamp(line).Trim();
+```
+
+## Переменные
+
+Переменная, которая используется один раз, не заводится: выражение подставляется на место использования. Исключения: у значения есть полезное имя, подстановка делает строку длиннее примерно 150 символов, порядок вычисления важен (запущенная задача `Task`, которую ждут позже).
+
+```csharp
+var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
+var error = process.StandardError.ReadToEndAsync(cancellationToken);
+
+await process.WaitForExitAsync(cancellationToken);
+
+return new CommandResult(process.ExitCode, (await output + await error).Trim());
+```
+
+## Тернарный оператор в присвоении
+
+`?` и `:` переносятся на 2 символа правее начала правой части. Вложенный тернарный оператор сдвигается так же.
+
+```csharp
+var minutes = int.TryParse(intervalText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : 0;
+```
+
+## Короткие методы
+
+Метод из одного выражения пишется в одну строку через `=>`, если строка получается разумной длины. XML-комментарии остаются у всех членов, включая закрытые.
+
+## Пустой catch
+
+В пустой `catch` ставится комментарий `// ignore`.
+
+## Один тип в файле
+
+В файле лежит один тип: класс, запись, интерфейс или перечисление. Имя файла равно имени типа. Вспомогательный тип выносится в отдельный файл рядом.
+## Без повторов
+
+Логика пишется один раз. Если один и тот же кусок нужен в двух местах, он выносится в общий метод, класс или стиль XAML, а не копируется. Общее для нескольких проектов лежит в `Steward.Status`, общее для окон приложения лежит в `App.xaml` и в `PanelViewModel`. В тестах повторяющаяся подготовка (настройки, часы, источник) собирается в один вспомогательный метод.
+
+## Фигурные скобки
+
+Тело `if`, `foreach` или `while` из одного оператора пишется без фигурных скобок. Скобки нужны, если в теле два оператора и больше или если за `if` идёт `else` со скобками.
+
+```csharp
+foreach (var child in await folder.GetSubfoldersAsync(false, cancellationToken))
+    queue.Enqueue(child);
+```
+
+## Регионы
+
+Регион объединяет блок по смыслу (`Reading`, `Writing`, `Events`) и закрывается с тем же именем: `#endregion Reading`. Регионов «Поля», «Конструкторы», «Публичные методы» и «Приватные методы» нет. Внутри метода регионов тоже нет.
+
+## Имена
+
+Токен отмены называется `cancellationToken`, а не `ct`. Параметры лямбд называются по смыслу (`job`, `item`, `summary`), а не одной буквой. Переменная исключения в `catch` называется `exception`. Константа пишется в `UPPER_SNAKE_CASE`.

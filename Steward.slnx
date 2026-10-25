@@ -1,0 +1,37 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="nuget.config" />
+    <File Path="README.md" />
+    <File Path="Dockerfile" />
+    <File Path="docker-compose.yml" />
+    <File Path="start-steward.ps1" />
+    <File Path="config/jobs.json" />
+    <File Path="tools/DocScan.cs" />
+  </Folder>
+  <Folder Name="/Whisper/">
+    <File Path="Whisper/README.md" />
+    <File Path="Whisper/setup.ps1" />
+    <File Path="Whisper/transcribe.py" />
+    <File Path="Whisper/requirements.txt" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Steward.Tests/Steward.Tests.csproj" />
+    <Project Path="tests/Steward.Status.Tests/Steward.Status.Tests.csproj" />
+    <Project Path="tests/Steward.Mail.Tests/Steward.Mail.Tests.csproj" />
+    <Project Path="tests/Steward.Schedule.Tests/Steward.Schedule.Tests.csproj" />
+  </Folder>
+  <Project Path="Steward/Steward.csproj" />
+  <Project Path="Steward.Status/Steward.Status.csproj" />
+  <Project Path="Steward.Schedule/Steward.Schedule.csproj" />
+  <Project Path="Steward.Schedule.Core/Steward.Schedule.Core.csproj" />
+  <Project Path="Steward.Schedule.Shared/Steward.Schedule.Shared.csproj" />
+  <Project Path="Steward.Mail/Steward.Mail.csproj" />
+</Solution>

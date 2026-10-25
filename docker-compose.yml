@@ -1,5 +1,7 @@
+name: steward
+
 services:
-  sync:
+  schedule:
     build: .
     env_file:
       - .env

@@ -4,3 +4,6 @@
 .git/
 .env
 *.user
+Whisper/
+data/
+publish/
