@@ -18,6 +18,21 @@
       ],
       "timeoutMinutes": 10,
       "staleAfterMinutes": 960
+    },
+    {
+      "id": "homework",
+      "title": "Домашние задания",
+      // Создаёт задачи SingularityApp по заданиям, которые агент записал в data/homework/items/<занятие>.json.
+      // Нужны Steward.Homework.Tasks/publish/appsettings.json с токеном и собранная программа:
+      //   dotnet publish Steward.Homework.Tasks -c Release -o Steward.Homework.Tasks/publish
+      "enabled": false,
+      "command": "{repo}\\Steward.Homework.Tasks\\publish\\Steward.Homework.Tasks.exe",
+      "triggers": [
+        { "type": "start" },
+        { "type": "daily", "at": "20:00" }
+      ],
+      "timeoutMinutes": 10,
+      "staleAfterMinutes": 1500
     }
   ]
 }

@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Steward.Homework.Models;
+using Steward.Homework.Services;
 
 namespace Steward.Homework.Storage;
 
@@ -67,6 +68,41 @@ public sealed class HomeworkStore(string directory)
         File.WriteAllText(temp, JsonSerializer.Serialize(formats, Json));
         File.Move(temp, FormatsFile, overwrite: true);
     }
+
+    /// <summary>
+    /// Путь к расшифровке занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Путь к <c>transcripts/&lt;ключ&gt;.txt</c></returns>
+    /// <exception cref="ArgumentException">Ключ не подходит для имени файла</exception>
+    public string TranscriptPath(string lessonId) => Path.Combine(directory, "transcripts", SafeName(lessonId) + ".txt");
+
+    /// <summary>
+    /// Путь к файлу с заданиями, который записывает агент
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Путь к <c>items/&lt;ключ&gt;.json</c></returns>
+    /// <exception cref="ArgumentException">Ключ не подходит для имени файла</exception>
+    public string ItemsPath(string lessonId) => Path.Combine(directory, "items", SafeName(lessonId) + ".json");
+
+    /// <summary>
+    /// Читает задания занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Задания или <see langword="null"/>, если агент ещё не записал файл</returns>
+    public IReadOnlyList<HomeworkItem>? ReadItems(string lessonId) =>
+        File.Exists(ItemsPath(lessonId)) ? HomeworkItemParser.Parse(File.ReadAllText(ItemsPath(lessonId))) : null;
+
+    /// <summary>
+    /// Проверяет, что ключ можно использовать как имя файла
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Тот же ключ</returns>
+    /// <exception cref="ArgumentException">В ключе есть что-то кроме латиницы, цифр, дефиса и подчёркивания</exception>
+    private static string SafeName(string lessonId) =>
+        lessonId.Length > 0 && lessonId.All(symbol => char.IsAsciiLetterOrDigit(symbol) || symbol is '-' or '_')
+            ? lessonId
+            : throw new ArgumentException("Ключ занятия может содержать только латиницу, цифры, дефис и подчёркивание", nameof(lessonId));
 
     /// <summary>
     /// Читает JSON-файл

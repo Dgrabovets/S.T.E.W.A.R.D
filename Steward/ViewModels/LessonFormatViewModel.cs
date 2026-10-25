@@ -18,13 +18,19 @@ public sealed class LessonFormatViewModel
     {
         Title = lesson.Title;
         Date = lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
-        Options = [.. HomeworkFormats.All.Select(option => new FormatOptionViewModel(option, option == format, picked =>
+        var options = new List<FormatOptionViewModel>();
+        foreach (var option in HomeworkFormats.All)
         {
-            foreach (var other in Options)
-                other.IsSelected = other.Format == picked;
+            options.Add(new FormatOptionViewModel(option, option == format, picked =>
+            {
+                foreach (var other in options)
+                    other.IsSelected = other.Format == picked;
 
-            chosen(lesson.Id, picked);
-        }))];
+                chosen(lesson.Id, picked);
+            }));
+        }
+
+        Options = options;
     }
 
     /// <summary>
