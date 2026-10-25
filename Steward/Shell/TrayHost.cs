@@ -53,6 +53,11 @@ public sealed class TrayHost : IDisposable
     private readonly StatusWindow _window = new();
 
     /// <summary>
+    /// Меню из капель, которое открывается по щелчку на иконку
+    /// </summary>
+    private readonly TrayMenuWindow _menu = new();
+
+    /// <summary>
     /// Иконка трея
     /// </summary>
     private readonly NotifyIcon _icon;
@@ -129,37 +134,30 @@ public sealed class TrayHost : IDisposable
     /// </summary>
     public TrayHost()
     {
-        var menu = new ContextMenuStrip
-        {
-            Renderer = new MenuRenderer(),
-            Font = new Font("Segoe UI", 10F),
-            BackColor = TrayPalette.Surface,
-            ForeColor = TrayPalette.Text,
-            ShowImageMargin = false,
-            Padding = new Padding(4, 6, 4, 6),
-        };
-
-        menu.Items.Add(Item("Открыть приложение", (_, _) => ShowMain()));
-        menu.Items.Add(Item("Быстрый статус", (_, _) => ShowWindow()));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Item("Выход", (_, _) => Exit()));
-
         _icon = new NotifyIcon
         {
             Icon = _stoppedIcon,
             Visible = true,
             Text = "Расписание",
-            ContextMenuStrip = menu,
         };
 
         _icon.MouseClick += (_, args) =>
         {
-            if (args.Button == MouseButtons.Left)
-                ShowWindow();
+            if (args.Button is MouseButtons.Left or MouseButtons.Right)
+                ShowMenu();
         };
 
         _icon.DoubleClick += (_, _) => ShowMain();
         _icon.BalloonTipClicked += (_, _) => ShowMain();
+        _menu.SetItems(
+        [
+            new GooeyItem("\uE80F", "Приложение", () => ShowMain()),
+            new GooeyItem("\uEA80", "Идеи", () => ShowMain(AppPageEnum.Ideas)),
+            new GooeyItem("\uE7BE", "Домашние задания", () => ShowMain(AppPageEnum.Homework)),
+            new GooeyItem("\uE81C", "Журнал", () => ShowMain(AppPageEnum.Journal)),
+            new GooeyItem("\uE713", "Настройки", ShowWindow),
+            new GooeyItem("\uE7E8", "Выход", Exit),
+        ]);
         _window.ExitRequested += (_, _) => Exit();
         _window.OpenAppRequested += (_, _) =>
         {
@@ -213,6 +211,7 @@ public sealed class TrayHost : IDisposable
         _icon.Visible = false;
         _icon.Dispose();
         _window.Close();
+        _menu.Close();
         _main?.CloseForExit();
         _runningIcon.Dispose();
         _stoppedIcon.Dispose();
@@ -338,6 +337,8 @@ public sealed class TrayHost : IDisposable
         ApplyIcon(_snapshot);
         if (_window.IsVisible)
             _window.Apply(_snapshot, _jobRows, scrollToProblem: false);
+        if (_menu.IsVisible)
+            _menu.Apply(_snapshot, _jobRows);
         if (_main is { IsVisible: true })
             ApplyMain();
 
@@ -429,9 +430,21 @@ public sealed class TrayHost : IDisposable
     }
 
     /// <summary>
+    /// Открывает меню из капель у курсора или прячет его
+    /// </summary>
+    private void ShowMenu()
+    {
+        if (!_menu.IsVisible)
+            _menu.Apply(_snapshot, _jobRows);
+
+        _menu.ToggleFromIcon();
+    }
+
+    /// <summary>
     /// Открывает главное окно приложения с самыми свежими данными
     /// </summary>
-    private void ShowMain()
+    /// <param name="page">Раздел, который нужно открыть, или <see langword="null"/>, чтобы оставить прежний</param>
+    private void ShowMain(AppPageEnum? page = null)
     {
         if (_exiting)
             return;
@@ -451,6 +464,9 @@ public sealed class TrayHost : IDisposable
 
         _jobRows = _jobs.Rows();
         ApplyMain();
+        if (page is { } selected)
+            _main.Model.Page = selected;
+
         _main.ShowAndActivate();
     }
 
@@ -520,61 +536,4 @@ public sealed class TrayHost : IDisposable
     }
 
     #endregion Window
-
-    #region Menu
-
-    /// <summary>
-    /// Пункт меню в цветах панели
-    /// </summary>
-    /// <param name="text">Подпись</param>
-    /// <param name="onClick">Действие</param>
-    /// <returns>Пункт меню</returns>
-    private static ToolStripMenuItem Item(string text, EventHandler onClick)
-    {
-        return new ToolStripMenuItem(text, null, onClick)
-        {
-            ForeColor = TrayPalette.Text,
-            Padding = new Padding(8, 4, 8, 4),
-        };
-    }
-
-    /// <summary>
-    /// Рисует меню в цветах панели
-    /// </summary>
-    private sealed class MenuRenderer : ToolStripProfessionalRenderer
-    {
-        /// <summary>
-        /// Создаёт отрисовщик с тёмной палитрой
-        /// </summary>
-        public MenuRenderer()
-            : base(new MenuColors())
-        {
-            RoundedEdges = false;
-        }
-
-        /// <summary>
-        /// Пишет текст пункта светлым цветом
-        /// </summary>
-        /// <param name="e">Аргументы текста</param>
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        {
-            e.TextColor = e.Item.Enabled ? TrayPalette.Text : TrayPalette.Muted;
-            base.OnRenderItemText(e);
-        }
-
-        /// <summary>
-        /// Убирает рамку выделения
-        /// </summary>
-        /// <param name="e">Аргументы рамки</param>
-        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
-        {
-            var bounds = new Rectangle(4, 0, e.Item.Width - 8, e.Item.Height);
-            var color = e.Item.Selected ? TrayPalette.SurfaceRaised : TrayPalette.Surface;
-
-            using var brush = new SolidBrush(color);
-            e.Graphics.FillRectangle(brush, bounds);
-        }
-    }
-
-    #endregion Menu
 }

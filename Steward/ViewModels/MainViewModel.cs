@@ -1,4 +1,3 @@
-using Steward.Controls;
 using Steward.Homework.Models;
 using Steward.Ideas.Models;
 using Steward.Models;
@@ -36,14 +35,9 @@ public sealed class MainViewModel : PanelViewModel
     private IReadOnlyList<HomeworkCardViewModel> _homework = [];
 
     /// <summary>
-    /// Задачи, которые выполнялись при прошлом обновлении
+    /// Следит за выполняющимися и только что закончившимися задачами
     /// </summary>
-    private HashSet<string> _working = [];
-
-    /// <summary>
-    /// Когда закончились задачи, которым ещё показывается галочка
-    /// </summary>
-    private readonly Dictionary<string, DateTimeOffset> _finished = [];
+    private readonly ActivityTracker _activity = new();
 
     /// <summary>
     /// Карточки идей, которые ждут решения
@@ -266,8 +260,8 @@ public sealed class MainViewModel : PanelViewModel
     public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors, IReadOnlyList<Idea> ideas)
     {
         var rows = TaskRows.Build(snapshot, jobs);
-        TrackFinished(rows, DateTimeOffset.UtcNow);
-        Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), ActivityOf(row), _finished.GetValueOrDefault(row.Id))).ToArray();
+        _activity.Track(rows, DateTimeOffset.UtcNow);
+        Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), _activity.StateOf(row), _activity.FinishedAt(row.Id))).ToArray();
         Records = records.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
         Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();
@@ -280,30 +274,6 @@ public sealed class MainViewModel : PanelViewModel
     /// </summary>
     /// <param name="rows">Задания с занятиями от свежих к старым</param>
     public void ApplyHomework(IReadOnlyList<HomeworkRow> rows) => Homework = [.. rows.Select(row => new HomeworkCardViewModel(row))];
-
-    /// <summary>
-    /// Замечает задачи, которые перестали выполняться с прошлого обновления, и запоминает, когда это случилось. Сбойные не отмечаются: им галочка не положена
-    /// </summary>
-    /// <param name="rows">Строки задач</param>
-    /// <param name="now">Текущий момент</param>
-    private void TrackFinished(IReadOnlyList<TaskStatusRow> rows, DateTimeOffset now)
-    {
-        foreach (var row in rows.Where(row => !row.Working && row.Tone != PanelToneEnum.Problem && _working.Contains(row.Id)))
-            _finished[row.Id] = now;
-
-        foreach (var id in _finished.Where(pair => (now - pair.Value).TotalSeconds >= ActivityOrb.DONE_SHOW_SECONDS).Select(pair => pair.Key).ToList())
-            _finished.Remove(id);
-
-        _working = [.. rows.Where(row => row.Working).Select(row => row.Id)];
-    }
-
-    /// <summary>
-    /// Что показывать у задачи: вращение, галочку или обычную точку
-    /// </summary>
-    /// <param name="row">Строка задачи</param>
-    /// <returns>Состояние индикатора</returns>
-    private ActivityStateEnum ActivityOf(TaskStatusRow row) =>
-        row.Working ? ActivityStateEnum.Working : _finished.ContainsKey(row.Id) ? ActivityStateEnum.Done : ActivityStateEnum.None;
 
     /// <summary>
     /// Переключает раздел и сообщает окну обо всех зависящих свойствах

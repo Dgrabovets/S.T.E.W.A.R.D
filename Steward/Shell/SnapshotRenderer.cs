@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows;
 using Steward.Homework.Models;
 using Steward.Ideas.Models;
+using Steward.Models;
 using Steward.Monitoring.Models;
 using Steward.Status.Registry;
 using Steward.Status.Rows;
@@ -33,6 +34,7 @@ public static class SnapshotRenderer
     {
         var now = DateTimeOffset.Now;
         var settleSeconds = 0.0;
+        Action? afterShow = null;
         var snapshot = SampleSnapshot(now);
         var jobs = SampleJobs();
 
@@ -41,6 +43,22 @@ public static class SnapshotRenderer
         if (string.Equals(parts[0], "design", StringComparison.OrdinalIgnoreCase))
         {
             window = new DesignWindow();
+        }
+        else if (string.Equals(parts[0], "tray", StringComparison.OrdinalIgnoreCase))
+        {
+            var menu = new TrayMenuWindow();
+            menu.Apply(snapshot, jobs);
+            menu.SetItems(
+            [
+                new GooeyItem("\uE80F", "Приложение", () => { }),
+                new GooeyItem("\uEA80", "Идеи", () => { }),
+                new GooeyItem("\uE7BE", "Домашние задания", () => { }),
+                new GooeyItem("\uE81C", "Журнал", () => { }),
+                new GooeyItem("\uE713", "Настройки", () => { }),
+                new GooeyItem("\uE7E8", "Выход", () => { }),
+            ]);
+            window = menu;
+            afterShow = () => menu.Expand(animate: false);
         }
         else if (string.Equals(parts[0], "formats", StringComparison.OrdinalIgnoreCase))
         {
@@ -75,6 +93,8 @@ public static class SnapshotRenderer
         window.Top = -20000;
         window.ShowInTaskbar = false;
         window.Show();
+        window.UpdateLayout();
+        afterShow?.Invoke();
         window.UpdateLayout();
         if (settleSeconds > 0)
         {
