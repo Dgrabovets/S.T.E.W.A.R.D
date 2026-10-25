@@ -44,4 +44,9 @@ public sealed class MailSettings
     /// Адрес веб-версии почты. Попадает в заметку задачи, чтобы письмо открывалось одним щелчком
     /// </summary>
     public string WebMailUrl { get; init; } = "https://mail.360.yandex.ru/";
+
+    /// <summary>
+    /// Шаблон ссылки на письмо в веб-почте. <c>{subject}</c> заменяется темой без «Re:» и «Fwd:», закодированной для адреса. Пустой шаблон даёт ссылку на саму веб-почту
+    /// </summary>
+    public string MessageLinkTemplate { get; init; } = "https://mail.360.yandex.ru/#search?request={subject}";
 }

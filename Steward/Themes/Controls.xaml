@@ -215,6 +215,37 @@
         </Setter>
     </Style>
 
+    <!-- Вывод процесса: каждая запись на отдельной плашке, цвет рамки по смыслу записи. Текст можно выделить и скопировать -->
+    <Style x:Key="LogLine" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource WindowBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
+        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="BorderBrush" Value="{StaticResource AttentionBrush}"/>
+                <Setter Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+                <Setter Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="LogView" TargetType="TextBox">
+        <Setter Property="IsReadOnly" Value="True"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}"/>
+    </Style>
     <Style x:Key="FieldTitle" TargetType="TextBlock" BasedOn="{StaticResource TextBody}">
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Margin" Value="0,16,0,4"/>

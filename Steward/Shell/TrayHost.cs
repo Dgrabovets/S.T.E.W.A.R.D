@@ -1,3 +1,4 @@
+using Steward.Status.Running;
 using Steward.Status.Common;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -435,6 +436,8 @@ public sealed class TrayHost : IDisposable
         {
             _main = new MainWindow();
             _main.Model.RunRequested += id => _jobs.RunNow(id);
+            _main.Model.FixRequested += OpenFix;
+            _main.Model.ClearJournalRequested += (_, _) => _jobs.ClearRecords();
             _main.Model.ExitRequested += (_, _) => Exit();
         }
 
@@ -443,6 +446,16 @@ public sealed class TrayHost : IDisposable
         _main.ShowAndActivate();
     }
 
+    /// <summary>
+    /// Открывает Claude с просьбой починить неудавшийся запуск. Если приложение не открылось, говорит об этом уведомлением
+    /// </summary>
+    /// <param name="record">Неудавшийся запуск из журнала</param>
+    private void OpenFix(RunRecord record)
+    {
+        var error = ClaudeFixLauncher.Open(record);
+        if (error.Length > 0)
+            _icon.ShowBalloonTip(BALLOON_MS, "Починка", error, ToolTipIcon.None);
+    }
     /// <summary>
     /// Убирает иконку и завершает процесс
     /// </summary>

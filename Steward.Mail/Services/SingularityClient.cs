@@ -1,8 +1,10 @@
 using Steward.Mail.Common;
 using Steward.Mail.Interfaces;
 using Steward.Mail.Models;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Steward.Mail.Services;
 
@@ -15,6 +17,11 @@ public sealed class SingularityClient : ISingularityClient, IDisposable
     /// Клиент, у которого базовый адрес — API SingularityApp, а в заголовке токен
     /// </summary>
     private readonly HttpClient _http;
+
+    /// <summary>
+    /// Сколько задач просить за один запрос
+    /// </summary>
+    private const int PAGE_SIZE = 1000;
 
     /// <summary>
     /// Создаёт клиент, авторизованный токеном из настроек
@@ -50,6 +57,41 @@ public sealed class SingularityClient : ISingularityClient, IDisposable
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new HttpRequestException($"SingularityApp ответил {(int)response.StatusCode}: {body}");
+        }
+    }
+
+    /// <summary>
+    /// Читает внешние ключи задач, которые начинаются позже заданного момента. Удалённые, выполненные и архивные тоже учитываются: если вы удалили задачу из письма, она не вернётся
+    /// </summary>
+    /// <param name="startsAfter">Нижняя граница начала задач</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Внешние ключи без повторов. Задачи без ключа пропускаются</returns>
+    /// <exception cref="HttpRequestException">
+    /// SingularityApp ответил ошибкой. В тексте код ответа и тело
+    /// </exception>
+    public async Task<IReadOnlySet<string>> ListExternalIdsAsync(DateTimeOffset startsAfter, CancellationToken cancellationToken)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        // Фильтр принимает только время в UTC с буквой Z: смещение вида +01:00 даёт ответ 400 «Invalid date value». Создание задачи со смещением работает
+        var after = Uri.EscapeDataString(startsAfter.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture));
+
+        for (var offset = 0; ; offset += PAGE_SIZE)
+        {
+            using var response = await _http.GetAsync($"v2/task?maxCount={PAGE_SIZE}&offset={offset}&includeRemoved=true&includeArchived=true&start.gt={after}", cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"SingularityApp ответил {(int)response.StatusCode}: {body}");
+
+            using var document = JsonDocument.Parse(body);
+            var tasks = document.RootElement.GetProperty("tasks");
+            foreach (var task in tasks.EnumerateArray())
+            {
+                if (task.TryGetProperty("externalId", out var key) && key.GetString() is { Length: > 0 } value)
+                    keys.Add(value);
+            }
+
+            if (tasks.GetArrayLength() < PAGE_SIZE)
+                return keys;
         }
     }
 

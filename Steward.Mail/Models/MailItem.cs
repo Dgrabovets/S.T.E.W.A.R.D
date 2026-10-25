@@ -9,7 +9,8 @@ namespace Steward.Mail.Models;
 /// <param name="FromAddress">Адрес отправителя</param>
 /// <param name="Subject">Тема письма</param>
 /// <param name="Date">Когда письмо отправлено</param>
-/// <param name="Snippet">Начало текста письма</param>
+/// <param name="Body">Текст письма без разметки. Если тело не удалось прочитать, начало текста из превью</param>
+/// <param name="Links">Адреса, найденные в тексте и в ссылках письма, без повторов</param>
 public sealed record MailItem(
     string MessageId,
     string Folder,
@@ -17,4 +18,5 @@ public sealed record MailItem(
     string FromAddress,
     string Subject,
     DateTimeOffset Date,
-    string Snippet);
+    string Body,
+    IReadOnlyList<string> Links);

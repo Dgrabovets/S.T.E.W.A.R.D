@@ -138,6 +138,15 @@ public sealed class JobHost : IDisposable
     /// <returns>Записи от новых к старым</returns>
     public IReadOnlyList<RunRecord> Records() => _runner.History.Load(RECORD_COUNT);
 
+    /// <summary>
+    /// Стирает журнал запусков и сообщает панелям
+    /// </summary>
+    public void ClearRecords()
+    {
+        _runner.History.Clear();
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     #endregion Reading
 
     #region Events

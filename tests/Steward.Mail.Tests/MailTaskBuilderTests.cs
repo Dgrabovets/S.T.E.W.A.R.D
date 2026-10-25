@@ -10,9 +10,9 @@ namespace Steward.Mail.Tests;
 public class MailTaskBuilderTests
 {
     /// <summary>
-    /// День, с которого начинаются задачи
+    /// Начало дня, с которого начинаются задачи, со смещением часового пояса
     /// </summary>
-    private static readonly DateOnly Today = new(2026, 10, 25);
+    private static readonly DateTimeOffset Today = new(2026, 10, 25, 0, 0, 0, TimeSpan.FromHours(1));
 
     /// <summary>
     /// Настройки с проектом назначения
@@ -31,7 +31,7 @@ public class MailTaskBuilderTests
 
         Assert.Equal("Отзыв преподавателя (Петров П. П.): «Задание 2» — посмотреть", task.Title);
         Assert.Equal(1, task.Priority);
-        Assert.Equal("2026-10-25", task.Start);
+        Assert.Equal("2026-10-25T00:00:00+01:00", task.Start);
         Assert.Equal("P-1", task.ProjectId);
     }
 
@@ -62,6 +62,29 @@ public class MailTaskBuilderTests
     }
 
     /// <summary>
+    /// Начало задачи записано датой, временем и смещением, как требует API, а время у задачи выключено. Дата без времени даёт ответ 400
+    /// </summary>
+    [Fact]
+    public void The_start_has_a_time_and_an_explicit_offset_and_the_task_has_no_time()
+    {
+        var task = MailTaskBuilder.Build(Samples.Mail("1"), MailCategoryEnum.PersonalReply, Settings, Today)!;
+
+        Assert.Matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$", task.Start);
+        Assert.False(task.UseTime);
+    }
+
+    /// <summary>
+    /// У задачи есть внешний ключ письма, по нему SingularityApp узнаёт, что задача уже создана
+    /// </summary>
+    [Fact]
+    public void Every_task_carries_the_external_key_of_its_mail()
+    {
+        var mail = Samples.Mail("<abc@mail.test>");
+
+        Assert.Equal("mail:<abc@mail.test>", MailTaskBuilder.Build(mail, MailCategoryEnum.PersonalReply, Settings, Today)!.ExternalId);
+        Assert.Equal("mail:<abc@mail.test>", MailTaskBuilder.Build(mail, MailCategoryEnum.TeacherFeedback, Settings, Today)!.ExternalId);
+    }
+    /// <summary>
     /// Справочное письмо задачи не создаёт
     /// </summary>
     [Fact]
@@ -69,16 +92,38 @@ public class MailTaskBuilderTests
         Assert.Null(MailTaskBuilder.Build(Samples.Mail("1"), MailCategoryEnum.Info, Settings, Today));
 
     /// <summary>
-    /// В заметке есть отправитель, тема, начало письма и ссылка на почту
+    /// Заметка записана дельтой Quill, как в расписании. В ней нет отправителя и темы (они уже в названии), есть время получения, текст собеседника без цитаты, линия и ссылка «Письмо» с подписью
     /// </summary>
     [Fact]
-    public void The_note_carries_the_sender_the_subject_the_snippet_and_the_web_mail_link()
+    public void The_note_is_a_delta_with_the_time_the_reply_a_divider_and_a_labelled_letter_link()
     {
-        var task = MailTaskBuilder.Build(Samples.Mail("1", subject: "Вопрос про зачёт"), MailCategoryEnum.PersonalReply, Settings, Today)!;
+        var mail = Samples.Mail("1", subject: "Re: Вопрос про зачёт", body: "Зачёт перенесён на пятницу.\n\n25.10.2026, 11:19, \"Данила\" <student@example.com>:\n> когда зачёт?");
 
-        Assert.Contains("От: Иванов Иван Иванович <ivanov@example.com>", task.Note, StringComparison.Ordinal);
-        Assert.Contains("Тема: Вопрос про зачёт", task.Note, StringComparison.Ordinal);
-        Assert.Contains("Начало письма", task.Note, StringComparison.Ordinal);
-        Assert.Contains("https://mail.360.yandex.ru/", task.Note, StringComparison.Ordinal);
+        var note = MailTaskBuilder.Build(mail, MailCategoryEnum.PersonalReply, Settings, Today)!.Note!;
+        var visible = NoteOps.Visible(note);
+
+        Assert.StartsWith("Получено: ", visible, StringComparison.Ordinal);
+        Assert.Contains("Зачёт перенесён на пятницу.", visible, StringComparison.Ordinal);
+        Assert.DoesNotContain("когда зачёт", visible, StringComparison.Ordinal);
+        Assert.DoesNotContain("ivanov@example.com", visible, StringComparison.Ordinal);
+        Assert.DoesNotContain("От:", visible, StringComparison.Ordinal);
+        Assert.DoesNotContain("Тема:", visible, StringComparison.Ordinal);
+        Assert.Equal(1, NoteOps.Dividers(note));
+        Assert.Equal([("Письмо", $"https://mail.360.yandex.ru/#search?request={Uri.EscapeDataString("Вопрос про зачёт")}")], NoteOps.Links(note));
+        Assert.EndsWith("Письмо\n", visible, StringComparison.Ordinal);
     }
-}
+
+    /// <summary>
+    /// В заметке отзыва ссылка «Задание» на LMS стоит перед ссылкой «Письмо», а текста письма нет
+    /// </summary>
+    [Fact]
+    public void A_feedback_note_links_to_the_assignment_before_the_letter_and_skips_the_body()
+    {
+        var mail = Samples.Mail("1", body: "Пользователь Петров дал отзыв. Откройте https://lms.ranepa.ru/mod/assign/view.php?id=1323404 чтобы увидеть.");
+
+        var note = MailTaskBuilder.Build(mail, MailCategoryEnum.TeacherFeedback, Settings, Today)!.Note!;
+
+        Assert.Equal(["Задание", "Письмо"], NoteOps.Links(note).Select(link => link.Label).ToArray());
+        Assert.Equal("https://lms.ranepa.ru/mod/assign/view.php?id=1323404", NoteOps.Links(note)[0].Url);
+        Assert.DoesNotContain("Пользователь Петров", NoteOps.Visible(note), StringComparison.Ordinal);
+    }}

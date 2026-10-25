@@ -121,7 +121,7 @@ public static class SnapshotRenderer
     private static IReadOnlyList<RunRecord> SampleRecords(DateTimeOffset now) =>
     [
         new RunRecord("telegram", "Telegram-бот", JobTrigger.START, now.AddMinutes(-5), now.AddMinutes(-4), 0, RunOutcomeEnum.Ok, null),
-        new RunRecord("mts", "MTS Link", JobTrigger.DAILY, now.AddHours(-17), now.AddHours(-17).AddMinutes(1), 1, RunOutcomeEnum.Failed, "Код завершения 1: нет доступа к LMS"),
-        new RunRecord("mail", "Почта", "manual", now.AddHours(-3), now.AddHours(-3).AddSeconds(8), 0, RunOutcomeEnum.Ok, null),
+        new RunRecord("mts", "MTS Link", JobTrigger.DAILY, now.AddHours(-17), now.AddHours(-17).AddMinutes(1), 1, RunOutcomeEnum.Failed, "Код завершения 1: нет доступа к LMS", null, "17.10.2026 18:50:01  Ошибка: System.InvalidOperationException: нет доступа к LMS\nat Lms.Client.SignIn() in LmsClient.cs:line 41\n17.10.2026 18:50:02  Ошибка: проверьте вход в браузере"),
+        new RunRecord("mail", "Почта", "manual", now.AddHours(-3), now.AddHours(-3).AddSeconds(8), 0, RunOutcomeEnum.Ok, null, "Ответить: 1 (Иванов И. И.)", "25.10.2026 14:11:06  Ответить: Иванов Иван — Вопрос → задача «Пришёл ответ от Иванов И. И.»\n25.10.2026 14:11:06  Инфо: Яндекс ID  — Вы создали пароль для приложения\n25.10.2026 14:11:07  Ответить: 1 (Иванов И. И.)\n25.10.2026 14:11:07  Прочее: 1"),
     ];
 }

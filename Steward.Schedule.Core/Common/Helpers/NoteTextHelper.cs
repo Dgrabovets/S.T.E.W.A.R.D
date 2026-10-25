@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace Steward.Schedule.Common.Helpers;
@@ -13,14 +12,6 @@ public static class NoteTextHelper
     /// Видимый текст гиперссылки в описании задачи
     /// </summary>
     private const string LINK_LABEL = "Ссылка";
-
-    /// <summary>
-    /// Сериализатор дельты. Кириллица остаётся символами, а не кодами <c>\u</c>
-    /// </summary>
-    private static readonly JsonSerializerOptions DeltaJson = new()
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
 
     #region Reading
 
@@ -201,20 +192,18 @@ public static class NoteTextHelper
         if (!TrySplitLink(note, out var body, out var url))
             return note;
 
-        var ops = new List<object>();
-        AppendBody(ops, body);
-        ops.Add(new { insert = LINK_LABEL, attributes = new { link = url } });
-        ops.Add(new { insert = "\n" });
+        var delta = new QuillDelta();
+        AppendBody(delta, body);
 
-        return JsonSerializer.Serialize(ops, DeltaJson);
+        return delta.Link(LINK_LABEL, url).ToString();
     }
 
     /// <summary>
     /// Пишет текст и превращает строку <c>---</c> во вставку разделителя Quill
     /// </summary>
-    /// <param name="ops">Операции заметки</param>
+    /// <param name="delta">Дельта заметки</param>
     /// <param name="body">Текст до адреса. Строка из трёх дефисов означает горизонтальную линию</param>
-    private static void AppendBody(List<object> ops, string body)
+    private static void AppendBody(QuillDelta delta, string body)
     {
         if (body.Length == 0)
             return;
@@ -224,8 +213,8 @@ public static class NoteTextHelper
         {
             if (line == "---")
             {
-                FlushText(ops, text);
-                ops.Add(new { insert = new { divider = true } });
+                FlushText(delta, text);
+                delta.Divider();
                 continue;
             }
 
@@ -235,15 +224,15 @@ public static class NoteTextHelper
             text.Append(line);
         }
 
-        FlushText(ops, text);
+        FlushText(delta, text);
     }
 
     /// <summary>
     /// Добавляет накопленный текст отдельной операцией и закрывает его переводом строки
     /// </summary>
-    /// <param name="ops">Операции заметки</param>
+    /// <param name="delta">Дельта заметки</param>
     /// <param name="text">Буфер текста. После записи очищается</param>
-    private static void FlushText(List<object> ops, StringBuilder text)
+    private static void FlushText(QuillDelta delta, StringBuilder text)
     {
         if (text.Length == 0)
             return;
@@ -251,7 +240,7 @@ public static class NoteTextHelper
         if (text[^1] != '\n')
             text.Append('\n');
 
-        ops.Add(new { insert = text.ToString() });
+        delta.Text(text.ToString());
         text.Clear();
     }
 

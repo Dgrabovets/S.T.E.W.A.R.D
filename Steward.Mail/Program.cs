@@ -33,7 +33,7 @@ internal static class Program
     /// Читает непрочитанные письма, создаёт задачи, пишет итог в лог и в файл статуса и показывает уведомление
     /// </summary>
     /// <param name="args">
-    /// Аргументы командной строки. <c>--dry-run</c> только пишет в лог: задачи не создаются, письма не запоминаются, статус не меняется
+    /// Аргументы командной строки. <c>--dry-run</c> только пишет в лог: задачи не создаются, статус не меняется
     /// </param>
     /// <returns>0, если проверка прошла, и 1, если случилась ошибка</returns>
     private static async Task<int> Main(string[] args)
@@ -49,7 +49,6 @@ internal static class Program
                 new ImapMailReader(settings.Mail),
                 new MailClassifier(settings.Mail, settings.Classifier),
                 singularity,
-                new JsonStateStore(Path.Combine(BaseDir, "processed.json")),
                 new ToastNotifier(),
                 settings,
                 TimeProvider.System,
@@ -64,9 +63,10 @@ internal static class Program
         }
         catch (Exception exception)
         {
-            Log($"Ошибка: {exception.Message}");
+            // В лог идёт полный текст исключения со стеком, в статус цепочка причин, в уведомление коротко
+            Log($"Ошибка: {exception}");
             if (!dryRun)
-                ReportStatus(statusStore, ProcessStateEnum.Failed, null, exception.Message);
+                ReportStatus(statusStore, ProcessStateEnum.Failed, null, Describe(exception));
 
             TryNotifyError(exception.Message);
             return 1;
@@ -124,6 +124,20 @@ internal static class Program
         {
             // Папка статусов недоступна, итог уже записан в лог
         }
+    }
+
+    /// <summary>
+    /// Описывает ошибку цепочкой причин: тип и сообщение каждого исключения от внешнего к внутреннему
+    /// </summary>
+    /// <param name="exception">Исключение проверки</param>
+    /// <returns>Строка вида «HttpRequestException: ответил 400 → SocketException: ...»</returns>
+    private static string Describe(Exception exception)
+    {
+        var parts = new List<string>();
+        for (var current = exception; current is not null; current = current.InnerException)
+            parts.Add($"{current.GetType().Name}: {current.Message}");
+
+        return string.Join(" → ", parts);
     }
 
     /// <summary>

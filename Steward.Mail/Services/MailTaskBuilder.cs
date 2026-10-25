@@ -1,8 +1,8 @@
 using System.Globalization;
-using System.Text;
 using System.Text.RegularExpressions;
 using Steward.Mail.Common;
 using Steward.Mail.Models;
+using Steward.Schedule.Common.Helpers;
 
 namespace Steward.Mail.Services;
 
@@ -12,29 +12,32 @@ namespace Steward.Mail.Services;
 public static partial class MailTaskBuilder
 {
     /// <summary>
+    /// Начало внешнего ключа задач из писем: отличает их от задач расписания и от созданных вручную
+    /// </summary>
+    private const string EXTERNAL_PREFIX = "mail:";
+
+    /// <summary>
+    /// Внешний ключ задачи для письма
+    /// </summary>
+    /// <param name="mail">Письмо</param>
+    /// <returns>Ключ вида <c>mail:&lt;Message-ID&gt;</c>: одно письмо, одна задача</returns>
+    public static string ExternalId(MailItem mail) => EXTERNAL_PREFIX + mail.MessageId;
+
+    /// <summary>
     /// Собирает задачу для SingularityApp
     /// Для информационных писем задача не создаётся
     /// </summary>
     /// <param name="mail">Письмо из почтового ящика</param>
     /// <param name="category">Категория письма</param>
     /// <param name="settings">Настройки: из них берутся проект назначения и адрес веб-почты</param>
-    /// <param name="today">День, с которого задача начинается</param>
+    /// <param name="dayStart">Начало сегодняшнего дня по местному времени со смещением: с него задача начинается</param>
     /// <returns>
     /// Задача с приоритетом по категории или <see langword="null"/> для информационного письма
     /// </returns>
-    public static SingularityTaskRequest? Build(MailItem mail, MailCategoryEnum category, AppSettings settings, DateOnly today)
+    public static SingularityTaskRequest? Build(MailItem mail, MailCategoryEnum category, AppSettings settings, DateTimeOffset dayStart)
     {
-        var note = new StringBuilder()
-            .AppendLine($"От: {mail.FromName} <{mail.FromAddress}>")
-            .AppendLine($"Тема: {mail.Subject}")
-            .AppendLine($"Получено: {mail.Date.LocalDateTime:dd.MM.yyyy HH:mm}")
-            .AppendLine()
-            .AppendLine(MailText.Truncate(mail.Snippet, 500))
-            .AppendLine()
-            .AppendLine(settings.Mail.WebMailUrl)
-            .ToString();
-
-        var start = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var note = Note(mail, category, settings);
+        var start = dayStart.ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture);
 
         return category switch
         {
@@ -44,6 +47,7 @@ public static partial class MailTaskBuilder
                 Note = note,
                 Priority = 1,
                 Start = start,
+                ExternalId = ExternalId(mail),
                 ProjectId = settings.Singularity.ProjectId
             },
             MailCategoryEnum.PersonalReply => new SingularityTaskRequest
@@ -52,12 +56,35 @@ public static partial class MailTaskBuilder
                 Note = note,
                 Priority = 0,
                 Start = start,
+                ExternalId = ExternalId(mail),
                 ProjectId = settings.Singularity.ProjectId
             },
             _ => null
         };
     }
 
+    /// <summary>
+    /// Собирает заметку задачи. Отправитель и тема в ней не повторяются, они уже в названии и в самой задаче
+    /// </summary>
+    /// <param name="mail">Письмо</param>
+    /// <param name="category">Категория письма: от неё зависит, что показывать</param>
+    /// <param name="settings">Настройки: шаблон ссылки на письмо</param>
+    /// <returns>Дельта Quill: время получения, текст собеседника (кроме отзывов), горизонтальная линия и ссылки с подписями «Задание» и «Письмо»</returns>
+    private static string Note(MailItem mail, MailCategoryEnum category, AppSettings settings)
+    {
+        var note = new QuillDelta().Text($"Получено: {mail.Date.LocalDateTime:dd.MM.yyyy HH:mm}\n");
+
+        var reply = category == MailCategoryEnum.PersonalReply ? MailReply.Extract(mail.Body) : string.Empty;
+        if (reply.Length > 0)
+            note.Text($"\n{reply}\n");
+
+        note.Divider();
+
+        if (category == MailCategoryEnum.TeacherFeedback && MailLinks.Assignment(mail) is { } assignment)
+            note.Link("Задание", assignment);
+
+        return note.Link("Письмо", MailLinks.Letter(mail, settings.Mail)).ToString();
+    }
     /// <summary>
     /// «Пользователь Иванов Иван Иванович дал отзыв на Ваш ответ на задание «Задание 2».»
     /// превращается в «Отзыв преподавателя (Иванов И. И.): «Задание 2» — посмотреть»

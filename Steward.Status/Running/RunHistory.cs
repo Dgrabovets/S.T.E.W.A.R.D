@@ -68,6 +68,24 @@ public sealed class RunHistory
     }
 
     /// <summary>
+    /// Стирает журнал целиком. Сбой удаления не мешает работе: файл просто останется как был
+    /// </summary>
+    public void Clear()
+    {
+        lock (_gate)
+        {
+            try
+            {
+                File.Delete(_path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // ignore
+            }
+        }
+    }
+
+    /// <summary>
     /// Читает последние записи
     /// </summary>
     /// <param name="count">Сколько записей нужно</param>

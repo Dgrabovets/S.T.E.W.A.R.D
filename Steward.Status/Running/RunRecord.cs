@@ -17,6 +17,8 @@ namespace Steward.Status.Running;
 /// <param name="Detail">
 /// Пояснение к ошибке или <see langword="null"/>
 /// </param>
+/// <param name="Summary">Сводка, которую записал процесс или раннер: что сделано за запуск</param>
+/// <param name="Output">Хвост вывода процесса или <see langword="null"/>, если вывода не было</param>
 public sealed record RunRecord(
     string JobId,
     string Title,
@@ -25,4 +27,6 @@ public sealed record RunRecord(
     DateTimeOffset FinishedAt,
     int? ExitCode,
     [property: JsonConverter(typeof(JsonStringEnumConverter))] RunOutcomeEnum Outcome,
-    string? Detail);
+    string? Detail,
+    string? Summary = null,
+    string? Output = null);

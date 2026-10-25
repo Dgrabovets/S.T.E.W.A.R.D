@@ -6,23 +6,22 @@ using Steward.Mail.Tests.Fakes;
 namespace Steward.Mail.Tests;
 
 /// <summary>
-/// Проверяет проверку почты целиком: какие задачи создаются, что запоминается и что показывается
+/// Проверяет проверку почты целиком: какие задачи создаются, что считается уже обработанным и что показывается
 /// </summary>
 public class MailCheckerTests
 {
     /// <summary>
-    /// Настройки: папка преподавателей по умолчанию, один игнорируемый адрес
+    /// Настройки: папка преподавателей по умолчанию, один игнорируемый адрес, письма за три дня
     /// </summary>
     private static readonly AppSettings Settings = new() { Classifier = new ClassifierSettings { IgnoredSenders = ["bot@example.com"] } };
 
     /// <summary>
-    /// Отзыв и личное письмо дают задачи, справка нет, и все три письма запоминаются
+    /// Отзыв и личное письмо дают задачи с внешним ключом письма, справка задачи не получает
     /// </summary>
     [Fact]
-    public async Task Run_creates_tasks_for_feedback_and_replies_and_remembers_all_mails()
+    public async Task Run_creates_tasks_for_feedback_and_replies_but_not_for_info()
     {
         var singularity = new RecordingSingularity();
-        var state = new MemoryState();
         var checker = Checker(
             [
                 Samples.Mail("feedback", subject: "Пользователь Петров Пётр дал отзыв на задание «А»", folder: "Преподаватели", hour: 8),
@@ -30,33 +29,29 @@ public class MailCheckerTests
                 Samples.Mail("info", fromAddress: "bot@example.com", hour: 10)
             ],
             singularity,
-            state,
             new RecordingNotifier(),
             out _);
 
         var result = await checker.RunAsync(dryRun: false, CancellationToken.None);
 
-        Assert.Equal(2, singularity.Created.Count);
-        Assert.All(singularity.Created, task => Assert.Equal("2026-10-25", task.Start));
-        Assert.Equal(["feedback", "reply", "info"], new[] { "feedback", "reply", "info" }.Where(state.Saved.Contains).ToArray());
+        Assert.Equal(["mail:feedback", "mail:reply"], singularity.Created.Select(task => task.ExternalId!).ToArray());
+        Assert.All(singularity.Created, task => Assert.Equal("2026-10-25T00:00:00+00:00", task.Start));
         Assert.Single(result.Feedback);
         Assert.Single(result.Replies);
         Assert.Single(result.Info);
     }
 
     /// <summary>
-    /// Уже обработанное письмо пропускается, письма идут от старых к новым
+    /// Письмо, для которого в SingularityApp уже есть задача, пропускается, остальные идут от старых к новым
     /// </summary>
     [Fact]
-    public async Task Run_skips_processed_mails_and_goes_oldest_first()
+    public async Task Run_skips_mails_that_already_have_a_task_and_goes_oldest_first()
     {
         var singularity = new RecordingSingularity();
-        var state = new MemoryState();
-        state.MarkProcessed("seen");
+        singularity.Existing.Add("mail:seen");
         var checker = Checker(
             [Samples.Mail("late", subject: "позднее", hour: 12), Samples.Mail("seen", subject: "уже было", hour: 7), Samples.Mail("early", subject: "раннее", hour: 8)],
             singularity,
-            state,
             new RecordingNotifier(),
             out _);
 
@@ -68,36 +63,68 @@ public class MailCheckerTests
     }
 
     /// <summary>
-    /// Пробный прогон только пишет в лог: задач нет, письма не запоминаются
+    /// Письмо остаётся непрочитанным, и повторная проверка не создаёт дублей
     /// </summary>
     [Fact]
-    public async Task A_dry_run_creates_nothing_and_remembers_nothing()
+    public async Task A_second_run_over_the_same_unread_mails_creates_no_duplicates()
     {
         var singularity = new RecordingSingularity();
-        var state = new MemoryState();
-        var checker = Checker([Samples.Mail("reply")], singularity, state, new RecordingNotifier(), out var log);
+        var checker = Checker([Samples.Mail("reply", hour: 9), Samples.Mail("other", hour: 10)], singularity, new RecordingNotifier(), out _);
+
+        await checker.RunAsync(dryRun: false, CancellationToken.None);
+        await checker.RunAsync(dryRun: false, CancellationToken.None);
+
+        Assert.Equal(2, singularity.Created.Count);
+    }
+
+    /// <summary>
+    /// Пробный прогон только пишет в лог: задач нет
+    /// </summary>
+    [Fact]
+    public async Task A_dry_run_creates_nothing()
+    {
+        var singularity = new RecordingSingularity();
+        var checker = Checker([Samples.Mail("reply")], singularity, new RecordingNotifier(), out var log);
 
         await checker.RunAsync(dryRun: true, CancellationToken.None);
 
         Assert.Empty(singularity.Created);
-        Assert.Empty(state.Saved);
-        Assert.False(state.IsProcessed("reply"));
         Assert.Contains(log, line => line.StartsWith("[тест] Ответить:", StringComparison.Ordinal));
     }
 
     /// <summary>
-    /// Если вторая задача не создалась, первое письмо уже сохранено и не превратится в задачу второй раз
+    /// Если вторая задача не создалась, первое письмо уже имеет задачу, и следующая проверка создаёт только вторую
     /// </summary>
     [Fact]
-    public async Task A_failure_in_the_middle_keeps_the_mails_that_were_already_done()
+    public async Task A_failure_in_the_middle_does_not_repeat_the_task_that_was_created()
     {
-        var singularity = new RecordingSingularity { FailOnCall = 2 };
-        var state = new MemoryState();
-        var checker = Checker([Samples.Mail("first", hour: 8), Samples.Mail("second", hour: 9)], singularity, state, new RecordingNotifier(), out _);
+        var failing = new RecordingSingularity { FailOnCall = 2 };
+        var mails = new[] { Samples.Mail("first", hour: 8), Samples.Mail("second", hour: 9) };
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => checker.RunAsync(dryRun: false, CancellationToken.None));
+        await Assert.ThrowsAsync<HttpRequestException>(() => Checker(mails, failing, new RecordingNotifier(), out _).RunAsync(dryRun: false, CancellationToken.None));
 
-        Assert.Equal(["first"], state.Saved.ToArray());
+        var retry = new RecordingSingularity();
+        retry.Existing.UnionWith(failing.Existing);
+        await Checker(mails, retry, new RecordingNotifier(), out _).RunAsync(dryRun: false, CancellationToken.None);
+
+        Assert.Equal(["mail:first"], failing.Created.Select(task => task.ExternalId!).ToArray());
+        Assert.Equal(["mail:second"], retry.Created.Select(task => task.ExternalId!).ToArray());
+    }
+
+    /// <summary>
+    /// Задачи ищутся от начала дня минус дни просмотра и ещё один день, а без непрочитанных писем SingularityApp не спрашивается вовсе
+    /// </summary>
+    [Fact]
+    public async Task The_search_window_covers_the_lookback_days_and_is_skipped_without_mail()
+    {
+        var withMail = new RecordingSingularity();
+        await Checker([Samples.Mail("reply")], withMail, new RecordingNotifier(), out _).RunAsync(dryRun: false, CancellationToken.None);
+
+        var withoutMail = new RecordingSingularity();
+        await Checker([], withoutMail, new RecordingNotifier(), out _).RunAsync(dryRun: false, CancellationToken.None);
+
+        Assert.Equal(new DateTimeOffset(2026, 10, 21, 0, 0, 0, TimeSpan.Zero), withMail.LastStartsAfter);
+        Assert.Null(withoutMail.LastStartsAfter);
     }
 
     /// <summary>
@@ -107,11 +134,11 @@ public class MailCheckerTests
     public async Task The_notification_appears_only_for_important_mails()
     {
         var onlyInfo = new RecordingNotifier();
-        await Checker([Samples.Mail("info", fromAddress: "bot@example.com")], new RecordingSingularity(), new MemoryState(), onlyInfo, out _)
+        await Checker([Samples.Mail("info", fromAddress: "bot@example.com")], new RecordingSingularity(), onlyInfo, out _)
             .RunAsync(dryRun: false, CancellationToken.None);
 
         var withReply = new RecordingNotifier();
-        await Checker([Samples.Mail("reply")], new RecordingSingularity(), new MemoryState(), withReply, out _)
+        await Checker([Samples.Mail("reply")], new RecordingSingularity(), withReply, out _)
             .RunAsync(dryRun: false, CancellationToken.None);
 
         Assert.Empty(onlyInfo.Shown);
@@ -123,11 +150,10 @@ public class MailCheckerTests
     /// </summary>
     /// <param name="mails">Письма ящика</param>
     /// <param name="singularity">Подделка SingularityApp</param>
-    /// <param name="state">Список обработанных писем</param>
     /// <param name="notifier">Подделка уведомлений</param>
     /// <param name="log">Строки лога, которые запишет проверка</param>
     /// <returns>Проверка почты</returns>
-    private static MailChecker Checker(MailItem[] mails, RecordingSingularity singularity, MemoryState state, RecordingNotifier notifier, out List<string> log)
+    private static MailChecker Checker(MailItem[] mails, RecordingSingularity singularity, RecordingNotifier notifier, out List<string> log)
     {
         var lines = new List<string>();
         log = lines;
@@ -136,7 +162,6 @@ public class MailCheckerTests
             new FakeMailReader(mails),
             new MailClassifier(Settings.Mail, Settings.Classifier),
             singularity,
-            state,
             notifier,
             Settings,
             new FixedTime(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero)),

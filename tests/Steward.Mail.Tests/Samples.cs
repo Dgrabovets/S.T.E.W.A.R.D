@@ -16,7 +16,9 @@ public static class Samples
     /// <param name="hour">Час получения 25 октября 2026 года</param>
     /// <param name="folder">Папка ящика</param>
     /// <param name="fromAddress">Адрес отправителя</param>
+    /// <param name="body">Текст письма</param>
+    /// <param name="links">Адреса, найденные в письме</param>
     /// <returns>Письмо</returns>
-    public static MailItem Mail(string id, string fromName = "Иванов Иван Иванович", string subject = "Вопрос", int hour = 9, string folder = "INBOX", string fromAddress = "ivanov@example.com") =>
-        new(id, folder, fromName, fromAddress, subject, new DateTimeOffset(2026, 10, 25, hour, 0, 0, TimeSpan.Zero), "Начало письма");
+    public static MailItem Mail(string id, string fromName = "Иванов Иван Иванович", string subject = "Вопрос", int hour = 9, string folder = "INBOX", string fromAddress = "ivanov@example.com", string body = "Начало письма", params string[] links) =>
+        new(id, folder, fromName, fromAddress, subject, new DateTimeOffset(2026, 10, 25, hour, 0, 0, TimeSpan.Zero), body, links);
 }

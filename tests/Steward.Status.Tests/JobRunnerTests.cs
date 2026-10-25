@@ -89,6 +89,63 @@ public class JobRunnerTests
     }
 
     /// <summary>
+    /// Хвост вывода программы и сводка попадают в запись журнала, а ошибка берётся из итогового статуса
+    /// </summary>
+    [Fact]
+    public async Task The_record_keeps_the_output_tail_the_summary_and_the_full_error()
+    {
+        using var dir = new TempDir();
+        var (runner, _) = Create(dir);
+
+        var record = await runner.RunAsync(Samples.Job("noisy") with { Arguments = "/c \"echo first line & echo second line & echo boom 1>&2 & exit 2\"" }, "manual");
+
+        Assert.Equal("Код завершения 2: boom", record.Detail);
+        Assert.Contains("first line", record.Output, StringComparison.Ordinal);
+        Assert.Contains("boom", record.Output, StringComparison.Ordinal);
+        Assert.Null(record.Summary);
+        Assert.Equal("noisy", runner.History.Load(1).Single().JobId);
+        Assert.Contains("second line", runner.History.Load(1).Single().Output, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Успешный запуск без вывода не хранит пустой вывод, но сохраняет сводку раннера
+    /// </summary>
+    [Fact]
+    public async Task A_silent_successful_run_has_no_output_and_the_runner_summary()
+    {
+        using var dir = new TempDir();
+        var (runner, _) = Create(dir);
+
+        var record = await runner.RunAsync(Samples.Job("silent") with { Arguments = "/c exit 0" }, "manual");
+
+        Assert.Null(record.Output);
+        Assert.Null(record.Detail);
+        Assert.Equal("Завершено без ошибок", record.Summary);
+    }
+
+    /// <summary>
+    /// Если программа сама записала ошибку, в журнал идёт её полный текст, а не короткий код завершения
+    /// </summary>
+    [Fact]
+    public async Task A_self_reported_error_replaces_the_exit_code_text_in_the_record()
+    {
+        using var dir = new TempDir();
+        var (runner, _) = Create(dir);
+        var script = Path.Combine(dir.Path, "self-error.ps1");
+        File.WriteAllText(script, """
+            $dir = Join-Path $env:STEWARD_DATA 'status'
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            $json = '{"id":"self-error","title":"Self","state":"failed","updatedAt":"' + (Get-Date).ToString('o') + '","error":"Token is not set in Singularity:Token"}'
+            Set-Content -Path (Join-Path $dir 'self-error.json') -Value $json -Encoding UTF8
+            exit 1
+            """);
+
+        var record = await runner.RunAsync(Samples.Job("self-error") with { Command = "powershell.exe", Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\"" }, "manual");
+
+        Assert.Equal(RunOutcomeEnum.Failed, record.Outcome);
+        Assert.Equal("Token is not set in Singularity:Token", record.Detail);
+    }
+    /// <summary>
     /// Зависшая программа останавливается по таймауту, статус становится «не удалось»
     /// </summary>
     [Fact]

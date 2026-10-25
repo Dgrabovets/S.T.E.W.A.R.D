@@ -1,4 +1,5 @@
 using Steward.Models;
+using Steward.Mvvm;
 using Steward.Monitoring.Models;
 using Steward.Status.Rows;
 using Steward.Status.Running;
@@ -35,12 +36,28 @@ public sealed class MainViewModel : PanelViewModel
     /// </summary>
     public MainViewModel() : base("Проверка")
     {
+        ClearJournalCommand = new RelayCommand(() => ClearJournalRequested?.Invoke(this, EventArgs.Empty));
     }
 
     /// <summary>
     /// Просит запустить задачу: параметр — идентификатор
     /// </summary>
     public event Action<string>? RunRequested;
+
+    /// <summary>
+    /// Просит отдать неудавшийся запуск Claude на починку: параметр — запись журнала
+    /// </summary>
+    public event Action<RunRecord>? FixRequested;
+
+    /// <summary>
+    /// Просит стереть журнал запусков
+    /// </summary>
+    public event EventHandler? ClearJournalRequested;
+
+    /// <summary>
+    /// Стирает журнал запусков
+    /// </summary>
+    public RelayCommand ClearJournalCommand { get; }
 
     #region State
 
@@ -110,6 +127,7 @@ public sealed class MainViewModel : PanelViewModel
                 return;
 
             Raise(nameof(IsJournalEmpty));
+            Raise(nameof(HasRecords));
         }
     }
 
@@ -117,6 +135,11 @@ public sealed class MainViewModel : PanelViewModel
     /// Журнал пуст
     /// </summary>
     public bool IsJournalEmpty => Records.Count == 0;
+
+    /// <summary>
+    /// В журнале есть записи, их можно стереть
+    /// </summary>
+    public bool HasRecords => Records.Count > 0;
 
     /// <summary>
     /// Что не удалось прочитать в реестре задач
@@ -153,7 +176,7 @@ public sealed class MainViewModel : PanelViewModel
     {
         var rows = TaskRows.Build(snapshot, jobs);
         Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id))).ToArray();
-        Records = records.Select(record => new RunRowViewModel(record)).ToArray();
+        Records = records.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
 
         ApplySummary(rows);

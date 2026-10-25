@@ -5,12 +5,11 @@ using Steward.Mail.Models;
 namespace Steward.Mail.Services;
 
 /// <summary>
-/// Одна проверка почты: читает новые письма, создаёт задачи, запоминает обработанные и показывает уведомление
+/// Одна проверка почты: читает непрочитанные письма, создаёт задачи для тех, у кого её ещё нет, и показывает уведомление. Флаг «прочитано» не ставится: пока вы не открыли письмо, оно считается требующим внимания, а повторную задачу не даёт внешний ключ в SingularityApp
 /// </summary>
 /// <param name="reader">Читает непрочитанные письма</param>
 /// <param name="classifier">Относит письмо к категории</param>
-/// <param name="singularity">Создаёт задачи в SingularityApp</param>
-/// <param name="state">Помнит обработанные письма</param>
+/// <param name="singularity">Создаёт задачи в SingularityApp и подсказывает, для каких писем они уже есть</param>
 /// <param name="notifier">Показывает уведомление со сводкой</param>
 /// <param name="settings">Настройки приложения</param>
 /// <param name="timeProvider">Часы: от них берётся день начала задачи</param>
@@ -19,7 +18,6 @@ public sealed class MailChecker(
     IMailReader reader,
     IMailClassifier classifier,
     ISingularityClient singularity,
-    IStateStore state,
     INotifier notifier,
     AppSettings settings,
     TimeProvider timeProvider,
@@ -29,15 +27,21 @@ public sealed class MailChecker(
     /// Читает непрочитанные письма, создаёт задачи и пишет по строке на письмо и на итог
     /// </summary>
     /// <param name="dryRun">
-    /// <see langword="true"/>, если нужно только записать в лог: задачи не создаются, письма не запоминаются
+    /// <see langword="true"/>, если нужно только записать в лог: задачи не создаются
     /// </param>
     /// <param name="cancellationToken">Отменяет проверку</param>
     /// <returns>Письма по категориям и сводка</returns>
     public async Task<MailCheckResult> RunAsync(bool dryRun, CancellationToken cancellationToken)
     {
+        var now = timeProvider.GetLocalNow();
+        var dayStart = new DateTimeOffset(now.Date, now.Offset);
+
         var unread = await reader.GetUnreadAsync(cancellationToken);
-        var fresh = unread.Where(item => !state.IsProcessed(item.MessageId)).OrderBy(item => item.Date).ToList();
-        var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
+        var existing = unread.Count == 0
+            ? new HashSet<string>()
+            : await singularity.ListExternalIdsAsync(dayStart.AddDays(-(settings.Mail.LookbackDays + 1)), cancellationToken);
+
+        var fresh = unread.Where(item => !existing.Contains(MailTaskBuilder.ExternalId(item))).OrderBy(item => item.Date).ToList();
 
         var feedback = new List<MailItem>();
         var replies = new List<MailItem>();
@@ -46,7 +50,7 @@ public sealed class MailChecker(
         foreach (var mail in fresh)
         {
             var category = classifier.Classify(mail);
-            var task = MailTaskBuilder.Build(mail, category, settings, today);
+            var task = MailTaskBuilder.Build(mail, category, settings, dayStart);
 
             if (task is not null && !dryRun)
                 await singularity.CreateTaskAsync(task, cancellationToken);
@@ -61,12 +65,6 @@ public sealed class MailChecker(
             log($"{(dryRun ? "[тест] " : string.Empty)}{CategoryLabel(category)}: {mail.FromName} — {mail.Subject}" +
                 (task is null ? string.Empty : $" → задача «{task.Title}»"));
 
-            if (!dryRun)
-            {
-                // Сохраняем после каждого письма: если следующее упадёт, это письмо не станет задачей во второй раз
-                state.MarkProcessed(mail.MessageId);
-                state.Save();
-            }
         }
 
         var summary = MailSummary.Build(feedback, replies, info);

@@ -22,6 +22,16 @@ public sealed class JobRunner
     private static readonly TimeSpan OUTPUT_DRAIN = TimeSpan.FromSeconds(3);
 
     /// <summary>
+    /// Сколько последних строк вывода хранить в журнале
+    /// </summary>
+    private const int OUTPUT_LINES = 40;
+
+    /// <summary>
+    /// Наибольшая длина хранимого вывода в символах
+    /// </summary>
+    private const int OUTPUT_LIMIT = 4000;
+
+    /// <summary>
     /// Хранилище статусов
     /// </summary>
     private readonly StatusStore _store;
@@ -141,33 +151,34 @@ public sealed class JobRunner
     private async Task<RunRecord> RunCoreAsync(JobDefinition job, string reason, CancellationToken cancellationToken)
     {
         var started = DateTimeOffset.Now;
-        int? exitCode = null;
-        var outcome = RunOutcomeEnum.NotStarted;
-        string? detail = null;
+        var result = new ProcessResult(RunOutcomeEnum.NotStarted, null, null);
 
         try
         {
             _store.Report(job.Id, job.DisplayTitle, ProcessStateEnum.Running, started, $"Запуск: {reason}", null, success: false);
             Started?.Invoke(this, job.Id);
 
-            (outcome, exitCode, detail) = await StartAndWaitAsync(job, cancellationToken);
+            result = await StartAndWaitAsync(job, cancellationToken);
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
         {
-            detail = exception.Message;
+            result = result with { Detail = exception.Message };
         }
 
         var finished = DateTimeOffset.Now;
         try
         {
-            Finish(job, started, finished, outcome, exitCode, detail);
+            Finish(job, started, finished, result);
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
         {
-            detail ??= exception.Message;
+            result = result with { Detail = result.Detail ?? exception.Message };
         }
 
-        var record = new RunRecord(job.Id, job.DisplayTitle, reason, started, finished, exitCode, outcome, detail);
+        // Итоговый статус уже записан: либо самим процессом, либо раннером. Из него берутся сводка и полный текст ошибки
+        var status = _store.TryRead(job.Id);
+        var detail = result.Outcome == RunOutcomeEnum.Ok ? null : status?.Error ?? result.Detail;
+        var record = new RunRecord(job.Id, job.DisplayTitle, reason, started, finished, result.ExitCode, result.Outcome, detail, status?.Summary, result.Output);
         History.Append(record);
 
         return record;
@@ -178,8 +189,8 @@ public sealed class JobRunner
     /// </summary>
     /// <param name="job">Задача</param>
     /// <param name="cancellationToken">Останавливает процесс</param>
-    /// <returns>Итог, код завершения и пояснение к ошибке</returns>
-    private async Task<(RunOutcomeEnum Outcome, int? ExitCode, string? Detail)> StartAndWaitAsync(JobDefinition job, CancellationToken cancellationToken)
+    /// <returns>Итог, код завершения, пояснение к ошибке и хвост вывода</returns>
+    private async Task<ProcessResult> StartAndWaitAsync(JobDefinition job, CancellationToken cancellationToken)
     {
         var temp = Path.Combine(_dataDirectory, "tmp");
         Directory.CreateDirectory(temp);
@@ -206,11 +217,11 @@ public sealed class JobRunner
             }
             catch (Exception exception) when (exception is Win32Exception or InvalidOperationException or DirectoryNotFoundException)
             {
-                return (RunOutcomeEnum.NotStarted, null, exception.Message);
+                return new ProcessResult(RunOutcomeEnum.NotStarted, null, exception.Message);
             }
 
             if (process is null)
-                return (RunOutcomeEnum.NotStarted, null, "Процесс не создан");
+                return new ProcessResult(RunOutcomeEnum.NotStarted, null, "Процесс не создан");
 
             var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
             var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
@@ -225,8 +236,8 @@ public sealed class JobRunner
             {
                 Kill(process);
                 return cancellationToken.IsCancellationRequested
-                    ? (RunOutcomeEnum.Failed, null, "Остановлена при закрытии приложения")
-                    : (RunOutcomeEnum.TimedOut, null, $"Не завершилась за {job.TimeoutMinutes:0.##} мин, процесс остановлен");
+                    ? new ProcessResult(RunOutcomeEnum.Failed, null, "Остановлена при закрытии приложения")
+                    : new ProcessResult(RunOutcomeEnum.TimedOut, null, $"Не завершилась за {job.TimeoutMinutes:0.##} мин, процесс остановлен");
             }
 
             // Внук процесса может держать трубу открытой и после выхода самого процесса: ждать вывод бесконечно нельзя
@@ -234,9 +245,11 @@ public sealed class JobRunner
             await Task.WhenAny(drained, Task.Delay(OUTPUT_DRAIN));
 
             var tail = drained.IsCompletedSuccessfully ? LastLine(error.Result) : null;
+            var text = drained.IsCompletedSuccessfully ? OutputTail(output.Result + "\n" + error.Result) : null;
+
             return process.ExitCode == 0
-                ? (RunOutcomeEnum.Ok, 0, null)
-                : (RunOutcomeEnum.Failed, process.ExitCode, tail is null ? $"Код завершения {process.ExitCode}" : $"Код завершения {process.ExitCode}: {tail}");
+                ? new ProcessResult(RunOutcomeEnum.Ok, 0, null, text)
+                : new ProcessResult(RunOutcomeEnum.Failed, process.ExitCode, tail is null ? $"Код завершения {process.ExitCode}" : $"Код завершения {process.ExitCode}: {tail}", text);
         }
         finally
         {
@@ -250,15 +263,13 @@ public sealed class JobRunner
     /// <param name="job">Задача</param>
     /// <param name="started">Когда запуск начался</param>
     /// <param name="finished">Когда запуск закончился</param>
-    /// <param name="outcome">Итог процесса</param>
-    /// <param name="exitCode">Код завершения</param>
-    /// <param name="detail">Пояснение к ошибке</param>
-    private void Finish(JobDefinition job, DateTimeOffset started, DateTimeOffset finished, RunOutcomeEnum outcome, int? exitCode, string? detail)
+    /// <param name="result">Итог процесса</param>
+    private void Finish(JobDefinition job, DateTimeOffset started, DateTimeOffset finished, ProcessResult result)
     {
         var current = _store.TryRead(job.Id);
         var selfReported = current is { } own && own.State != ProcessStateEnum.Running && own.UpdatedAt > started;
 
-        if (outcome == RunOutcomeEnum.Ok)
+        if (result.Outcome == RunOutcomeEnum.Ok)
         {
             if (!selfReported)
                 _store.Report(job.Id, job.DisplayTitle, ProcessStateEnum.Ok, finished, "Завершено без ошибок", null, success: true);
@@ -270,7 +281,7 @@ public sealed class JobRunner
 
         var reportedFailure = selfReported && current!.State == ProcessStateEnum.Failed;
         if (!reportedFailure)
-            _store.Report(job.Id, job.DisplayTitle, ProcessStateEnum.Failed, finished, null, detail ?? $"Код завершения {exitCode}", success: false);
+            _store.Report(job.Id, job.DisplayTitle, ProcessStateEnum.Failed, finished, null, result.Detail ?? $"Код завершения {result.ExitCode}", success: false);
         else if (current!.LastRunAt is null || current.LastRunAt < started)
             _store.Write(current with { LastRunAt = finished });
     }
@@ -291,6 +302,21 @@ public sealed class JobRunner
 
         var directory = Path.IsPathRooted(job.Command) ? Path.GetDirectoryName(job.Command) : null;
         return directory is not null && Directory.Exists(directory) ? directory : string.Empty;
+    }
+
+    /// <summary>
+    /// Оставляет конец вывода процесса: последние строки, но не больше лимита символов
+    /// </summary>
+    /// <param name="text">Весь вывод: стандартный поток и поток ошибок</param>
+    /// <returns>
+    /// Последние непустые строки или <see langword="null"/>, если вывода не было
+    /// </returns>
+    private static string? OutputTail(string text)
+    {
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).TakeLast(OUTPUT_LINES);
+        var tail = string.Join('\n', lines);
+
+        return tail.Length == 0 ? null : tail.Length <= OUTPUT_LIMIT ? tail : "…" + tail[^OUTPUT_LIMIT..];
     }
 
     /// <summary>
