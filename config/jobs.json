@@ -6,9 +6,10 @@
     {
       "id": "mail",
       "title": "Почта",
-      // Включай, когда настроишь Steward.Mail/appsettings.json и соберёшь программу:
+      // Нужны настроенный Steward.Mail/appsettings.json и собранная программа:
       //   dotnet publish Steward.Mail -c Release -o Steward.Mail/publish
-      "enabled": false,
+      // Письма читаются без отметки «прочитано», задачи не дублируются (внешний ключ в Singularity)
+      "enabled": true,
       "command": "{repo}\\Steward.Mail\\publish\\Steward.Mail.exe",
       "triggers": [
         { "type": "start" },
