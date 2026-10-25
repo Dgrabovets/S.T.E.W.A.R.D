@@ -90,7 +90,8 @@ public sealed partial class StatusStore
     /// <param name="success">
     /// <see langword="true"/>, если запуск удался и нужно обновить время успеха
     /// </param>
-    public void Report(string id, string title, ProcessStateEnum state, DateTimeOffset at, string? summary, string? error, bool success)
+    /// <param name="awaiting">Сколько результатов ждёт решения человека. Если не задано, остаётся прежнее число</param>
+    public void Report(string id, string title, ProcessStateEnum state, DateTimeOffset at, string? summary, string? error, bool success, int? awaiting = null)
     {
         var previous = Read(id);
         Write(new ProcessStatus
@@ -104,7 +105,7 @@ public sealed partial class StatusStore
             NextRunAt = previous?.NextRunAt,
             Summary = summary,
             Error = error,
-            Awaiting = previous?.Awaiting ?? 0,
+            Awaiting = awaiting ?? previous?.Awaiting ?? 0,
         });
     }
 

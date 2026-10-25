@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows.Input;
 using System.Windows;
+using Steward.Ideas.Models;
 using Steward.Monitoring.Models;
 using Steward.Status.Rows;
 using Steward.Status.Running;
@@ -39,9 +40,10 @@ public partial class MainWindow : Window
     /// <param name="snapshot">Состояние контейнера расписания</param>
     /// <param name="jobs">Строки задач из реестра</param>
     /// <param name="records">Последние запуски</param>
+    /// <param name="ideas">Идеи, которые ждут решения</param>
     /// <param name="registryErrors">Ошибки чтения реестра</param>
-    public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors) =>
-        Model.Apply(snapshot, jobs, records, registryErrors);
+    public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors, IReadOnlyList<Idea> ideas) =>
+        Model.Apply(snapshot, jobs, records, registryErrors, ideas);
 
     /// <summary>
     /// Показывает окно и выводит его на передний план

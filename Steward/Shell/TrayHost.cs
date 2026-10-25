@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Steward.Ideas.Models;
 using Steward.Status.Running;
 using Steward.Status.Common;
 using System.Drawing.Drawing2D;
@@ -335,7 +337,7 @@ public sealed class TrayHost : IDisposable
         if (_window.IsVisible)
             _window.Apply(_snapshot, _jobRows, scrollToProblem: false);
         if (_main is { IsVisible: true })
-            _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors);
+            _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
 
         NotifyJobProblems(_jobRows);
     }
@@ -438,11 +440,14 @@ public sealed class TrayHost : IDisposable
             _main.Model.RunRequested += id => _jobs.RunNow(id);
             _main.Model.FixRequested += OpenFix;
             _main.Model.ClearJournalRequested += (_, _) => _jobs.ClearRecords();
+            _main.Model.IdeaApproved += ApproveIdea;
+            _main.Model.IdeaRejected += idea => _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Rejected);
+            _main.Model.LinkRequested += OpenLink;
             _main.Model.ExitRequested += (_, _) => Exit();
         }
 
         _jobRows = _jobs.Rows();
-        _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors);
+        _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
         _main.ShowAndActivate();
     }
 
@@ -456,6 +461,34 @@ public sealed class TrayHost : IDisposable
         if (error.Length > 0)
             _icon.ShowBalloonTip(BALLOON_MS, "Починка", error, ToolTipIcon.None);
     }
+
+    /// <summary>
+    /// Открывает Claude с просьбой разобрать идею. Идея считается принятой, только если приложение открылось
+    /// </summary>
+    /// <param name="idea">Идея, которую решено делать</param>
+    private void ApproveIdea(Idea idea)
+    {
+        var error = ClaudeLauncher.Open(IdeaPrompt.Build(idea, DataLocation.RepoRootOrStart(), _jobs.IdeaPath(idea.Id)));
+        if (error.Length > 0)
+        {
+            _icon.ShowBalloonTip(BALLOON_MS, "Идея", error, ToolTipIcon.None);
+
+            return;
+        }
+
+        _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Approved);
+    }
+
+    /// <summary>
+    /// Открывает ссылку в браузере, если это обычный адрес сайта
+    /// </summary>
+    /// <param name="link">Адрес рилса</param>
+    private static void OpenLink(string link)
+    {
+        if (Uri.TryCreate(link, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    }
+
     /// <summary>
     /// Убирает иконку и завершает процесс
     /// </summary>

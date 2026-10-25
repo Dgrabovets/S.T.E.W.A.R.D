@@ -8,8 +8,9 @@
 | [`Steward.Status/`](Steward.Status/README.md) | Общий формат статуса процессов, реестр задач и раннер, который их запускает |
 | [`Steward.Schedule/`](Steward.Schedule/README.md) | Переносит расписание из Google Таблицы в задачи. Работает в Docker. Библиотеки: `Steward.Schedule.Core` и `Steward.Schedule.Shared` |
 | [`Steward.Mail/`](Steward.Mail/README.md) | Проверяет учебную почту и ставит задачи на письма, которые требуют ответа или содержат отзыв |
+| [`Steward.Reels/`](Steward.Reels/README.md) | Бот в Telegram: рилсы превращаются в идеи на странице «Идеи». Идеи хранит библиотека `Steward.Ideas` |
 | [`Whisper/`](Whisper/README.md) | Локальная расшифровка речи из видео, пока для рилсов (Python) |
-| `tests/` | Тесты: `Steward.Tests`, `Steward.Status.Tests`, `Steward.Schedule.Tests` |
+| `tests/` | Тесты: `Steward.Tests`, `Steward.Status.Tests`, `Steward.Schedule.Tests`, `Steward.Mail.Tests`, `Steward.Reels.Tests` |
 | [`config/jobs.json`](config/jobs.json) | Список задач, которые приложение запускает само |
 | `tools/` | Служебные инструменты разработки, например проверка XML-комментариев |
 
@@ -56,4 +57,4 @@ dotnet run tools/DocScan.cs -- . --params
 
 ## Секреты
 
-Ни токены, ни пароли в репозиторий не попадают: `.env` и `Steward.Mail/appsettings.json` лежат в `.gitignore`. Образцы без значений: `.env.example` и `Steward.Mail/appsettings.example.json`.
+Ни токены, ни пароли в репозиторий не попадают: `.env` и `Steward.Mail/appsettings.json` и `Steward.Reels/appsettings.json` лежат в `.gitignore`. Образцы без значений: `.env.example` и `appsettings.example.json` в папках программ.

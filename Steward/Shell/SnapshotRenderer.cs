@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows.Media.Imaging;
 using System.Windows.Media;
 using System.Windows;
+using Steward.Ideas.Models;
 using Steward.Monitoring.Models;
 using Steward.Status.Registry;
 using Steward.Status.Rows;
@@ -48,7 +49,7 @@ public static class SnapshotRenderer
         else
         {
             var main = new MainWindow();
-            main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"]);
+            main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"], SampleIdeas(now));
             if (parts.Length > 1 && Enum.TryParse<AppPageEnum>(parts[1], ignoreCase: true, out var page))
                 main.Model.Page = page;
 
@@ -111,6 +112,17 @@ public static class SnapshotRenderer
         new JobRow("mts", "MTS Link", "Не удалось", "Нет доступа к LMS: войдите заново (вчера в 19:00)", RowToneEnum.Problem, 0, true),
         new JobRow("telegram", "Telegram-бот", "Выполняется", "Запущена сегодня в 12:00", RowToneEnum.Working, 0, true),
         new JobRow("homework", "Домашние задания", "Отключена", "Включается полем enabled в config/jobs.json", RowToneEnum.Idle, 0, false),
+    ];
+
+    /// <summary>
+    /// Выдуманные идеи из рилсов
+    /// </summary>
+    /// <param name="now">Текущий момент</param>
+    /// <returns>Идеи от свежих к старым</returns>
+    private static IReadOnlyList<Idea> SampleIdeas(DateTimeOffset now) =>
+    [
+        new Idea { Id = "r1-1", CreatedAt = now.AddMinutes(-12), SourceUrl = "https://www.instagram.com/reel/sample/", Title = "Хранить конспекты лекций в одном поиске", Author = "@study.tools", Transcript = "Собери все конспекты в одну папку, прогони через расшифровку и ищи по ключевым словам вместо того, чтобы листать файлы. Я так готовлюсь к экзаменам уже второй семестр и экономлю кучу времени перед сессией." },
+        new Idea { Id = "r1-2", CreatedAt = now.AddHours(-5), SourceUrl = "https://www.instagram.com/reel/sample2/", Title = "Напоминание о дедлайне за день", Author = "@productivity", Caption = "Настрой напоминание за сутки до сдачи" },
     ];
 
     /// <summary>

@@ -60,7 +60,7 @@ public class FixPromptTests
     [Fact]
     public void The_url_opens_a_new_code_session_with_an_encoded_folder_and_prompt()
     {
-        var url = ClaudeFixLauncher.BuildUrl("Почини & проверь", @"D:\My Repo");
+        var url = ClaudeLauncher.BuildUrl("Почини & проверь", @"D:\My Repo");
 
         Assert.StartsWith("claude://code/new?folder=", url, StringComparison.Ordinal);
         Assert.Contains("folder=D%3A%5CMy%20Repo", url, StringComparison.Ordinal);

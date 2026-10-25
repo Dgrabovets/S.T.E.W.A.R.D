@@ -1,3 +1,4 @@
+using Steward.Ideas.Models;
 using Steward.Models;
 using Steward.Mvvm;
 using Steward.Monitoring.Models;
@@ -27,6 +28,11 @@ public sealed class MainViewModel : PanelViewModel
     private IReadOnlyList<RunRowViewModel> _records = [];
 
     /// <summary>
+    /// Карточки идей, которые ждут решения
+    /// </summary>
+    private IReadOnlyList<IdeaCardViewModel> _ideas = [];
+
+    /// <summary>
     /// Что не удалось прочитать в реестре задач
     /// </summary>
     private string _registryErrors = string.Empty;
@@ -53,6 +59,21 @@ public sealed class MainViewModel : PanelViewModel
     /// Просит стереть журнал запусков
     /// </summary>
     public event EventHandler? ClearJournalRequested;
+
+    /// <summary>
+    /// Решено делать идею: параметр — идея
+    /// </summary>
+    public event Action<Idea>? IdeaApproved;
+
+    /// <summary>
+    /// Решено не делать идею: параметр — идея
+    /// </summary>
+    public event Action<Idea>? IdeaRejected;
+
+    /// <summary>
+    /// Просит открыть ссылку в браузере: параметр — адрес
+    /// </summary>
+    public event Action<string>? LinkRequested;
 
     /// <summary>
     /// Стирает журнал запусков
@@ -137,6 +158,26 @@ public sealed class MainViewModel : PanelViewModel
     public bool IsJournalEmpty => Records.Count == 0;
 
     /// <summary>
+    /// Карточки идей, которые ждут решения
+    /// </summary>
+    public IReadOnlyList<IdeaCardViewModel> Ideas
+    {
+        get => _ideas;
+        private set
+        {
+            if (!Set(ref _ideas, value))
+                return;
+
+            Raise(nameof(IsIdeasEmpty));
+        }
+    }
+
+    /// <summary>
+    /// Идей, которые ждут решения, нет
+    /// </summary>
+    public bool IsIdeasEmpty => Ideas.Count == 0;
+
+    /// <summary>
     /// В журнале есть записи, их можно стереть
     /// </summary>
     public bool HasRecords => Records.Count > 0;
@@ -172,12 +213,14 @@ public sealed class MainViewModel : PanelViewModel
     /// <param name="jobs">Строки задач из реестра</param>
     /// <param name="records">Последние запуски</param>
     /// <param name="registryErrors">Ошибки чтения реестра</param>
-    public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors)
+    /// <param name="ideas">Идеи, которые ждут решения</param>
+    public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors, IReadOnlyList<Idea> ideas)
     {
         var rows = TaskRows.Build(snapshot, jobs);
         Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id))).ToArray();
         Records = records.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
+        Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();
 
         ApplySummary(rows);
     }

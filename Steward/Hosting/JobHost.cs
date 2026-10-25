@@ -1,5 +1,7 @@
 using System.IO;
 using System.Windows.Threading;
+using Steward.Ideas.Models;
+using Steward.Ideas.Storage;
 using Steward.Status.Common;
 using Steward.Status.Registry;
 using Steward.Status.Rows;
@@ -30,6 +32,11 @@ public sealed class JobHost : IDisposable
     private const int RECORD_COUNT = 100;
 
     /// <summary>
+    /// Идентификатор задачи бота для рилсов в config/jobs.json
+    /// </summary>
+    private const string REELS_ID = "reels";
+
+    /// <summary>
     /// Поток окна: в него переправляются события из рабочих потоков
     /// </summary>
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
@@ -43,6 +50,11 @@ public sealed class JobHost : IDisposable
     /// Папка файлов статусов
     /// </summary>
     private readonly StatusStore _store;
+
+    /// <summary>
+    /// Папка идей из рилсов
+    /// </summary>
+    private readonly IdeaStore _ideas;
 
     /// <summary>
     /// Запускает процессы и ведёт журнал
@@ -66,6 +78,7 @@ public sealed class JobHost : IDisposable
     {
         var dataDirectory = DataLocation.DataDirectory();
         _store = new StatusStore(Path.Combine(dataDirectory, "status"));
+        _ideas = new IdeaStore(Path.Combine(dataDirectory, "ideas"));
 
         var registry = JobRegistry.Load(DataLocation.JobsFile(), DataLocation.FindRepoRoot());
         _jobs = registry.Jobs;
@@ -137,6 +150,38 @@ public sealed class JobHost : IDisposable
     /// </summary>
     /// <returns>Записи от новых к старым</returns>
     public IReadOnlyList<RunRecord> Records() => _runner.History.Load(RECORD_COUNT);
+
+    /// <summary>
+    /// Читает идеи, которые ждут решения
+    /// </summary>
+    /// <returns>Новые идеи от свежих к старым</returns>
+    public IReadOnlyList<Idea> Ideas() => [.. _ideas.LoadAll().Where(idea => idea.State == IdeaStateEnum.New)];
+
+    /// <summary>
+    /// Путь к файлу идеи
+    /// </summary>
+    /// <param name="id">Идентификатор идеи</param>
+    /// <returns>Полный путь к файлу</returns>
+    public string IdeaPath(string id) => _ideas.PathFor(id);
+
+    /// <summary>
+    /// Записывает решение по идее и обновляет число ожидающих в статусе задачи «reels», не дожидаясь следующего запуска бота
+    /// </summary>
+    /// <param name="id">Идентификатор идеи</param>
+    /// <param name="state">Решение</param>
+    public void SetIdeaState(string id, IdeaStateEnum state)
+    {
+        if (!_ideas.SetState(id, state) || _store.TryRead(REELS_ID) is not { State: ProcessStateEnum.Ok or ProcessStateEnum.NeedsAttention } status)
+        {
+            Changed?.Invoke(this, EventArgs.Empty);
+
+            return;
+        }
+
+        var awaiting = Ideas().Count;
+        _store.Write(status with { Awaiting = awaiting, State = awaiting > 0 ? ProcessStateEnum.NeedsAttention : ProcessStateEnum.Ok });
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>
     /// Стирает журнал запусков и сообщает панелям

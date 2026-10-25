@@ -16,6 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Steward.Ideas\Steward.Ideas.csproj" />
     <ProjectReference Include="..\Steward.Schedule.Shared\Steward.Schedule.Shared.csproj" />
     <ProjectReference Include="..\Steward.Status\Steward.Status.csproj" />
   </ItemGroup>

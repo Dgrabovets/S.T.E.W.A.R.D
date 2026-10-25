@@ -18,6 +18,21 @@
       ],
       "timeoutMinutes": 10,
       "staleAfterMinutes": 960
+    },
+    {
+      "id": "reels",
+      "title": "Рилсы",
+      // Бот в Telegram: ссылки на рилсы превращаются в идеи на странице «Идеи».
+      // Нужны Steward.Reels/publish/appsettings.json с токеном бота и Whisper с yt-dlp (см. Steward.Reels/README.md):
+      //   dotnet publish Steward.Reels -c Release -o Steward.Reels/publish
+      "enabled": false,
+      "command": "{repo}\\Steward.Reels\\publish\\Steward.Reels.exe",
+      "triggers": [
+        { "type": "start" },
+        { "type": "interval", "everyMinutes": 5 }
+      ],
+      "timeoutMinutes": 40,
+      "staleAfterMinutes": 30
     }
   ]
 }

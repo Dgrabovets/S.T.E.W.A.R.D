@@ -143,17 +143,38 @@
                                 </Style.Triggers>
                             </Style>
                         </Grid.Style>
-                        <StackPanel>
-                            <TextBlock Text="Идеи" Style="{StaticResource PageTitle}"/>
-                            <TextBlock Text="Разобранные идеи из сохранённых рилсов, которые ждут твоего решения." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="Идей пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                                    <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
-                                               Text="Сюда попадут идеи из рилсов, которыми ты поделишься с ботом. У каждой будет подробное описание и кнопки «Делаем» и «Отклонить». Если принять идею, приложение запустит Claude Code, и он реализует её в отдельной ветке git, а ты проверишь результат."/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="Идеи" Style="{StaticResource PageTitle}"/>
+                                <TextBlock Text="Разобранные идеи из сохранённых рилсов, которые ждут твоего решения." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
+                                <Border Style="{StaticResource Card}" Visibility="{Binding IsIdeasEmpty, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Text="Идей пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
+                                        <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
+                                                   Text="Пришли ссылку на рилс боту в Telegram: через несколько минут идея появится здесь с кнопками «Делаем» и «Отклонить». Если принять идею, откроется Claude Code с готовой просьбой, а ты отправишь её сам."/>
+                                    </StackPanel>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding Ideas}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Meta}" Style="{StaticResource PageHint}" Margin="0,4,0,0"/>
+                                                    <TextBlock Text="{Binding Preview}" Style="{StaticResource PageHint}" Margin="0,8,0,0" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"
+                                                               Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                                        <Button Content="Делаем" Command="{Binding ApproveCommand}" Style="{StaticResource PrimaryButton}"/>
+                                                        <Button Content="Отклонить" Command="{Binding RejectCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                                        <Button Content="Открыть рилс" Command="{Binding OpenSourceCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
                     </Grid>
 
                     <!-- ДЗ -->
