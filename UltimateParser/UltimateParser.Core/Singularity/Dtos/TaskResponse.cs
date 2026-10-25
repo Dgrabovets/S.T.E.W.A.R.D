@@ -59,4 +59,9 @@ internal sealed class TaskResponse
     /// Минуты до начала, за которые стоят напоминания
     /// </summary>
     public int[]? Notifies { get; set; }
+
+    /// <summary>
+    /// Идентификаторы тегов задачи
+    /// </summary>
+    public string[]? Tags { get; set; }
 }

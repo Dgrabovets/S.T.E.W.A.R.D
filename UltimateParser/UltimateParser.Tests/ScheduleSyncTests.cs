@@ -483,9 +483,126 @@ public class ScheduleSyncTests
         Assert.Empty(client.Updated);
     }
 
+    /// <summary>
+    /// Новое занятие получает тег предмета, а у существующего тег добавляется к тем, что поставил пользователь
+    /// </summary>
+    [Fact]
+    public async Task Run_adds_the_subject_tag_and_keeps_tags_set_by_hand()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,"Предмет, Иванов"
+            пт,02.10,17.20-18.40,"Другой предмет, Петров"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Преподаватель: Иванов"),
+            "T-1",
+            checkState: 0) with { Tags = ["A-ручной"] });
+
+        var report = await SyncWithSubjectTags(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(1, 1, 0, 0, 0, 0), report);
+        Assert.Equal(["A-ручной", "A-Предмет"], client.Updated.Single().TagIds);
+        Assert.Equal(["A-Другой предмет"], client.Created.Single().TagIds);
+    }
+
+    /// <summary>
+    /// Задача, на которой тег предмета уже стоит, не обновляется
+    /// </summary>
+    [Fact]
+    public async Task Run_does_not_update_when_the_subject_tag_is_already_set()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,"Предмет, Иванов"
+            """;
+
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(
+            SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Преподаватель: Иванов"),
+            "T-1",
+            checkState: 0) with { Tags = ["A-Предмет"] });
+
+        var report = await SyncWithSubjectTags(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(0, 0, 0, 0, 0, 0), report);
+        Assert.Empty(client.Updated);
+    }
+
+    /// <summary>
+    /// Если токену не хватает доступа к тегам, прогон идёт дальше без них
+    /// </summary>
+    [Fact]
+    public async Task Run_continues_without_tags_when_the_token_cannot_use_tags()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,"Предмет, Иванов"
+            """;
+
+        var client = new FakeClient { FailTags = true };
+
+        var report = await SyncWithSubjectTags(new FakeSource(csv), client);
+
+        Assert.Equal(new SyncReport(1, 0, 0, 0, 0, 0), report);
+        Assert.Empty(client.Created.Single().TagIds);
+    }
+
+    /// <summary>
+    /// Пока флаг выключен, теги не запрашиваются и не ставятся
+    /// </summary>
+    [Fact]
+    public async Task Run_does_not_touch_tags_while_the_flag_is_off()
+    {
+        const string csv = """
+            ,Дата,время,РКИ-2-26
+            чт,01.10,17.20-18.40,"Предмет, Иванов"
+            """;
+
+        var client = new FakeClient();
+
+        await Sync(new FakeSource(csv), client);
+
+        Assert.Empty(client.RequestedTags);
+        Assert.Empty(client.Created.Single().TagIds);
+    }
+
     #endregion Facts
 
     #region Helpers
+
+    /// <summary>
+    /// Запускает синхронизацию с включёнными тегами предметов
+    /// </summary>
+    /// <param name="source">
+    /// Источник CSV
+    /// </param>
+    /// <param name="client">
+    /// Клиент Singularity, который записывает вызовы
+    /// </param>
+    /// <returns>
+    /// Отчёт синхронизации
+    /// </returns>
+    private static Task<SyncReport> SyncWithSubjectTags(FakeSource source, FakeClient client)
+    {
+        var options = new SyncOptions
+        {
+            SingularityToken = "test",
+            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
+            SheetGid = "197520568",
+            GroupColumn = "РКИ-2-26",
+            ProjectTitle = "РКИ-2-26",
+            TimeZoneId = "Europe/Moscow",
+            IntervalMinutes = 30,
+            RunOnce = true,
+            SubjectTags = true,
+        };
+        var sync = new ScheduleSyncer(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSyncer>.Instance);
+        return sync.RunAsync(CancellationToken.None);
+    }
+
 
     /// <summary>
     /// Запускает синхронизацию на подделках с фиксированной датой
@@ -700,6 +817,37 @@ public class ScheduleSyncTests
         /// </returns>
         public Task<string?> FindProjectIdAsync(string title, CancellationToken cancellationToken) =>
             Task.FromResult<string?>(null);
+
+        /// <summary>
+        /// Названия тегов, которые запрашивала синхронизация
+        /// </summary>
+        public List<string> RequestedTags { get; } = [];
+
+        /// <summary>
+        /// <see langword="true"/>, если запрос тега должен упасть так же, как при нехватке доступа
+        /// </summary>
+        public bool FailTags { get; set; }
+
+        /// <summary>
+        /// Записывает запрос тега
+        /// </summary>
+        /// <param name="title">
+        /// Название тега
+        /// </param>
+        /// <param name="cancellationToken">
+        /// Не используется
+        /// </param>
+        /// <returns>
+        /// Идентификатор вида <c>A-название</c>
+        /// </returns>
+        public Task<string> GetOrCreateTagIdAsync(string title, CancellationToken cancellationToken)
+        {
+            if (FailTags)
+                throw new InvalidOperationException("Singularity 403 GET /v2/tag: forbidden");
+
+            RequestedTags.Add(title);
+            return Task.FromResult($"A-{title}");
+        }
 
         /// <summary>
         /// Возвращает <see cref="Tasks"/>

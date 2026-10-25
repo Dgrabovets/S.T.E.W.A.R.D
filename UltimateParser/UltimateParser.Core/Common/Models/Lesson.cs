@@ -56,4 +56,21 @@ public sealed record Lesson
     /// Длительность в минутах, взятая из диапазона слота
     /// </summary>
     public int TimeLengthMinutes { get; init; }
+
+    /// <summary>
+    /// Идентификаторы тегов, которые должны стоять на задаче. Пусто, пока теги предметов выключены
+    /// </summary>
+    public string[] TagIds { get; init; } = [];
+
+    /// <summary>
+    /// Предмет без типа занятия: из названия вида <c>Предмет (Практика)</c> остаётся <c>Предмет</c>
+    /// </summary>
+    public string Subject
+    {
+        get
+        {
+            var open = Title.LastIndexOf(" (", StringComparison.Ordinal);
+            return open > 0 && Title.EndsWith(')') ? Title[..open].Trim() : Title.Trim();
+        }
+    }
 }

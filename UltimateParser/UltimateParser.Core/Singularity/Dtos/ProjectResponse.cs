@@ -14,4 +14,14 @@ internal sealed class ProjectResponse
     /// Название проекта
     /// </summary>
     public string? Title { get; set; }
+
+    /// <summary>
+    /// Устойчивый ключ, по которому проект находится после переименования
+    /// </summary>
+    public string? ExternalId { get; set; }
+
+    /// <summary>
+    /// Идентификатор родительского проекта
+    /// </summary>
+    public string? Parent { get; set; }
 }

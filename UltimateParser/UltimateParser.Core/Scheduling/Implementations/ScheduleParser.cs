@@ -120,6 +120,17 @@ public static partial class ScheduleParser
     public static string ExternalIdPrefix(string groupColumn) => $"up:{Slug(groupColumn)}:";
 
     /// <summary>
+    /// Ключ проекта группы. Начинается не с <c>up:</c>, чтобы его не приняли за ключ задачи занятия
+    /// </summary>
+    /// <param name="groupColumn">
+    /// Заголовок колонки, из которого получается slug
+    /// </param>
+    /// <returns>
+    /// Значение вроде <c>up-project:rki-2-26</c>
+    /// </returns>
+    public static string ProjectExternalId(string groupColumn) => $"up-project:{Slug(groupColumn)}";
+
+    /// <summary>
     /// Превращает заголовок колонки в строчный slug, пригодный для внешнего идентификатора
     /// </summary>
     /// <param name="value">

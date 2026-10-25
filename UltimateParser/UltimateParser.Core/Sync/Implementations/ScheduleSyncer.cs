@@ -124,6 +124,10 @@ public sealed class ScheduleSyncer
                     .First(),
                 StringComparer.Ordinal);
 
+        var subjectTags = _options.SubjectTags
+            ? await ResolveSubjectTagsAsync(slots, cancellationToken)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+
         #endregion Load
 
         #region Reconciliation
@@ -147,7 +151,7 @@ public sealed class ScheduleSyncer
                     if (!IsCurrentWeek(slot.Lesson.Start, _clock.Now))
                         continue;
 
-                    var taskId = await _client.CreateTaskAsync(projectId, WithNotices(slot.Lesson, notices), cancellationToken);
+                    var taskId = await _client.CreateTaskAsync(projectId, WithTags(WithNotices(slot.Lesson, notices), null, subjectTags), cancellationToken);
                     created++;
                     _logger.LogInformation("Created {ExternalId} {Title}", slot.ExternalId, slot.Lesson.Title);
                     await _client.CompleteTaskAsync(taskId, cancellationToken);
@@ -170,7 +174,7 @@ public sealed class ScheduleSyncer
                     _logger.LogInformation("Unarchived past lesson {ExternalId}", slot.ExternalId);
                 }
 
-                var pastLesson = WithNotices(slot.Lesson, notices);
+                var pastLesson = WithTags(WithNotices(slot.Lesson, notices), existing, subjectTags);
                 if (!targetTaskIds.Contains(existing.Id) || SingularityClient.NeedsUpdate(existing, pastLesson))
                 {
                     await _client.UpdateTaskAsync(existing.Id, projectId, pastLesson, cancellationToken);
@@ -219,7 +223,7 @@ public sealed class ScheduleSyncer
 
             if (existing is null)
             {
-                await _client.CreateTaskAsync(projectId, WithNotices(slot.Lesson, notices), cancellationToken);
+                await _client.CreateTaskAsync(projectId, WithTags(WithNotices(slot.Lesson, notices), null, subjectTags), cancellationToken);
                 created++;
                 _logger.LogInformation("Created {ExternalId} {Title}", slot.ExternalId, slot.Lesson.Title);
                 continue;
@@ -232,7 +236,7 @@ public sealed class ScheduleSyncer
                 _logger.LogInformation("Unarchived {ExternalId}", slot.ExternalId);
             }
 
-            var lesson = WithNotices(slot.Lesson, notices);
+            var lesson = WithTags(WithNotices(slot.Lesson, notices), existing, subjectTags);
             if (!targetTaskIds.Contains(existing.Id) || SingularityClient.NeedsUpdate(existing, lesson))
             {
                 await _client.UpdateTaskAsync(existing.Id, projectId, lesson, cancellationToken);
@@ -403,6 +407,65 @@ public sealed class ScheduleSyncer
     }
 
     #endregion Removal notices
+
+    #region Subject tags
+
+    /// <summary>
+    /// Находит или создаёт по одному тегу на каждый предмет таблицы
+    /// </summary>
+    /// <param name="slots">
+    /// Слоты текущего листа
+    /// </param>
+    /// <param name="cancellationToken">
+    /// Отменяет прогон
+    /// </param>
+    /// <returns>
+    /// Идентификаторы тегов по названию предмета. Пусто, если токену не хватает доступа к тегам: прогон тогда идёт без тегов
+    /// </returns>
+    private async Task<Dictionary<string, string>> ResolveSubjectTagsAsync(
+        IReadOnlyList<Scheduling.Models.ScheduleSlot> slots,
+        CancellationToken cancellationToken)
+    {
+        var tagIds = new Dictionary<string, string>(StringComparer.Ordinal);
+        try
+        {
+            foreach (var subject in slots.Where(slot => slot.Lesson is not null).Select(slot => slot.Lesson!.Subject).Distinct(StringComparer.Ordinal))
+                tagIds[subject] = await _client.GetOrCreateTagIdAsync(subject, cancellationToken);
+        }
+        catch (InvalidOperationException exception)
+        {
+            _logger.LogWarning("Subject tags skipped for this run: {Reason}", exception.Message);
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        return tagIds;
+    }
+
+    /// <summary>
+    /// Добавляет к занятию тег его предмета, сохраняя теги, которые пользователь уже поставил на задачу
+    /// </summary>
+    /// <param name="lesson">
+    /// Занятие из таблицы
+    /// </param>
+    /// <param name="existing">
+    /// Сохранённая задача или <see langword="null"/>, если задачу ещё создают
+    /// </param>
+    /// <param name="subjectTags">
+    /// Идентификаторы тегов по названию предмета
+    /// </param>
+    /// <returns>
+    /// То же занятие, если тега для предмета нет. Иначе копия с тегами задачи и тегом предмета
+    /// </returns>
+    private static Lesson WithTags(Lesson lesson, Singularity.Models.SingularityTask? existing, Dictionary<string, string> subjectTags)
+    {
+        if (!subjectTags.TryGetValue(lesson.Subject, out var tagId))
+            return lesson;
+
+        var tags = (existing?.Tags ?? []).Append(tagId).Distinct(StringComparer.Ordinal).ToArray();
+        return lesson with { TagIds = tags };
+    }
+
+    #endregion Subject tags
 
     #region Week
 

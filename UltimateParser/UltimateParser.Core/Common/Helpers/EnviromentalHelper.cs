@@ -29,6 +29,8 @@ namespace UltimateParser.Common.Helpers
                 SheetGid = TryGetEnviromentalVariable(EnviromentalParamsNames.SHEET_GID),
                 GroupColumn = TryGetEnviromentalVariable(EnviromentalParamsNames.GROUP_COLUMN),
                 ProjectTitle = TryGetEnviromentalVariable(EnviromentalParamsNames.PROJECT_TITLE),
+                ProjectParentId = ReadOptionalVariable(EnviromentalParamsNames.PROJECT_PARENT_ID),
+                SubjectTags = string.Equals(ReadOptionalVariable(EnviromentalParamsNames.SUBJECT_TAGS), "true", StringComparison.OrdinalIgnoreCase),
                 TimeZoneId = TryGetEnviromentalVariable(EnviromentalParamsNames.TIME_ZONE),
                 IntervalMinutes = ReadIntervalMinutes(),
                 RunOnce = runOnce,
@@ -80,6 +82,21 @@ namespace UltimateParser.Common.Helpers
                 throw new ArgumentNullException($"Environment variable {name} is empty, fill it in and rerun the application.");
 
             return value.Trim();
+        }
+
+        /// <summary>
+        /// Возвращает необязательную переменную окружения без крайних пробелов
+        /// </summary>
+        /// <param name="name">
+        /// Имя переменной
+        /// </param>
+        /// <returns>
+        /// Обрезанное значение или <see langword="null"/>, если переменной нет или она пустая
+        /// </returns>
+        private static string? ReadOptionalVariable(string name)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
 
         /// <summary>

@@ -9,10 +9,10 @@ namespace UltimateParser.Singularity.Interfaces;
 public interface ISingularityClient
 {
     /// <summary>
-    /// Возвращает идентификатор проекта с названием <paramref name="title"/> и создаёт его, если такого нет
+    /// Возвращает идентификатор проекта группы и создаёт его, если такого нет. Сначала проект ищется по устойчивому ключу, затем по названию
     /// </summary>
     /// <param name="title">
-    /// Точное название проекта
+    /// Точное название проекта. По нему проект находится, пока на нём нет ключа, и с ним создаётся новый
     /// </param>
     /// <param name="cancellationToken">
     /// Токен отмены запроса
@@ -35,6 +35,20 @@ public interface ISingularityClient
     /// Идентификатор проекта или <see langword="null"/>, если проекта нет
     /// </returns>
     Task<string?> FindProjectIdAsync(string title, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Возвращает идентификатор тега с названием <paramref name="title"/> и создаёт тег, если такого нет
+    /// </summary>
+    /// <param name="title">
+    /// Название тега. Регистр не важен
+    /// </param>
+    /// <param name="cancellationToken">
+    /// Токен отмены запроса
+    /// </param>
+    /// <returns>
+    /// Идентификатор тега, начинается с <c>A-</c>
+    /// </returns>
+    Task<string> GetOrCreateTagIdAsync(string title, CancellationToken cancellationToken);
 
     /// <summary>
     /// Возвращает задачи проекта, включая архивные

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using UltimateParser.Common.Helpers;
 using UltimateParser.Common.Models;
+using UltimateParser.Scheduling.Implementations;
 using UltimateParser.Singularity.Dtos;
 using UltimateParser.Singularity.Interfaces;
 using UltimateParser.Singularity.Models;
@@ -62,30 +63,48 @@ public sealed class SingularityClient : ISingularityClient
     #region Projects
 
     /// <summary>
-    /// Ищет активный проект по точному названию или создаёт его
+    /// Ищет активный проект группы по устойчивому ключу, затем по точному названию, и создаёт его, если такого нет
     /// </summary>
     /// <param name="title">
-    /// Название проекта
+    /// Название проекта. По нему проект находится, пока на нём нет ключа, и с ним создаётся новый
     /// </param>
     /// <param name="cancellationToken">
     /// Токен отмены запроса
     /// </param>
     /// <returns>
-    /// Идентификатор проекта
+    /// Идентификатор проекта. Проект, найденный по названию без ключа, получает ключ, и дальше переименование ему не мешает
     /// </returns>
     /// <exception cref="InvalidOperationException">
     /// Singularity не вернула идентификатор созданного проекта
     /// </exception>
     public async Task<string> GetOrCreateProjectIdAsync(string title, CancellationToken cancellationToken)
     {
-        var existing = await FindProjectIdAsync(title, cancellationToken);
-        if (existing is not null)
-            return existing;
+        var key = ScheduleParser.ProjectExternalId(_options.GroupColumn);
+        var projects = await ListProjectsAsync(cancellationToken);
+
+        var keyed = projects.FirstOrDefault(project => string.Equals(project.ExternalId, key, StringComparison.Ordinal));
+        if (keyed?.Id is { Length: > 0 } keyedId)
+            return keyedId;
+
+        var titled = FindByTitle(projects, title);
+        if (titled?.Id is { Length: > 0 } titledId)
+        {
+            if (string.IsNullOrEmpty(titled.ExternalId))
+            {
+                await SendAsync<ProjectResponse>(
+                    HttpMethod.Patch,
+                    $"/v2/project/{Uri.EscapeDataString(titledId)}",
+                    new { externalId = key },
+                    cancellationToken);
+            }
+
+            return titledId;
+        }
 
         var created = await SendAsync<ProjectCreateResponse>(
             HttpMethod.Post,
             "/v2/project",
-            new { title },
+            new { title, externalId = key, parent = _options.ProjectParentId },
             cancellationToken);
 
         if (created.Project?.Id is not { Length: > 0 } projectId)
@@ -108,6 +127,22 @@ public sealed class SingularityClient : ISingularityClient
     /// </returns>
     public async Task<string?> FindProjectIdAsync(string title, CancellationToken cancellationToken)
     {
+        var projects = await ListProjectsAsync(cancellationToken);
+        return FindByTitle(projects, title)?.Id is { Length: > 0 } id ? id : null;
+    }
+
+    /// <summary>
+    /// Загружает все активные проекты: в API нет фильтра по <c>externalId</c>, поэтому поиск идёт на стороне клиента
+    /// </summary>
+    /// <param name="cancellationToken">
+    /// Токен отмены запроса
+    /// </param>
+    /// <returns>
+    /// Проекты всех страниц
+    /// </returns>
+    private async Task<IReadOnlyList<ProjectResponse>> ListProjectsAsync(CancellationToken cancellationToken)
+    {
+        var projects = new List<ProjectResponse>();
         var offset = 0;
         while (true)
         {
@@ -117,20 +152,80 @@ public sealed class SingularityClient : ISingularityClient
                 null,
                 cancellationToken);
 
-            var projects = page.Projects ?? [];
-            var match = projects.FirstOrDefault(project =>
-                string.Equals(project.Title?.Trim(), title, StringComparison.Ordinal));
-            if (match?.Id is { Length: > 0 } id)
-                return id;
+            var batch = page.Projects ?? [];
+            projects.AddRange(batch);
+            if (batch.Count < PageSize)
+                return projects;
 
-            if (projects.Count < PageSize)
-                return null;
-
-            offset += projects.Count;
+            offset += batch.Count;
         }
     }
 
+    /// <summary>
+    /// Находит проект по точному названию без крайних пробелов
+    /// </summary>
+    /// <param name="projects">
+    /// Загруженные проекты
+    /// </param>
+    /// <param name="title">
+    /// Название проекта
+    /// </param>
+    /// <returns>
+    /// Первый подходящий проект или <see langword="null"/>
+    /// </returns>
+    private static ProjectResponse? FindByTitle(IReadOnlyList<ProjectResponse> projects, string title) =>
+        projects.FirstOrDefault(project => string.Equals(project.Title?.Trim(), title, StringComparison.Ordinal));
+
     #endregion Projects
+
+    #region Tags
+
+    /// <summary>
+    /// Находит активный тег по названию без учёта регистра или создаёт его
+    /// </summary>
+    /// <param name="title">
+    /// Название тега
+    /// </param>
+    /// <param name="cancellationToken">
+    /// Токен отмены запроса
+    /// </param>
+    /// <returns>
+    /// Идентификатор тега
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Токену не хватает доступа к тегам, либо Singularity не вернула идентификатор созданного тега
+    /// </exception>
+    public async Task<string> GetOrCreateTagIdAsync(string title, CancellationToken cancellationToken)
+    {
+        var offset = 0;
+        while (true)
+        {
+            var page = await SendAsync<TagListResponse>(
+                HttpMethod.Get,
+                $"/v2/tag?maxCount={PageSize}&offset={offset}&includeRemoved=false",
+                null,
+                cancellationToken);
+
+            var tags = page.Tags ?? [];
+            var match = tags.FirstOrDefault(tag =>
+                tag.Removed != true && string.Equals(tag.Title?.Trim(), title, StringComparison.OrdinalIgnoreCase));
+            if (match?.Id is { Length: > 0 } existingId)
+                return existingId;
+
+            if (tags.Count < PageSize)
+                break;
+
+            offset += tags.Count;
+        }
+
+        var created = await SendAsync<TagResponse>(HttpMethod.Post, "/v2/tag", new { title }, cancellationToken);
+        if (created.Id is not { Length: > 0 } tagId)
+            throw new InvalidOperationException($"Singularity did not return an id for tag '{title}'.");
+
+        return tagId;
+    }
+
+    #endregion Tags
 
     #region Tasks
 
@@ -344,7 +439,8 @@ public sealed class SingularityClient : ISingularityClient
         || task.TimeLength != lesson.TimeLengthMinutes
         || !SameStart(task.Start, lesson.Start)
         || task.Notifies is null
-        || !task.Notifies.Contains(ReminderMinutes);
+        || !task.Notifies.Contains(ReminderMinutes)
+        || lesson.TagIds.Any(tagId => task.Tags is null || !task.Tags.Contains(tagId));
 
     /// <summary>
     /// Форматирует момент начала так, как в примерах API, с числовым смещением
@@ -382,6 +478,7 @@ public sealed class SingularityClient : ISingularityClient
         useTime = true,
         timeLength = lesson.TimeLengthMinutes,
         notifies = new[] { ReminderMinutes },
+        tags = lesson.TagIds.Length == 0 ? null : lesson.TagIds,
         externalId = includeExternalId ? lesson.ExternalId : null,
     };
 
@@ -430,7 +527,8 @@ public sealed class SingularityClient : ISingularityClient
         task.Checked,
         task.JournalDate,
         task.Removed == true,
-        task.Notifies);
+        task.Notifies,
+        task.Tags);
 
     #endregion Comparison
 

@@ -31,6 +31,16 @@
         public const string PROJECT_TITLE = "PROJECT_TITLE";
 
         /// <summary>
+        /// Наименование необязательного параметра, содержащего идентификатор родительского проекта
+        /// </summary>
+        public const string PROJECT_PARENT_ID = "PROJECT_PARENT_ID";
+
+        /// <summary>
+        /// Наименование необязательного параметра, включающего тег предмета на задачах занятий
+        /// </summary>
+        public const string SUBJECT_TAGS = "SUBJECT_TAGS";
+
+        /// <summary>
         /// Наименование параметра, содержащего часовой пояс
         /// </summary>
         public const string TIME_ZONE = "TIME_ZONE";

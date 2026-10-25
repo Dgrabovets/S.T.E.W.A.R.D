@@ -31,6 +31,16 @@ public sealed record SyncOptions
     public required string ProjectTitle { get; init; }
 
     /// <summary>
+    /// Идентификатор проекта Singularity, внутри которого создаётся проект расписания. Пусто, если проект создаётся на верхнем уровне
+    /// </summary>
+    public string? ProjectParentId { get; init; }
+
+    /// <summary>
+    /// <see langword="true"/>, если задача занятия получает тег с названием предмета
+    /// </summary>
+    public bool SubjectTags { get; init; }
+
+    /// <summary>
     /// Пояс, в котором выбирается год даты без года и ставится время начала
     /// </summary>
     public required string TimeZoneId { get; init; }
