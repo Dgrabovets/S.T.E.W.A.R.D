@@ -24,13 +24,13 @@ public static class SyncLogInterpreter
     {
         var entries = LogJournal.Read(logs);
         var running = dockerAvailable && string.Equals(serviceState, "running", StringComparison.OrdinalIgnoreCase);
-        var latestProblem = entries.Count > 0 && entries[0].Tone == LogTone.Problem ? entries[0] : null;
+        var latestProblem = entries.Count > 0 && entries[0].Tone == LogToneEnum.Problem ? entries[0] : null;
 
         return new SyncSnapshot
         {
             DockerAvailable = dockerAvailable,
             ContainerRunning = running,
-            LastSuccess = entries.FirstOrDefault(entry => entry.Tone != LogTone.Problem)?.Time,
+            LastSuccess = entries.FirstOrDefault(entry => entry.Tone != LogToneEnum.Problem)?.Time,
             CurrentError = latestProblem is null
                 ? null
                 : latestProblem.Detail.Length == 0 ? latestProblem.Title : latestProblem.Title + "\n" + latestProblem.Detail,

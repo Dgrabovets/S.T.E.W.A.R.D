@@ -73,13 +73,13 @@
                             <Style TargetType="Border">
                                 <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Running}">
+                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
                                         <Setter Property="Background" Value="#203A34"/>
                                     </DataTrigger>
-                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Attention}">
+                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
                                         <Setter Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
                                     </DataTrigger>
-                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Problem}">
+                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
                                         <Setter Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -90,13 +90,13 @@
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Running}">
+                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
                                             <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
                                         </DataTrigger>
-                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Attention}">
+                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
                                             <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
                                         </DataTrigger>
-                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Problem}">
+                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
                                             <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -123,13 +123,13 @@
                                 </StackPanel>
                             </Grid>
                             <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Running}">
+                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
                                     <Setter TargetName="Dot" Property="Fill" Value="{StaticResource OkBrush}"/>
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Attention}">
+                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
                                     <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AttentionBrush}"/>
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Problem}">
+                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
                                     <Setter TargetName="Dot" Property="Fill" Value="{StaticResource DangerBrush}"/>
                                 </DataTrigger>
                             </DataTemplate.Triggers>
@@ -195,11 +195,11 @@
                                                 <Setter TargetName="Card" Property="Background" Value="{StaticResource RaisedBrush}"/>
                                                 <Setter TargetName="Card" Property="BorderBrush" Value="#668B6CFF"/>
                                             </Trigger>
-                                            <DataTrigger Binding="{Binding Tone}" Value="{x:Static models:LogTone.Update}">
+                                            <DataTrigger Binding="{Binding Tone}" Value="{x:Static models:LogToneEnum.Update}">
                                                 <Setter TargetName="Bar" Property="Background" Value="{StaticResource AccentBrush}"/>
                                                 <Setter TargetName="Time" Property="Foreground" Value="{StaticResource AccentBrush}"/>
                                             </DataTrigger>
-                                            <DataTrigger Binding="{Binding Tone}" Value="{x:Static models:LogTone.Problem}">
+                                            <DataTrigger Binding="{Binding Tone}" Value="{x:Static models:LogToneEnum.Problem}">
                                                 <Setter TargetName="Card" Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
                                                 <Setter TargetName="Bar" Property="Background" Value="{StaticResource DangerBrush}"/>
                                                 <Setter TargetName="Time" Property="Foreground" Value="{StaticResource DangerBrush}"/>

@@ -369,21 +369,21 @@ public static partial class LogJournal
             var detail = cycle.Skipped > 0
                 ? AlreadyDone(cycle.Skipped)
                 : "Новых правок в таблице нет";
-            if (entries.Count > 0 && entries[^1].Tone == LogTone.Quiet && entries[^1].Detail == detail)
+            if (entries.Count > 0 && entries[^1].Tone == LogToneEnum.Quiet && entries[^1].Detail == detail)
             {
                 var previous = entries[^1];
                 entries[^1] = previous with { Time = cycle.Time, Repeat = previous.Repeat + 1 };
                 return;
             }
 
-            entries.Add(new LogEntry(cycle.Time, LogTone.Quiet, "Всё совпало", detail, 1));
+            entries.Add(new LogEntry(cycle.Time, LogToneEnum.Quiet, "Всё совпало", detail, 1));
             return;
         }
 
         if (cycle.Skipped > 0)
             cycle.Changes.Add(AlreadyDone(cycle.Skipped));
 
-        entries.Add(new LogEntry(cycle.Time, LogTone.Update, "Появились правки", string.Join('\n', cycle.Changes), 1));
+        entries.Add(new LogEntry(cycle.Time, LogToneEnum.Update, "Появились правки", string.Join('\n', cycle.Changes), 1));
     }
 
     /// <summary>
@@ -402,7 +402,7 @@ public static partial class LogJournal
     /// <param name="cycle">Прогон, в котором случился сбой</param>
     /// <returns>Запись с понятной причиной</returns>
     private static LogEntry Problem(Cycle cycle) =>
-        new(cycle.Time, LogTone.Problem, "Не удалось обновить", cycle.Failure ?? "Синхронизация остановилась", 1);
+        new(cycle.Time, LogToneEnum.Problem, "Не удалось обновить", cycle.Failure ?? "Синхронизация остановилась", 1);
 
     #endregion Entries
 

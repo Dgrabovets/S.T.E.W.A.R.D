@@ -3,7 +3,7 @@ namespace Steward.Mail.Models;
 /// <summary>
 /// Категория письма после разбора
 /// </summary>
-public enum MailCategory
+public enum MailCategoryEnum
 {
     /// <summary>
     /// Отзыв или оценка преподавателя в LMS

@@ -128,6 +128,6 @@ public static class Samples
     /// <param name="state">Состояние</param>
     /// <param name="updatedAt">Когда записан</param>
     /// <returns>Статус с заполненными по умолчанию полями</returns>
-    public static ProcessStatus Status(string id, ProcessState state, DateTimeOffset updatedAt) =>
+    public static ProcessStatus Status(string id, ProcessStateEnum state, DateTimeOffset updatedAt) =>
         new() { Id = id, Title = id, State = state, UpdatedAt = updatedAt };
 }

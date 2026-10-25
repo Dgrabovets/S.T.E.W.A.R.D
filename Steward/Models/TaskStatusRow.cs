@@ -14,4 +14,4 @@ namespace Steward.Models;
 /// <param name="CanRun">
 /// <see langword="true"/>, если задачу можно запустить кнопкой
 /// </param>
-public sealed record TaskStatusRow(string Id, string Name, string Headline, string Detail, PanelTone Tone, bool Muted = false, bool CanRun = false);
+public sealed record TaskStatusRow(string Id, string Name, string Headline, string Detail, PanelToneEnum Tone, bool Muted = false, bool CanRun = false);

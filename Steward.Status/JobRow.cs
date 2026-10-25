@@ -5,7 +5,7 @@ namespace Steward.Status;
 /// <summary>
 /// Цвет строки задачи на панели
 /// </summary>
-public enum RowTone
+public enum RowToneEnum
 {
     /// <summary>
     /// Задача ждёт, отключена или ещё не запускалась
@@ -43,7 +43,7 @@ public enum RowTone
 /// <param name="Tone">Цвет строки</param>
 /// <param name="Awaiting">Сколько результатов ждёт решения пользователя</param>
 /// <param name="Enabled">Включена ли задача. Выключенная не влияет на общий статус</param>
-public sealed record JobRow(string Id, string Title, string Headline, string Detail, RowTone Tone, int Awaiting, bool Enabled);
+public sealed record JobRow(string Id, string Title, string Headline, string Detail, RowToneEnum Tone, int Awaiting, bool Enabled);
 
 /// <summary>
 /// Собирает строку задачи из её описания и файла статуса
@@ -77,36 +77,36 @@ public static class JobRowBuilder
         var title = string.IsNullOrWhiteSpace(job.Title) ? job.Id : job.Title;
         var next = NextText(nextRun, now);
 
-        JobRow Row(RowTone tone, string headline, string detail) => new(job.Id, title, headline, detail, tone, status?.Awaiting ?? 0, job.Enabled);
+        JobRow Row(RowToneEnum tone, string headline, string detail) => new(job.Id, title, headline, detail, tone, status?.Awaiting ?? 0, job.Enabled);
 
         if (!job.Enabled)
-            return Row(RowTone.Idle, "Отключена", "Включается полем enabled в config/jobs.json");
+            return Row(RowToneEnum.Idle, "Отключена", "Включается полем enabled в config/jobs.json");
 
         if (status is null)
-            return Row(RowTone.Idle, "Ещё не запускалась", next);
+            return Row(RowToneEnum.Idle, "Ещё не запускалась", next);
 
         switch (status.State)
         {
-            case ProcessState.Failed:
-                return Row(RowTone.Problem, "Не удалось", $"{Short(status.Error)} ({When(status.UpdatedAt, now)})");
-            case ProcessState.Running when now - status.UpdatedAt > job.Timeout + HangGrace:
-                return Row(RowTone.Problem, "Завис?", $"Запущена {When(status.UpdatedAt, now)} и не отвечает");
-            case ProcessState.Running:
-                return Row(RowTone.Working, "Выполняется", $"Запущена {When(status.UpdatedAt, now)}");
+            case ProcessStateEnum.Failed:
+                return Row(RowToneEnum.Problem, "Не удалось", $"{Short(status.Error)} ({When(status.UpdatedAt, now)})");
+            case ProcessStateEnum.Running when now - status.UpdatedAt > job.Timeout + HangGrace:
+                return Row(RowToneEnum.Problem, "Завис?", $"Запущена {When(status.UpdatedAt, now)} и не отвечает");
+            case ProcessStateEnum.Running:
+                return Row(RowToneEnum.Working, "Выполняется", $"Запущена {When(status.UpdatedAt, now)}");
         }
 
         var lastSuccess = status.LastSuccessAt ?? status.UpdatedAt;
         if (job.StaleAfterMinutes is { } stale && now - lastSuccess > TimeSpan.FromMinutes(stale))
-            return Row(RowTone.Problem, "Давно не запускалась", $"Последний успех {When(lastSuccess, now)}");
+            return Row(RowToneEnum.Problem, "Давно не запускалась", $"Последний успех {When(lastSuccess, now)}");
 
-        if (status.State == ProcessState.NeedsAttention || status.Awaiting > 0)
-            return Row(RowTone.Attention, "Ждёт тебя", Join(status.Summary, status.Awaiting > 0 ? $"Ждут решения: {status.Awaiting}" : null));
+        if (status.State == ProcessStateEnum.NeedsAttention || status.Awaiting > 0)
+            return Row(RowToneEnum.Attention, "Ждёт тебя", Join(status.Summary, status.Awaiting > 0 ? $"Ждут решения: {status.Awaiting}" : null));
 
         return status.State switch
         {
-            ProcessState.Ok => Row(RowTone.Ok, $"Выполнено {When(lastSuccess, now)}", Join(status.Summary, next)),
-            ProcessState.Idle => Row(RowTone.Idle, "Ожидает", Join(status.Summary, next)),
-            _ => Row(RowTone.Idle, "Статус не распознан", "Файл статуса записан более новой версией формата"),
+            ProcessStateEnum.Ok => Row(RowToneEnum.Ok, $"Выполнено {When(lastSuccess, now)}", Join(status.Summary, next)),
+            ProcessStateEnum.Idle => Row(RowToneEnum.Idle, "Ожидает", Join(status.Summary, next)),
+            _ => Row(RowToneEnum.Idle, "Статус не распознан", "Файл статуса записан более новой версией формата"),
         };
     }
 

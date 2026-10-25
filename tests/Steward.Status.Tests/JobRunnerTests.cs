@@ -29,9 +29,9 @@ public class JobRunnerTests
 
         var record = await runner.RunAsync(Samples.Job("quiet") with { Arguments = "/c exit 0" }, "manual");
 
-        Assert.Equal(RunOutcome.Ok, record.Outcome);
+        Assert.Equal(RunOutcomeEnum.Ok, record.Outcome);
         var status = store.Read("quiet")!;
-        Assert.Equal(ProcessState.Ok, status.State);
+        Assert.Equal(ProcessStateEnum.Ok, status.State);
         Assert.NotNull(status.LastSuccessAt);
         Assert.NotNull(status.LastRunAt);
         Assert.Equal("quiet", runner.History.Load(5).Single().JobId);
@@ -45,14 +45,14 @@ public class JobRunnerTests
     {
         using var dir = new TempDir();
         var (runner, store) = Create(dir);
-        var before = new ProcessStatus { Id = "flaky", State = ProcessState.Ok, UpdatedAt = Samples.Winter(2026, 10, 24, 9), LastSuccessAt = Samples.Winter(2026, 10, 24, 9) };
+        var before = new ProcessStatus { Id = "flaky", State = ProcessStateEnum.Ok, UpdatedAt = Samples.Winter(2026, 10, 24, 9), LastSuccessAt = Samples.Winter(2026, 10, 24, 9) };
         store.Write(before);
 
         var record = await runner.RunAsync(Samples.Job("flaky") with { Arguments = "/c \"echo boom 1>&2 & exit 3\"" }, "interval");
 
-        Assert.Equal((RunOutcome.Failed, 3), (record.Outcome, record.ExitCode));
+        Assert.Equal((RunOutcomeEnum.Failed, 3), (record.Outcome, record.ExitCode));
         var status = store.Read("flaky")!;
-        Assert.Equal(ProcessState.Failed, status.State);
+        Assert.Equal(ProcessStateEnum.Failed, status.State);
         Assert.Equal("Код завершения 3: boom", status.Error);
         Assert.Equal(before.LastSuccessAt, status.LastSuccessAt);
     }
@@ -77,9 +77,9 @@ public class JobRunnerTests
 
         var record = await runner.RunAsync(job, "manual");
 
-        Assert.Equal(RunOutcome.Ok, record.Outcome);
+        Assert.Equal(RunOutcomeEnum.Ok, record.Outcome);
         var status = store.Read("selfish")!;
-        Assert.Equal((ProcessState.NeedsAttention, 2, "two items"), (status.State, status.Awaiting, status.Summary));
+        Assert.Equal((ProcessStateEnum.NeedsAttention, 2, "two items"), (status.State, status.Awaiting, status.Summary));
         Assert.NotNull(status.LastRunAt);
         Assert.Equal(Path.Combine(dir.Path, "tmp"), File.ReadAllText(Path.Combine(dir.Path, "temp-was.txt")).Trim());
     }
@@ -97,9 +97,9 @@ public class JobRunnerTests
 
         var record = await runner.RunAsync(job, "manual");
 
-        Assert.Equal(RunOutcome.TimedOut, record.Outcome);
+        Assert.Equal(RunOutcomeEnum.TimedOut, record.Outcome);
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), "процесс должен быть остановлен по таймауту, а не дожит до конца");
-        Assert.Equal(ProcessState.Failed, store.Read("hang")!.State);
+        Assert.Equal(ProcessStateEnum.Failed, store.Read("hang")!.State);
         Assert.Contains("Не завершилась", store.Read("hang")!.Error, StringComparison.Ordinal);
     }
 
@@ -115,8 +115,8 @@ public class JobRunnerTests
 
         var record = await runner.RunAsync(job, "manual");
 
-        Assert.Equal(RunOutcome.NotStarted, record.Outcome);
-        Assert.Equal(ProcessState.Failed, store.Read("ghost")!.State);
+        Assert.Equal(RunOutcomeEnum.NotStarted, record.Outcome);
+        Assert.Equal(ProcessStateEnum.Failed, store.Read("ghost")!.State);
     }
 
     /// <summary>
@@ -179,11 +179,11 @@ public class JobRunnerTests
         var job = Samples.Job("slow", Samples.OnStart);
         var now = DateTimeOffset.Now;
 
-        store.Write(Samples.Status("slow", ProcessState.Running, now.AddMinutes(-1)));
+        store.Write(Samples.Status("slow", ProcessStateEnum.Running, now.AddMinutes(-1)));
         var fresh = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10));
         Assert.Empty(fresh.Tick(now));
 
-        store.Write(Samples.Status("slow", ProcessState.Running, now.AddMinutes(-90)));
+        store.Write(Samples.Status("slow", ProcessStateEnum.Running, now.AddMinutes(-90)));
         var abandoned = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10));
         var started = abandoned.Tick(now);
         await Task.WhenAll(started);

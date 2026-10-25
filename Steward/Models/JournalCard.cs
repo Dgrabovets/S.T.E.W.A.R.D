@@ -36,7 +36,7 @@ public sealed class JournalCard
     /// <summary>
     /// Тон карточки
     /// </summary>
-    public LogTone Tone { get; init; }
+    public LogToneEnum Tone { get; init; }
 
     #region Cards
 
@@ -78,7 +78,7 @@ public sealed class JournalCard
     /// <returns>Текст подробностей</returns>
     private static string ShownDetail(LogEntry entry)
     {
-        if (entry.Tone != LogTone.Quiet || entry.Repeat <= 1)
+        if (entry.Tone != LogToneEnum.Quiet || entry.Repeat <= 1)
             return entry.Detail;
 
         var more = entry.Repeat - 1;

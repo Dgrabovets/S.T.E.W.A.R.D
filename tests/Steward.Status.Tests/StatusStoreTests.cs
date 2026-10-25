@@ -17,7 +17,7 @@ public class StatusStoreTests
         {
             Id = "mail",
             Title = "Почта",
-            State = ProcessState.NeedsAttention,
+            State = ProcessStateEnum.NeedsAttention,
             UpdatedAt = Samples.Winter(2026, 10, 25, 9),
             LastRunAt = Samples.Winter(2026, 10, 25, 9),
             LastSuccessAt = Samples.Winter(2026, 10, 24, 19),
@@ -45,10 +45,10 @@ public class StatusStoreTests
         using var dir = new TempDir();
         var store = new StatusStore(dir.StatusPath);
 
-        store.Write(Samples.Status("job", ProcessState.Running, Samples.Winter(2026, 10, 25, 9)));
-        store.Write(Samples.Status("job", ProcessState.Ok, Samples.Winter(2026, 10, 25, 10)));
+        store.Write(Samples.Status("job", ProcessStateEnum.Running, Samples.Winter(2026, 10, 25, 9)));
+        store.Write(Samples.Status("job", ProcessStateEnum.Ok, Samples.Winter(2026, 10, 25, 10)));
 
-        Assert.Equal(ProcessState.Ok, store.Read("job")!.State);
+        Assert.Equal(ProcessStateEnum.Ok, store.Read("job")!.State);
         Assert.Equal(["job.json"], Directory.GetFiles(dir.StatusPath).Select(path => Path.GetFileName(path)!).ToArray());
     }
 
@@ -60,8 +60,8 @@ public class StatusStoreTests
     {
         using var dir = new TempDir();
         var store = new StatusStore(dir.StatusPath);
-        store.Write(Samples.Status("b-job", ProcessState.Ok, Samples.Winter(2026, 10, 25, 9)));
-        store.Write(Samples.Status("a-job", ProcessState.Idle, Samples.Winter(2026, 10, 25, 9)));
+        store.Write(Samples.Status("b-job", ProcessStateEnum.Ok, Samples.Winter(2026, 10, 25, 9)));
+        store.Write(Samples.Status("a-job", ProcessStateEnum.Idle, Samples.Winter(2026, 10, 25, 9)));
         File.WriteAllText(Path.Combine(dir.StatusPath, "broken.json"), "{ это не json");
         File.WriteAllText(Path.Combine(dir.StatusPath, "no-id.json"), "{ \"state\": \"ok\" }");
 
@@ -82,7 +82,7 @@ public class StatusStoreTests
         var status = new StatusStore(dir.StatusPath).Read("future");
 
         Assert.NotNull(status);
-        Assert.Equal(ProcessState.Unknown, status.State);
+        Assert.Equal(ProcessStateEnum.Unknown, status.State);
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public class StatusStoreTests
 
         Assert.False(StatusStore.IsValidId(id));
         Assert.Throws<ArgumentException>(() => store.Read(id));
-        Assert.Throws<ArgumentException>(() => store.Write(Samples.Status(id, ProcessState.Ok, DateTimeOffset.Now)));
+        Assert.Throws<ArgumentException>(() => store.Write(Samples.Status(id, ProcessStateEnum.Ok, DateTimeOffset.Now)));
     }
 
     /// <summary>

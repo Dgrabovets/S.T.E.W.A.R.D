@@ -20,7 +20,7 @@ public sealed class PanelStatus
     private PanelStatus(string subtitle,
                         string summary,
                         string label,
-                        PanelTone tone,
+                        PanelToneEnum tone,
                         string emptyText,
                         IReadOnlyList<JournalCard> cards)
     {
@@ -50,7 +50,7 @@ public sealed class PanelStatus
     /// <summary>
     /// Какой цвет взять для плашки
     /// </summary>
-    public PanelTone Tone { get; }
+    public PanelToneEnum Tone { get; }
 
     /// <summary>
     /// Что показать, если карточек нет
@@ -72,8 +72,8 @@ public sealed class PanelStatus
     public static PanelStatus From(SyncSnapshot snapshot)
     {
         var tone = snapshot.CurrentError is not null
-            ? PanelTone.Problem
-            : snapshot.ContainerRunning ? PanelTone.Running : PanelTone.Idle;
+            ? PanelToneEnum.Problem
+            : snapshot.ContainerRunning ? PanelToneEnum.Running : PanelToneEnum.Idle;
         return new PanelStatus(
             When(snapshot.LastSuccess),
             SummaryOf(snapshot),
@@ -119,7 +119,7 @@ public sealed class PanelStatus
             return "Синхронизация запущена, первая сверка ещё впереди";
 
         var latest = snapshot.Entries[0];
-        if (latest.Tone == LogTone.Update)
+        if (latest.Tone == LogToneEnum.Update)
             return "Последняя сверка внесла правки в задачи";
         if (latest.Repeat > 1)
             return "Несколько сверок подряд ничего не меняли";

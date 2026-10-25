@@ -76,8 +76,8 @@ internal static partial class Program
 
                 (category switch
                 {
-                    MailCategory.TeacherFeedback => feedback,
-                    MailCategory.PersonalReply => replies,
+                    MailCategoryEnum.TeacherFeedback => feedback,
+                    MailCategoryEnum.PersonalReply => replies,
                     _ => info
                 }).Add(mail);
 
@@ -100,7 +100,7 @@ internal static partial class Program
 
             if (!dryRun)
             {
-                ReportStatus(statusStore, ProcessState.Ok, summary.Replace('\n', ' '), null);
+                ReportStatus(statusStore, ProcessStateEnum.Ok, summary.Replace('\n', ' '), null);
             }
 
             if (feedback.Count + replies.Count > 0)
@@ -115,7 +115,7 @@ internal static partial class Program
             Log($"Ошибка: {ex.Message}");
             if (!dryRun)
             {
-                ReportStatus(statusStore, ProcessState.Failed, null, ex.Message);
+                ReportStatus(statusStore, ProcessStateEnum.Failed, null, ex.Message);
             }
 
             TryNotifyError(ex.Message);
@@ -166,7 +166,7 @@ internal static partial class Program
     /// <returns>
     /// Задача с приоритетом по категории или <see langword="null"/> для информационного письма
     /// </returns>
-    private static SingularityTaskRequest? BuildTask(MailItem mail, MailCategory category, AppSettings settings)
+    private static SingularityTaskRequest? BuildTask(MailItem mail, MailCategoryEnum category, AppSettings settings)
     {
         var note = new StringBuilder()
             .AppendLine($"От: {mail.FromName} <{mail.FromAddress}>")
@@ -182,7 +182,7 @@ internal static partial class Program
 
         return category switch
         {
-            MailCategory.TeacherFeedback => new SingularityTaskRequest
+            MailCategoryEnum.TeacherFeedback => new SingularityTaskRequest
             {
                 Title = FeedbackTitle(mail.Subject),
                 Note = note,
@@ -190,7 +190,7 @@ internal static partial class Program
                 Start = today,
                 ProjectId = settings.Singularity.ProjectId
             },
-            MailCategory.PersonalReply => new SingularityTaskRequest
+            MailCategoryEnum.PersonalReply => new SingularityTaskRequest
             {
                 Title = $"Пришёл ответ от {ShortName(mail.FromName)}, нужно ответить: «{Truncate(mail.Subject, 80)}»",
                 Note = note,
@@ -273,10 +273,10 @@ internal static partial class Program
     /// </summary>
     /// <param name="category">Категория письма</param>
     /// <returns>«Отзыв», «Ответить» или «Инфо»</returns>
-    private static string CategoryLabel(MailCategory category) => category switch
+    private static string CategoryLabel(MailCategoryEnum category) => category switch
     {
-        MailCategory.TeacherFeedback => "Отзыв",
-        MailCategory.PersonalReply => "Ответить",
+        MailCategoryEnum.TeacherFeedback => "Отзыв",
+        MailCategoryEnum.PersonalReply => "Ответить",
         _ => "Инфо"
     };
 
@@ -301,7 +301,7 @@ internal static partial class Program
     /// <param name="error">
     /// Текст ошибки или <see langword="null"/> при успехе
     /// </param>
-    private static void ReportStatus(StatusStore store, ProcessState state, string? summary, string? error)
+    private static void ReportStatus(StatusStore store, ProcessStateEnum state, string? summary, string? error)
     {
         try
         {
@@ -314,7 +314,7 @@ internal static partial class Program
                 State = state,
                 UpdatedAt = now,
                 LastRunAt = now,
-                LastSuccessAt = state == ProcessState.Ok ? now : previous?.LastSuccessAt,
+                LastSuccessAt = state == ProcessStateEnum.Ok ? now : previous?.LastSuccessAt,
                 Summary = summary,
                 Error = error
             });

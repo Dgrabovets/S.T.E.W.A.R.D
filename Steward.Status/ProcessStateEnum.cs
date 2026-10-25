@@ -7,7 +7,7 @@ namespace Steward.Status;
 /// Состояние процесса в файле статуса. Незнакомое значение читается как <see cref="Unknown"/>, а не ломает чтение
 /// </summary>
 [JsonConverter(typeof(ProcessStateConverter))]
-public enum ProcessState
+public enum ProcessStateEnum
 {
     /// <summary>
     /// Значение не распознано: файл написан более новой версией формата
@@ -41,9 +41,9 @@ public enum ProcessState
 }
 
 /// <summary>
-/// Пишет состояние строкой в camelCase и читает незнакомую строку как <see cref="ProcessState.Unknown"/>
+/// Пишет состояние строкой в camelCase и читает незнакомую строку как <see cref="ProcessStateEnum.Unknown"/>
 /// </summary>
-public sealed class ProcessStateConverter : JsonConverter<ProcessState>
+public sealed class ProcessStateConverter : JsonConverter<ProcessStateEnum>
 {
     /// <summary>
     /// Читает состояние из строки
@@ -52,17 +52,17 @@ public sealed class ProcessStateConverter : JsonConverter<ProcessState>
     /// <param name="typeToConvert">Тип состояния</param>
     /// <param name="options">Настройки сериализатора</param>
     /// <returns>
-    /// Состояние или <see cref="ProcessState.Unknown"/>
+    /// Состояние или <see cref="ProcessStateEnum.Unknown"/>
     /// </returns>
-    public override ProcessState Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override ProcessStateEnum Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType != JsonTokenType.String)
         {
             reader.Skip();
-            return ProcessState.Unknown;
+            return ProcessStateEnum.Unknown;
         }
 
-        return Enum.TryParse<ProcessState>(reader.GetString(), ignoreCase: true, out var state) ? state : ProcessState.Unknown;
+        return Enum.TryParse<ProcessStateEnum>(reader.GetString(), ignoreCase: true, out var state) ? state : ProcessStateEnum.Unknown;
     }
 
     /// <summary>
@@ -71,7 +71,7 @@ public sealed class ProcessStateConverter : JsonConverter<ProcessState>
     /// <param name="writer">Писатель JSON</param>
     /// <param name="value">Состояние</param>
     /// <param name="options">Настройки сериализатора</param>
-    public override void Write(Utf8JsonWriter writer, ProcessState value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, ProcessStateEnum value, JsonSerializerOptions options)
     {
         var name = value.ToString();
         writer.WriteStringValue(char.ToLowerInvariant(name[0]) + name[1..]);

@@ -7,7 +7,7 @@ namespace Steward.Status;
 /// <summary>
 /// Чем закончился запуск
 /// </summary>
-public enum RunOutcome
+public enum RunOutcomeEnum
 {
     /// <summary>
     /// Программа завершилась с кодом 0
@@ -52,7 +52,7 @@ public sealed record RunRecord(
     DateTimeOffset StartedAt,
     DateTimeOffset FinishedAt,
     int? ExitCode,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] RunOutcome Outcome,
+    [property: JsonConverter(typeof(JsonStringEnumConverter))] RunOutcomeEnum Outcome,
     string? Detail);
 
 /// <summary>

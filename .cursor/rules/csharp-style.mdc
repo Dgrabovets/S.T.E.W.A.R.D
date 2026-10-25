@@ -18,7 +18,7 @@ private PanelStatus(
     string subtitle,
     string summary,
     string label,
-    PanelTone tone,
+    PanelToneEnum tone,
     string emptyText,
     IReadOnlyList<JournalCard> cards)
 ```
@@ -26,7 +26,7 @@ private PanelStatus(
 Можно в одну строку:
 
 ```csharp
-private PanelStatus(string subtitle, string summary, string label, PanelTone tone, string emptyText, IReadOnlyList<JournalCard> cards)
+private PanelStatus(string subtitle, string summary, string label, PanelToneEnum tone, string emptyText, IReadOnlyList<JournalCard> cards)
 ```
 
 Можно столбцом, имена друг под другом:
@@ -35,7 +35,26 @@ private PanelStatus(string subtitle, string summary, string label, PanelTone ton
 private PanelStatus(string subtitle,
                     string summary,
                     string label,
-                    PanelTone tone,
+                    PanelToneEnum tone,
                     string emptyText,
                     IReadOnlyList<JournalCard> cards)
 ```
+
+## Комментарии параметров
+
+Если описание параметра или возвращаемого значения умещается в одну строку, тег пишется целиком в одну строку:
+
+```csharp
+/// <param name="reader">Читатель JSON</param>
+/// <returns>Состояние или <see cref="ProcessStateEnum.Unknown"/></returns>
+```
+
+Тег раскрывается на несколько строк только для длинного описания.
+
+## Перечисления
+
+Имя перечисления заканчивается на `Enum`: `ProcessStateEnum`, `PanelToneEnum`. Файл называется так же.
+
+## Файлы настроек
+
+В корне лежат `.editorconfig` (`insert_final_newline`, `charset = utf-8` для `*.cs`) и `.gitattributes` (`* text=auto`).

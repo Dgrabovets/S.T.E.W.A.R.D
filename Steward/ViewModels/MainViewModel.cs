@@ -9,7 +9,7 @@ namespace Steward.ViewModels;
 /// <summary>
 /// Раздел главного окна
 /// </summary>
-public enum AppPage
+public enum AppPageEnum
 {
     /// <summary>
     /// Статус всех задач
@@ -71,7 +71,7 @@ public sealed class TaskCardViewModel
     /// <summary>
     /// Цвет точки
     /// </summary>
-    public PanelTone Tone { get; }
+    public PanelToneEnum Tone { get; }
 
     /// <summary>
     /// Задача выключена
@@ -112,13 +112,13 @@ public sealed class RunRowViewModel
         };
         Outcome = record.Outcome switch
         {
-            RunOutcome.Ok => "Успешно",
-            RunOutcome.Failed => "Ошибка",
-            RunOutcome.TimedOut => "Не уложилась во время",
+            RunOutcomeEnum.Ok => "Успешно",
+            RunOutcomeEnum.Failed => "Ошибка",
+            RunOutcomeEnum.TimedOut => "Не уложилась во время",
             _ => "Не запустилась",
         };
         Detail = record.Detail ?? string.Empty;
-        Tone = record.Outcome == RunOutcome.Ok ? PanelTone.Running : PanelTone.Problem;
+        Tone = record.Outcome == RunOutcomeEnum.Ok ? PanelToneEnum.Running : PanelToneEnum.Problem;
     }
 
     /// <summary>
@@ -154,7 +154,7 @@ public sealed class RunRowViewModel
     /// <summary>
     /// Цвет точки
     /// </summary>
-    public PanelTone Tone { get; }
+    public PanelToneEnum Tone { get; }
 }
 
 /// <summary>
@@ -165,7 +165,7 @@ public sealed class MainViewModel : Bindable
     /// <summary>
     /// Текущий раздел
     /// </summary>
-    private AppPage _page = AppPage.Status;
+    private AppPageEnum _page = AppPageEnum.Status;
 
     /// <summary>
     /// Карточки задач
@@ -195,7 +195,7 @@ public sealed class MainViewModel : Bindable
     /// <summary>
     /// Цвет плашки
     /// </summary>
-    private PanelTone _tone = PanelTone.Idle;
+    private PanelToneEnum _tone = PanelToneEnum.Idle;
 
     /// <summary>
     /// Создаёт модель
@@ -227,8 +227,8 @@ public sealed class MainViewModel : Bindable
     /// </summary>
     public bool IsStatusPage
     {
-        get => _page == AppPage.Status;
-        set => Select(value, AppPage.Status);
+        get => _page == AppPageEnum.Status;
+        set => Select(value, AppPageEnum.Status);
     }
 
     /// <summary>
@@ -236,8 +236,8 @@ public sealed class MainViewModel : Bindable
     /// </summary>
     public bool IsIdeasPage
     {
-        get => _page == AppPage.Ideas;
-        set => Select(value, AppPage.Ideas);
+        get => _page == AppPageEnum.Ideas;
+        set => Select(value, AppPageEnum.Ideas);
     }
 
     /// <summary>
@@ -245,8 +245,8 @@ public sealed class MainViewModel : Bindable
     /// </summary>
     public bool IsHomeworkPage
     {
-        get => _page == AppPage.Homework;
-        set => Select(value, AppPage.Homework);
+        get => _page == AppPageEnum.Homework;
+        set => Select(value, AppPageEnum.Homework);
     }
 
     /// <summary>
@@ -254,14 +254,14 @@ public sealed class MainViewModel : Bindable
     /// </summary>
     public bool IsJournalPage
     {
-        get => _page == AppPage.Journal;
-        set => Select(value, AppPage.Journal);
+        get => _page == AppPageEnum.Journal;
+        set => Select(value, AppPageEnum.Journal);
     }
 
     /// <summary>
     /// Текущий раздел
     /// </summary>
-    public AppPage Page
+    public AppPageEnum Page
     {
         get => _page;
         set => Select(true, value);
@@ -337,7 +337,7 @@ public sealed class MainViewModel : Bindable
     /// <summary>
     /// Цвет плашки
     /// </summary>
-    public PanelTone Tone
+    public PanelToneEnum Tone
     {
         get => _tone;
         private set => Set(ref _tone, value);
@@ -374,7 +374,7 @@ public sealed class MainViewModel : Bindable
     /// <see langword="true"/>, если раздел выбран. Снятие выбора игнорируется: его делает выбор соседнего раздела
     /// </param>
     /// <param name="page">Раздел</param>
-    private void Select(bool selected, AppPage page)
+    private void Select(bool selected, AppPageEnum page)
     {
         if (!selected || _page == page)
             return;

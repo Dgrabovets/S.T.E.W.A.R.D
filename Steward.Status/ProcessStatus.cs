@@ -23,7 +23,7 @@ public sealed record ProcessStatus
     /// <summary>
     /// Текущее состояние
     /// </summary>
-    public ProcessState State { get; init; }
+    public ProcessStateEnum State { get; init; }
 
     /// <summary>
     /// Когда файл записан в последний раз. По нему раннер понимает, что процесс сам обновил статус

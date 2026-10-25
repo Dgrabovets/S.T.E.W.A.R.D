@@ -28,7 +28,7 @@ public static class ChangeNotice
         newest = after;
         var lines = new List<string>();
 
-        foreach (var entry in entries.Where(entry => entry.Tone == LogTone.Update && entry.Time > after).Reverse())
+        foreach (var entry in entries.Where(entry => entry.Tone == LogToneEnum.Update && entry.Time > after).Reverse())
         {
             if (entry.Time > newest)
                 newest = entry.Time;

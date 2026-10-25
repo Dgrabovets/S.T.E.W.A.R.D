@@ -46,7 +46,7 @@ public sealed class StatusViewModel : Bindable
     /// <summary>
     /// Цвет плашки
     /// </summary>
-    private PanelTone _tone = PanelTone.Idle;
+    private PanelToneEnum _tone = PanelToneEnum.Idle;
 
     /// <summary>
     /// Карточки журнала
@@ -187,7 +187,7 @@ public sealed class StatusViewModel : Bindable
     /// <summary>
     /// Какой цвет взять для плашки
     /// </summary>
-    public PanelTone Tone
+    public PanelToneEnum Tone
     {
         get => _tone;
         private set
@@ -202,7 +202,7 @@ public sealed class StatusViewModel : Bindable
     /// <summary>
     /// Контейнер работает и сбоя нет. От этого зависит свечение значка
     /// </summary>
-    public bool IsRunning => Tone == PanelTone.Running;
+    public bool IsRunning => Tone == PanelToneEnum.Running;
 
     /// <summary>
     /// Карточки журнала от новых к старым

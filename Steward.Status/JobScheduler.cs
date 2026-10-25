@@ -66,7 +66,7 @@ public sealed class JobScheduler
         foreach (var job in _jobs.Where(job => job.Enabled && !_runner.IsRunning(job.Id)))
         {
             var status = ReadStatus(job.Id);
-            if (status is { State: ProcessState.Running } && now - status.UpdatedAt < job.Timeout)
+            if (status is { State: ProcessStateEnum.Running } && now - status.UpdatedAt < job.Timeout)
             {
                 // Запуск начался до перезапуска приложения и ещё идёт: второй экземпляр не нужен
                 _startHandled.Add(job.Id);

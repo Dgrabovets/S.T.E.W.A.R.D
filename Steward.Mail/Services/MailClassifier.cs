@@ -17,19 +17,19 @@ public sealed class MailClassifier(MailSettings mail, ClassifierSettings setting
     /// </summary>
     /// <param name="item">Письмо из почтового ящика</param>
     /// <returns>Категория, от которой зависит, будет ли создана задача</returns>
-    public MailCategory Classify(MailItem item)
+    public MailCategoryEnum Classify(MailItem item)
     {
         if (string.Equals(item.Folder, mail.TeachersFolder, StringComparison.OrdinalIgnoreCase))
         {
-            return MailCategory.TeacherFeedback;
+            return MailCategoryEnum.TeacherFeedback;
         }
 
         if (IsSystemSender(item.FromAddress))
         {
-            return MailCategory.Info;
+            return MailCategoryEnum.Info;
         }
 
-        return MailCategory.PersonalReply;
+        return MailCategoryEnum.PersonalReply;
     }
 
     #endregion

@@ -112,13 +112,13 @@ public sealed class JobRunner
         var started = DateTimeOffset.Now;
         ProcessStatus? previous = null;
         int? exitCode = null;
-        var outcome = RunOutcome.NotStarted;
+        var outcome = RunOutcomeEnum.NotStarted;
         string? detail = null;
 
         try
         {
             previous = SafeRead(job.Id);
-            Save(job, title, previous, ProcessState.Running, started, $"Запуск: {reason}", null, success: false);
+            Save(job, title, previous, ProcessStateEnum.Running, started, $"Запуск: {reason}", null, success: false);
             Started?.Invoke(this, job.Id);
 
             (outcome, exitCode, detail) = await StartAndWaitAsync(job, cancellationToken);
@@ -153,7 +153,7 @@ public sealed class JobRunner
     /// <param name="job">Задача</param>
     /// <param name="cancellationToken">Останавливает процесс</param>
     /// <returns>Итог, код завершения и пояснение к ошибке</returns>
-    private async Task<(RunOutcome Outcome, int? ExitCode, string? Detail)> StartAndWaitAsync(JobDefinition job, CancellationToken cancellationToken)
+    private async Task<(RunOutcomeEnum Outcome, int? ExitCode, string? Detail)> StartAndWaitAsync(JobDefinition job, CancellationToken cancellationToken)
     {
         var temp = Path.Combine(_dataDirectory, "tmp");
         Directory.CreateDirectory(temp);
@@ -179,11 +179,11 @@ public sealed class JobRunner
             }
             catch (Exception exception) when (exception is Win32Exception or InvalidOperationException or DirectoryNotFoundException)
             {
-                return (RunOutcome.NotStarted, null, exception.Message);
+                return (RunOutcomeEnum.NotStarted, null, exception.Message);
             }
 
             if (process is null)
-                return (RunOutcome.NotStarted, null, "Процесс не создан");
+                return (RunOutcomeEnum.NotStarted, null, "Процесс не создан");
 
             var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
             var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
@@ -198,15 +198,15 @@ public sealed class JobRunner
             {
                 Kill(process);
                 return cancellationToken.IsCancellationRequested
-                    ? (RunOutcome.Failed, null, "Остановлена при закрытии приложения")
-                    : (RunOutcome.TimedOut, null, $"Не завершилась за {job.TimeoutMinutes:0.##} мин, процесс остановлен");
+                    ? (RunOutcomeEnum.Failed, null, "Остановлена при закрытии приложения")
+                    : (RunOutcomeEnum.TimedOut, null, $"Не завершилась за {job.TimeoutMinutes:0.##} мин, процесс остановлен");
             }
 
             await output;
             var tail = LastLine(await error);
             return process.ExitCode == 0
-                ? (RunOutcome.Ok, 0, null)
-                : (RunOutcome.Failed, process.ExitCode, tail is null ? $"Код завершения {process.ExitCode}" : $"Код завершения {process.ExitCode}: {tail}");
+                ? (RunOutcomeEnum.Ok, 0, null)
+                : (RunOutcomeEnum.Failed, process.ExitCode, tail is null ? $"Код завершения {process.ExitCode}" : $"Код завершения {process.ExitCode}: {tail}");
         }
         finally
         {
@@ -225,24 +225,24 @@ public sealed class JobRunner
     /// <param name="outcome">Итог процесса</param>
     /// <param name="exitCode">Код завершения</param>
     /// <param name="detail">Пояснение к ошибке</param>
-    private void Finish(JobDefinition job, string title, ProcessStatus? previous, DateTimeOffset started, DateTimeOffset finished, RunOutcome outcome, int? exitCode, string? detail)
+    private void Finish(JobDefinition job, string title, ProcessStatus? previous, DateTimeOffset started, DateTimeOffset finished, RunOutcomeEnum outcome, int? exitCode, string? detail)
     {
         var current = SafeRead(job.Id);
-        var selfReported = current is { } own && own.State != ProcessState.Running && own.UpdatedAt > started;
+        var selfReported = current is { } own && own.State != ProcessStateEnum.Running && own.UpdatedAt > started;
 
-        if (outcome == RunOutcome.Ok)
+        if (outcome == RunOutcomeEnum.Ok)
         {
             if (!selfReported)
-                Save(job, title, previous, ProcessState.Ok, finished, "Завершено без ошибок", null, success: true);
+                Save(job, title, previous, ProcessStateEnum.Ok, finished, "Завершено без ошибок", null, success: true);
             else if (current!.LastRunAt is null || current.LastRunAt < started)
                 _store.Write(current with { LastRunAt = finished });
 
             return;
         }
 
-        var reportedFailure = selfReported && current!.State == ProcessState.Failed;
+        var reportedFailure = selfReported && current!.State == ProcessStateEnum.Failed;
         if (!reportedFailure)
-            Save(job, title, previous, ProcessState.Failed, finished, null, detail ?? $"Код завершения {exitCode}", success: false);
+            Save(job, title, previous, ProcessStateEnum.Failed, finished, null, detail ?? $"Код завершения {exitCode}", success: false);
         else if (current!.LastRunAt is null || current.LastRunAt < started)
             _store.Write(current with { LastRunAt = finished });
     }
@@ -260,7 +260,7 @@ public sealed class JobRunner
     /// <param name="success">
     /// <see langword="true"/>, если запуск удался и нужно обновить время успеха
     /// </param>
-    private void Save(JobDefinition job, string title, ProcessStatus? previous, ProcessState state, DateTimeOffset at, string? summary, string? error, bool success)
+    private void Save(JobDefinition job, string title, ProcessStatus? previous, ProcessStateEnum state, DateTimeOffset at, string? summary, string? error, bool success)
     {
         _store.Write(new ProcessStatus
         {
@@ -268,7 +268,7 @@ public sealed class JobRunner
             Title = title,
             State = state,
             UpdatedAt = at,
-            LastRunAt = state == ProcessState.Running ? previous?.LastRunAt : at,
+            LastRunAt = state == ProcessStateEnum.Running ? previous?.LastRunAt : at,
             LastSuccessAt = success ? at : previous?.LastSuccessAt,
             NextRunAt = previous?.NextRunAt,
             Summary = summary,

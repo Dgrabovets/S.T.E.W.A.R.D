@@ -339,7 +339,7 @@ public sealed class TrayHost : IDisposable
     private void NotifyJobProblems(IReadOnlyList<JobRow> rows)
     {
         var current = rows
-            .Where(row => row.Enabled && row.Tone == RowTone.Problem)
+            .Where(row => row.Enabled && row.Tone == RowToneEnum.Problem)
             .ToDictionary(row => $"{row.Id}|{row.Headline}|{row.Detail}", row => row, StringComparer.Ordinal);
 
         _notifiedProblems.RemoveWhere(key => !current.ContainsKey(key));
@@ -381,7 +381,7 @@ public sealed class TrayHost : IDisposable
     /// <param name="snapshot">Текущее состояние</param>
     private void ApplyIcon(SyncSnapshot snapshot)
     {
-        var failed = _jobRows.FirstOrDefault(row => row.Enabled && row.Tone == RowTone.Problem);
+        var failed = _jobRows.FirstOrDefault(row => row.Enabled && row.Tone == RowToneEnum.Problem);
         _icon.Icon = snapshot.CurrentError is not null || failed is not null
             ? _errorIcon
             : snapshot.ContainerRunning ? _runningIcon : _stoppedIcon;

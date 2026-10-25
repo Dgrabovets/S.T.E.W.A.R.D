@@ -8,4 +8,4 @@ namespace Steward.Monitoring.Models;
 /// <param name="Title">Короткая строка о том, чем закончился прогон</param>
 /// <param name="Detail">Подробности, строки разделены переводом строки</param>
 /// <param name="Repeat">Сколько одинаковых тихих прогонов схлопнуто в эту запись</param>
-public sealed record LogEntry(DateTimeOffset Time, LogTone Tone, string Title, string Detail, int Repeat);
+public sealed record LogEntry(DateTimeOffset Time, LogToneEnum Tone, string Title, string Detail, int Repeat);

@@ -12,5 +12,5 @@ public interface IMailClassifier
     /// </summary>
     /// <param name="mail">Письмо из почтового ящика</param>
     /// <returns>Категория, от которой зависит, будет ли создана задача</returns>
-    MailCategory Classify(MailItem mail);
+    MailCategoryEnum Classify(MailItem mail);
 }

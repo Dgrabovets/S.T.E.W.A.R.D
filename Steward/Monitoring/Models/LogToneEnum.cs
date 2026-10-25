@@ -3,7 +3,7 @@ namespace Steward.Monitoring.Models;
 /// <summary>
 /// Тон записи журнала
 /// </summary>
-public enum LogTone
+public enum LogToneEnum
 {
     /// <summary>
     /// Прогон ничего не изменил

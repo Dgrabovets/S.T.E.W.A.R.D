@@ -27,7 +27,7 @@ public static class TaskRows
             new(SCHEDULE_ID, "Расписание", panel.Label, $"{panel.Subtitle}. {panel.Summary}", panel.Tone),
         };
 
-        rows.AddRange(jobs.Select(job => new TaskStatusRow(job.Id, job.Title, job.Headline, job.Detail, ToneOf(job.Tone), Muted: !job.Enabled, CanRun: job.Tone != RowTone.Working)));
+        rows.AddRange(jobs.Select(job => new TaskStatusRow(job.Id, job.Title, job.Headline, job.Detail, ToneOf(job.Tone), Muted: !job.Enabled, CanRun: job.Tone != RowToneEnum.Working)));
         return rows;
     }
 
@@ -36,12 +36,12 @@ public static class TaskRows
     /// </summary>
     /// <param name="tone">Цвет из библиотеки статусов</param>
     /// <returns>Цвет панели</returns>
-    private static PanelTone ToneOf(RowTone tone) => tone switch
+    private static PanelToneEnum ToneOf(RowToneEnum tone) => tone switch
     {
-        RowTone.Ok or RowTone.Working => PanelTone.Running,
-        RowTone.Attention => PanelTone.Attention,
-        RowTone.Problem => PanelTone.Problem,
-        _ => PanelTone.Idle,
+        RowToneEnum.Ok or RowToneEnum.Working => PanelToneEnum.Running,
+        RowToneEnum.Attention => PanelToneEnum.Attention,
+        RowToneEnum.Problem => PanelToneEnum.Problem,
+        _ => PanelToneEnum.Idle,
     };
 }
 
@@ -51,7 +51,7 @@ public static class TaskRows
 /// <param name="Tone">Цвет плашки</param>
 /// <param name="Label">Короткий текст плашки</param>
 /// <param name="Subtitle">Строка под заголовком</param>
-public sealed record TaskSummary(PanelTone Tone, string Label, string Subtitle)
+public sealed record TaskSummary(PanelToneEnum Tone, string Label, string Subtitle)
 {
     /// <summary>
     /// Считает итог. Выключенные задачи в нём не участвуют
@@ -61,16 +61,16 @@ public sealed record TaskSummary(PanelTone Tone, string Label, string Subtitle)
     public static TaskSummary Of(IReadOnlyList<TaskStatusRow> rows)
     {
         var active = rows.Where(row => !row.Muted).ToArray();
-        var problems = active.Where(row => row.Tone == PanelTone.Problem).Select(row => row.Name).ToArray();
+        var problems = active.Where(row => row.Tone == PanelToneEnum.Problem).Select(row => row.Name).ToArray();
         if (problems.Length > 0)
-            return new TaskSummary(PanelTone.Problem, "Сбой", "Требует внимания: " + string.Join(", ", problems));
+            return new TaskSummary(PanelToneEnum.Problem, "Сбой", "Требует внимания: " + string.Join(", ", problems));
 
-        var waiting = active.Where(row => row.Tone == PanelTone.Attention).Select(row => row.Name).ToArray();
+        var waiting = active.Where(row => row.Tone == PanelToneEnum.Attention).Select(row => row.Name).ToArray();
         if (waiting.Length > 0)
-            return new TaskSummary(PanelTone.Attention, "Ждёт тебя", "Ждут решения: " + string.Join(", ", waiting));
+            return new TaskSummary(PanelToneEnum.Attention, "Ждёт тебя", "Ждут решения: " + string.Join(", ", waiting));
 
-        return active.All(row => row.Tone == PanelTone.Running)
-            ? new TaskSummary(PanelTone.Running, "Работает", "Все задачи работают")
-            : new TaskSummary(PanelTone.Idle, "Не всё запущено", "Не все задачи запущены");
+        return active.All(row => row.Tone == PanelToneEnum.Running)
+            ? new TaskSummary(PanelToneEnum.Running, "Работает", "Все задачи работают")
+            : new TaskSummary(PanelToneEnum.Idle, "Не всё запущено", "Не все задачи запущены");
     }
 }

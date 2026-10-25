@@ -3,7 +3,7 @@ namespace Steward.Models;
 /// <summary>
 /// Цвет плашки состояния на панели
 /// </summary>
-public enum PanelTone
+public enum PanelToneEnum
 {
     /// <summary>
     /// Процесс остановлен или Docker не отвечает
