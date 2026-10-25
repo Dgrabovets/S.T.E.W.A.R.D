@@ -66,6 +66,11 @@ public sealed class LessonFormatViewModel : Bindable
     public bool HasTranscript { get; }
 
     /// <summary>
+    /// Как движутся точки индикатора: идёт поиск по тексту расшифровки
+    /// </summary>
+    public ActivityKindEnum Kind => ActivityKindEnum.Searching;
+
+    /// <summary>
     /// Что показывает индикатор подготовки
     /// </summary>
     public ActivityStateEnum Activity

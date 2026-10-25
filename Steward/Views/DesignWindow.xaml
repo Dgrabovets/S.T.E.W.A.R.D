@@ -1,6 +1,7 @@
 <Window x:Class="Steward.Views.DesignWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="clr-namespace:Steward.Controls"
         Title="Дизайн"
         Width="1400"
         SizeToContent="Height"
@@ -97,6 +98,15 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <TextBlock Text="Индикаторы процесса" Style="{StaticResource Section}"/>
+            <StackPanel Orientation="Horizontal">
+                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Working" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Работа" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Searching" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Поиск" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Connecting" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Связь" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Composing" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Сборка" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Breathing" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Ожидание" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
+            </StackPanel>
 
             <TextBlock Text="Форма" Style="{StaticResource Section}"/>
             <StackPanel Orientation="Horizontal">

@@ -110,6 +110,7 @@
         <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
         <Setter Property="DoneBrush" Value="{StaticResource OkBrush}"/>
         <Setter Property="State" Value="{Binding Activity}"/>
+        <Setter Property="Kind" Value="{Binding Kind}"/>
         <Setter Property="Since" Value="{Binding ActivitySince}"/>
         <Style.Triggers>
             <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">

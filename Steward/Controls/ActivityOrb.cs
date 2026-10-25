@@ -64,6 +64,11 @@ public sealed class ActivityOrb : FrameworkElement
     })];
 
     /// <summary>
+    /// Постоянное случайное число для каждой точки: по нему точки разлетаются при сборке сферы
+    /// </summary>
+    private static readonly double[] Scatter = [.. Enumerable.Range(0, POINT_COUNT).Select(index => (Math.Sin(index * 12.9898) * 43758.5453) % 1 is var value ? Math.Abs(value) : 0)];
+
+    /// <summary>
     /// Состояние индикатора
     /// </summary>
     public static readonly DependencyProperty StateProperty = DependencyProperty.Register(
@@ -71,6 +76,15 @@ public sealed class ActivityOrb : FrameworkElement
         typeof(ActivityStateEnum),
         typeof(ActivityOrb),
         new FrameworkPropertyMetadata(ActivityStateEnum.None, FrameworkPropertyMetadataOptions.AffectsRender, (orb, _) => ((ActivityOrb)orb).UpdateLoop()));
+
+    /// <summary>
+    /// Как движутся точки, пока процесс идёт
+    /// </summary>
+    public static readonly DependencyProperty KindProperty = DependencyProperty.Register(
+        nameof(Kind),
+        typeof(ActivityKindEnum),
+        typeof(ActivityOrb),
+        new FrameworkPropertyMetadata(ActivityKindEnum.Working, FrameworkPropertyMetadataOptions.AffectsRender));
 
     /// <summary>
     /// Когда процесс закончился: от этого момента идёт анимация галочки. Так анимация не начинается заново, если карточку пересоздали
@@ -123,6 +137,15 @@ public sealed class ActivityOrb : FrameworkElement
     {
         get => (ActivityStateEnum)GetValue(StateProperty);
         set => SetValue(StateProperty, value);
+    }
+
+    /// <summary>
+    /// Как движутся точки, пока процесс идёт
+    /// </summary>
+    public ActivityKindEnum Kind
+    {
+        get => (ActivityKindEnum)GetValue(KindProperty);
+        set => SetValue(KindProperty, value);
     }
 
     /// <summary>
@@ -234,27 +257,66 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
-    /// Рисует вращающуюся сферу из точек: дальние точки меньше и бледнее
+    /// Рисует сферу из точек. Движение зависит от вида: у каждого свои радиус точки, яркость и размер
     /// </summary>
     /// <param name="context">Контекст рисования</param>
     /// <param name="center">Центр</param>
     /// <param name="radius">Радиус сферы</param>
     private void DrawSphere(DrawingContext context, Point center, double radius)
     {
-        var turn = DateTimeOffset.UtcNow.TimeOfDay.TotalSeconds % TURN_SECONDS / TURN_SECONDS * Math.PI * 2;
+        var seconds = DateTimeOffset.UtcNow.TimeOfDay.TotalSeconds;
+        var kind = Kind;
+        var turn = seconds % TURN_SECONDS / TURN_SECONDS * Math.PI * 2 * (kind == ActivityKindEnum.Breathing ? 0.5 : 1);
         var (sinTurn, cosTurn) = Math.SinCos(turn);
         var (sinTilt, cosTilt) = Math.SinCos(TILT);
         var brushes = Enumerable.Range(0, DEPTH_LEVELS).Select(MakeBrush).ToArray();
 
-        foreach (var (x, y, z) in Points)
+        for (var index = 0; index < Points.Length; index++)
         {
+            var (x, y, z) = Points[index];
             var turnedX = x * cosTurn + z * sinTurn;
             var turnedZ = -x * sinTurn + z * cosTurn;
             var tiltedY = y * cosTilt - turnedZ * sinTilt;
             var depth = (y * sinTilt + turnedZ * cosTilt + 1) / 2;
-            var level = Math.Min(DEPTH_LEVELS - 1, (int)(depth * DEPTH_LEVELS));
+            var (reach, glow) = Motion(kind, seconds, y, Scatter[index]);
+            var level = Math.Min(DEPTH_LEVELS - 1, (int)(Math.Clamp(depth + glow, 0, 0.999) * DEPTH_LEVELS));
+            var dot = (0.45 + 0.75 * depth) * (1 + glow * 0.8);
 
-            context.DrawEllipse(brushes[level], null, new Point(center.X + turnedX * radius, center.Y + tiltedY * radius), 0.45 + 0.75 * depth, 0.45 + 0.75 * depth);
+            context.DrawEllipse(brushes[level], null, new Point(center.X + turnedX * radius * reach, center.Y + tiltedY * radius * reach), dot, dot);
+        }
+    }
+
+    /// <summary>
+    /// Считает, как далеко от центра лежит точка и насколько она подсвечена в этот момент
+    /// </summary>
+    /// <param name="kind">Вид движения</param>
+    /// <param name="seconds">Время, секунд</param>
+    /// <param name="height">Высота точки на единичной сфере от -1 до 1</param>
+    /// <param name="scatter">Постоянное случайное число точки от 0 до 1</param>
+    /// <returns>Доля радиуса сферы и добавка яркости от 0 до 1</returns>
+    private static (double Reach, double Glow) Motion(ActivityKindEnum kind, double seconds, double height, double scatter)
+    {
+        switch (kind)
+        {
+            case ActivityKindEnum.Searching:
+                var band = (seconds * 0.7 % 1) * 2.6 - 1.3;
+
+                return (1, Math.Max(0, 1 - Math.Abs(height - band) * 3.2) * 0.6);
+
+            case ActivityKindEnum.Connecting:
+                return (0.62 + 0.38 * (0.5 + 0.5 * Math.Sin(seconds * 2.4 - height * 3)), 0);
+
+            case ActivityKindEnum.Composing:
+                var phase = seconds % 3.2 / 3.2;
+                var gather = phase < 0.7 ? 1 - Math.Pow(1 - phase / 0.7, 3) : phase < 0.9 ? 1 : 1 - (phase - 0.9) / 0.1;
+
+                return (1 + (1 - gather) * (0.5 + scatter), gather > 0.98 ? 0.15 : 0);
+
+            case ActivityKindEnum.Breathing:
+                return (0.82 + 0.18 * Math.Sin(seconds * 1.3), 0);
+
+            default:
+                return (1, 0);
         }
     }
 
