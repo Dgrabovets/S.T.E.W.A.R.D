@@ -1,4 +1,5 @@
 faster-whisper
+yt-dlp
 # faster-whisper 1.2.1 передаёт в PyAV параметр metadata_errors, который убрали в av 17 и новее
 av<17
 nvidia-cublas-cu12

@@ -3,6 +3,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media;
 using System.Windows;
 using Steward.Homework.Models;
+using Steward.Ideas.Models;
 using Steward.Monitoring.Models;
 using Steward.Status.Registry;
 using Steward.Status.Rows;
@@ -54,14 +55,14 @@ public static class SnapshotRenderer
         else
         {
             var main = new MainWindow();
-            main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"]);
+            main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"], SampleIdeas(now));
             if (parts.Length > 1 && Enum.TryParse<AppPageEnum>(parts[1], ignoreCase: true, out var page))
                 main.Model.Page = page;
 
             // «main:done»: задача «telegram» только что закончилась, на её карточке рисуется галочка
             if (parts.Length > 1 && string.Equals(parts[1], "done", StringComparison.OrdinalIgnoreCase))
             {
-                main.Apply(snapshot, [.. jobs.Select(job => job.Id == "telegram" ? job with { Tone = RowToneEnum.Ok, Headline = "Выполнено только что" } : job)], SampleRecords(now), []);
+                main.Apply(snapshot, [.. jobs.Select(job => job.Id == "telegram" ? job with { Tone = RowToneEnum.Ok, Headline = "Выполнено только что" } : job)], SampleRecords(now), [], SampleIdeas(now));
                 settleSeconds = 1.2;
             }
 
@@ -155,6 +156,17 @@ public static class SnapshotRenderer
         (new Lesson("ux-1025", "Гейм-дизайн: игровые механики", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Presentation),
         (new Lesson("db-1022", "Базы данных: нормализация", new DateOnly(2026, 10, 22)), HomeworkFormatEnum.Word),
         (new Lesson("en-1020", "Английский: эссе", new DateOnly(2026, 10, 20)), HomeworkFormatEnum.Skip),
+    ];
+
+    /// <summary>
+    /// Выдуманные идеи из рилсов
+    /// </summary>
+    /// <param name="now">Текущий момент</param>
+    /// <returns>Идеи от свежих к старым</returns>
+    private static IReadOnlyList<Idea> SampleIdeas(DateTimeOffset now) =>
+    [
+        new Idea { Id = "r1-1", CreatedAt = now.AddMinutes(-12), SourceUrl = "https://www.instagram.com/reel/sample/", Title = "Хранить конспекты лекций в одном поиске", Author = "@study.tools", Transcript = "Собери все конспекты в одну папку, прогони через расшифровку и ищи по ключевым словам вместо того, чтобы листать файлы. Я так готовлюсь к экзаменам уже второй семестр и экономлю кучу времени перед сессией." },
+        new Idea { Id = "r1-2", CreatedAt = now.AddHours(-5), SourceUrl = "https://www.instagram.com/reel/sample2/", Title = "Напоминание о дедлайне за день", Author = "@productivity", Caption = "Настрой напоминание за сутки до сдачи" },
     ];
 
     /// <summary>

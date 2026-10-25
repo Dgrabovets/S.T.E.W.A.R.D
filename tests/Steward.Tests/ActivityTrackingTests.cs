@@ -18,10 +18,10 @@ public class ActivityTrackingTests
     {
         var model = new MainViewModel();
 
-        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Working)], [], []);
+        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Working)], [], [], []);
         Assert.Equal(ActivityStateEnum.Working, model.Tasks.Single(task => task.Name == "Почта").Activity);
 
-        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Ok)], [], []);
+        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Ok)], [], [], []);
         var done = model.Tasks.Single(task => task.Name == "Почта");
         Assert.Equal(ActivityStateEnum.Done, done.Activity);
         Assert.True(done.ActivitySince > DateTimeOffset.UtcNow.AddMinutes(-1));
@@ -35,8 +35,8 @@ public class ActivityTrackingTests
     {
         var model = new MainViewModel();
 
-        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Working)], [], []);
-        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Problem)], [], []);
+        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Working)], [], [], []);
+        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Problem)], [], [], []);
 
         Assert.Equal(ActivityStateEnum.None, model.Tasks.Single(task => task.Name == "Почта").Activity);
     }
@@ -49,7 +49,7 @@ public class ActivityTrackingTests
     {
         var model = new MainViewModel();
 
-        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Ok)], [], []);
+        model.Apply(new SyncSnapshot(), [Row(RowToneEnum.Ok)], [], [], []);
 
         Assert.Equal(ActivityStateEnum.None, model.Tasks.Single(task => task.Name == "Почта").Activity);
     }
