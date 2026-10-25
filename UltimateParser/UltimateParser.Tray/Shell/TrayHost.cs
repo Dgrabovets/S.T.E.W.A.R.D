@@ -2,6 +2,8 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using SingularityTools.Status;
+using UltimateParser.Tray.Hosting;
 using UltimateParser.Tray.Models;
 using UltimateParser.Tray.Monitoring.Implementations;
 using UltimateParser.Tray.Monitoring.Models;
@@ -80,6 +82,31 @@ public sealed class TrayHost : IDisposable
     private string? _notifiedError;
 
     /// <summary>
+    /// Запускает задачи из реестра и отдаёт их статусы
+    /// </summary>
+    private readonly JobHost _jobs = new();
+
+    /// <summary>
+    /// Главное окно. Создаётся при первом открытии
+    /// </summary>
+    private MainWindow? _main;
+
+    /// <summary>
+    /// Последние строки задач
+    /// </summary>
+    private IReadOnlyList<JobRow> _jobRows = [];
+
+    /// <summary>
+    /// Проблемы задач, о которых уже показано уведомление
+    /// </summary>
+    private readonly HashSet<string> _notifiedProblems = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Момент самой свежей правки расписания, о которой уже показано уведомление. Переживает перезапуск иконки
+    /// </summary>
+    private DateTimeOffset _notifiedChangeAt = ChangeStamp.Load();
+
+    /// <summary>
     /// Не даёт двум опросам идти одновременно
     /// </summary>
     private bool _refreshing;
@@ -105,7 +132,8 @@ public sealed class TrayHost : IDisposable
             ShowImageMargin = false,
             Padding = new Padding(4, 6, 4, 6),
         };
-        menu.Items.Add(Item("Открыть", (_, _) => ShowWindow()));
+        menu.Items.Add(Item("Открыть приложение", (_, _) => ShowMain()));
+        menu.Items.Add(Item("Быстрый статус", (_, _) => ShowWindow()));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(Item("Выход", (_, _) => Exit()));
 
@@ -121,8 +149,14 @@ public sealed class TrayHost : IDisposable
             if (args.Button == MouseButtons.Left)
                 ShowWindow();
         };
-        _icon.BalloonTipClicked += (_, _) => ShowWindow();
+        _icon.DoubleClick += (_, _) => ShowMain();
+        _icon.BalloonTipClicked += (_, _) => ShowMain();
         _window.ExitRequested += (_, _) => Exit();
+        _window.OpenAppRequested += (_, _) =>
+        {
+            _window.Hide();
+            ShowMain();
+        };
         _window.RestartRequested += async (_, _) =>
         {
             var restarted = await _probe.RestartAsync(CancellationToken.None);
@@ -139,6 +173,9 @@ public sealed class TrayHost : IDisposable
         _timer.Tick += async (_, _) => await RefreshAsync();
         _timer.Start();
         _ = RefreshAsync();
+
+        _jobs.Changed += (_, _) => ApplyAll();
+        _jobs.Start();
     }
 
     /// <summary>
@@ -163,9 +200,11 @@ public sealed class TrayHost : IDisposable
 
         _exiting = true;
         _timer.Stop();
+        _jobs.Dispose();
         _icon.Visible = false;
         _icon.Dispose();
         _window.Close();
+        _main?.CloseForExit();
         _runningIcon.Dispose();
         _stoppedIcon.Dispose();
         _errorIcon.Dispose();
@@ -265,13 +304,12 @@ public sealed class TrayHost : IDisposable
             if (_exiting)
                 return;
 
-            ApplyIcon(_snapshot);
-            if (_window.IsVisible)
-                _window.Apply(_snapshot, scrollToProblem: false);
+            ApplyAll();
 
             if (_snapshot.CurrentError is null)
             {
                 _notifiedError = null;
+                NotifyChanges(_snapshot);
                 return;
             }
 
@@ -291,6 +329,71 @@ public sealed class TrayHost : IDisposable
     }
 
     /// <summary>
+    /// Обновляет иконку и открытые окна свежими статусами контейнера и задач
+    /// </summary>
+    private void ApplyAll()
+    {
+        if (_exiting)
+            return;
+
+        _jobRows = _jobs.Rows();
+        ApplyIcon(_snapshot);
+        if (_window.IsVisible)
+            _window.Apply(_snapshot, _jobRows, scrollToProblem: false);
+        if (_main is { IsVisible: true })
+            _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors);
+
+        NotifyJobProblems(_jobRows);
+    }
+
+    /// <summary>
+    /// Один раз сообщает о каждой новой проблеме включённой задачи. Когда проблема уходит, о ней можно будет сообщить снова
+    /// </summary>
+    /// <param name="rows">
+    /// Строки задач
+    /// </param>
+    private void NotifyJobProblems(IReadOnlyList<JobRow> rows)
+    {
+        var current = rows
+            .Where(row => row.Enabled && row.Tone == RowTone.Problem)
+            .ToDictionary(row => $"{row.Id}|{row.Headline}|{row.Detail}", row => row, StringComparer.Ordinal);
+
+        _notifiedProblems.RemoveWhere(key => !current.ContainsKey(key));
+        foreach (var (key, row) in current)
+        {
+            if (!_notifiedProblems.Add(key))
+                continue;
+
+            var tip = $"{row.Headline}. {row.Detail}";
+            if (tip.Length > BALLOON_TEXT_LIMIT)
+                tip = tip[..BALLOON_TEXT_LIMIT];
+            _icon.ShowBalloonTip(BALLOON_MS, row.Title, tip, ToolTipIcon.None);
+        }
+    }
+
+    /// <summary>
+    /// Один раз сообщает об отмене, переносе или правке занятия, которые появились после прошлого уведомления
+    /// </summary>
+    /// <param name="snapshot">
+    /// Текущее состояние
+    /// </param>
+    private void NotifyChanges(SyncSnapshot snapshot)
+    {
+        var text = ChangeNotice.Build(snapshot.Entries, _notifiedChangeAt, out var newest);
+        if (newest <= _notifiedChangeAt)
+            return;
+
+        _notifiedChangeAt = newest;
+        ChangeStamp.Save(newest);
+        if (text is null)
+            return;
+
+        if (text.Length > BALLOON_TEXT_LIMIT)
+            text = text[..BALLOON_TEXT_LIMIT];
+        _icon.ShowBalloonTip(BALLOON_MS, "Расписание изменилось", text, ToolTipIcon.None);
+    }
+
+    /// <summary>
     /// Красит иконку и пишет короткую подсказку
     /// </summary>
     /// <param name="snapshot">
@@ -298,12 +401,15 @@ public sealed class TrayHost : IDisposable
     /// </param>
     private void ApplyIcon(SyncSnapshot snapshot)
     {
-        _icon.Icon = snapshot.CurrentError is not null
+        var failed = _jobRows.FirstOrDefault(row => row.Enabled && row.Tone == RowTone.Problem);
+        _icon.Icon = snapshot.CurrentError is not null || failed is not null
             ? _errorIcon
             : snapshot.ContainerRunning ? _runningIcon : _stoppedIcon;
 
         var text = snapshot.CurrentError is not null
             ? "Расписание: не удалось обновить"
+            : failed is not null
+                ? $"{failed.Title}: {failed.Headline}"
             : snapshot.ContainerRunning
                 ? snapshot.LastSuccess is null
                     ? "Расписание работает"
@@ -324,9 +430,29 @@ public sealed class TrayHost : IDisposable
     private void ShowWindow()
     {
         if (!_window.IsVisible)
-            _window.Apply(_snapshot, scrollToProblem: _snapshot.CurrentError is not null);
+            _window.Apply(_snapshot, _jobRows, scrollToProblem: _snapshot.CurrentError is not null);
 
         _window.ToggleFromIcon();
+    }
+
+    /// <summary>
+    /// Открывает главное окно приложения с самыми свежими данными
+    /// </summary>
+    private void ShowMain()
+    {
+        if (_exiting)
+            return;
+
+        if (_main is null)
+        {
+            _main = new MainWindow();
+            _main.Model.RunRequested += id => _jobs.RunNow(id);
+            _main.Model.ExitRequested += (_, _) => Exit();
+        }
+
+        _jobRows = _jobs.Rows();
+        _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors);
+        _main.ShowAndActivate();
     }
 
     /// <summary>

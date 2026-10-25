@@ -16,6 +16,11 @@ public enum PanelTone
     Running,
 
     /// <summary>
+    /// Готов результат, который ждёт решения пользователя
+    /// </summary>
+    Attention,
+
+    /// <summary>
     /// Последняя сверка закончилась сбоем
     /// </summary>
     Problem,

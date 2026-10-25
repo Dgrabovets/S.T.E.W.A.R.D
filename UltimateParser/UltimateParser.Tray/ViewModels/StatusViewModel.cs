@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using SingularityTools.Status;
 using UltimateParser.Tray.Models;
 using UltimateParser.Tray.Monitoring.Implementations;
 using UltimateParser.Tray.Monitoring.Models;
@@ -30,12 +31,12 @@ public sealed class StatusViewModel : Bindable
     /// <summary>
     /// Подпись под заголовком
     /// </summary>
-    private string _subtitle = "Ещё не обновлялось";
+    private string _subtitle = "Проверяю задачи";
 
     /// <summary>
-    /// Фраза о том, что происходит сейчас
+    /// Строки списка задач
     /// </summary>
-    private string _summary = "Синхронизация ещё не запускалась";
+    private IReadOnlyList<TaskStatusRow> _tasks = [];
 
     /// <summary>
     /// Короткий текст плашки
@@ -104,6 +105,7 @@ public sealed class StatusViewModel : Bindable
     {
         ToggleSettingsCommand = new RelayCommand(ToggleSettings);
         ExitCommand = new RelayCommand(() => ExitRequested?.Invoke(this, EventArgs.Empty));
+        OpenAppCommand = new RelayCommand(() => OpenAppRequested?.Invoke(this, EventArgs.Empty));
         SaveAndRestartCommand = new RelayCommand(SaveAndRestart);
         RestartCommand = new RelayCommand(Restart);
         LoadSettings();
@@ -120,6 +122,16 @@ public sealed class StatusViewModel : Bindable
     /// Просит пересоздать контейнер
     /// </summary>
     public event EventHandler? RestartRequested;
+
+    /// <summary>
+    /// Просит открыть главное окно приложения
+    /// </summary>
+    public event EventHandler? OpenAppRequested;
+
+    /// <summary>
+    /// Открывает главное окно приложения
+    /// </summary>
+    public RelayCommand OpenAppCommand { get; }
 
     /// <summary>
     /// Переключает журнал и настройки
@@ -146,7 +158,7 @@ public sealed class StatusViewModel : Bindable
     #region State
 
     /// <summary>
-    /// Строка под заголовком «Расписание»
+    /// Строка под заголовком «Задачи»: всё ли в порядке или что требует внимания
     /// </summary>
     public string Subtitle
     {
@@ -155,12 +167,12 @@ public sealed class StatusViewModel : Bindable
     }
 
     /// <summary>
-    /// Одна фраза о текущем состоянии сверки
+    /// Задачи со статусом: расписание и проверка почты
     /// </summary>
-    public string Summary
+    public IReadOnlyList<TaskStatusRow> Tasks
     {
-        get => _summary;
-        private set => Set(ref _summary, value);
+        get => _tasks;
+        private set => Set(ref _tasks, value);
     }
 
     /// <summary>
@@ -351,18 +363,23 @@ public sealed class StatusViewModel : Bindable
     #region Snapshot
 
     /// <summary>
-    /// Показывает свежий снимок журнала
+    /// Показывает свежий снимок журнала и статусы задач
     /// </summary>
     /// <param name="snapshot">
     /// Текущее состояние синхронизации
     /// </param>
-    public void Apply(SyncSnapshot snapshot)
+    /// <param name="jobs">
+    /// Строки задач из реестра
+    /// </param>
+    public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs)
     {
         var panel = PanelStatus.From(snapshot);
-        Subtitle = panel.Subtitle;
-        Summary = panel.Summary;
-        StatusLabel = panel.Label;
-        Tone = panel.Tone;
+        Tasks = TaskRows.Build(snapshot, jobs);
+
+        var summary = TaskSummary.Of(Tasks);
+        Tone = summary.Tone;
+        StatusLabel = summary.Label;
+        Subtitle = summary.Subtitle;
         EmptyText = panel.EmptyText;
         Cards = panel.Cards;
     }

@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using SingularityTools.Status;
 using UltimateParser.Tray.Monitoring.Models;
 using UltimateParser.Tray.ViewModels;
 
@@ -45,6 +46,7 @@ public partial class StatusWindow : Window
         Model.PropertyChanged += OnModelChanged;
         Model.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
         Model.RestartRequested += (_, _) => RestartRequested?.Invoke(this, EventArgs.Empty);
+        Model.OpenAppRequested += (_, _) => OpenAppRequested?.Invoke(this, EventArgs.Empty);
         Deactivated += OnDeactivated;
     }
 
@@ -69,17 +71,25 @@ public partial class StatusWindow : Window
     public event EventHandler? RestartRequested;
 
     /// <summary>
+    /// Просит открыть главное окно приложения
+    /// </summary>
+    public event EventHandler? OpenAppRequested;
+
+    /// <summary>
     /// Показывает свежий снимок
     /// </summary>
     /// <param name="snapshot">
     /// Текущее состояние синхронизации
     /// </param>
+    /// <param name="jobs">
+    /// Строки задач из реестра
+    /// </param>
     /// <param name="scrollToProblem">
     /// <see langword="true"/>, если журнал нужно открыть сверху
     /// </param>
-    public void Apply(SyncSnapshot snapshot, bool scrollToProblem)
+    public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, bool scrollToProblem)
     {
-        Model.Apply(snapshot);
+        Model.Apply(snapshot, jobs);
         if (scrollToProblem)
             JournalScroll.ScrollToTop();
     }

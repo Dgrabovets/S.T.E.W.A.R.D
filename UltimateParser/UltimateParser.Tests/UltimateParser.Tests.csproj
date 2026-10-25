@@ -20,6 +20,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\UltimateParser.Tray\Monitoring\Implementations\LogJournal.cs" Link="Tray\LogJournal.cs" />
+    <Compile Include="..\UltimateParser.Tray\Monitoring\Implementations\ChangeNotice.cs" Link="Tray\ChangeNotice.cs" />
+    <Compile Include="..\UltimateParser.Tray\Monitoring\Models\LogEntry.cs" Link="Tray\LogEntry.cs" />
+    <Compile Include="..\UltimateParser.Tray\Monitoring\Models\LogTone.cs" Link="Tray\LogTone.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

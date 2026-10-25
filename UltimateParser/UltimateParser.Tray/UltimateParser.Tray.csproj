@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UltimateParser.Shared\UltimateParser.Shared.csproj" />
+    <ProjectReference Include="..\..\Status\SingularityTools.Status.csproj" />
   </ItemGroup>
 
 </Project>

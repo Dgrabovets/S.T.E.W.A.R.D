@@ -14,6 +14,35 @@
         <SolidColorBrush x:Key="DangerBrush" Color="#FF7A92"/>
         <SolidColorBrush x:Key="DangerSurfaceBrush" Color="#482438"/>
         <SolidColorBrush x:Key="IdleBrush" Color="#847A9E"/>
+        <SolidColorBrush x:Key="AttentionBrush" Color="#FFC857"/>
+        <SolidColorBrush x:Key="AttentionSurfaceBrush" Color="#3D3320"/>
+        <SolidColorBrush x:Key="WorkingBrush" Color="#7DB8FF"/>
+
+        <Style x:Key="NavButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Plate" Background="Transparent" CornerRadius="12" Padding="14,10">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{StaticResource RaisedBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <Style x:Key="Field" TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>

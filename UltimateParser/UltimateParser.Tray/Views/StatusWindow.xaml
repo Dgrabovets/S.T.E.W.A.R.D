@@ -65,7 +65,7 @@
                         </Border>
                     </Grid>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Расписание" Foreground="{StaticResource TextBrush}" FontSize="22" FontWeight="SemiBold"/>
+                        <TextBlock Text="Задачи" Foreground="{StaticResource TextBrush}" FontSize="22" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Border Grid.Column="2" CornerRadius="12" Padding="12,6" VerticalAlignment="Top" Margin="12,6,0,0">
@@ -75,6 +75,9 @@
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Running}">
                                         <Setter Property="Background" Value="#203A34"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Attention}">
+                                        <Setter Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Problem}">
                                         <Setter Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
@@ -90,6 +93,9 @@
                                         <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Running}">
                                             <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
                                         </DataTrigger>
+                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Attention}">
+                                            <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+                                        </DataTrigger>
                                         <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Problem}">
                                             <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
                                         </DataTrigger>
@@ -99,7 +105,37 @@
                         </TextBlock>
                     </Border>
                 </Grid>
-                <TextBlock Text="{Binding Summary}" Margin="0,14,0,4" Foreground="{StaticResource TextBrush}" FontSize="15" TextWrapping="Wrap"/>
+                <ItemsControl ItemsSource="{Binding Tasks}" Margin="0,14,0,4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,5,0,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Ellipse x:Name="Dot" Width="10" Height="10" Fill="{StaticResource IdleBrush}" VerticalAlignment="Top" Margin="0,6,12,0"/>
+                                <StackPanel Grid.Column="1">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="15" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Headline}" Foreground="{StaticResource MutedBrush}" FontSize="15" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Running}">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource OkBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Attention}">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AttentionBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelTone.Problem}">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource DangerBrush}"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
 
             <Grid Grid.Row="1">
@@ -116,7 +152,7 @@
                     </Grid.Style>
                     <ScrollViewer x:Name="JournalScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="12,0,12,8">
                         <StackPanel>
-                            <TextBlock Text="История сверок" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="8,4,0,10"/>
+                            <TextBlock Text="История сверок расписания" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="8,4,0,10"/>
                             <TextBlock Text="{Binding EmptyText}" Foreground="{StaticResource MutedBrush}" FontSize="14"
                                        Margin="8,24,8,24" TextWrapping="Wrap"
                                        Visibility="{Binding IsJournalEmpty, Converter={StaticResource BoolToVisibility}}"/>
@@ -251,6 +287,7 @@
             <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="16,0,16,8" Padding="4,6">
                 <DockPanel LastChildFill="False">
                     <Button Content="{Binding ModeCaption}" Style="{StaticResource GhostButton}" DockPanel.Dock="Left" Command="{Binding ToggleSettingsCommand}"/>
+                    <Button Content="Приложение" Style="{StaticResource GhostButton}" DockPanel.Dock="Left" Command="{Binding OpenAppCommand}"/>
                     <Button Content="Выход" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Command="{Binding ExitCommand}"/>
                 </DockPanel>
             </Border>
