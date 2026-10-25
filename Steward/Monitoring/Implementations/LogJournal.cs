@@ -1,6 +1,7 @@
+using Steward.Monitoring.Models;
+using Steward.Schedule.Common.Constants;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using Steward.Monitoring.Models;
 
 namespace Steward.Monitoring.Implementations;
 
@@ -30,7 +31,7 @@ public static partial class LogJournal
     /// <summary>
     /// Итог прогона синхронизации
     /// </summary>
-    [GeneratedRegex(@"^Sync finished: created=(\d+) updated=(\d+) archived=(\d+) unarchived=(\d+) completed=(\d+) skipped=(\d+)(?: deleted=(\d+))?", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^" + SyncLogMessages.FINISHED + @"created=(\d+) updated=(\d+)(?: archived=\d+)? unarchived=(\d+) completed=(\d+) skipped=(\d+)(?: deleted=(\d+))?", RegexOptions.CultureInvariant)]
     private static partial Regex FinishedPattern();
 
     /// <summary>
@@ -64,7 +65,7 @@ public static partial class LogJournal
 
         foreach (var message in Messages(logs))
         {
-            if (message.Text.Equals("Sync failed", StringComparison.Ordinal))
+            if (message.Text.Equals(SyncLogMessages.FAILED, StringComparison.Ordinal))
             {
                 cycle.Time = message.Time;
                 cycle.Failed = true;
@@ -84,9 +85,9 @@ public static partial class LogJournal
             {
                 cycle.Time = message.Time;
                 cycle.HasFinish = true;
-                if (int.TryParse(finished.Groups[6].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var skipped))
+                if (int.TryParse(finished.Groups[5].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var skipped))
                     cycle.Skipped = skipped;
-                RememberDeleted(cycle, finished.Groups[7]);
+                RememberDeleted(cycle, finished.Groups[6]);
                 Emit(entries, cycle);
                 cycle = new Cycle();
                 continue;
@@ -119,8 +120,7 @@ public static partial class LogJournal
     /// <returns>Сообщения по порядку</returns>
     private static IEnumerable<Message> Messages(string logs)
     {
-        var lines = logs.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        foreach (var raw in lines)
+        foreach (var raw in logs.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
             var line = ContainerPrefix().Replace(raw.Trim(), string.Empty);
             if (line.Length == 0 || CategoryPattern().IsMatch(StripTimestamp(line)))
@@ -211,43 +211,43 @@ public static partial class LogJournal
         change = null;
         skipped = false;
 
-        if (text.StartsWith("Skipped completed task ", StringComparison.Ordinal))
+        if (text.StartsWith(SyncLogMessages.SKIPPED_COMPLETED, StringComparison.Ordinal))
         {
             skipped = true;
             return true;
         }
 
-        if (text.StartsWith("Created ", StringComparison.Ordinal))
+        if (text.StartsWith(SyncLogMessages.CREATED, StringComparison.Ordinal))
         {
-            change = Action("Добавлено", text["Created ".Length..]);
+            change = Action("Добавлено", text[SyncLogMessages.CREATED.Length..]);
             return change is not null;
         }
 
-        if (text.StartsWith("Updated ", StringComparison.Ordinal))
+        if (text.StartsWith(SyncLogMessages.UPDATED, StringComparison.Ordinal))
         {
-            change = Action("Обновлено", text["Updated ".Length..]);
+            change = Action("Обновлено", text[SyncLogMessages.UPDATED.Length..]);
             return change is not null;
         }
 
-        if (text.StartsWith("Deleted completed future task ", StringComparison.Ordinal))
+        if (text.StartsWith(SyncLogMessages.DELETED_FUTURE, StringComparison.Ordinal))
         {
             change = $"Удалено {When(text)}. Время ещё не прошло";
             return true;
         }
 
-        if (text.StartsWith("Completed past lesson ", StringComparison.Ordinal))
+        if (text.StartsWith(SyncLogMessages.COMPLETED_PAST, StringComparison.Ordinal))
         {
             change = $"Отмечено выполненным {When(text)}";
             return true;
         }
 
-        if (text.StartsWith("Completed removed lesson ", StringComparison.Ordinal))
+        if (text.StartsWith(SyncLogMessages.COMPLETED_REMOVED, StringComparison.Ordinal))
         {
             change = $"Убрано из таблицы {When(text)}";
             return true;
         }
 
-        if (text.StartsWith("Unarchived ", StringComparison.Ordinal))
+        if (text.StartsWith(SyncLogMessages.UNARCHIVED, StringComparison.Ordinal))
         {
             change = $"Возвращено из архива {When(text)}";
             return true;
@@ -367,8 +367,9 @@ public static partial class LogJournal
         if (cycle.Changes.Count == 0)
         {
             var detail = cycle.Skipped > 0
-                ? AlreadyDone(cycle.Skipped)
-                : "Новых правок в таблице нет";
+                           ? AlreadyDone(cycle.Skipped)
+                           : "Новых правок в таблице нет";
+
             if (entries.Count > 0 && entries[^1].Tone == LogToneEnum.Quiet && entries[^1].Detail == detail)
             {
                 var previous = entries[^1];

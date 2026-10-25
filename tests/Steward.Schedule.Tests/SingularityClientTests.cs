@@ -1,8 +1,8 @@
+using Steward.Schedule.Common.Models;
+using Steward.Schedule.Singularity.Implementations;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Steward.Schedule.Common.Models;
-using Steward.Schedule.Singularity.Implementations;
 
 namespace Steward.Schedule.Tests;
 
@@ -196,6 +196,7 @@ public class SingularityClientTests
             IntervalMinutes = 30,
             RunOnce = true,
         };
+
         return new SingularityClient(new HttpClient(http) { BaseAddress = new Uri("https://api.example.test") }, options);
     }
 

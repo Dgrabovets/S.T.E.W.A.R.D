@@ -1,11 +1,11 @@
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media;
 using System.Windows.Threading;
-using Steward.Status;
+using System.Windows;
 using Steward.Monitoring.Models;
+using Steward.Status.Rows;
 using Steward.ViewModels;
 
 namespace Steward.Views;
@@ -126,6 +126,7 @@ public partial class StatusWindow : Window
             Hide();
             Dismissed?.Invoke(this, EventArgs.Empty);
             e.Handled = true;
+
             return;
         }
 
@@ -140,6 +141,7 @@ public partial class StatusWindow : Window
         _ignoreToggle = true;
         var cursor = System.Windows.Forms.Cursor.Position;
         var screen = System.Windows.Forms.Screen.FromPoint(cursor);
+
         BeginAnimation(OpacityProperty, null);
         Opacity = 0;
         Left = screen.WorkingArea.Left;
@@ -221,8 +223,7 @@ public partial class StatusWindow : Window
     private void PlaceNearCursor(System.Drawing.Point cursor, System.Windows.Forms.Screen screen)
     {
         var area = screen.WorkingArea;
-        var source = PresentationSource.FromVisual(this);
-        var toDip = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        var toDip = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
         var origin = toDip.Transform(new System.Windows.Point(cursor.X, cursor.Y));
         var topLeft = toDip.Transform(new System.Windows.Point(area.Left, area.Top));
         var bottomRight = toDip.Transform(new System.Windows.Point(area.Right, area.Bottom));

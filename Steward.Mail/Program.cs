@@ -1,11 +1,8 @@
-using System.Text;
-using System.Text.RegularExpressions;
-using Steward.Mail.Common;
-using Steward.Mail.Interfaces;
-using Steward.Mail.Models;
-using Steward.Mail.Services;
 using Microsoft.Extensions.Configuration;
-using Steward.Status;
+using Steward.Mail.Common;
+using Steward.Mail.Services;
+using Steward.Status.Common;
+using Steward.Status.State;
 
 namespace Steward.Mail;
 
@@ -13,10 +10,8 @@ namespace Steward.Mail;
 /// Проверка учебной почты: задачи в SingularityApp и уведомление со сводкой
 /// Запускается приложением в трее: при его старте, утром и вечером
 /// </summary>
-internal static partial class Program
+internal static class Program
 {
-    #region Fields
-
     /// <summary>
     /// Каталог программы: рядом с ним лежат настройки, список обработанных писем и лог
     /// </summary>
@@ -30,9 +25,7 @@ internal static partial class Program
     /// <summary>
     /// Идентификатор процесса в общем формате статусов, он же имя файла и id задачи в config/jobs.json
     /// </summary>
-    private const string StatusId = "mail";
-
-    #endregion
+    private const string STATUS_ID = "mail";
 
     #region Entry point
 
@@ -51,81 +44,38 @@ internal static partial class Program
         try
         {
             var settings = LoadSettings();
-            var reader = new ImapMailReader(settings.Mail);
-            var classifier = new MailClassifier(settings.Mail, settings.Classifier);
-            var state = new JsonStateStore(Path.Combine(BaseDir, "processed.json"));
             using var singularity = new SingularityClient(settings.Singularity);
-            INotifier notifier = new ToastNotifier();
+            var checker = new MailChecker(
+                new ImapMailReader(settings.Mail),
+                new MailClassifier(settings.Mail, settings.Classifier),
+                singularity,
+                new JsonStateStore(Path.Combine(BaseDir, "processed.json")),
+                new ToastNotifier(),
+                settings,
+                TimeProvider.System,
+                Log);
 
-            var unread = await reader.GetUnreadAsync(CancellationToken.None);
-            var fresh = unread.Where(m => !state.IsProcessed(m.MessageId)).OrderBy(m => m.Date).ToList();
-
-            var feedback = new List<MailItem>();
-            var replies = new List<MailItem>();
-            var info = new List<MailItem>();
-
-            foreach (var mail in fresh)
-            {
-                var category = classifier.Classify(mail);
-                var task = BuildTask(mail, category, settings);
-
-                if (task is not null && !dryRun)
-                {
-                    await singularity.CreateTaskAsync(task, CancellationToken.None);
-                }
-
-                (category switch
-                {
-                    MailCategoryEnum.TeacherFeedback => feedback,
-                    MailCategoryEnum.PersonalReply => replies,
-                    _ => info
-                }).Add(mail);
-
-                Log($"{(dryRun ? "[тест] " : string.Empty)}{CategoryLabel(category)}: {mail.FromName} — {mail.Subject}" +
-                    (task is null ? string.Empty : $" → задача «{task.Title}»"));
-
-                if (!dryRun)
-                {
-                    state.MarkProcessed(mail.MessageId);
-                }
-            }
+            var result = await checker.RunAsync(dryRun, CancellationToken.None);
 
             if (!dryRun)
-            {
-                state.Save();
-            }
-
-            var summary = BuildSummary(feedback, replies, info);
-            Log(summary.Replace('\n', ' '));
-
-            if (!dryRun)
-            {
-                ReportStatus(statusStore, ProcessStateEnum.Ok, summary.Replace('\n', ' '), null);
-            }
-
-            if (feedback.Count + replies.Count > 0)
-            {
-                notifier.Show("Учебная почта", summary);
-            }
+                ReportStatus(statusStore, ProcessStateEnum.Ok, result.Summary.Replace('\n', ' '), null);
 
             return 0;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            Log($"Ошибка: {ex.Message}");
+            Log($"Ошибка: {exception.Message}");
             if (!dryRun)
-            {
-                ReportStatus(statusStore, ProcessStateEnum.Failed, null, ex.Message);
-            }
+                ReportStatus(statusStore, ProcessStateEnum.Failed, null, exception.Message);
 
-            TryNotifyError(ex.Message);
+            TryNotifyError(exception.Message);
             return 1;
         }
     }
 
-    #endregion
+    #endregion Entry point
 
-    #region Private methods
+    #region Helpers
 
     /// <summary>
     /// Читает appsettings.json рядом с exe и проверяет, что пароль и токен не остались заглушками
@@ -144,150 +94,13 @@ internal static partial class Program
         var settings = config.Get<AppSettings>() ?? throw new InvalidOperationException("Не удалось прочитать appsettings.json");
 
         if (string.IsNullOrWhiteSpace(settings.Mail.AppPassword) || settings.Mail.AppPassword.StartsWith('<'))
-        {
             throw new InvalidOperationException("Не задан пароль приложения в Mail:AppPassword");
-        }
 
         if (string.IsNullOrWhiteSpace(settings.Singularity.Token) || settings.Singularity.Token.StartsWith('<'))
-        {
             throw new InvalidOperationException("Не задан токен в Singularity:Token");
-        }
 
         return settings;
     }
-
-    /// <summary>
-    /// Собирает задачу для SingularityApp
-    /// Для информационных писем задача не создаётся
-    /// </summary>
-    /// <param name="mail">Письмо из почтового ящика</param>
-    /// <param name="category">Категория письма</param>
-    /// <param name="settings">Настройки: из них берутся проект назначения и адрес веб-почты</param>
-    /// <returns>
-    /// Задача с приоритетом по категории или <see langword="null"/> для информационного письма
-    /// </returns>
-    private static SingularityTaskRequest? BuildTask(MailItem mail, MailCategoryEnum category, AppSettings settings)
-    {
-        var note = new StringBuilder()
-            .AppendLine($"От: {mail.FromName} <{mail.FromAddress}>")
-            .AppendLine($"Тема: {mail.Subject}")
-            .AppendLine($"Получено: {mail.Date.LocalDateTime:dd.MM.yyyy HH:mm}")
-            .AppendLine()
-            .AppendLine(Truncate(mail.Snippet, 500))
-            .AppendLine()
-            .AppendLine(settings.Mail.WebMailUrl)
-            .ToString();
-
-        var today = DateTime.Today.ToString("yyyy-MM-dd");
-
-        return category switch
-        {
-            MailCategoryEnum.TeacherFeedback => new SingularityTaskRequest
-            {
-                Title = FeedbackTitle(mail.Subject),
-                Note = note,
-                Priority = 1,
-                Start = today,
-                ProjectId = settings.Singularity.ProjectId
-            },
-            MailCategoryEnum.PersonalReply => new SingularityTaskRequest
-            {
-                Title = $"Пришёл ответ от {ShortName(mail.FromName)}, нужно ответить: «{Truncate(mail.Subject, 80)}»",
-                Note = note,
-                Priority = 0,
-                Start = today,
-                ProjectId = settings.Singularity.ProjectId
-            },
-            _ => null
-        };
-    }
-
-    /// <summary>
-    /// «Пользователь Иванов Иван Иванович дал отзыв на Ваш ответ на задание «Задание 2».»
-    /// превращается в «Отзыв преподавателя (Иванов И. И.): «Задание 2» — посмотреть»
-    /// </summary>
-    /// <param name="subject">Тема письма об отзыве</param>
-    /// <returns>Название задачи. Если тема не похожа на отзыв, в нём остаётся сама тема</returns>
-    private static string FeedbackTitle(string subject)
-    {
-        var match = FeedbackRegex().Match(subject);
-        if (!match.Success)
-        {
-            return $"Отзыв преподавателя — посмотреть: {Truncate(subject, 80)}";
-        }
-
-        return $"Отзыв преподавателя ({ShortName(match.Groups["name"].Value)}): «{match.Groups["task"].Value}» — посмотреть";
-    }
-
-    /// <summary>
-    /// Сокращает «Иванов Иван Иванович» до «Иванов И. И.»
-    /// </summary>
-    /// <param name="fullName">Имя отправителя или адрес</param>
-    /// <returns>Фамилия и инициалы. Адрес и имя из одного слова остаются как есть</returns>
-    private static string ShortName(string fullName)
-    {
-        var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2 || fullName.Contains('@'))
-        {
-            return fullName;
-        }
-
-        return parts[0] + " " + string.Join(" ", parts.Skip(1).Take(2).Select(p => p[0] + "."));
-    }
-
-    /// <summary>
-    /// Собирает текст уведомления и строку статуса: сколько писем требуют ответа, сколько отзывов и сколько прочих
-    /// </summary>
-    /// <param name="feedback">Письма с отзывами преподавателей</param>
-    /// <param name="replies">Письма, на которые нужно ответить</param>
-    /// <param name="info">Прочие письма</param>
-    /// <returns>Строки по категориям или «Новых важных писем нет», если писем не было</returns>
-    private static string BuildSummary(List<MailItem> feedback, List<MailItem> replies, List<MailItem> info)
-    {
-        if (feedback.Count + replies.Count + info.Count == 0)
-        {
-            return "Новых важных писем нет";
-        }
-
-        var sb = new StringBuilder();
-        if (replies.Count > 0)
-        {
-            sb.AppendLine($"Ответить: {replies.Count} ({string.Join(", ", replies.Select(r => ShortName(r.FromName)).Distinct())})");
-        }
-
-        if (feedback.Count > 0)
-        {
-            sb.AppendLine($"Отзывы и оценки: {feedback.Count}");
-        }
-
-        if (info.Count > 0)
-        {
-            sb.AppendLine($"Прочее: {info.Count}");
-        }
-
-        return sb.ToString().TrimEnd();
-    }
-
-    /// <summary>
-    /// Короткая подпись категории для строки лога
-    /// </summary>
-    /// <param name="category">Категория письма</param>
-    /// <returns>«Отзыв», «Ответить» или «Инфо»</returns>
-    private static string CategoryLabel(MailCategoryEnum category) => category switch
-    {
-        MailCategoryEnum.TeacherFeedback => "Отзыв",
-        MailCategoryEnum.PersonalReply => "Ответить",
-        _ => "Инфо"
-    };
-
-    /// <summary>
-    /// Обрезает строку до заданной длины
-    /// </summary>
-    /// <param name="value">Исходный текст</param>
-    /// <param name="max">Наибольшая длина без многоточия</param>
-    /// <returns>Тот же текст или его начало с многоточием</returns>
-    private static string Truncate(string value, int max) =>
-        value.Length <= max ? value : value[..max].TrimEnd() + "…";
 
     /// <summary>
     /// Записывает итог проверки в общую папку статусов, откуда его читает приложение в трее
@@ -305,21 +118,9 @@ internal static partial class Program
     {
         try
         {
-            var previous = store.Read(StatusId);
-            var now = DateTimeOffset.Now;
-            store.Write(new ProcessStatus
-            {
-                Id = StatusId,
-                Title = "Почта",
-                State = state,
-                UpdatedAt = now,
-                LastRunAt = now,
-                LastSuccessAt = state == ProcessStateEnum.Ok ? now : previous?.LastSuccessAt,
-                Summary = summary,
-                Error = error
-            });
+            store.Report(STATUS_ID, "Почта", state, DateTimeOffset.Now, summary, error, success: state == ProcessStateEnum.Ok);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // Папка статусов недоступна, итог уже записан в лог
         }
@@ -352,14 +153,5 @@ internal static partial class Program
         }
     }
 
-    /// <summary>
-    /// Разбирает тему письма об отзыве: имя преподавателя и название задания
-    /// </summary>
-    /// <returns>
-    /// Регулярное выражение с группами <c>name</c> и <c>task</c>
-    /// </returns>
-    [GeneratedRegex("Пользователь\\s+(?<name>.+?)\\s+дал\\s+отзыв.*?«(?<task>[^»]+)»")]
-    private static partial Regex FeedbackRegex();
-
-    #endregion
+    #endregion Helpers
 }

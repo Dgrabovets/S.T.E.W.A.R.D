@@ -1,3 +1,6 @@
+using Steward.Status.Rows;
+using Steward.Status.State;
+
 namespace Steward.Status.Tests;
 
 /// <summary>

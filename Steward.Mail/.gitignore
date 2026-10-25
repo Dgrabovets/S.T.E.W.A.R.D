@@ -3,3 +3,4 @@ obj/
 appsettings.json
 processed.json
 *.log
+processed.json.tmp

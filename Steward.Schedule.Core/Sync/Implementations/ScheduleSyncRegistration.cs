@@ -41,14 +41,17 @@ public static class ScheduleSyncRegistration
             client.Timeout = REQUEST_TIMEOUT;
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Steward.Schedule/1.0");
         });
+
         services.AddHttpClient<ISingularityClient, SingularityClient>(client =>
         {
             client.BaseAddress = new Uri(SINGULARITY_API);
             client.Timeout = REQUEST_TIMEOUT;
         });
+
         services.AddSingleton<IScheduleClock, TimeZoneClock>();
         services.AddSingleton<ScheduleSyncer>();
         services.AddHostedService<SyncHostedService>();
+
         return services;
     }
 

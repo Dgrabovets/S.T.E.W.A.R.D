@@ -19,6 +19,7 @@ public static class Program
     {
         var runOnce = args.Any(arg => arg == "--once");
         var builder = Host.CreateApplicationBuilder(args.Where(arg => arg != "--once").ToArray());
+
         builder.Services.AddScheduleSync(runOnce);
         await builder.Build().RunAsync();
     }

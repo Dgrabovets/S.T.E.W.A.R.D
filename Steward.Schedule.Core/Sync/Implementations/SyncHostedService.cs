@@ -1,3 +1,4 @@
+using Steward.Schedule.Common.Constants;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Steward.Schedule.Common.Models;
@@ -65,7 +66,7 @@ public sealed class SyncHostedService : BackgroundService
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logger.LogError(exception, "Sync failed");
+                _logger.LogError(exception, SyncLogMessages.FAILED);
                 Environment.ExitCode = 1;
             }
 
@@ -85,7 +86,7 @@ public sealed class SyncHostedService : BackgroundService
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logger.LogError(exception, "Sync failed");
+                _logger.LogError(exception, SyncLogMessages.FAILED);
             }
 
             try

@@ -25,6 +25,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Steward.Tests/Steward.Tests.csproj" />
     <Project Path="tests/Steward.Status.Tests/Steward.Status.Tests.csproj" />
+    <Project Path="tests/Steward.Mail.Tests/Steward.Mail.Tests.csproj" />
     <Project Path="tests/Steward.Schedule.Tests/Steward.Schedule.Tests.csproj" />
   </Folder>
   <Project Path="Steward/Steward.csproj" />

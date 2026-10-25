@@ -1,22 +1,23 @@
+using Steward.Status.Common;
 using System.Globalization;
 using System.IO;
-using Steward.Status;
 using Steward.Models;
 using Steward.Monitoring.Implementations;
 using Steward.Monitoring.Models;
 using Steward.Mvvm;
+using Steward.Status.Rows;
 
 namespace Steward.ViewModels;
 
 /// <summary>
 /// Состояние панели: журнал, плашка и поля файла настроек
 /// </summary>
-public sealed class StatusViewModel : Bindable
+public sealed class StatusViewModel : PanelViewModel
 {
     /// <summary>
     /// Путь к файлу настроек
     /// </summary>
-    private readonly string _envPath = Path.Combine(DockerSyncProbe.FindRepoRoot(), ".env");
+    private readonly string _envPath = Path.Combine(DataLocation.RepoRootOrStart(), ".env");
 
     /// <summary>
     /// Интервал в минутах
@@ -29,24 +30,9 @@ public sealed class StatusViewModel : Bindable
     private string _minutesText = SyncSettings.DEFAULT_INTERVAL.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// Подпись под заголовком
-    /// </summary>
-    private string _subtitle = "Проверяю задачи";
-
-    /// <summary>
     /// Строки списка задач
     /// </summary>
     private IReadOnlyList<TaskStatusRow> _tasks = [];
-
-    /// <summary>
-    /// Короткий текст плашки
-    /// </summary>
-    private string _statusLabel = "Остановлено";
-
-    /// <summary>
-    /// Цвет плашки
-    /// </summary>
-    private PanelToneEnum _tone = PanelToneEnum.Idle;
 
     /// <summary>
     /// Карточки журнала
@@ -101,10 +87,9 @@ public sealed class StatusViewModel : Bindable
     /// <summary>
     /// Создаёт модель и сразу читает файл настроек
     /// </summary>
-    public StatusViewModel()
+    public StatusViewModel() : base("Остановлено")
     {
         ToggleSettingsCommand = new RelayCommand(ToggleSettings);
-        ExitCommand = new RelayCommand(() => ExitRequested?.Invoke(this, EventArgs.Empty));
         OpenAppCommand = new RelayCommand(() => OpenAppRequested?.Invoke(this, EventArgs.Empty));
         SaveAndRestartCommand = new RelayCommand(SaveAndRestart);
         RestartCommand = new RelayCommand(Restart);
@@ -112,11 +97,6 @@ public sealed class StatusViewModel : Bindable
     }
 
     #region Commands
-
-    /// <summary>
-    /// Просит закрыть приложение
-    /// </summary>
-    public event EventHandler? ExitRequested;
 
     /// <summary>
     /// Просит пересоздать контейнер
@@ -139,11 +119,6 @@ public sealed class StatusViewModel : Bindable
     public RelayCommand ToggleSettingsCommand { get; }
 
     /// <summary>
-    /// Закрывает приложение
-    /// </summary>
-    public RelayCommand ExitCommand { get; }
-
-    /// <summary>
     /// Записывает поля и просит перезапуск
     /// </summary>
     public RelayCommand SaveAndRestartCommand { get; }
@@ -158,45 +133,12 @@ public sealed class StatusViewModel : Bindable
     #region State
 
     /// <summary>
-    /// Строка под заголовком «Задачи»: всё ли в порядке или что требует внимания
-    /// </summary>
-    public string Subtitle
-    {
-        get => _subtitle;
-        private set => Set(ref _subtitle, value);
-    }
-
-    /// <summary>
     /// Задачи со статусом: расписание и проверка почты
     /// </summary>
     public IReadOnlyList<TaskStatusRow> Tasks
     {
         get => _tasks;
         private set => Set(ref _tasks, value);
-    }
-
-    /// <summary>
-    /// Текст цветной плашки справа
-    /// </summary>
-    public string StatusLabel
-    {
-        get => _statusLabel;
-        private set => Set(ref _statusLabel, value);
-    }
-
-    /// <summary>
-    /// Какой цвет взять для плашки
-    /// </summary>
-    public PanelToneEnum Tone
-    {
-        get => _tone;
-        private set
-        {
-            if (!Set(ref _tone, value))
-                return;
-
-            Raise(nameof(IsRunning));
-        }
     }
 
     /// <summary>
@@ -372,15 +314,21 @@ public sealed class StatusViewModel : Bindable
         var panel = PanelStatus.From(snapshot);
         Tasks = TaskRows.Build(snapshot, jobs);
 
-        var summary = TaskSummary.Of(Tasks);
-        Tone = summary.Tone;
-        StatusLabel = summary.Label;
-        Subtitle = summary.Subtitle;
+        ApplySummary(Tasks);
         EmptyText = panel.EmptyText;
         Cards = panel.Cards;
     }
 
     #endregion Snapshot
+
+    #region Overrides
+
+    /// <summary>
+    /// От цвета плашки зависит свечение значка
+    /// </summary>
+    protected override void OnToneChanged() => Raise(nameof(IsRunning));
+
+    #endregion Overrides
 
     #region Settings
 
@@ -459,6 +407,7 @@ public sealed class StatusViewModel : Bindable
             SheetGid = SheetGid,
             Token = Token,
         };
+
         var rejection = settings.Rejection();
         if (rejection is not null)
         {

@@ -1,14 +1,14 @@
-using System.Globalization;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Steward.Schedule.Common.Helpers;
 using Steward.Schedule.Common.Models;
 using Steward.Schedule.Scheduling.Implementations;
 using Steward.Schedule.Singularity.Dtos;
 using Steward.Schedule.Singularity.Interfaces;
 using Steward.Schedule.Singularity.Models;
+using System.Globalization;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Steward.Schedule.Singularity.Implementations;
 
@@ -181,6 +181,7 @@ public sealed class SingularityClient : ISingularityClient
             var tags = page.Tags ?? [];
             var match = tags.FirstOrDefault(tag =>
                 tag.Removed != true && string.Equals(tag.Title?.Trim(), title, StringComparison.OrdinalIgnoreCase));
+
             if (match?.Id is { Length: > 0 } existingId)
                 return existingId;
 
@@ -273,22 +274,6 @@ public sealed class SingularityClient : ISingularityClient
             HttpMethod.Patch,
             $"/v2/task/{Uri.EscapeDataString(taskId)}",
             WriteBody(projectId, lesson, includeExternalId: false),
-            cancellationToken);
-
-    /// <summary>
-    /// Архивирует задачу датой <paramref name="journalDate"/>
-    /// </summary>
-    /// <param name="taskId">Идентификатор задачи</param>
-    /// <param name="journalDate">
-    /// Момент архивации. API принимает его только с явным смещением, например <c>2026-10-16T18:00:00+03:00</c>
-    /// </param>
-    /// <param name="cancellationToken">Токен отмены запроса</param>
-    /// <returns>Задача, которая завершается, когда API архивирует задачу</returns>
-    public Task ArchiveTaskAsync(string taskId, DateTimeOffset journalDate, CancellationToken cancellationToken) =>
-        SendAsync<TaskResponse>(
-            HttpMethod.Post,
-            $"/v2/task/{Uri.EscapeDataString(taskId)}/archive",
-            new { journalDate = FormatStart(journalDate) },
             cancellationToken);
 
     /// <summary>

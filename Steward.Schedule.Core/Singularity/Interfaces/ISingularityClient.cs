@@ -72,15 +72,6 @@ public interface ISingularityClient
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Отправляет задачу в архив
-    /// </summary>
-    /// <param name="taskId">Идентификатор задачи</param>
-    /// <param name="journalDate">Момент архивации со смещением часового пояса</param>
-    /// <param name="cancellationToken">Токен отмены запроса</param>
-    /// <returns>Задача, которая завершается после архивации</returns>
-    Task ArchiveTaskAsync(string taskId, DateTimeOffset journalDate, CancellationToken cancellationToken);
-
-    /// <summary>
     /// Отмечает задачу выполненной
     /// </summary>
     /// <param name="taskId">Идентификатор задачи</param>

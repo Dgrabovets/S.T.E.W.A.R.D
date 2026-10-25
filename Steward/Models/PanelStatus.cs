@@ -1,5 +1,5 @@
-using System.Globalization;
 using Steward.Monitoring.Models;
+using Steward.Status.Common;
 
 namespace Steward.Models;
 
@@ -72,8 +72,9 @@ public sealed class PanelStatus
     public static PanelStatus From(SyncSnapshot snapshot)
     {
         var tone = snapshot.CurrentError is not null
-            ? PanelToneEnum.Problem
-            : snapshot.ContainerRunning ? PanelToneEnum.Running : PanelToneEnum.Idle;
+                     ? PanelToneEnum.Problem
+                     : snapshot.ContainerRunning ? PanelToneEnum.Running : PanelToneEnum.Idle;
+
         return new PanelStatus(
             When(snapshot.LastSuccess),
             SummaryOf(snapshot),
@@ -96,6 +97,7 @@ public sealed class PanelStatus
     {
         if (snapshot.CurrentError is not null)
             return "Ошибка";
+
         if (!snapshot.DockerAvailable)
             return "Нет Docker";
 
@@ -111,16 +113,20 @@ public sealed class PanelStatus
     {
         if (!snapshot.DockerAvailable)
             return "Docker не запущен, сверка с таблицей не идёт";
+
         if (!snapshot.ContainerRunning)
             return "Контейнер остановлен, новые сверки не запускаются";
+
         if (snapshot.CurrentError is not null)
             return "Последняя сверка не удалась";
+
         if (snapshot.Entries.Count == 0)
             return "Синхронизация запущена, первая сверка ещё впереди";
 
         var latest = snapshot.Entries[0];
         if (latest.Tone == LogToneEnum.Update)
             return "Последняя сверка внесла правки в задачи";
+
         if (latest.Repeat > 1)
             return "Несколько сверок подряд ничего не меняли";
 
@@ -132,21 +138,8 @@ public sealed class PanelStatus
     /// </summary>
     /// <param name="lastSuccess">Местное время прогона. Пусто, если его ещё не было</param>
     /// <returns>Строка под заголовком</returns>
-    private static string When(DateTimeOffset? lastSuccess)
-    {
-        if (lastSuccess is null)
-            return "Ещё не обновлялось";
-
-        var local = lastSuccess.Value;
-        var clock = local.ToString("HH:mm", CultureInfo.InvariantCulture);
-        var day = local.Date;
-        if (day == DateTime.Today)
-            return $"Обновлено сегодня в {clock}";
-        if (day == DateTime.Today.AddDays(-1))
-            return $"Обновлено вчера в {clock}";
-
-        return $"Обновлено {local:dd.MM} в {clock}";
-    }
+    private static string When(DateTimeOffset? lastSuccess) =>
+        lastSuccess is null ? "Ещё не обновлялось" : $"Обновлено {TimeWording.Moment(lastSuccess.Value, DateTimeOffset.Now)}";
 
     #endregion Wording
 }

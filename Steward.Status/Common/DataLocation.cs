@@ -1,4 +1,4 @@
-namespace Steward.Status;
+namespace Steward.Status.Common;
 
 /// <summary>
 /// Находит папку с данными и файл задач, чтобы все процессы и приложение в трее смотрели в одно место
@@ -58,8 +58,7 @@ public static class DataLocation
         if (!string.IsNullOrWhiteSpace(fromEnvironment))
             return fromEnvironment;
 
-        var root = FindRepoRoot(startDirectory);
-        return Path.Combine(root ?? startDirectory ?? AppContext.BaseDirectory, "data");
+        return Path.Combine(RepoRootOrStart(startDirectory), "data");
     }
 
     /// <summary>
@@ -86,7 +85,13 @@ public static class DataLocation
         if (!string.IsNullOrWhiteSpace(fromEnvironment))
             return fromEnvironment;
 
-        var root = FindRepoRoot(startDirectory);
-        return Path.Combine(root ?? startDirectory ?? AppContext.BaseDirectory, "config", "jobs.json");
+        return Path.Combine(RepoRootOrStart(startDirectory), "config", "jobs.json");
     }
+
+    /// <summary>
+    /// Корень репозитория или, если его нет, каталог, с которого начался поиск
+    /// </summary>
+    /// <param name="startDirectory">Откуда искать корень. По умолчанию каталог программы</param>
+    /// <returns>Каталог, от которого считаются <c>data</c>, <c>config</c> и <c>docker-compose.yml</c></returns>
+    public static string RepoRootOrStart(string? startDirectory = null) => FindRepoRoot(startDirectory) ?? startDirectory ?? AppContext.BaseDirectory;
 }

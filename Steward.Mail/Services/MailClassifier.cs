@@ -10,8 +10,6 @@ namespace Steward.Mail.Services;
 /// </summary>
 public sealed class MailClassifier(MailSettings mail, ClassifierSettings settings) : IMailClassifier
 {
-    #region Public methods
-
     /// <summary>
     /// Относит письмо к категории: из папки преподавателей это отзыв, от системного отправителя это справка, остальное личное письмо
     /// </summary>
@@ -20,21 +18,13 @@ public sealed class MailClassifier(MailSettings mail, ClassifierSettings setting
     public MailCategoryEnum Classify(MailItem item)
     {
         if (string.Equals(item.Folder, mail.TeachersFolder, StringComparison.OrdinalIgnoreCase))
-        {
             return MailCategoryEnum.TeacherFeedback;
-        }
 
         if (IsSystemSender(item.FromAddress))
-        {
             return MailCategoryEnum.Info;
-        }
 
         return MailCategoryEnum.PersonalReply;
     }
-
-    #endregion
-
-    #region Private methods
 
     /// <summary>
     /// Проверяет, что письмо отправила система, а не человек: адрес есть в списке игнорируемых или в его имени есть noreply, no-reply или notification
@@ -45,16 +35,12 @@ public sealed class MailClassifier(MailSettings mail, ClassifierSettings setting
     /// </returns>
     private bool IsSystemSender(string address)
     {
-        if (settings.IgnoredSenders.Any(s => string.Equals(s, address, StringComparison.OrdinalIgnoreCase)))
-        {
+        if (settings.IgnoredSenders.Any(sender => string.Equals(sender, address, StringComparison.OrdinalIgnoreCase)))
             return true;
-        }
 
         var local = address.Split('@')[0];
         return local.Contains("noreply", StringComparison.OrdinalIgnoreCase)
             || local.Contains("no-reply", StringComparison.OrdinalIgnoreCase)
             || local.Contains("notification", StringComparison.OrdinalIgnoreCase);
     }
-
-    #endregion
 }

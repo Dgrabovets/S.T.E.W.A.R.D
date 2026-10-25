@@ -1,6 +1,7 @@
 using System.Globalization;
+using Steward.Status.Registry;
 
-namespace Steward.Status;
+namespace Steward.Status.Scheduling;
 
 /// <summary>
 /// Считает, когда задаче пора запускаться. Время по расписанию берётся по местным часам, поэтому переход на зимнее и летнее время ничего не ломает
@@ -96,6 +97,7 @@ public static class JobSchedule
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
         var candidate = Occurrence(today, time, zone);
+
         return candidate <= now ? candidate : Occurrence(today.AddDays(-1), time, zone);
     }
 
@@ -110,6 +112,7 @@ public static class JobSchedule
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
         var candidate = Occurrence(today, time, zone);
+
         return candidate > now ? candidate : Occurrence(today.AddDays(1), time, zone);
     }
 
@@ -127,8 +130,9 @@ public static class JobSchedule
             local = local.AddHours(1);
 
         var offset = zone.IsAmbiguousTime(local)
-            ? zone.GetAmbiguousTimeOffsets(local).Max()
-            : zone.GetUtcOffset(local);
+                       ? zone.GetAmbiguousTimeOffsets(local).Max()
+                       : zone.GetUtcOffset(local);
+
         return new DateTimeOffset(local, offset);
     }
 

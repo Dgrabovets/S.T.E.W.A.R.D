@@ -1,6 +1,6 @@
+using Steward.Monitoring.Models;
 using System.Diagnostics;
 using System.IO;
-using Steward.Monitoring.Models;
 
 namespace Steward.Monitoring.Implementations;
 
@@ -27,26 +27,6 @@ public sealed class DockerSyncProbe
         _repoRoot = repoRoot;
     }
 
-    /// <summary>
-    /// Находит каталог репозитория, поднимаясь от каталога программы
-    /// </summary>
-    /// <returns>
-    /// Каталог с <c>docker-compose.yml</c>. Если файл не найден, каталог программы
-    /// </returns>
-    public static string FindRepoRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "docker-compose.yml")))
-                return directory.FullName;
-
-            directory = directory.Parent;
-        }
-
-        return AppContext.BaseDirectory;
-    }
-
     #endregion Location
 
     #region Commands
@@ -60,8 +40,8 @@ public sealed class DockerSyncProbe
     {
         var state = await RunAsync("docker", "compose ps -a --format {{.Service}}|{{.State}}", cancellationToken);
         var logs = state.ExitCode == 0
-            ? await RunAsync("docker", "compose logs --tail 250 --timestamps schedule", cancellationToken)
-            : new CommandResult(state.ExitCode, string.Empty);
+                     ? await RunAsync("docker", "compose logs --tail 250 --timestamps schedule", cancellationToken)
+                     : new CommandResult(state.ExitCode, string.Empty);
 
         var serviceState = string.Empty;
         if (state.ExitCode == 0)
@@ -121,9 +101,10 @@ public sealed class DockerSyncProbe
 
             var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
             var error = process.StandardError.ReadToEndAsync(cancellationToken);
+
             await process.WaitForExitAsync(cancellationToken);
-            var text = (await output + await error).Trim();
-            return new CommandResult(process.ExitCode, text);
+
+            return new CommandResult(process.ExitCode, (await output + await error).Trim());
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

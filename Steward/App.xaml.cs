@@ -45,6 +45,7 @@ public partial class App : System.Windows.Application
             var which = snapshot + 2 < e.Args.Length ? e.Args[snapshot + 2] : "main";
             SnapshotRenderer.Render(e.Args[snapshot + 1], which);
             Shutdown();
+
             return;
         }
 

@@ -1,3 +1,6 @@
+using Steward.Status.Common;
+using Steward.Status.Registry;
+
 namespace Steward.Status.Tests;
 
 /// <summary>

@@ -1,3 +1,5 @@
+using Steward.Status.State;
+
 namespace Steward.Status.Tests;
 
 /// <summary>
@@ -115,4 +117,52 @@ public class StatusStoreTests
 
         Assert.Empty(new StatusStore(Path.Combine(dir.Path, "missing")).ReadAll());
     }
-}
+
+    /// <summary>
+    /// Плохой идентификатор при безопасном чтении даёт пустой результат, а не исключение
+    /// </summary>
+    [Fact]
+    public void TryRead_returns_null_for_a_bad_id_and_for_a_missing_file()
+    {
+        using var dir = new TempDir();
+        var store = new StatusStore(dir.StatusPath);
+
+        Assert.Null(store.TryRead("..\\evil"));
+        Assert.Null(store.TryRead("missing"));
+    }
+
+    /// <summary>
+    /// Сбой не стирает время последнего успеха и число ожидающих решения
+    /// </summary>
+    [Fact]
+    public void Report_keeps_the_last_success_and_the_awaiting_count_after_a_failure()
+    {
+        using var dir = new TempDir();
+        var store = new StatusStore(dir.StatusPath);
+        var success = Samples.Winter(2026, 10, 25, 9);
+        store.Write(Samples.Status("job", ProcessStateEnum.Ok, success) with { LastSuccessAt = success, Awaiting = 3 });
+
+        store.Report("job", "Задача", ProcessStateEnum.Failed, Samples.Winter(2026, 10, 25, 19), null, "упала", success: false);
+
+        var status = store.Read("job")!;
+        Assert.Equal(ProcessStateEnum.Failed, status.State);
+        Assert.Equal(success, status.LastSuccessAt);
+        Assert.Equal(Samples.Winter(2026, 10, 25, 19), status.LastRunAt);
+        Assert.Equal(3, status.Awaiting);
+    }
+
+    /// <summary>
+    /// Запись «выполняется» не меняет время последнего запуска, пока запуск не закончился
+    /// </summary>
+    [Fact]
+    public void Report_running_keeps_the_previous_last_run()
+    {
+        using var dir = new TempDir();
+        var store = new StatusStore(dir.StatusPath);
+        var earlier = Samples.Winter(2026, 10, 25, 9);
+        store.Write(Samples.Status("job", ProcessStateEnum.Ok, earlier) with { LastRunAt = earlier });
+
+        store.Report("job", "Задача", ProcessStateEnum.Running, Samples.Winter(2026, 10, 25, 19), "Запуск", null, success: false);
+
+        Assert.Equal(earlier, store.Read("job")!.LastRunAt);
+    }}

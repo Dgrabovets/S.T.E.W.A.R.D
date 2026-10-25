@@ -1,6 +1,6 @@
-using System.Globalization;
-using Steward.Schedule.Common.Constants;
 using Steward.Monitoring.Implementations;
+using Steward.Schedule.Common.Constants;
+using System.Globalization;
 
 namespace Steward.Models;
 
@@ -78,8 +78,9 @@ public sealed class SyncSettings
         var file = EnvFile.Load(path);
         var intervalText = file.Get(EnviromentalParamsNames.SYNC_INTERVAL_MINUTES).Trim();
         var minutes = int.TryParse(intervalText, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
-            ? parsed
-            : 0;
+                        ? parsed
+                        : 0;
+
         return new SyncSettings
         {
             IntervalText = intervalText,
@@ -165,8 +166,7 @@ public sealed class SyncSettings
     /// <returns>
     /// <see langword="true"/>, если значение разбило бы файл на несколько строк
     /// </returns>
-    private static bool HasLineBreak(string value) =>
-        value.Contains('\r') || value.Contains('\n');
+    private static bool HasLineBreak(string value) => value.Contains('\r') || value.Contains('\n');
 
     #endregion Checks
 }

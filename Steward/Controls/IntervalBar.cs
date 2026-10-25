@@ -120,6 +120,7 @@ public sealed class IntervalBar : FrameworkElement
         var span = Math.Max(1, ActualWidth - THUMB_RADIUS * 2);
         var ratio = Math.Clamp((x - THUMB_RADIUS) / span, 0, 1);
         var minutes = MIN_VALUE + ratio * (MAX_VALUE - MIN_VALUE);
+
         Value = Math.Clamp(Math.Round(minutes), MIN_VALUE, MAX_VALUE);
     }
 
@@ -165,7 +166,9 @@ public sealed class IntervalBar : FrameworkElement
     {
         var color = accent is SolidColorBrush solid ? solid.Color : System.Windows.Media.Color.FromRgb(139, 108, 255);
         var glow = new RadialGradientBrush(color, System.Windows.Media.Color.FromArgb(0, color.R, color.G, color.B));
+
         glow.Freeze();
+
         return glow;
     }
 

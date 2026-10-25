@@ -72,8 +72,7 @@ public class ScheduleParserTests
             пн,01.01,17.20-18.40,"Предмет, преподаватель"
             """;
 
-        var slots = ScheduleParser.Parse(csv, "РКИ-2-26", Moscow, new DateOnly(2026, 6, 15));
-        var lesson = Assert.Single(slots).Lesson;
+        var lesson = Assert.Single(ScheduleParser.Parse(csv, "РКИ-2-26", Moscow, new DateOnly(2026, 6, 15))).Lesson;
 
         Assert.NotNull(lesson);
         Assert.Equal("up:rki-2-26:2027-01-01:1720", lesson.ExternalId);

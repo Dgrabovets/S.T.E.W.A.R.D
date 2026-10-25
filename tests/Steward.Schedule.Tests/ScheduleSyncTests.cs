@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using System.Globalization;
 using Steward.Schedule.Common.Helpers;
 using Steward.Schedule.Common.Models;
 using Steward.Schedule.Scheduling.Interfaces;
@@ -9,6 +8,7 @@ using Steward.Schedule.Singularity.Models;
 using Steward.Schedule.Sync.Implementations;
 using Steward.Schedule.Sync.Interfaces;
 using Steward.Schedule.Sync.Models;
+using System.Globalization;
 
 namespace Steward.Schedule.Tests;
 
@@ -28,7 +28,7 @@ public class ScheduleSyncTests
     /// Новые ячейки создаются, удалённые отмечаются выполненными, а следующая пара получает пометку
     /// </summary>
     [Fact]
-    public async Task Run_creates_updates_archives_and_skips_completed_tasks()
+    public async Task Run_creates_completes_and_skips_completed_tasks()
     {
         const string csv = """
             ,Дата,время,РКИ-2-26
@@ -40,16 +40,17 @@ public class ScheduleSyncTests
 
         var source = new FakeSource(csv);
         var client = new FakeClient();
-        var kept = SampleLesson("up:rki-2-26:2026-10-01:2010", "Старый предмет", "Преподаватель: Петров");
-        client.Tasks.Add(TaskFrom(kept, "T-same", checkState: 0));
+        client.Tasks.Add(TaskFrom(SampleLesson("up:rki-2-26:2026-10-01:2010", "Старый предмет", "Преподаватель: Петров"), "T-same", checkState: 0));
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Убрали", "Убрали, преподаватель"),
             "T-empty",
             checkState: 0));
+
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-09-30:1720", "Выполненный предмет", "Выполненный предмет, Сидоров"),
             "T-done",
             checkState: 1));
+
         client.Tasks.Add(new SingularityTask(
             "T-other-month",
             "up:rki-2-26:2026-09-01:1720",
@@ -61,6 +62,7 @@ public class ScheduleSyncTests
             0,
             null,
             false));
+
         client.Tasks.Add(new SingularityTask(
             "T-foreign",
             "manual-task",
@@ -75,11 +77,10 @@ public class ScheduleSyncTests
 
         var report = await Sync(source, client);
 
-        Assert.Equal(new SyncReport(1, 0, 0, 0, 1, 1), report);
+        Assert.Equal(new SyncReport(1, 0, 0, 1, 1), report);
         Assert.Equal("Новый предмет", client.Created.Single().Title);
         Assert.Contains("Отмена или перенос: Убрали, 01.10 17:20", client.Created.Single().Note, StringComparison.Ordinal);
         Assert.Equal("T-empty", client.Completed.Single());
-        Assert.Empty(client.Archived);
         Assert.Empty(client.Updated);
         Assert.Empty(client.Unarchived);
         Assert.Equal("РКИ-2-26", client.ProjectTitle);
@@ -102,6 +103,7 @@ public class ScheduleSyncTests
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Преподаватель: Иванов"),
             "T-removed",
             checkState: 0));
+
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:2010", "Предмет", "Преподаватель: Иванов"),
             "T-kept",
@@ -109,9 +111,8 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(0, 1, 0, 0, 1, 0), report);
+        Assert.Equal(new SyncReport(0, 1, 0, 1, 0), report);
         Assert.Equal("T-removed", client.Completed.Single());
-        Assert.Empty(client.Archived);
         Assert.StartsWith("Перенос с 01.10 17:20", client.Updated.Single().Note, StringComparison.Ordinal);
     }
 
@@ -134,7 +135,7 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(1, 0, 0, 0, 0, 0, 1), report);
+        Assert.Equal(new SyncReport(1, 0, 0, 0, 0, 1), report);
         Assert.Equal("T-moved", client.Deleted.Single());
         Assert.Equal("Перенесённый предмет", client.Created.Single().Title);
         Assert.Empty(client.Completed);
@@ -161,7 +162,7 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(1, 0, 0, 1, 1, 0), report);
+        Assert.Equal(new SyncReport(1, 0, 1, 1, 0), report);
         Assert.Equal("T-archived-empty", client.Unarchived.Single());
         Assert.Equal("T-archived-empty", client.Completed.Single());
         Assert.Contains("Отмена или перенос: Убрали, 01.10 17:20", client.Created.Single().Note, StringComparison.Ordinal);
@@ -187,7 +188,7 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(0, 1, 0, 1, 0, 0), report);
+        Assert.Equal(new SyncReport(0, 1, 1, 0, 0), report);
         Assert.Equal("T-archived", client.Unarchived.Single());
         Assert.Equal("Новое название", client.Updated.Single().Title);
     }
@@ -196,7 +197,7 @@ public class ScheduleSyncTests
     /// Занятие, которое уже закончилось, сначала получает текст из таблицы, затем отмечается выполненным. Ещё не начавшееся создаётся
     /// </summary>
     [Fact]
-    public async Task Run_archives_a_lesson_that_has_already_ended()
+    public async Task Run_updates_and_completes_a_lesson_that_has_already_ended()
     {
         const string csv = """
             ,Дата,время,РКИ-2-26
@@ -210,27 +211,12 @@ public class ScheduleSyncTests
             "T-past",
             checkState: 0));
 
-        var options = new SyncOptions
-        {
-            SingularityToken = "test",
-            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
-            SheetGid = "197520568",
-            GroupColumn = "РКИ-2-26",
-            ProjectTitle = "Расписание",
-            TimeZoneId = "Europe/Moscow",
-            IntervalMinutes = 30,
-            RunOnce = true,
-        };
-        var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
-        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
+        var report = await Sync(new FakeSource(csv), client, Moscow(2, 12), "Расписание");
 
-        var report = await sync.RunAsync(CancellationToken.None);
-
-        Assert.Equal(new SyncReport(1, 1, 0, 0, 1, 0), report);
+        Assert.Equal(new SyncReport(1, 1, 0, 1, 0), report);
         Assert.Equal("T-past", client.Completed.Single());
         Assert.Equal("Прошедший предмет", client.Updated.Single().Title);
         Assert.StartsWith("Преподаватель: Иванов", client.Updated.Single().Note, StringComparison.Ordinal);
-        Assert.Empty(client.Archived);
         Assert.Equal("Будущий предмет", client.Created.Single().Title);
         Assert.Equal("Расписание", client.ProjectTitle);
     }
@@ -248,24 +234,10 @@ public class ScheduleSyncTests
             пт,09.10,17.20-18.40,"Будущая пара, Сидоров"
             """;
 
-        var options = new SyncOptions
-        {
-            SingularityToken = "test",
-            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
-            SheetGid = "197520568",
-            GroupColumn = "РКИ-2-26",
-            ProjectTitle = "Расписание",
-            TimeZoneId = "Europe/Moscow",
-            IntervalMinutes = 30,
-            RunOnce = true,
-        };
-        var clock = new FixedClock(new DateOnly(2026, 10, 8), new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.FromHours(3)));
         var client = new FakeClient();
-        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
+        var report = await Sync(new FakeSource(csv), client, Moscow(8, 12), "Расписание");
 
-        var report = await sync.RunAsync(CancellationToken.None);
-
-        Assert.Equal(new SyncReport(2, 0, 0, 0, 1, 0), report);
+        Assert.Equal(new SyncReport(2, 0, 0, 1, 0), report);
         Assert.Equal(["Эта неделя", "Будущая пара"], client.Created.Select(lesson => lesson.Title).ToArray());
         Assert.Equal("T-1", client.Completed.Single());
     }
@@ -288,7 +260,7 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(0, 0, 0, 0, 0, 0), report);
+        Assert.Equal(new SyncReport(0, 0, 0, 0, 0), report);
         Assert.Empty(client.Updated);
     }
 
@@ -309,7 +281,7 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(0, 0, 0, 0, 0, 0), report);
+        Assert.Equal(new SyncReport(0, 0, 0, 0, 0), report);
         Assert.Empty(client.Updated);
     }
 
@@ -333,7 +305,7 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(0, 1, 0, 0, 0, 0), report);
+        Assert.Equal(new SyncReport(0, 1, 0, 0, 0), report);
         Assert.Equal("Предмет", client.Updated.Single().Title);
     }
 
@@ -354,6 +326,7 @@ public class ScheduleSyncTests
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Убрали", "Преподаватель: Иванов"),
             "T-empty",
             checkState: 1));
+
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1850", "Другой предмет", "Преподаватель: Петров"),
             "T-next",
@@ -361,7 +334,7 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(0, 1, 0, 0, 0, 1), report);
+        Assert.Equal(new SyncReport(0, 1, 0, 0, 1), report);
         Assert.Empty(client.Deleted);
         Assert.Contains("Отмена или перенос: Убрали, 01.10 17:20", client.Updated.Single().Note, StringComparison.Ordinal);
     }
@@ -378,32 +351,20 @@ public class ScheduleSyncTests
             ,,20.10-21.30,"Предмет, Иванов"
             """;
 
-        var options = new SyncOptions
-        {
-            SingularityToken = "test",
-            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
-            SheetGid = "197520568",
-            GroupColumn = "РКИ-2-26",
-            ProjectTitle = "Расписание",
-            TimeZoneId = "Europe/Moscow",
-            IntervalMinutes = 30,
-            RunOnce = true,
-        };
-        var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
         var client = new FakeClient();
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Преподаватель: Иванов"),
             "T-removed",
             checkState: 0));
+
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:2010", "Предмет", "Преподаватель: Иванов"),
             "T-kept",
             checkState: 0));
-        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
 
-        var report = await sync.RunAsync(CancellationToken.None);
+        var report = await Sync(new FakeSource(csv), client, Moscow(2, 12), "Расписание");
 
-        Assert.Equal(new SyncReport(0, 1, 0, 0, 2, 0), report);
+        Assert.Equal(new SyncReport(0, 1, 0, 2, 0), report);
         Assert.StartsWith("Перенос с 01.10 17:20", client.Updated.Single().Note, StringComparison.Ordinal);
         Assert.Equal(["T-removed", "T-kept"], client.Completed);
     }
@@ -419,29 +380,16 @@ public class ScheduleSyncTests
             чт,01.10,17.20-18.40,"Новое название, Иванов"
             """;
 
-        var options = new SyncOptions
-        {
-            SingularityToken = "test",
-            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
-            SheetGid = "197520568",
-            GroupColumn = "РКИ-2-26",
-            ProjectTitle = "Расписание",
-            TimeZoneId = "Europe/Moscow",
-            IntervalMinutes = 30,
-            RunOnce = true,
-        };
-        var clock = new FixedClock(Today, new DateTimeOffset(2026, 10, 2, 12, 0, 0, TimeSpan.FromHours(3)));
         var client = new FakeClient();
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Старое название", "Старое название, Иванов"),
             "T-past",
             checkState: 0,
             journalDate: "2026-10-07"));
-        var sync = new ScheduleSyncer(new FakeSource(csv), client, clock, options, NullLogger<ScheduleSyncer>.Instance);
 
-        var report = await sync.RunAsync(CancellationToken.None);
+        var report = await Sync(new FakeSource(csv), client, Moscow(2, 12), "Расписание");
 
-        Assert.Equal(new SyncReport(0, 1, 0, 1, 1, 0), report);
+        Assert.Equal(new SyncReport(0, 1, 1, 1, 0), report);
         Assert.Equal("T-past", client.Unarchived.Single());
         Assert.Equal("Новое название", client.Updated.Single().Title);
         Assert.Equal("T-past", client.Completed.Single());
@@ -465,10 +413,12 @@ public class ScheduleSyncTests
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Убрали", "Преподаватель: Иванов"),
             "T-empty",
             checkState: 0));
+
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1850", "Предмет", "Преподаватель: Иванов"),
             "T-mid",
             checkState: 1));
+
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:2010", "Другой предмет", "Преподаватель: Петров"),
             "T-late",
@@ -476,7 +426,7 @@ public class ScheduleSyncTests
 
         var report = await Sync(new FakeSource(csv), client);
 
-        Assert.Equal(new SyncReport(1, 0, 0, 0, 1, 0, 1), report);
+        Assert.Equal(new SyncReport(1, 0, 0, 1, 0, 1), report);
         Assert.Equal("T-mid", client.Deleted.Single());
         Assert.Equal("T-empty", client.Completed.Single());
         Assert.Contains("Отмена или перенос: Убрали, 01.10 17:20", client.Created.Single().Note, StringComparison.Ordinal);
@@ -499,11 +449,12 @@ public class ScheduleSyncTests
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Преподаватель: Иванов"),
             "T-1",
-            checkState: 0) with { Tags = ["A-ручной"] });
+            checkState: 0) with
+        { Tags = ["A-ручной"] });
 
-        var report = await SyncWithSubjectTags(new FakeSource(csv), client);
+        var report = await Sync(new FakeSource(csv), client, subjectTags: true);
 
-        Assert.Equal(new SyncReport(1, 1, 0, 0, 0, 0), report);
+        Assert.Equal(new SyncReport(1, 1, 0, 0, 0), report);
         Assert.Equal(["A-ручной", "A-Предмет"], client.Updated.Single().TagIds);
         Assert.Equal(["A-Другой предмет"], client.Created.Single().TagIds);
     }
@@ -523,11 +474,12 @@ public class ScheduleSyncTests
         client.Tasks.Add(TaskFrom(
             SampleLesson("up:rki-2-26:2026-10-01:1720", "Предмет", "Преподаватель: Иванов"),
             "T-1",
-            checkState: 0) with { Tags = ["A-Предмет"] });
+            checkState: 0) with
+        { Tags = ["A-Предмет"] });
 
-        var report = await SyncWithSubjectTags(new FakeSource(csv), client);
+        var report = await Sync(new FakeSource(csv), client, subjectTags: true);
 
-        Assert.Equal(new SyncReport(0, 0, 0, 0, 0, 0), report);
+        Assert.Equal(new SyncReport(0, 0, 0, 0, 0), report);
         Assert.Empty(client.Updated);
     }
 
@@ -544,9 +496,9 @@ public class ScheduleSyncTests
 
         var client = new FakeClient { FailTags = true };
 
-        var report = await SyncWithSubjectTags(new FakeSource(csv), client);
+        var report = await Sync(new FakeSource(csv), client, subjectTags: true);
 
-        Assert.Equal(new SyncReport(1, 0, 0, 0, 0, 0), report);
+        Assert.Equal(new SyncReport(1, 0, 0, 0, 0), report);
         Assert.Empty(client.Created.Single().TagIds);
     }
 
@@ -574,12 +526,15 @@ public class ScheduleSyncTests
     #region Helpers
 
     /// <summary>
-    /// Запускает синхронизацию с включёнными тегами предметов
+    /// Запускает синхронизацию на подделках. По умолчанию время стоит на начале 1 октября, так что все пары ещё впереди
     /// </summary>
     /// <param name="source">Источник CSV</param>
     /// <param name="client">Клиент Singularity, который записывает вызовы</param>
+    /// <param name="now">Текущий момент или <see langword="null"/> для 1 октября 00:00</param>
+    /// <param name="projectTitle">Название проекта для задач</param>
+    /// <param name="subjectTags">Включены ли теги предметов</param>
     /// <returns>Отчёт синхронизации</returns>
-    private static Task<SyncReport> SyncWithSubjectTags(FakeSource source, FakeClient client)
+    private static Task<SyncReport> Sync(FakeSource source, FakeClient client, DateTimeOffset? now = null, string projectTitle = "РКИ-2-26", bool subjectTags = false)
     {
         var options = new SyncOptions
         {
@@ -587,40 +542,24 @@ public class ScheduleSyncTests
             SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
             SheetGid = "197520568",
             GroupColumn = "РКИ-2-26",
-            ProjectTitle = "РКИ-2-26",
+            ProjectTitle = projectTitle,
             TimeZoneId = "Europe/Moscow",
             IntervalMinutes = 30,
             RunOnce = true,
-            SubjectTags = true,
+            SubjectTags = subjectTags,
         };
-        var sync = new ScheduleSyncer(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSyncer>.Instance);
+
+        var sync = new ScheduleSyncer(source, client, new FixedClock(Today, now ?? Moscow(1, 0)), options, NullLogger<ScheduleSyncer>.Instance);
         return sync.RunAsync(CancellationToken.None);
     }
-
 
     /// <summary>
-    /// Запускает синхронизацию на подделках с фиксированной датой
+    /// Момент в октябре 2026 года по московскому времени
     /// </summary>
-    /// <param name="source">Источник CSV</param>
-    /// <param name="client">Клиент Singularity, который записывает вызовы</param>
-    /// <returns>Отчёт синхронизации</returns>
-    private static Task<SyncReport> Sync(FakeSource source, FakeClient client)
-    {
-        var options = new SyncOptions
-        {
-            SingularityToken = "test",
-            SpreadsheetId = "1NKd10Q4Ld17T2c_g_71cqAHBAuPaVKNN5rPpWsL20ic",
-            SheetGid = "197520568",
-            GroupColumn = "РКИ-2-26",
-            ProjectTitle = "РКИ-2-26",
-            TimeZoneId = "Europe/Moscow",
-            IntervalMinutes = 30,
-            RunOnce = true,
-        };
-        var sync = new ScheduleSyncer(source, client, new FixedClock(Today, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(3))), options, NullLogger<ScheduleSyncer>.Instance);
-        return sync.RunAsync(CancellationToken.None);
-    }
-
+    /// <param name="day">День октября</param>
+    /// <param name="hour">Час</param>
+    /// <returns>Момент со смещением +03:00</returns>
+    private static DateTimeOffset Moscow(int day, int hour) => new(2026, 10, day, hour, 0, 0, TimeSpan.FromHours(3));
     /// <summary>
     /// Собирает занятие, у которого начало закодировано во внешнем идентификаторе
     /// </summary>
@@ -638,6 +577,7 @@ public class ScheduleSyncTests
             $"{parts[^2]}T{clock[..2]}:{clock[2..]}:00+03:00",
             "yyyy-MM-dd'T'HH:mm:sszzz",
             CultureInfo.InvariantCulture);
+
         return new Lesson(externalId, title, note, start, 80);
     }
 
@@ -735,8 +675,7 @@ public class ScheduleSyncTests
         /// <summary>
         /// Идентификаторы задач, переданные в архивацию
         /// </summary>
-        public List<string> Archived { get; } = [];
-
+    
         /// <summary>
         /// Идентификаторы задач, отмеченных выполненными
         /// </summary>
@@ -862,19 +801,6 @@ public class ScheduleSyncTests
         public Task DeleteTaskAsync(string taskId, CancellationToken cancellationToken)
         {
             Deleted.Add(taskId);
-            return Task.CompletedTask;
-        }
-
-        /// <summary>
-        /// Записывает архивацию
-        /// </summary>
-        /// <param name="taskId">Идентификатор архивируемой задачи</param>
-        /// <param name="journalDate">Не используется</param>
-        /// <param name="cancellationToken">Не используется</param>
-        /// <returns>Завершённая задача</returns>
-        public Task ArchiveTaskAsync(string taskId, DateTimeOffset journalDate, CancellationToken cancellationToken)
-        {
-            Archived.Add(taskId);
             return Task.CompletedTask;
         }
 

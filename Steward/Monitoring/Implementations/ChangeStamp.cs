@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.IO;
-using Steward.Status;
+using Steward.Status.Common;
 
 namespace Steward.Monitoring.Implementations;
 
@@ -30,9 +30,11 @@ public static class ChangeStamp
         }
         catch (IOException)
         {
+            // ignore
         }
         catch (UnauthorizedAccessException)
         {
+            // ignore
         }
 
         var now = DateTimeOffset.Now;
@@ -53,9 +55,11 @@ public static class ChangeStamp
         }
         catch (IOException)
         {
+            // ignore
         }
         catch (UnauthorizedAccessException)
         {
+            // ignore
         }
     }
 }

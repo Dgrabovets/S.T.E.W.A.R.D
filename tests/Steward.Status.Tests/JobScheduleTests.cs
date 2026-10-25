@@ -1,3 +1,6 @@
+using Steward.Status.Registry;
+using Steward.Status.Scheduling;
+
 namespace Steward.Status.Tests;
 
 /// <summary>

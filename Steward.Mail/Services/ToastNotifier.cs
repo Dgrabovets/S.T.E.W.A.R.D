@@ -1,5 +1,5 @@
-using Steward.Mail.Interfaces;
 using Microsoft.Toolkit.Uwp.Notifications;
+using Steward.Mail.Interfaces;
 
 namespace Steward.Mail.Services;
 

@@ -1,9 +1,11 @@
 using System.IO;
-using System.Windows;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Steward.Status;
+using System.Windows.Media;
+using System.Windows;
 using Steward.Monitoring.Models;
+using Steward.Status.Registry;
+using Steward.Status.Rows;
+using Steward.Status.Running;
 using Steward.ViewModels;
 using Steward.Views;
 

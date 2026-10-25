@@ -1,6 +1,11 @@
 using System.IO;
 using System.Windows.Threading;
-using Steward.Status;
+using Steward.Status.Common;
+using Steward.Status.Registry;
+using Steward.Status.Rows;
+using Steward.Status.Running;
+using Steward.Status.Scheduling;
+using Steward.Status.State;
 
 namespace Steward.Hosting;
 
@@ -124,7 +129,7 @@ public sealed class JobHost : IDisposable
     public IReadOnlyList<JobRow> Rows()
     {
         var now = DateTimeOffset.Now;
-        return _jobs.Select(job => JobRowBuilder.Build(job, ReadStatus(job.Id), _scheduler.NextRun(job, now), now)).ToArray();
+        return _jobs.Select(job => JobRowBuilder.Build(job, _store.TryRead(job.Id), _scheduler.NextRun(job, now), now)).ToArray();
     }
 
     /// <summary>
@@ -132,25 +137,6 @@ public sealed class JobHost : IDisposable
     /// </summary>
     /// <returns>Записи от новых к старым</returns>
     public IReadOnlyList<RunRecord> Records() => _runner.History.Load(RECORD_COUNT);
-
-    /// <summary>
-    /// Читает файл статуса и не падает от повреждённого файла
-    /// </summary>
-    /// <param name="id">Идентификатор задачи</param>
-    /// <returns>
-    /// Статус или <see langword="null"/>
-    /// </returns>
-    private ProcessStatus? ReadStatus(string id)
-    {
-        try
-        {
-            return _store.Read(id);
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-    }
 
     #endregion Reading
 

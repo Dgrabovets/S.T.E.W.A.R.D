@@ -131,6 +131,7 @@ public static class NoteTextHelper
                 JsonElement ops = default;
                 var found = document.RootElement.ValueKind == JsonValueKind.Object
                     && document.RootElement.TryGetProperty("ops", out ops);
+
                 if (!found && document.RootElement.ValueKind == JsonValueKind.Array)
                 {
                     ops = document.RootElement;
@@ -204,6 +205,7 @@ public static class NoteTextHelper
         AppendBody(ops, body);
         ops.Add(new { insert = LINK_LABEL, attributes = new { link = url } });
         ops.Add(new { insert = "\n" });
+
         return JsonSerializer.Serialize(ops, DeltaJson);
     }
 

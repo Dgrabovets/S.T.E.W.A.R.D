@@ -1,7 +1,10 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using Steward.Status.Common;
+using Steward.Status.Registry;
+using Steward.Status.State;
 
-namespace Steward.Status;
+namespace Steward.Status.Running;
 
 /// <summary>
 /// Запускает задачи как отдельные процессы и ведёт их статус. Одна задача выполняется не более чем в одном экземпляре
@@ -12,6 +15,11 @@ public sealed class JobRunner
     /// Длина хвоста ошибки из вывода программы
     /// </summary>
     private const int DETAIL_LIMIT = 200;
+
+    /// <summary>
+    /// Сколько ждать остаток вывода после выхода процесса
+    /// </summary>
+    private static readonly TimeSpan OUTPUT_DRAIN = TimeSpan.FromSeconds(3);
 
     /// <summary>
     /// Хранилище статусов
@@ -100,7 +108,7 @@ public sealed class JobRunner
     #region Execution
 
     /// <summary>
-    /// Выполняет один запуск от начала до записи итога
+    /// Выполняет один запуск и в любом случае освобождает задачу для следующего
     /// </summary>
     /// <param name="job">Задача</param>
     /// <param name="reason">Причина запуска</param>
@@ -108,17 +116,38 @@ public sealed class JobRunner
     /// <returns>Запись о запуске</returns>
     private async Task<RunRecord> ExecuteAsync(JobDefinition job, string reason, CancellationToken cancellationToken)
     {
-        var title = string.IsNullOrWhiteSpace(job.Title) ? job.Id : job.Title;
+        RunRecord record;
+        try
+        {
+            record = await RunCoreAsync(job, reason, cancellationToken);
+        }
+        finally
+        {
+            lock (_gate)
+                _running.Remove(job.Id);
+        }
+
+        Finished?.Invoke(this, record);
+        return record;
+    }
+
+    /// <summary>
+    /// Выполняет один запуск от начала до записи итога
+    /// </summary>
+    /// <param name="job">Задача</param>
+    /// <param name="reason">Причина запуска</param>
+    /// <param name="cancellationToken">Останавливает процесс</param>
+    /// <returns>Запись о запуске</returns>
+    private async Task<RunRecord> RunCoreAsync(JobDefinition job, string reason, CancellationToken cancellationToken)
+    {
         var started = DateTimeOffset.Now;
-        ProcessStatus? previous = null;
         int? exitCode = null;
         var outcome = RunOutcomeEnum.NotStarted;
         string? detail = null;
 
         try
         {
-            previous = SafeRead(job.Id);
-            Save(job, title, previous, ProcessStateEnum.Running, started, $"Запуск: {reason}", null, success: false);
+            _store.Report(job.Id, job.DisplayTitle, ProcessStateEnum.Running, started, $"Запуск: {reason}", null, success: false);
             Started?.Invoke(this, job.Id);
 
             (outcome, exitCode, detail) = await StartAndWaitAsync(job, cancellationToken);
@@ -131,19 +160,16 @@ public sealed class JobRunner
         var finished = DateTimeOffset.Now;
         try
         {
-            Finish(job, title, previous, started, finished, outcome, exitCode, detail);
+            Finish(job, started, finished, outcome, exitCode, detail);
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
         {
             detail ??= exception.Message;
         }
 
-        var record = new RunRecord(job.Id, title, reason, started, finished, exitCode, outcome, detail);
+        var record = new RunRecord(job.Id, job.DisplayTitle, reason, started, finished, exitCode, outcome, detail);
         History.Append(record);
-        lock (_gate)
-            _running.Remove(job.Id);
 
-        Finished?.Invoke(this, record);
         return record;
     }
 
@@ -166,6 +192,7 @@ public sealed class JobRunner
             RedirectStandardError = true,
             WorkingDirectory = WorkingDirectoryOf(job),
         };
+
         startInfo.Environment[DataLocation.DATA_ENVIRONMENT_VARIABLE] = _dataDirectory;
         startInfo.Environment["TEMP"] = temp;
         startInfo.Environment["TMP"] = temp;
@@ -202,8 +229,11 @@ public sealed class JobRunner
                     : (RunOutcomeEnum.TimedOut, null, $"Не завершилась за {job.TimeoutMinutes:0.##} мин, процесс остановлен");
             }
 
-            await output;
-            var tail = LastLine(await error);
+            // Внук процесса может держать трубу открытой и после выхода самого процесса: ждать вывод бесконечно нельзя
+            var drained = Task.WhenAll(output, error);
+            await Task.WhenAny(drained, Task.Delay(OUTPUT_DRAIN));
+
+            var tail = drained.IsCompletedSuccessfully ? LastLine(error.Result) : null;
             return process.ExitCode == 0
                 ? (RunOutcomeEnum.Ok, 0, null)
                 : (RunOutcomeEnum.Failed, process.ExitCode, tail is null ? $"Код завершения {process.ExitCode}" : $"Код завершения {process.ExitCode}: {tail}");
@@ -218,22 +248,20 @@ public sealed class JobRunner
     /// Записывает итог запуска, если процесс не рассказал о себе сам
     /// </summary>
     /// <param name="job">Задача</param>
-    /// <param name="title">Название задачи</param>
-    /// <param name="previous">Статус до запуска</param>
     /// <param name="started">Когда запуск начался</param>
     /// <param name="finished">Когда запуск закончился</param>
     /// <param name="outcome">Итог процесса</param>
     /// <param name="exitCode">Код завершения</param>
     /// <param name="detail">Пояснение к ошибке</param>
-    private void Finish(JobDefinition job, string title, ProcessStatus? previous, DateTimeOffset started, DateTimeOffset finished, RunOutcomeEnum outcome, int? exitCode, string? detail)
+    private void Finish(JobDefinition job, DateTimeOffset started, DateTimeOffset finished, RunOutcomeEnum outcome, int? exitCode, string? detail)
     {
-        var current = SafeRead(job.Id);
+        var current = _store.TryRead(job.Id);
         var selfReported = current is { } own && own.State != ProcessStateEnum.Running && own.UpdatedAt > started;
 
         if (outcome == RunOutcomeEnum.Ok)
         {
             if (!selfReported)
-                Save(job, title, previous, ProcessStateEnum.Ok, finished, "Завершено без ошибок", null, success: true);
+                _store.Report(job.Id, job.DisplayTitle, ProcessStateEnum.Ok, finished, "Завершено без ошибок", null, success: true);
             else if (current!.LastRunAt is null || current.LastRunAt < started)
                 _store.Write(current with { LastRunAt = finished });
 
@@ -242,63 +270,14 @@ public sealed class JobRunner
 
         var reportedFailure = selfReported && current!.State == ProcessStateEnum.Failed;
         if (!reportedFailure)
-            Save(job, title, previous, ProcessStateEnum.Failed, finished, null, detail ?? $"Код завершения {exitCode}", success: false);
+            _store.Report(job.Id, job.DisplayTitle, ProcessStateEnum.Failed, finished, null, detail ?? $"Код завершения {exitCode}", success: false);
         else if (current!.LastRunAt is null || current.LastRunAt < started)
             _store.Write(current with { LastRunAt = finished });
-    }
-
-    /// <summary>
-    /// Записывает статус от имени раннера
-    /// </summary>
-    /// <param name="job">Задача</param>
-    /// <param name="title">Название задачи</param>
-    /// <param name="previous">Статус до запуска: из него берутся прошлый успех и число ожидающих</param>
-    /// <param name="state">Новое состояние</param>
-    /// <param name="at">Момент записи</param>
-    /// <param name="summary">Сводка</param>
-    /// <param name="error">Текст ошибки</param>
-    /// <param name="success">
-    /// <see langword="true"/>, если запуск удался и нужно обновить время успеха
-    /// </param>
-    private void Save(JobDefinition job, string title, ProcessStatus? previous, ProcessStateEnum state, DateTimeOffset at, string? summary, string? error, bool success)
-    {
-        _store.Write(new ProcessStatus
-        {
-            Id = job.Id,
-            Title = title,
-            State = state,
-            UpdatedAt = at,
-            LastRunAt = state == ProcessStateEnum.Running ? previous?.LastRunAt : at,
-            LastSuccessAt = success ? at : previous?.LastSuccessAt,
-            NextRunAt = previous?.NextRunAt,
-            Summary = summary,
-            Error = error,
-            Awaiting = previous?.Awaiting ?? 0,
-        });
     }
 
     #endregion Execution
 
     #region Helpers
-
-    /// <summary>
-    /// Читает статус и не падает, если идентификатор или файл плохие
-    /// </summary>
-    /// <param name="id">Идентификатор задачи</param>
-    /// <returns>
-    /// Статус или <see langword="null"/>
-    /// </returns>
-    private ProcessStatus? SafeRead(string id)
-    {
-        try
-        {
-            return _store.Read(id);
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-    }
 
     /// <summary>
     /// Выбирает рабочий каталог: заданный, иначе каталог программы
@@ -339,6 +318,7 @@ public sealed class JobRunner
         }
         catch (Exception exception) when (exception is InvalidOperationException or Win32Exception)
         {
+            // ignore
         }
     }
 

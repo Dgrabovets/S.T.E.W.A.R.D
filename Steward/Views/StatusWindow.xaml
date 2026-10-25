@@ -18,24 +18,13 @@
         TextOptions.TextFormattingMode="Display"
         FontFamily="Segoe UI">
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
         <Storyboard x:Key="GlowPulse" RepeatBehavior="Forever" AutoReverse="True">
             <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity"
                              From="0.35" To="1" Duration="0:0:1.4"/>
         </Storyboard>
     </Window.Resources>
 
-    <Border CornerRadius="22" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Margin="16">
-        <Border.Background>
-            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="#2A2144" Offset="0"/>
-                <GradientStop Color="#1C1630" Offset="0.28"/>
-                <GradientStop Color="#1C1630" Offset="1"/>
-            </LinearGradientBrush>
-        </Border.Background>
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="24" ShadowDepth="0" Opacity="0.55" Color="#000000"/>
-        </Border.Effect>
+    <Border Style="{StaticResource WindowChrome}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -68,41 +57,8 @@
                         <TextBlock Text="Задачи" Foreground="{StaticResource TextBrush}" FontSize="22" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
-                    <Border Grid.Column="2" CornerRadius="12" Padding="12,6" VerticalAlignment="Top" Margin="12,6,0,0">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
-                                        <Setter Property="Background" Value="#203A34"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
-                                        <Setter Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
-                                        <Setter Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <TextBlock Text="{Binding StatusLabel}" FontSize="13">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
-                                            <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
-                                            <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
-                                            <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                    <Border Grid.Column="2" Style="{StaticResource ToneBadge}" Padding="12,6" VerticalAlignment="Top" Margin="12,6,0,0">
+                        <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource ToneBadgeText}"/>
                     </Border>
                 </Grid>
                 <ItemsControl ItemsSource="{Binding Tasks}" Margin="0,14,0,4">
@@ -113,7 +69,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Ellipse x:Name="Dot" Width="10" Height="10" Fill="{StaticResource IdleBrush}" VerticalAlignment="Top" Margin="0,6,12,0"/>
+                                <Ellipse Width="10" Height="10" Style="{StaticResource ToneDot}" VerticalAlignment="Top" Margin="0,6,12,0"/>
                                 <StackPanel Grid.Column="1">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="15" FontWeight="SemiBold"/>
@@ -122,17 +78,6 @@
                                     <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </Grid>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
-                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource OkBrush}"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
-                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AttentionBrush}"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
-                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource DangerBrush}"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

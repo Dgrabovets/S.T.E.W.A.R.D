@@ -14,70 +14,60 @@ namespace Steward.Mail.Services;
 /// </summary>
 public sealed class ImapMailReader(MailSettings settings) : IMailReader
 {
-    #region Public methods
-
     /// <summary>
     /// Подключается к ящику и собирает непрочитанные письма из «Входящих» и из папки преподавателей
     /// </summary>
-    /// <param name="ct">Токен отмены запроса</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Письма за последние дни, которые указаны в настройках. Папки открываются только для чтения, флаг «прочитано» не ставится</returns>
-    public async Task<IReadOnlyList<MailItem>> GetUnreadAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<MailItem>> GetUnreadAsync(CancellationToken cancellationToken)
     {
         using var client = new ImapClient();
-        await client.ConnectAsync(settings.Host, settings.Port, SecureSocketOptions.SslOnConnect, ct);
-        await client.AuthenticateAsync(settings.Login, settings.AppPassword, ct);
+        await client.ConnectAsync(settings.Host, settings.Port, SecureSocketOptions.SslOnConnect, cancellationToken);
+        await client.AuthenticateAsync(settings.Login, settings.AppPassword, cancellationToken);
 
         var result = new List<MailItem>();
         var since = DateTime.Today.AddDays(-settings.LookbackDays);
 
-        result.AddRange(await ReadFolderAsync(client.Inbox, since, ct));
+        result.AddRange(await ReadFolderAsync(client.Inbox, since, cancellationToken));
 
-        var teachers = await FindFolderByNameAsync(client, settings.TeachersFolder, ct);
+        var teachers = await FindFolderByNameAsync(client, settings.TeachersFolder, cancellationToken);
         if (teachers is not null)
-        {
-            result.AddRange(await ReadFolderAsync(teachers, since, ct));
-        }
+            result.AddRange(await ReadFolderAsync(teachers, since, cancellationToken));
 
-        await client.DisconnectAsync(true, ct);
+        await client.DisconnectAsync(true, cancellationToken);
         return result;
     }
-
-    #endregion
-
-    #region Private methods
 
     /// <summary>
     /// Читает из папки непрочитанные письма, полученные не раньше указанной даты. Берутся только заголовки и превью текста
     /// </summary>
     /// <param name="folder">Папка ящика</param>
     /// <param name="since">Дата, с которой письма считаются свежими</param>
-    /// <param name="ct">Токен отмены запроса</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Письма папки. Пустой список, если свежих непрочитанных нет</returns>
-    private static async Task<IReadOnlyList<MailItem>> ReadFolderAsync(IMailFolder folder, DateTime since, CancellationToken ct)
+    private static async Task<IReadOnlyList<MailItem>> ReadFolderAsync(IMailFolder folder, DateTime since, CancellationToken cancellationToken)
     {
-        await folder.OpenAsync(FolderAccess.ReadOnly, ct);
+        await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
-        var uids = await folder.SearchAsync(SearchQuery.NotSeen.And(SearchQuery.DeliveredAfter(since)), ct);
+        var uids = await folder.SearchAsync(SearchQuery.NotSeen.And(SearchQuery.DeliveredAfter(since)), cancellationToken);
         if (uids.Count == 0)
-        {
             return [];
-        }
 
-        var summaries = await folder.FetchAsync(uids, MessageSummaryItems.Envelope | MessageSummaryItems.PreviewText, ct);
+        var summaries = await folder.FetchAsync(uids, MessageSummaryItems.Envelope | MessageSummaryItems.PreviewText, cancellationToken);
 
         return summaries
-            .Select(s =>
+            .Select(summary =>
             {
                 // Конверт всегда запрашивается выше через MessageSummaryItems.Envelope
-                var from = s.Envelope!.From.Mailboxes.FirstOrDefault();
+                var from = summary.Envelope!.From.Mailboxes.FirstOrDefault();
                 return new MailItem(
-                    MessageId: s.Envelope.MessageId ?? $"{folder.FullName}:{s.UniqueId}",
+                    MessageId: summary.Envelope.MessageId ?? $"{folder.FullName}:{summary.UniqueId}",
                     Folder: folder.Name,
                     FromName: string.IsNullOrWhiteSpace(from?.Name) ? from?.Address ?? "?" : from!.Name,
                     FromAddress: from?.Address ?? string.Empty,
-                    Subject: s.Envelope.Subject ?? "(без темы)",
-                    Date: s.Envelope.Date ?? DateTimeOffset.Now,
-                    Snippet: (s.PreviewText ?? string.Empty).Trim());
+                    Subject: summary.Envelope.Subject ?? "(без темы)",
+                    Date: summary.Envelope.Date ?? DateTimeOffset.Now,
+                    Snippet: (summary.PreviewText ?? string.Empty).Trim());
             })
             .ToList();
     }
@@ -88,32 +78,25 @@ public sealed class ImapMailReader(MailSettings settings) : IMailReader
     /// </summary>
     /// <param name="client">Подключённый IMAP-клиент</param>
     /// <param name="name">Название папки без учёта регистра</param>
-    /// <param name="ct">Токен отмены запроса</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>
     /// Первая найденная папка или <see langword="null"/>, если такой нет
     /// </returns>
-    private static async Task<IMailFolder?> FindFolderByNameAsync(ImapClient client, string name, CancellationToken ct)
+    private static async Task<IMailFolder?> FindFolderByNameAsync(ImapClient client, string name, CancellationToken cancellationToken)
     {
-        var root = client.GetFolder(client.PersonalNamespaces[0]);
-        var all = await root.GetSubfoldersAsync(true, ct);
+        var all = await client.GetFolder(client.PersonalNamespaces[0]).GetSubfoldersAsync(true, cancellationToken);
         var queue = new Queue<IMailFolder>(all);
 
         while (queue.Count > 0)
         {
             var folder = queue.Dequeue();
             if (string.Equals(folder.Name, name, StringComparison.OrdinalIgnoreCase))
-            {
                 return folder;
-            }
 
-            foreach (var child in await folder.GetSubfoldersAsync(false, ct))
-            {
+            foreach (var child in await folder.GetSubfoldersAsync(false, cancellationToken))
                 queue.Enqueue(child);
-            }
         }
 
         return null;
     }
-
-    #endregion
 }

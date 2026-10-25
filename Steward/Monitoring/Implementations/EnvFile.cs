@@ -42,8 +42,9 @@ public sealed class EnvFile
     public static EnvFile Load(string path)
     {
         var lines = File.Exists(path)
-            ? File.ReadAllLines(path).ToList()
-            : [];
+                      ? File.ReadAllLines(path).ToList()
+                      : [];
+
         return new EnvFile(path, lines);
     }
 

@@ -1,8 +1,8 @@
+using Steward.Schedule.Common.Models;
+using Steward.Schedule.Scheduling.Models;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using Steward.Schedule.Common.Models;
-using Steward.Schedule.Scheduling.Models;
 
 namespace Steward.Schedule.Scheduling.Implementations;
 
@@ -62,8 +62,7 @@ public static partial class ScheduleParser
             if (currentDate is null)
                 continue;
 
-            var timeCell = Cell(row, timeIndex).Trim();
-            if (!TryParseTimeRange(timeCell, out var startClock, out var duration))
+            if (!TryParseTimeRange(Cell(row, timeIndex).Trim(), out var startClock, out var duration))
                 continue;
 
             var date = currentDate.Value;
@@ -313,6 +312,7 @@ public static partial class ScheduleParser
             return url ?? note;
 
         var description = $"Преподаватель: {teacher}";
+
         return url is null ? description : description + "\n---\n" + url;
     }
 
@@ -329,8 +329,8 @@ public static partial class ScheduleParser
         var comma = lines[0].IndexOf(',');
         var tail = comma < 0 ? "" : lines[0][(comma + 1)..].Trim().Trim(',');
         var name = tail.Length > 0
-            ? tail.Split(',')[0].Trim()
-            : lines.Count > 1 ? lines[1].Trim().Trim(',') : "";
+                     ? tail.Split(',')[0].Trim()
+                     : lines.Count > 1 ? lines[1].Trim().Trim(',') : "";
 
         name = ParentheticalLessonType().Replace(name, "").Trim().Trim(',');
         if (name.Length == 0 || name.Equals("преподаватель", StringComparison.OrdinalIgnoreCase))
@@ -377,11 +377,11 @@ public static partial class ScheduleParser
     /// <returns>Нормализованный текст. Пустая ячейка или ячейка из пробелов становится пустой строкой</returns>
     private static string NormalizeCell(string raw)
     {
-        var text = raw.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
-        var lines = text
+        var lines = raw.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n')
             .Split('\n')
             .Select(line => Whitespace().Replace(line.Trim(), " "))
             .Where(line => line.Length > 0);
+
         return string.Join("\n", lines).Trim();
     }
 

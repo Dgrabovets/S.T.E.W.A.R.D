@@ -1,4 +1,5 @@
 using Steward.Monitoring.Implementations;
+using Steward.Schedule.Common.Constants;
 
 namespace Steward.Tests;
 
@@ -15,12 +16,10 @@ public class ChangeNoticeTests
     [Fact]
     public void Build_reports_a_removed_lesson_once()
     {
-        var logs = Run("Completed removed lesson up:rki-2-26:2026-10-30:2010", 0);
+        var logs = Run(SyncLogMessages.COMPLETED_REMOVED + "up:rki-2-26:2026-10-30:2010", 0);
 
-        var first = LogJournal.Read(logs);
-        var text = ChangeNotice.Build(first, DateTimeOffset.MinValue, out var newest);
-        var second = LogJournal.Read(logs);
-        var again = ChangeNotice.Build(second, newest, out var newestAgain);
+        var text = ChangeNotice.Build(LogJournal.Read(logs), DateTimeOffset.MinValue, out var newest);
+        var again = ChangeNotice.Build(LogJournal.Read(logs), newest, out var newestAgain);
 
         Assert.Equal("Убрано из таблицы 30.10 в 20:10", text);
         Assert.Null(again);
@@ -33,7 +32,7 @@ public class ChangeNoticeTests
     [Fact]
     public void Journal_takes_entry_time_from_the_docker_timestamp()
     {
-        var entry = LogJournal.Read(Run("Completed removed lesson up:rki-2-26:2026-10-30:2010", 0)).Single();
+        var entry = LogJournal.Read(Run(SyncLogMessages.COMPLETED_REMOVED + "up:rki-2-26:2026-10-30:2010", 0)).Single();
 
         Assert.Equal(new DateTime(2026, 10, 25, 9, 0, 0, DateTimeKind.Utc), entry.Time.UtcDateTime);
     }
@@ -44,7 +43,7 @@ public class ChangeNoticeTests
     [Fact]
     public void Build_stays_silent_about_new_lessons()
     {
-        var entries = LogJournal.Read(Run("Created up:rki-2-26:2026-10-30:2010 Предмет", 0));
+        var entries = LogJournal.Read(Run(SyncLogMessages.CREATED + "up:rki-2-26:2026-10-30:2010 Предмет", 0));
 
         var text = ChangeNotice.Build(entries, DateTimeOffset.MinValue, out var newest);
 
@@ -58,7 +57,7 @@ public class ChangeNoticeTests
     [Fact]
     public void Build_joins_changes_from_several_runs_oldest_first()
     {
-        var logs = Run("Updated up:rki-2-26:2026-10-30:2010 Предмет", 0) + "\n" + Run("Completed removed lesson up:rki-2-26:2026-10-29:1720", 5);
+        var logs = Run(SyncLogMessages.UPDATED + "up:rki-2-26:2026-10-30:2010 Предмет", 0) + "\n" + Run(SyncLogMessages.COMPLETED_REMOVED + "up:rki-2-26:2026-10-29:1720", 5);
         var entries = LogJournal.Read(logs);
 
         var text = ChangeNotice.Build(entries, DateTimeOffset.MinValue, out _);
@@ -80,6 +79,20 @@ public class ChangeNoticeTests
         Assert.Equal(DateTimeOffset.MinValue, newest);
     }
 
+    /// <summary>
+    /// Итоговая строка из журнала, записанного до удаления счётчика архивных задач, читается так же
+    /// </summary>
+    [Fact]
+    public void Journal_reads_the_old_finish_line_with_the_archived_counter()
+    {
+        var logs = $"schedule-1  | 2026-10-25T09:00:00.000000000Z       {SyncLogMessages.CREATED}up:rki-2-26:2026-10-30:2010 Предмет\n"
+            + $"schedule-1  | 2026-10-25T09:00:00.000000000Z       {SyncLogMessages.FINISHED}created=1 updated=0 archived=0 unarchived=0 completed=0 skipped=2 deleted=0";
+
+        var entry = LogJournal.Read(logs).Single();
+
+        Assert.Equal(new DateTime(2026, 10, 25, 9, 0, 0, DateTimeKind.Utc), entry.Time.UtcDateTime);
+    }
+
     #endregion Facts
 
     #region Helpers
@@ -99,7 +112,7 @@ public class ChangeNoticeTests
         if (change is not null)
             lines.Add($"schedule-1  | {stamp}       {change}");
 
-        lines.Add($"schedule-1  | {stamp}       Sync finished: created=0 updated=0 archived=0 unarchived=0 completed=0 skipped=0 deleted=0");
+        lines.Add($"schedule-1  | {stamp}       {SyncLogMessages.FINISHED}created=0 updated=0 unarchived=0 completed=0 skipped=0 deleted=0");
         return string.Join('\n', lines);
     }
 

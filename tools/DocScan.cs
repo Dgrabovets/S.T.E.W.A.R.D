@@ -15,8 +15,7 @@ foreach (var path in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDire
              .Where(p => !skip.Any(s => p.Contains(s, StringComparison.OrdinalIgnoreCase)) && !p.EndsWith(".g.cs") && !p.EndsWith(".g.i.cs"))
              .OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
 {
-    var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(path));
-    var rootNode = tree.GetRoot();
+    var rootNode = CSharpSyntaxTree.ParseText(File.ReadAllText(path)).GetRoot();
     var report = new List<string>();
 
     foreach (var node in rootNode.DescendantNodes())
@@ -35,6 +34,7 @@ foreach (var path in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDire
             EnumMemberDeclarationSyntax => "enum member",
             _ => null,
         };
+
         if (kind is null)
             continue;
 
@@ -71,6 +71,7 @@ foreach (var path in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDire
             RecordDeclarationSyntax r => r.ParameterList?.Parameters.Select(p => p.Identifier.ValueText).ToArray() ?? [],
             _ => [],
         };
+
         var generatedRegex = node is MethodDeclarationSyntax gm && gm.AttributeLists.Any(list => list.Attributes.Any(a => a.Name.ToString().StartsWith("GeneratedRegex")));
         var lacking = parameters.Where(p => !text.Contains($"name=\"{p}\"")).ToArray();
         var returnsValue = !generatedRegex && node is MethodDeclarationSyntax { ReturnType: var rt } && rt.ToString() is not ("void" or "Task") && !text.Contains("<returns>") && !text.Contains("<inheritdoc");

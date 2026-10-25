@@ -11,7 +11,7 @@ public interface ISingularityClient
     /// Создаёт задачу
     /// </summary>
     /// <param name="request">Поля новой задачи</param>
-    /// <param name="ct">Токен отмены запроса</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Задача, которая завершается, когда SingularityApp принимает запрос</returns>
-    Task CreateTaskAsync(SingularityTaskRequest request, CancellationToken ct);
+    Task CreateTaskAsync(SingularityTaskRequest request, CancellationToken cancellationToken);
 }

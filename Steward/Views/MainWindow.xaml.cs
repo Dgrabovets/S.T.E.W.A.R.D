@@ -1,8 +1,9 @@
 using System.ComponentModel;
-using System.Windows;
 using System.Windows.Input;
-using Steward.Status;
+using System.Windows;
 using Steward.Monitoring.Models;
+using Steward.Status.Rows;
+using Steward.Status.Running;
 using Steward.ViewModels;
 
 namespace Steward.Views;

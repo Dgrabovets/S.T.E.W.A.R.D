@@ -1,166 +1,14 @@
-using System.Globalization;
-using Steward.Status;
 using Steward.Models;
 using Steward.Monitoring.Models;
-using Steward.Mvvm;
+using Steward.Status.Rows;
+using Steward.Status.Running;
 
 namespace Steward.ViewModels;
 
 /// <summary>
-/// Раздел главного окна
-/// </summary>
-public enum AppPageEnum
-{
-    /// <summary>
-    /// Статус всех задач
-    /// </summary>
-    Status,
-
-    /// <summary>
-    /// Идеи, которые ждут решения
-    /// </summary>
-    Ideas,
-
-    /// <summary>
-    /// Подготовленные черновики домашних заданий
-    /// </summary>
-    Homework,
-
-    /// <summary>
-    /// Журнал запусков
-    /// </summary>
-    Journal,
-}
-
-/// <summary>
-/// Карточка задачи в разделе «Статус»
-/// </summary>
-public sealed class TaskCardViewModel
-{
-    /// <summary>
-    /// Создаёт карточку
-    /// </summary>
-    /// <param name="row">Строка задачи</param>
-    /// <param name="run">Действие кнопки «Запустить»</param>
-    public TaskCardViewModel(TaskStatusRow row, Action<string> run)
-    {
-        Name = row.Name;
-        Headline = row.Headline;
-        Detail = row.Detail;
-        Tone = row.Tone;
-        Muted = row.Muted;
-        CanRun = row.CanRun;
-        RunCommand = new RelayCommand(() => run(row.Id), () => row.CanRun);
-    }
-
-    /// <summary>
-    /// Название задачи
-    /// </summary>
-    public string Name { get; }
-
-    /// <summary>
-    /// Короткий статус
-    /// </summary>
-    public string Headline { get; }
-
-    /// <summary>
-    /// Подробности
-    /// </summary>
-    public string Detail { get; }
-
-    /// <summary>
-    /// Цвет точки
-    /// </summary>
-    public PanelToneEnum Tone { get; }
-
-    /// <summary>
-    /// Задача выключена
-    /// </summary>
-    public bool Muted { get; }
-
-    /// <summary>
-    /// У карточки есть кнопка запуска
-    /// </summary>
-    public bool CanRun { get; }
-
-    /// <summary>
-    /// Запускает задачу сейчас
-    /// </summary>
-    public RelayCommand RunCommand { get; }
-}
-
-/// <summary>
-/// Строка журнала запусков
-/// </summary>
-public sealed class RunRowViewModel
-{
-    /// <summary>
-    /// Создаёт строку по записи журнала
-    /// </summary>
-    /// <param name="record">Запись о запуске</param>
-    public RunRowViewModel(RunRecord record)
-    {
-        When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm:ss", CultureInfo.InvariantCulture);
-        Title = record.Title;
-        Reason = record.Reason switch
-        {
-            JobTrigger.START => "при запуске приложения",
-            JobTrigger.DAILY => "по расписанию",
-            JobTrigger.INTERVAL => "по интервалу",
-            "manual" => "вручную",
-            _ => record.Reason,
-        };
-        Outcome = record.Outcome switch
-        {
-            RunOutcomeEnum.Ok => "Успешно",
-            RunOutcomeEnum.Failed => "Ошибка",
-            RunOutcomeEnum.TimedOut => "Не уложилась во время",
-            _ => "Не запустилась",
-        };
-        Detail = record.Detail ?? string.Empty;
-        Tone = record.Outcome == RunOutcomeEnum.Ok ? PanelToneEnum.Running : PanelToneEnum.Problem;
-    }
-
-    /// <summary>
-    /// Когда запущена
-    /// </summary>
-    public string When { get; }
-
-    /// <summary>
-    /// Название задачи
-    /// </summary>
-    public string Title { get; }
-
-    /// <summary>
-    /// Почему запущена
-    /// </summary>
-    public string Reason { get; }
-
-    /// <summary>
-    /// Чем закончилась
-    /// </summary>
-    public string Outcome { get; }
-
-    /// <summary>
-    /// Пояснение к ошибке
-    /// </summary>
-    public string Detail { get; }
-
-    /// <summary>
-    /// Есть что показать под названием: у успешных запусков пояснения нет
-    /// </summary>
-    public bool HasDetail => Detail.Length > 0;
-
-    /// <summary>
-    /// Цвет точки
-    /// </summary>
-    public PanelToneEnum Tone { get; }
-}
-
-/// <summary>
 /// Состояние главного окна: раздел, задачи, журнал и общий итог
 /// </summary>
-public sealed class MainViewModel : Bindable
+public sealed class MainViewModel : PanelViewModel
 {
     /// <summary>
     /// Текущий раздел
@@ -183,42 +31,16 @@ public sealed class MainViewModel : Bindable
     private string _registryErrors = string.Empty;
 
     /// <summary>
-    /// Строка под заголовком
-    /// </summary>
-    private string _subtitle = "Проверяю задачи";
-
-    /// <summary>
-    /// Текст плашки
-    /// </summary>
-    private string _statusLabel = "Проверка";
-
-    /// <summary>
-    /// Цвет плашки
-    /// </summary>
-    private PanelToneEnum _tone = PanelToneEnum.Idle;
-
-    /// <summary>
     /// Создаёт модель
     /// </summary>
-    public MainViewModel()
+    public MainViewModel() : base("Проверка")
     {
-        ExitCommand = new RelayCommand(() => ExitRequested?.Invoke(this, EventArgs.Empty));
     }
 
     /// <summary>
     /// Просит запустить задачу: параметр — идентификатор
     /// </summary>
     public event Action<string>? RunRequested;
-
-    /// <summary>
-    /// Просит закрыть приложение
-    /// </summary>
-    public event EventHandler? ExitRequested;
-
-    /// <summary>
-    /// Закрывает приложение целиком
-    /// </summary>
-    public RelayCommand ExitCommand { get; }
 
     #region State
 
@@ -316,33 +138,6 @@ public sealed class MainViewModel : Bindable
     /// </summary>
     public bool HasRegistryErrors => RegistryErrors.Length > 0;
 
-    /// <summary>
-    /// Строка под заголовком окна
-    /// </summary>
-    public string Subtitle
-    {
-        get => _subtitle;
-        private set => Set(ref _subtitle, value);
-    }
-
-    /// <summary>
-    /// Текст цветной плашки
-    /// </summary>
-    public string StatusLabel
-    {
-        get => _statusLabel;
-        private set => Set(ref _statusLabel, value);
-    }
-
-    /// <summary>
-    /// Цвет плашки
-    /// </summary>
-    public PanelToneEnum Tone
-    {
-        get => _tone;
-        private set => Set(ref _tone, value);
-    }
-
     #endregion State
 
     #region Updating
@@ -361,10 +156,7 @@ public sealed class MainViewModel : Bindable
         Records = records.Select(record => new RunRowViewModel(record)).ToArray();
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
 
-        var summary = TaskSummary.Of(rows);
-        Tone = summary.Tone;
-        StatusLabel = summary.Label;
-        Subtitle = summary.Subtitle;
+        ApplySummary(rows);
     }
 
     /// <summary>

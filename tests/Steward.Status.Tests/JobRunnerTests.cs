@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using Steward.Status.Running;
+using Steward.Status.Scheduling;
+using Steward.Status.State;
 
 namespace Steward.Status.Tests;
 
@@ -73,6 +76,7 @@ public class JobRunnerTests
             Set-Content -Path (Join-Path $dir 'selfish.json') -Value $json -Encoding UTF8
             Set-Content -Path (Join-Path $env:STEWARD_DATA 'temp-was.txt') -Value $env:TEMP
             """);
+
         var job = Samples.Job("selfish") with { Command = "powershell.exe", Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{script}\"" };
 
         var record = await runner.RunAsync(job, "manual");
@@ -131,6 +135,7 @@ public class JobRunnerTests
 
         var first = runner.RunAsync(job, "start");
         var second = runner.RunAsync(job, "manual");
+
         Assert.True(runner.IsRunning("slow"));
         await Task.WhenAll(first, second);
 
@@ -152,6 +157,7 @@ public class JobRunnerTests
 
         var first = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10));
         var started = first.Tick(now);
+
         await Task.WhenAll(started);
         var again = first.Tick(now.AddSeconds(30));
 
@@ -159,11 +165,9 @@ public class JobRunnerTests
         Assert.Empty(again);
         Assert.Equal("start", (await started[0]).Reason);
 
-        var restarted = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10));
-        Assert.Empty(restarted.Tick(now.AddMinutes(2)));
+        Assert.Empty(new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10)).Tick(now.AddMinutes(2)));
 
-        var muchLater = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10));
-        var afterAWhile = muchLater.Tick(now.AddMinutes(30));
+        var afterAWhile = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10)).Tick(now.AddMinutes(30));
         await Task.WhenAll(afterAWhile);
         Assert.True(afterAWhile.Count == 1, "спустя срок дедупликации запуск должен повториться");
     }
@@ -180,12 +184,10 @@ public class JobRunnerTests
         var now = DateTimeOffset.Now;
 
         store.Write(Samples.Status("slow", ProcessStateEnum.Running, now.AddMinutes(-1)));
-        var fresh = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10));
-        Assert.Empty(fresh.Tick(now));
+        Assert.Empty(new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10)).Tick(now));
 
         store.Write(Samples.Status("slow", ProcessStateEnum.Running, now.AddMinutes(-90)));
-        var abandoned = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10));
-        var started = abandoned.Tick(now);
+        var started = new JobScheduler([job], store, runner, TimeZoneInfo.Local, TimeSpan.FromMinutes(10)).Tick(now);
         await Task.WhenAll(started);
         Assert.True(started.Count == 1, "брошенный запуск старше таймаута должен быть выполнен заново");
     }

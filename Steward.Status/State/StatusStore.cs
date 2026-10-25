@@ -2,7 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace Steward.Status;
+namespace Steward.Status.State;
 
 /// <summary>
 /// Папка с файлами статусов: по одному JSON на процесс
@@ -78,6 +78,36 @@ public sealed partial class StatusStore
         }
     }
 
+    /// <summary>
+    /// Записывает состояние процесса, сохраняя из прошлого статуса время последнего успеха, ближайший запуск и число ожидающих
+    /// </summary>
+    /// <param name="id">Идентификатор процесса</param>
+    /// <param name="title">Название для показа</param>
+    /// <param name="state">Новое состояние</param>
+    /// <param name="at">Момент записи</param>
+    /// <param name="summary">Сводка одной строкой</param>
+    /// <param name="error">Текст ошибки</param>
+    /// <param name="success">
+    /// <see langword="true"/>, если запуск удался и нужно обновить время успеха
+    /// </param>
+    public void Report(string id, string title, ProcessStateEnum state, DateTimeOffset at, string? summary, string? error, bool success)
+    {
+        var previous = Read(id);
+        Write(new ProcessStatus
+        {
+            Id = id,
+            Title = title,
+            State = state,
+            UpdatedAt = at,
+            LastRunAt = state == ProcessStateEnum.Running ? previous?.LastRunAt : at,
+            LastSuccessAt = success ? at : previous?.LastSuccessAt,
+            NextRunAt = previous?.NextRunAt,
+            Summary = summary,
+            Error = error,
+            Awaiting = previous?.Awaiting ?? 0,
+        });
+    }
+
     #endregion Writing
 
     #region Reading
@@ -90,6 +120,15 @@ public sealed partial class StatusStore
     /// Статус или <see langword="null"/>, если файла нет или он не читается
     /// </returns>
     public ProcessStatus? Read(string id) => ReadFile(PathFor(id));
+
+    /// <summary>
+    /// Читает статус и не падает от плохого идентификатора
+    /// </summary>
+    /// <param name="id">Идентификатор процесса</param>
+    /// <returns>
+    /// Статус или <see langword="null"/>, если идентификатор не подходит, файла нет или он не читается
+    /// </returns>
+    public ProcessStatus? TryRead(string id) => IsValidId(id) ? ReadFile(PathFor(id)) : null;
 
     /// <summary>
     /// Читает все статусы в папке. Повреждённые и недописанные файлы пропускаются

@@ -1,5 +1,5 @@
-using System.Globalization;
 using Steward.Monitoring.Models;
+using System.Globalization;
 
 namespace Steward.Models;
 
@@ -61,6 +61,7 @@ public sealed class JournalCard
                 Detail = ShownDetail(entry),
                 Tone = entry.Tone,
             });
+
             previousDay = day;
         }
 
@@ -95,12 +96,13 @@ public sealed class JournalCard
         var mod100 = count % 100;
         var mod10 = count % 10;
         var word = mod100 is >= 11 and <= 14
-            ? "сверок"
-            : mod10 == 1
-                ? "сверка"
-                : mod10 is >= 2 and <= 4
-                    ? "сверки"
-                    : "сверок";
+                     ? "сверок"
+                     : mod10 == 1
+                         ? "сверка"
+                         : mod10 is >= 2 and <= 4
+                             ? "сверки"
+                             : "сверок";
+
         return $"{count} {word}";
     }
 
@@ -114,6 +116,7 @@ public sealed class JournalCard
         var day = time.Date;
         if (day == DateTime.Today)
             return "Сегодня";
+
         if (day == DateTime.Today.AddDays(-1))
             return "Вчера";
 

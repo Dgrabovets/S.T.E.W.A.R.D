@@ -1,12 +1,13 @@
+using Steward.Status.Common;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
-using Steward.Status;
 using Steward.Hosting;
 using Steward.Models;
 using Steward.Monitoring.Implementations;
 using Steward.Monitoring.Models;
+using Steward.Status.Rows;
 using Steward.Views;
 
 namespace Steward.Shell;
@@ -39,7 +40,7 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Опрос контейнера
     /// </summary>
-    private readonly DockerSyncProbe _probe = new(DockerSyncProbe.FindRepoRoot());
+    private readonly DockerSyncProbe _probe = new(DataLocation.RepoRootOrStart());
 
     /// <summary>
     /// Панель с подробностями
@@ -132,6 +133,7 @@ public sealed class TrayHost : IDisposable
             ShowImageMargin = false,
             Padding = new Padding(4, 6, 4, 6),
         };
+
         menu.Items.Add(Item("Открыть приложение", (_, _) => ShowMain()));
         menu.Items.Add(Item("Быстрый статус", (_, _) => ShowWindow()));
         menu.Items.Add(new ToolStripSeparator());
@@ -144,11 +146,13 @@ public sealed class TrayHost : IDisposable
             Text = "Расписание",
             ContextMenuStrip = menu,
         };
+
         _icon.MouseClick += (_, args) =>
         {
             if (args.Button == MouseButtons.Left)
                 ShowWindow();
         };
+
         _icon.DoubleClick += (_, _) => ShowMain();
         _icon.BalloonTipClicked += (_, _) => ShowMain();
         _window.ExitRequested += (_, _) => Exit();
@@ -157,6 +161,7 @@ public sealed class TrayHost : IDisposable
             _window.Hide();
             ShowMain();
         };
+
         _window.RestartRequested += async (_, _) =>
         {
             var restarted = await _probe.RestartAsync(CancellationToken.None);
@@ -166,6 +171,7 @@ public sealed class TrayHost : IDisposable
             _window.SetSettingsStatus(restarted
                 ? "Контейнер перезапущен"
                 : "Не удалось перезапустить контейнер");
+
             if (restarted)
                 await RefreshAsync();
         };
@@ -224,8 +230,7 @@ public sealed class TrayHost : IDisposable
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         graphics.Clear(Color.Transparent);
 
-        var bounds = new Rectangle(1, 1, 30, 30);
-        using (var shape = Rounded(bounds, 8))
+        using (var shape = Rounded(new Rectangle(1, 1, 30, 30), 8))
         using (var brush = new SolidBrush(color))
             graphics.FillPath(brush, shape);
 
@@ -259,6 +264,7 @@ public sealed class TrayHost : IDisposable
         var path = new GraphicsPath();
         var diameter = Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height));
         var arc = new Rectangle(bounds.X, bounds.Y, diameter, diameter);
+
         path.AddArc(arc, 180, 90);
         arc.X = bounds.Right - diameter;
         path.AddArc(arc, 270, 90);
@@ -267,6 +273,7 @@ public sealed class TrayHost : IDisposable
         arc.X = bounds.Left;
         path.AddArc(arc, 90, 90);
         path.CloseFigure();
+
         return path;
     }
 
@@ -387,16 +394,17 @@ public sealed class TrayHost : IDisposable
             : snapshot.ContainerRunning ? _runningIcon : _stoppedIcon;
 
         var text = snapshot.CurrentError is not null
-            ? "Расписание: не удалось обновить"
-            : failed is not null
-                ? $"{failed.Title}: {failed.Headline}"
-            : snapshot.ContainerRunning
-                ? snapshot.LastSuccess is null
-                    ? "Расписание работает"
-                    : $"Расписание, обновлено в {snapshot.LastSuccess:HH:mm}"
-                : snapshot.DockerAvailable
-                    ? "Расписание остановлено"
-                    : "Расписание: Docker не запущен";
+                     ? "Расписание: не удалось обновить"
+                     : failed is not null
+                         ? $"{failed.Title}: {failed.Headline}"
+                     : snapshot.ContainerRunning
+                         ? snapshot.LastSuccess is null
+                             ? "Расписание работает"
+                             : $"Расписание, обновлено в {snapshot.LastSuccess:HH:mm}"
+                         : snapshot.DockerAvailable
+                             ? "Расписание остановлено"
+                             : "Расписание: Docker не запущен";
+
         _icon.Text = text.Length <= TOOLTIP_LIMIT ? text : text[..TOOLTIP_LIMIT];
     }
 
@@ -498,6 +506,7 @@ public sealed class TrayHost : IDisposable
         {
             var bounds = new Rectangle(4, 0, e.Item.Width - 8, e.Item.Height);
             var color = e.Item.Selected ? TrayPalette.SurfaceRaised : TrayPalette.Surface;
+
             using var brush = new SolidBrush(color);
             e.Graphics.FillRectangle(brush, bounds);
         }

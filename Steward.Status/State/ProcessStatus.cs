@@ -1,4 +1,4 @@
-namespace Steward.Status;
+namespace Steward.Status.State;
 
 /// <summary>
 /// Статус одного процесса. Лежит в файле <c>status/&lt;id&gt;.json</c>, его пишет сам процесс или раннер, читает приложение в трее

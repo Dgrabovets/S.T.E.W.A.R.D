@@ -1,59 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
-namespace Steward.Status;
-
-/// <summary>
-/// Чем закончился запуск
-/// </summary>
-public enum RunOutcomeEnum
-{
-    /// <summary>
-    /// Программа завершилась с кодом 0
-    /// </summary>
-    Ok,
-
-    /// <summary>
-    /// Программа завершилась с ошибкой
-    /// </summary>
-    Failed,
-
-    /// <summary>
-    /// Программа не уложилась во время и была остановлена
-    /// </summary>
-    TimedOut,
-
-    /// <summary>
-    /// Программа не запустилась: нет файла или нет прав
-    /// </summary>
-    NotStarted,
-}
-
-/// <summary>
-/// Запись журнала об одном запуске
-/// </summary>
-/// <param name="JobId">Идентификатор задачи</param>
-/// <param name="Title">Название задачи</param>
-/// <param name="Reason">Почему запущена: start, daily, interval или manual</param>
-/// <param name="StartedAt">Когда запуск начался</param>
-/// <param name="FinishedAt">Когда запуск закончился</param>
-/// <param name="ExitCode">
-/// Код завершения программы или <see langword="null"/>, если она не завершилась сама
-/// </param>
-/// <param name="Outcome">Итог запуска</param>
-/// <param name="Detail">
-/// Пояснение к ошибке или <see langword="null"/>
-/// </param>
-public sealed record RunRecord(
-    string JobId,
-    string Title,
-    string Reason,
-    DateTimeOffset StartedAt,
-    DateTimeOffset FinishedAt,
-    int? ExitCode,
-    [property: JsonConverter(typeof(JsonStringEnumConverter))] RunOutcomeEnum Outcome,
-    string? Detail);
+namespace Steward.Status.Running;
 
 /// <summary>
 /// Журнал запусков в файле <c>runs.jsonl</c>: по одной записи JSON на строку
@@ -114,6 +62,7 @@ public sealed class RunHistory
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
+                // ignore
             }
         }
     }

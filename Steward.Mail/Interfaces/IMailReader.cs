@@ -10,7 +10,7 @@ public interface IMailReader
     /// <summary>
     /// Возвращает непрочитанные письма из папок «Входящие» и «Преподаватели»
     /// </summary>
-    /// <param name="ct">Токен отмены запроса</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Письма за последние дни, которые указаны в настройках. Статус «прочитано» у них не меняется</returns>
-    Task<IReadOnlyList<MailItem>> GetUnreadAsync(CancellationToken ct);
+    Task<IReadOnlyList<MailItem>> GetUnreadAsync(CancellationToken cancellationToken);
 }

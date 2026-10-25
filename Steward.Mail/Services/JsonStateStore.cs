@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Steward.Mail.Interfaces;
+using System.Text.Json;
 
 namespace Steward.Mail.Services;
 
@@ -8,12 +8,10 @@ namespace Steward.Mail.Services;
 /// </summary>
 public sealed class JsonStateStore : IStateStore
 {
-    #region Fields
-
     /// <summary>
     /// Сколько последних идентификаторов хранить в файле, чтобы он не рос бесконечно
     /// </summary>
-    private const int MaxEntries = 2000;
+    private const int MAX_ENTRIES = 2000;
 
     /// <summary>
     /// Путь к JSON-файлу
@@ -30,10 +28,6 @@ public sealed class JsonStateStore : IStateStore
     /// </summary>
     private readonly HashSet<string> _lookup;
 
-    #endregion
-
-    #region Constructors
-
     /// <summary>
     /// Загружает список из файла. Если файла нет, список пуст
     /// </summary>
@@ -44,12 +38,9 @@ public sealed class JsonStateStore : IStateStore
         _ids = File.Exists(path)
             ? JsonSerializer.Deserialize<List<string>>(File.ReadAllText(path)) ?? []
             : [];
+
         _lookup = [.. _ids];
     }
-
-    #endregion
-
-    #region Public methods
 
     /// <summary>
     /// Проверяет, обработано ли письмо раньше
@@ -67,19 +58,18 @@ public sealed class JsonStateStore : IStateStore
     public void MarkProcessed(string messageId)
     {
         if (_lookup.Add(messageId))
-        {
             _ids.Add(messageId);
-        }
     }
 
     /// <summary>
-    /// Записывает список в файл, оставляя только последние <see cref="MaxEntries"/> идентификаторов
+    /// Записывает список в файл через временный файл, чтобы обрыв записи не испортил список. Остаются только последние <see cref="MAX_ENTRIES"/> идентификаторов
     /// </summary>
     public void Save()
     {
-        var tail = _ids.Count > MaxEntries ? _ids[^MaxEntries..] : _ids;
-        File.WriteAllText(_path, JsonSerializer.Serialize(tail, new JsonSerializerOptions { WriteIndented = true }));
-    }
+        var tail = _ids.Count > MAX_ENTRIES ? _ids[^MAX_ENTRIES..] : _ids;
+        var temp = _path + ".tmp";
 
-    #endregion
+        File.WriteAllText(temp, JsonSerializer.Serialize(tail, new JsonSerializerOptions { WriteIndented = true }));
+        File.Move(temp, _path, overwrite: true);
+    }
 }

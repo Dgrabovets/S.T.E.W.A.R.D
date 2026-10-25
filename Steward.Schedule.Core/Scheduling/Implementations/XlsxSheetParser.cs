@@ -41,13 +41,16 @@ public static class XlsxSheetParser
         var strings = ReadSharedStrings(archive);
         var sheet = archive.GetEntry("xl/worksheets/sheet1.xml")
             ?? throw new FormatException("The workbook does not contain a worksheet.");
+
         using var sheetStream = sheet.Open();
         var document = XDocument.Load(sheetStream);
         var cells = ReadCells(document, strings);
+
         ApplyMerges(document, cells);
         var links = ReadHyperlinks(archive, document);
-        ApplyMergeLinks(document, links);
+        ApplyMerges(document, links);
         AppendLinks(cells, links);
+
         return WriteCsv(cells);
     }
 
@@ -63,8 +66,7 @@ public static class XlsxSheetParser
             return [];
 
         using var stream = entry.Open();
-        var document = XDocument.Load(stream);
-        return document.Descendants(Spreadsheet + "si")
+        return XDocument.Load(stream).Descendants(Spreadsheet + "si")
             .Select(item => string.Concat(item.Descendants(Spreadsheet + "t").Select(text => text.Value)))
             .ToList();
     }
@@ -93,11 +95,11 @@ public static class XlsxSheetParser
     }
 
     /// <summary>
-    /// Копирует значение левой верхней ячейки в пустые ячейки её объединения
+    /// Копирует значение левой верхней ячейки в пустые позиции её объединения
     /// </summary>
     /// <param name="document">Документ листа</param>
-    /// <param name="cells">Уже прочитанные ячейки. Пустые позиции объединения заполняются на месте</param>
-    private static void ApplyMerges(XDocument document, Dictionary<(int Row, int Column), string> cells)
+    /// <param name="values">Уже прочитанные значения (текст или ссылки) по координатам. Пустые позиции объединения заполняются на месте</param>
+    private static void ApplyMerges(XDocument document, Dictionary<(int Row, int Column), string> values)
     {
         foreach (var merge in document.Descendants(Spreadsheet + "mergeCell"))
         {
@@ -109,7 +111,7 @@ public static class XlsxSheetParser
             if (bounds.Length != 2
                 || !TryReference(bounds[0], out var startRow, out var startColumn)
                 || !TryReference(bounds[1], out var endRow, out var endColumn)
-                || !cells.TryGetValue((startRow, startColumn), out var value))
+                || !values.TryGetValue((startRow, startColumn), out var value))
             {
                 continue;
             }
@@ -118,8 +120,8 @@ public static class XlsxSheetParser
             {
                 for (var column = startColumn; column <= endColumn; column++)
                 {
-                    if (!cells.ContainsKey((row, column)))
-                        cells[(row, column)] = value;
+                    if (!values.ContainsKey((row, column)))
+                        values[(row, column)] = value;
                 }
             }
         }
@@ -213,39 +215,6 @@ public static class XlsxSheetParser
         }
 
         return targets;
-    }
-
-    /// <summary>
-    /// Копирует ссылку левой верхней ячейки на пустые позиции объединения
-    /// </summary>
-    /// <param name="document">Документ листа</param>
-    /// <param name="links">Уже прочитанные ссылки. Пустые позиции объединения заполняются на месте</param>
-    private static void ApplyMergeLinks(XDocument document, Dictionary<(int Row, int Column), string> links)
-    {
-        foreach (var merge in document.Descendants(Spreadsheet + "mergeCell"))
-        {
-            var range = (string?)merge.Attribute("ref");
-            if (range is null)
-                continue;
-
-            var bounds = range.Split(':');
-            if (bounds.Length != 2
-                || !TryReference(bounds[0], out var startRow, out var startColumn)
-                || !TryReference(bounds[1], out var endRow, out var endColumn)
-                || !links.TryGetValue((startRow, startColumn), out var value))
-            {
-                continue;
-            }
-
-            for (var row = startRow; row <= endRow; row++)
-            {
-                for (var column = startColumn; column <= endColumn; column++)
-                {
-                    if (!links.ContainsKey((row, column)))
-                        links[(row, column)] = value;
-                }
-            }
-        }
     }
 
     /// <summary>

@@ -1,13 +1,16 @@
 using Microsoft.Extensions.Logging;
-using System.Globalization;
+using Steward.Schedule.Common.Constants;
 using Steward.Schedule.Common.Helpers;
 using Steward.Schedule.Common.Models;
 using Steward.Schedule.Scheduling.Implementations;
 using Steward.Schedule.Scheduling.Interfaces;
+using Steward.Schedule.Scheduling.Models;
 using Steward.Schedule.Singularity.Implementations;
 using Steward.Schedule.Singularity.Interfaces;
+using Steward.Schedule.Singularity.Models;
 using Steward.Schedule.Sync.Interfaces;
 using Steward.Schedule.Sync.Models;
+using System.Globalization;
 
 namespace Steward.Schedule.Sync.Implementations;
 
@@ -70,19 +73,59 @@ public sealed class ScheduleSyncer
     /// <returns>Счётчики каждого действия. Уже выполненная задача прошедшего занятия не меняется</returns>
     public async Task<SyncReport> RunAsync(CancellationToken cancellationToken)
     {
-        #region Load
-
         var csv = await _source.ReadCsvAsync(cancellationToken);
-        var timeZone = TimeHelper.ResolveTimeZone(_options.TimeZoneId);
-        var slots = ScheduleParser.Parse(csv, _options.GroupColumn, timeZone, _clock.Today);
-        var lessons = slots.Count(slot => slot.Lesson is not null);
+        var slots = ScheduleParser.Parse(csv, _options.GroupColumn, TimeHelper.ResolveTimeZone(_options.TimeZoneId), _clock.Today);
         _logger.LogInformation(
             "Parsed {Lessons} lessons across {Slots} slots in column {Group}",
-            lessons,
+            slots.Count(slot => slot.Lesson is not null),
             slots.Count,
             _options.GroupColumn);
 
         var projectId = await _client.GetOrCreateProjectIdAsync(_options.ProjectTitle, cancellationToken);
+        var (byExternalId, targetTaskIds) = await LoadTasksAsync(projectId, cancellationToken);
+        var run = new SyncRun(
+            projectId,
+            targetTaskIds,
+            RemovalNotices(slots, byExternalId, _clock.Now),
+            _options.SubjectTags ? await ResolveSubjectTagsAsync(slots, cancellationToken) : new Dictionary<string, string>(StringComparer.Ordinal));
+
+        foreach (var slot in slots)
+        {
+            byExternalId.TryGetValue(slot.ExternalId, out var existing);
+
+            if (slot.Lesson is not { } lesson)
+                await ReconcileRemovedAsync(slot, existing, run, cancellationToken);
+            else if (lesson.Start.AddMinutes(lesson.TimeLengthMinutes) <= _clock.Now)
+                await ReconcilePastAsync(slot, lesson, existing, run, cancellationToken);
+            else
+                await ReconcileFutureAsync(slot, lesson, existing, run, cancellationToken);
+        }
+
+        var report = run.ToReport();
+        _logger.LogInformation(
+            SyncLogMessages.FINISHED + "created={Created} updated={Updated} unarchived={Unarchived} completed={Completed} skipped={Skipped} deleted={Deleted}",
+            report.Created,
+            report.Updated,
+            report.Unarchived,
+            report.Completed,
+            report.Skipped,
+            report.Deleted);
+
+        return report;
+    }
+
+    #region Loading
+
+    /// <summary>
+    /// Собирает задачи проекта и, если проект переименовали, задачи из проекта со старым названием
+    /// </summary>
+    /// <param name="projectId">Проект, в который пишутся задачи</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    /// <returns>Задачи этой группы по внешнему идентификатору и идентификаторы задач, которые уже лежат в целевом проекте</returns>
+    private async Task<(Dictionary<string, SingularityTask> ByExternalId, HashSet<string> TargetTaskIds)> LoadTasksAsync(
+        string projectId,
+        CancellationToken cancellationToken)
+    {
         var tasks = await _client.ListProjectTasksAsync(projectId, cancellationToken);
         var targetTaskIds = tasks.Select(task => task.Id).ToHashSet(StringComparer.Ordinal);
         if (!string.Equals(_options.ProjectTitle, _options.GroupColumn, StringComparison.Ordinal))
@@ -110,142 +153,170 @@ public sealed class ScheduleSyncer
                     .First(),
                 StringComparer.Ordinal);
 
-        var subjectTags = _options.SubjectTags
-            ? await ResolveSubjectTagsAsync(slots, cancellationToken)
-            : new Dictionary<string, string>(StringComparer.Ordinal);
-
-        #endregion Load
-
-        #region Reconciliation
-
-        var created = 0;
-        var updated = 0;
-        var archived = 0;
-        var unarchived = 0;
-        var completed = 0;
-        var skipped = 0;
-        var deleted = 0;
-        var notices = RemovalNotices(slots, byExternalId, _clock.Now);
-
-        foreach (var slot in slots)
-        {
-            byExternalId.TryGetValue(slot.ExternalId, out var existing);
-            if (slot.Lesson is not null && slot.Lesson.Start.AddMinutes(slot.Lesson.TimeLengthMinutes) <= _clock.Now)
-            {
-                if (existing is null)
-                {
-                    if (!IsCurrentWeek(slot.Lesson.Start, _clock.Now))
-                        continue;
-
-                    var taskId = await _client.CreateTaskAsync(projectId, WithTags(WithNotices(slot.Lesson, notices), null, subjectTags), cancellationToken);
-                    created++;
-                    _logger.LogInformation("Created {ExternalId} {Title}", slot.ExternalId, slot.Lesson.Title);
-                    await _client.CompleteTaskAsync(taskId, cancellationToken);
-                    completed++;
-                    _logger.LogInformation("Completed past lesson {ExternalId}", slot.ExternalId);
-                    continue;
-                }
-
-                if (existing.IsCompleted)
-                {
-                    skipped++;
-                    _logger.LogInformation("Skipped completed task {ExternalId}", slot.ExternalId);
-                    continue;
-                }
-
-                if (existing.IsArchived)
-                {
-                    await _client.UnarchiveTaskAsync(existing.Id, cancellationToken);
-                    unarchived++;
-                    _logger.LogInformation("Unarchived past lesson {ExternalId}", slot.ExternalId);
-                }
-
-                var pastLesson = WithTags(WithNotices(slot.Lesson, notices), existing, subjectTags);
-                if (!targetTaskIds.Contains(existing.Id) || SingularityClient.NeedsUpdate(existing, pastLesson))
-                {
-                    await _client.UpdateTaskAsync(existing.Id, projectId, pastLesson, cancellationToken);
-                    updated++;
-                    _logger.LogInformation("Updated past lesson {ExternalId} {Title}", slot.ExternalId, slot.Lesson.Title);
-                }
-
-                await _client.CompleteTaskAsync(existing.Id, cancellationToken);
-                completed++;
-                _logger.LogInformation("Completed past lesson {ExternalId}", slot.ExternalId);
-                continue;
-            }
-
-            if (slot.Lesson is null)
-            {
-                if (existing is null)
-                    continue;
-
-                if (existing.IsCompleted)
-                {
-                    skipped++;
-                    _logger.LogInformation("Skipped completed removed lesson {ExternalId}", slot.ExternalId);
-                    continue;
-                }
-
-                if (existing.IsArchived)
-                {
-                    await _client.UnarchiveTaskAsync(existing.Id, cancellationToken);
-                    unarchived++;
-                    _logger.LogInformation("Unarchived removed lesson {ExternalId}", slot.ExternalId);
-                }
-
-                await _client.CompleteTaskAsync(existing.Id, cancellationToken);
-                completed++;
-                _logger.LogInformation("Completed removed lesson {ExternalId}", slot.ExternalId);
-                continue;
-            }
-
-            if (existing is not null && existing.IsCompleted)
-            {
-                await _client.DeleteTaskAsync(existing.Id, cancellationToken);
-                deleted++;
-                _logger.LogInformation("Deleted completed future task {ExternalId}", slot.ExternalId);
-                existing = null;
-            }
-
-            if (existing is null)
-            {
-                await _client.CreateTaskAsync(projectId, WithTags(WithNotices(slot.Lesson, notices), null, subjectTags), cancellationToken);
-                created++;
-                _logger.LogInformation("Created {ExternalId} {Title}", slot.ExternalId, slot.Lesson.Title);
-                continue;
-            }
-
-            if (existing.IsArchived)
-            {
-                await _client.UnarchiveTaskAsync(existing.Id, cancellationToken);
-                unarchived++;
-                _logger.LogInformation("Unarchived {ExternalId}", slot.ExternalId);
-            }
-
-            var lesson = WithTags(WithNotices(slot.Lesson, notices), existing, subjectTags);
-            if (!targetTaskIds.Contains(existing.Id) || SingularityClient.NeedsUpdate(existing, lesson))
-            {
-                await _client.UpdateTaskAsync(existing.Id, projectId, lesson, cancellationToken);
-                updated++;
-                _logger.LogInformation("Updated {ExternalId} {Title}", slot.ExternalId, slot.Lesson.Title);
-            }
-        }
-
-        var report = new SyncReport(created, updated, archived, unarchived, completed, skipped, deleted);
-        _logger.LogInformation(
-            "Sync finished: created={Created} updated={Updated} archived={Archived} unarchived={Unarchived} completed={Completed} skipped={Skipped} deleted={Deleted}",
-            report.Created,
-            report.Updated,
-            report.Archived,
-            report.Unarchived,
-            report.Completed,
-            report.Skipped,
-            report.Deleted);
-        return report;
-
-        #endregion Reconciliation
+        return (byExternalId, targetTaskIds);
     }
 
+    #endregion Loading
+
+    #region Reconciliation
+
+    /// <summary>
+    /// Сверяет занятие, которое уже закончилось: создаёт задачу, если она нужна на этой неделе, обновляет текст и отмечает выполненной
+    /// </summary>
+    /// <param name="slot">Слот таблицы</param>
+    /// <param name="lesson">Занятие слота</param>
+    /// <param name="existing">Сохранённая задача или <see langword="null"/></param>
+    /// <param name="run">Контекст и счётчики прогона</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    private async Task ReconcilePastAsync(ScheduleSlot slot, Lesson lesson, SingularityTask? existing, SyncRun run, CancellationToken cancellationToken)
+    {
+        if (existing is null)
+        {
+            if (!IsCurrentWeek(lesson.Start, _clock.Now))
+                return;
+
+            await CompleteAsync(await CreateAsync(slot, lesson, run, cancellationToken), SyncLogMessages.COMPLETED_PAST, slot.ExternalId, run, cancellationToken);
+
+            return;
+        }
+
+        if (existing.IsCompleted)
+        {
+            run.Skipped++;
+            _logger.LogInformation(SyncLogMessages.SKIPPED_COMPLETED + "{ExternalId}", slot.ExternalId);
+
+            return;
+        }
+
+        await UnarchiveIfNeededAsync(existing, "past lesson ", slot.ExternalId, run, cancellationToken);
+        await UpdateIfNeededAsync(existing, slot, lesson, "past lesson ", run, cancellationToken);
+        await CompleteAsync(existing.Id, SyncLogMessages.COMPLETED_PAST, slot.ExternalId, run, cancellationToken);
+    }
+
+    /// <summary>
+    /// Сверяет опустевшую ячейку: задача занятия, которое убрали из таблицы, отмечается выполненной
+    /// </summary>
+    /// <param name="slot">Слот таблицы без занятия</param>
+    /// <param name="existing">Сохранённая задача или <see langword="null"/></param>
+    /// <param name="run">Контекст и счётчики прогона</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    private async Task ReconcileRemovedAsync(ScheduleSlot slot, SingularityTask? existing, SyncRun run, CancellationToken cancellationToken)
+    {
+        if (existing is null)
+            return;
+
+        if (existing.IsCompleted)
+        {
+            run.Skipped++;
+            _logger.LogInformation("Skipped completed removed lesson {ExternalId}", slot.ExternalId);
+
+            return;
+        }
+
+        await UnarchiveIfNeededAsync(existing, "removed lesson ", slot.ExternalId, run, cancellationToken);
+        await CompleteAsync(existing.Id, SyncLogMessages.COMPLETED_REMOVED, slot.ExternalId, run, cancellationToken);
+    }
+
+    /// <summary>
+    /// Сверяет занятие, которое ещё не закончилось: создаёт или обновляет задачу. Выполненная задача такого занятия удаляется и создаётся заново
+    /// </summary>
+    /// <param name="slot">Слот таблицы</param>
+    /// <param name="lesson">Занятие слота</param>
+    /// <param name="existing">Сохранённая задача или <see langword="null"/></param>
+    /// <param name="run">Контекст и счётчики прогона</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    private async Task ReconcileFutureAsync(ScheduleSlot slot, Lesson lesson, SingularityTask? existing, SyncRun run, CancellationToken cancellationToken)
+    {
+        if (existing is { IsCompleted: true })
+        {
+            await _client.DeleteTaskAsync(existing.Id, cancellationToken);
+            run.Deleted++;
+            _logger.LogInformation(SyncLogMessages.DELETED_FUTURE + "{ExternalId}", slot.ExternalId);
+            existing = null;
+        }
+
+        if (existing is null)
+        {
+            await CreateAsync(slot, lesson, run, cancellationToken);
+
+            return;
+        }
+
+        await UnarchiveIfNeededAsync(existing, string.Empty, slot.ExternalId, run, cancellationToken);
+        await UpdateIfNeededAsync(existing, slot, lesson, string.Empty, run, cancellationToken);
+    }
+
+    /// <summary>
+    /// Создаёт задачу занятия вместе с пометками и тегом предмета
+    /// </summary>
+    /// <param name="slot">Слот таблицы</param>
+    /// <param name="lesson">Занятие слота</param>
+    /// <param name="run">Контекст и счётчики прогона</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    /// <returns>Идентификатор новой задачи</returns>
+    private async Task<string> CreateAsync(ScheduleSlot slot, Lesson lesson, SyncRun run, CancellationToken cancellationToken)
+    {
+        var taskId = await _client.CreateTaskAsync(run.ProjectId, WithTags(WithNotices(lesson, run.Notices), null, run.SubjectTags), cancellationToken);
+        run.Created++;
+        _logger.LogInformation(SyncLogMessages.CREATED + "{ExternalId} {Title}", slot.ExternalId, lesson.Title);
+
+        return taskId;
+    }
+
+    /// <summary>
+    /// Обновляет задачу, если она лежит не в целевом проекте или её поля разошлись с таблицей
+    /// </summary>
+    /// <param name="existing">Сохранённая задача</param>
+    /// <param name="slot">Слот таблицы</param>
+    /// <param name="lesson">Занятие слота</param>
+    /// <param name="kind">Пояснение для журнала: «past lesson » у прошедшего занятия или пустая строка</param>
+    /// <param name="run">Контекст и счётчики прогона</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    private async Task UpdateIfNeededAsync(SingularityTask existing, ScheduleSlot slot, Lesson lesson, string kind, SyncRun run, CancellationToken cancellationToken)
+    {
+        var target = WithTags(WithNotices(lesson, run.Notices), existing, run.SubjectTags);
+        if (run.TargetTaskIds.Contains(existing.Id) && !SingularityClient.NeedsUpdate(existing, target))
+            return;
+
+        await _client.UpdateTaskAsync(existing.Id, run.ProjectId, target, cancellationToken);
+        run.Updated++;
+        _logger.LogInformation(SyncLogMessages.UPDATED + "{Kind}{ExternalId} {Title}", kind, slot.ExternalId, lesson.Title);
+    }
+
+    /// <summary>
+    /// Возвращает задачу из архива, если она там лежит
+    /// </summary>
+    /// <param name="existing">Сохранённая задача</param>
+    /// <param name="kind">Пояснение для журнала: «past lesson », «removed lesson » или пустая строка</param>
+    /// <param name="externalId">Внешний идентификатор занятия</param>
+    /// <param name="run">Контекст и счётчики прогона</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    private async Task UnarchiveIfNeededAsync(SingularityTask existing, string kind, string externalId, SyncRun run, CancellationToken cancellationToken)
+    {
+        if (!existing.IsArchived)
+            return;
+
+        await _client.UnarchiveTaskAsync(existing.Id, cancellationToken);
+        run.Unarchived++;
+        _logger.LogInformation(SyncLogMessages.UNARCHIVED + "{Kind}{ExternalId}", kind, externalId);
+    }
+
+    /// <summary>
+    /// Отмечает задачу выполненной
+    /// </summary>
+    /// <param name="taskId">Идентификатор задачи</param>
+    /// <param name="message">Начало строки журнала из <see cref="SyncLogMessages"/></param>
+    /// <param name="externalId">Внешний идентификатор занятия</param>
+    /// <param name="run">Контекст и счётчики прогона</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    private async Task CompleteAsync(string taskId, string message, string externalId, SyncRun run, CancellationToken cancellationToken)
+    {
+        await _client.CompleteTaskAsync(taskId, cancellationToken);
+        run.Completed++;
+        _logger.LogInformation("{Message}{ExternalId}", message, externalId);
+    }
+
+    #endregion Reconciliation
     #region Removal notices
 
     /// <summary>
@@ -256,8 +327,8 @@ public sealed class ScheduleSyncer
     /// <param name="now">Текущий момент. По нему видно, какое выполненное занятие этот прогон создаст заново</param>
     /// <returns>Строки заметки по внешнему идентификатору занятия, которое их получит</returns>
     private static Dictionary<string, List<string>> RemovalNotices(
-        IReadOnlyList<Scheduling.Models.ScheduleSlot> slots,
-        Dictionary<string, Singularity.Models.SingularityTask> byExternalId,
+        IReadOnlyList<ScheduleSlot> slots,
+        Dictionary<string, SingularityTask> byExternalId,
         DateTimeOffset now)
     {
         var live = slots
@@ -265,6 +336,7 @@ public sealed class ScheduleSyncer
             .Select(slot => slot.Lesson!)
             .OrderBy(lesson => lesson.Start)
             .ToArray();
+
         var notices = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
         foreach (var slot in slots)
@@ -289,6 +361,7 @@ public sealed class ScheduleSyncer
 
             var sameDay = string.Equals(target.Title, existing.Title, StringComparison.Ordinal)
                 && DateOnly.FromDateTime(target.Start.Date) == DateOnly.FromDateTime(removedStart.Date);
+
             lines.Add(sameDay
                 ? $"Перенос с {removedStart:dd.MM HH:mm}"
                 : $"Отмена или перенос: {existing.Title}, {removedStart:dd.MM HH:mm}");
@@ -310,7 +383,7 @@ public sealed class ScheduleSyncer
     /// </returns>
     private static Lesson? NoticeTarget(
         IReadOnlyList<Lesson> live,
-        Dictionary<string, Singularity.Models.SingularityTask> byExternalId,
+        Dictionary<string, SingularityTask> byExternalId,
         string title,
         DateTimeOffset removedStart,
         DateTimeOffset now)
@@ -323,6 +396,7 @@ public sealed class ScheduleSyncer
                 && lesson.Start != removedStart)
             .OrderBy(lesson => Math.Abs((lesson.Start - removedStart).Ticks))
             .FirstOrDefault();
+
         if (sameDay is not null)
             return sameDay;
 
@@ -340,7 +414,7 @@ public sealed class ScheduleSyncer
     /// </returns>
     private static bool Open(
         Lesson lesson,
-        Dictionary<string, Singularity.Models.SingularityTask> byExternalId,
+        Dictionary<string, SingularityTask> byExternalId,
         DateTimeOffset now) =>
         !byExternalId.TryGetValue(lesson.ExternalId, out var task)
         || !task.IsCompleted
@@ -358,6 +432,7 @@ public sealed class ScheduleSyncer
             return lesson;
 
         var block = string.Join('\n', lines.Distinct(StringComparer.Ordinal));
+
         var note = lesson.Note.Length == 0 ? block : block + "\n" + lesson.Note;
         return lesson with { Note = note };
     }
@@ -373,7 +448,7 @@ public sealed class ScheduleSyncer
     /// <param name="cancellationToken">Отменяет прогон</param>
     /// <returns>Идентификаторы тегов по названию предмета. Пусто, если токену не хватает доступа к тегам: прогон тогда идёт без тегов</returns>
     private async Task<Dictionary<string, string>> ResolveSubjectTagsAsync(
-        IReadOnlyList<Scheduling.Models.ScheduleSlot> slots,
+        IReadOnlyList<ScheduleSlot> slots,
         CancellationToken cancellationToken)
     {
         var tagIds = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -400,7 +475,7 @@ public sealed class ScheduleSyncer
     /// </param>
     /// <param name="subjectTags">Идентификаторы тегов по названию предмета</param>
     /// <returns>То же занятие, если тега для предмета нет. Иначе копия с тегами задачи и тегом предмета</returns>
-    private static Lesson WithTags(Lesson lesson, Singularity.Models.SingularityTask? existing, Dictionary<string, string> subjectTags)
+    private static Lesson WithTags(Lesson lesson, SingularityTask? existing, Dictionary<string, string> subjectTags)
     {
         if (!subjectTags.TryGetValue(lesson.Subject, out var tagId))
             return lesson;
@@ -426,6 +501,7 @@ public sealed class ScheduleSyncer
         var today = DateOnly.FromDateTime(now.Date);
         var lessonDay = DateOnly.FromDateTime(start.Date);
         var monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+
         return lessonDay >= monday && lessonDay <= monday.AddDays(6);
     }
 

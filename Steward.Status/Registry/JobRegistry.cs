@@ -1,14 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
+using Steward.Status.State;
 
-namespace Steward.Status;
-
-/// <summary>
-/// Результат чтения списка задач
-/// </summary>
-/// <param name="Jobs">Задачи, прошедшие проверку</param>
-/// <param name="Errors">Что не удалось прочитать и почему. Пусто, если всё в порядке</param>
-public sealed record JobRegistryResult(IReadOnlyList<JobDefinition> Jobs, IReadOnlyList<string> Errors);
+namespace Steward.Status.Registry;
 
 /// <summary>
 /// Читает файл <c>jobs.json</c> со списком задач
@@ -119,10 +113,13 @@ public static class JobRegistry
     {
         if (!StatusStore.IsValidId(job.Id))
             return "нужен id из латиницы, цифр, дефиса и подчёркивания";
+
         if (string.IsNullOrWhiteSpace(job.Command))
             return "не указана команда";
+
         if (!repoKnown)
             return "путь содержит {repo}, а корень репозитория не найден";
+
         if (job.TimeoutMinutes <= 0)
             return "таймаут должен быть больше нуля";
 
@@ -135,6 +132,7 @@ public static class JobRegistry
                 JobTrigger.INTERVAL => trigger.EveryMinutes is >= 1 ? null : "для interval нужно число минут от 1",
                 _ => $"неизвестное условие «{trigger.Type}»",
             };
+
             if (problem is not null)
                 return problem;
         }

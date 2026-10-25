@@ -1,4 +1,8 @@
-namespace Steward.Status;
+using Steward.Status.Registry;
+using Steward.Status.Running;
+using Steward.Status.State;
+
+namespace Steward.Status.Scheduling;
 
 /// <summary>
 /// Решает, какие задачи пора запустить. Приложение вызывает <see cref="Tick"/> каждые полминуты
@@ -65,7 +69,7 @@ public sealed class JobScheduler
         var started = new List<Task<RunRecord>>();
         foreach (var job in _jobs.Where(job => job.Enabled && !_runner.IsRunning(job.Id)))
         {
-            var status = ReadStatus(job.Id);
+            var status = _store.TryRead(job.Id);
             if (status is { State: ProcessStateEnum.Running } && now - status.UpdatedAt < job.Timeout)
             {
                 // Запуск начался до перезапуска приложения и ещё идёт: второй экземпляр не нужен
@@ -110,24 +114,5 @@ public sealed class JobScheduler
     /// Момент запуска или <see langword="null"/>, если у задачи нет условий по времени
     /// </returns>
     public DateTimeOffset? NextRun(JobDefinition job, DateTimeOffset now) =>
-        job.Enabled ? JobSchedule.NextRun(job, ReadStatus(job.Id)?.LastRunAt, now, _zone) : null;
-
-    /// <summary>
-    /// Читает статус задачи и не падает от плохого идентификатора
-    /// </summary>
-    /// <param name="id">Идентификатор задачи</param>
-    /// <returns>
-    /// Статус или <see langword="null"/>, если задача ещё не запускалась
-    /// </returns>
-    private ProcessStatus? ReadStatus(string id)
-    {
-        try
-        {
-            return _store.Read(id);
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-    }
+        job.Enabled ? JobSchedule.NextRun(job, _store.TryRead(job.Id)?.LastRunAt, now, _zone) : null;
 }
