@@ -42,7 +42,7 @@ public static class SnapshotRenderer
         }
         else if (string.Equals(parts[0], "formats", StringComparison.OrdinalIgnoreCase))
         {
-            window = new HomeworkFormatsWindow(new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }));
+            window = new HomeworkFormatsWindow(new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => { }));
         }
         else if (string.Equals(parts[0], "popup", StringComparison.OrdinalIgnoreCase))
         {

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Threading;
 using Steward.Homework.Models;
+using Steward.Homework.Services;
 using Steward.Homework.Storage;
 using Steward.Status.Common;
 using Steward.Status.Registry;
@@ -152,6 +153,27 @@ public sealed class JobHost : IDisposable
     /// <returns>Занятия от свежих к старым с их форматами</returns>
     public IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> Lessons() =>
         [.. _homework.LoadLessons().Select(lesson => (lesson, _homework.FormatFor(lesson.Id)))];
+
+    /// <summary>
+    /// Проверяет, лежит ли расшифровка занятия
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>
+    /// <see langword="true"/>, если файл расшифровки есть
+    /// </returns>
+    public bool HasTranscript(Lesson lesson) => File.Exists(_homework.TranscriptPath(lesson.Id));
+
+    /// <summary>
+    /// Собирает просьбу к Claude найти домашние задания занятия. Папка для результата создаётся здесь, чтобы агенту не пришлось её делать
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>Текст просьбы</returns>
+    public string HomeworkPrompt(Lesson lesson)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_homework.ItemsPath(lesson.Id))!);
+
+        return HomeworkExtractionPrompt.Build(lesson, _homework.TranscriptPath(lesson.Id), _homework.ItemsPath(lesson.Id));
+    }
 
     /// <summary>
     /// Запоминает формат ДЗ для занятия

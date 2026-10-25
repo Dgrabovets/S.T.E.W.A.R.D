@@ -1,5 +1,6 @@
 using System.Globalization;
 using Steward.Homework.Models;
+using Steward.Mvvm;
 
 namespace Steward.ViewModels;
 
@@ -14,8 +15,12 @@ public sealed class LessonFormatViewModel
     /// <param name="lesson">Занятие</param>
     /// <param name="format">Выбранный сейчас формат</param>
     /// <param name="chosen">Вызывается, когда выбран другой формат: параметры — ключ занятия и формат</param>
-    public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen)
+    /// <param name="hasTranscript">Есть ли у занятия расшифровка, с которой можно начинать</param>
+    /// <param name="prepare">Вызывается по кнопке «Подготовить»: параметр — занятие</param>
+    public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen, bool hasTranscript, Action<Lesson> prepare)
     {
+        HasTranscript = hasTranscript;
+        PrepareCommand = new RelayCommand(() => prepare(lesson));
         Title = lesson.Title;
         Date = lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
         var options = new List<FormatOptionViewModel>();
@@ -32,6 +37,16 @@ public sealed class LessonFormatViewModel
 
         Options = options;
     }
+
+    /// <summary>
+    /// Есть ли у занятия расшифровка: без неё готовить задания не из чего
+    /// </summary>
+    public bool HasTranscript { get; }
+
+    /// <summary>
+    /// Открывает Claude с просьбой найти в расшифровке домашние задания
+    /// </summary>
+    public RelayCommand PrepareCommand { get; }
 
     /// <summary>
     /// Название предмета и темы

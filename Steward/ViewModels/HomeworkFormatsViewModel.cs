@@ -12,9 +12,15 @@ public sealed class HomeworkFormatsViewModel
     /// </summary>
     /// <param name="lessons">Занятия с выбранными форматами</param>
     /// <param name="chosen">Вызывается при выборе формата: параметры — ключ занятия и формат</param>
-    public HomeworkFormatsViewModel(IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> lessons, Action<string, HomeworkFormatEnum> chosen)
+    /// <param name="hasTranscript">Проверяет, есть ли у занятия расшифровка</param>
+    /// <param name="prepare">Вызывается по кнопке «Подготовить»: параметр — занятие</param>
+    public HomeworkFormatsViewModel(
+        IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> lessons,
+        Action<string, HomeworkFormatEnum> chosen,
+        Func<Lesson, bool> hasTranscript,
+        Action<Lesson> prepare)
     {
-        Lessons = [.. lessons.Select(item => new LessonFormatViewModel(item.Lesson, item.Format, chosen))];
+        Lessons = [.. lessons.Select(item => new LessonFormatViewModel(item.Lesson, item.Format, chosen, hasTranscript(item.Lesson), prepare))];
     }
 
     /// <summary>
