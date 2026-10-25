@@ -13,21 +13,16 @@ namespace Steward.Shell;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>Steward.exe --snapshot файл.png [popup | main[:status|ideas|homework|journal]]</c>
+/// Запуск: <c>Steward.exe --snapshot файл.png [popup | design | main[:status|ideas|homework|journal]]</c>
 /// </summary>
 public static class SnapshotRenderer
 {
-    /// <summary>
-    /// Фон, на который накладывается прозрачное окно
-    /// </summary>
-    private static readonly System.Windows.Media.Color Backdrop = System.Windows.Media.Color.FromRgb(14, 10, 26);
-
     /// <summary>
     /// Рисует окно и сохраняет картинку
     /// </summary>
     /// <param name="path">Куда сохранить PNG</param>
     /// <param name="which">
-    /// Какое окно: <c>main</c> или <c>popup</c>
+    /// Какое окно: <c>main</c>, <c>popup</c> или <c>design</c> (страница-образец дизайн-системы)
     /// </param>
     /// <returns>
     /// <see langword="true"/>, если картинка записана
@@ -40,7 +35,11 @@ public static class SnapshotRenderer
 
         var parts = which.Split(':');
         Window window;
-        if (string.Equals(parts[0], "popup", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(parts[0], "design", StringComparison.OrdinalIgnoreCase))
+        {
+            window = new DesignWindow();
+        }
+        else if (string.Equals(parts[0], "popup", StringComparison.OrdinalIgnoreCase))
         {
             var popup = new StatusWindow();
             popup.Apply(snapshot, jobs, scrollToProblem: false);
@@ -68,7 +67,7 @@ public static class SnapshotRenderer
         var visual = new DrawingVisual();
         using (var context = visual.RenderOpen())
         {
-            context.DrawRectangle(new SolidColorBrush(Backdrop), null, new Rect(0, 0, width, height));
+            context.DrawRectangle(new SolidColorBrush((System.Windows.Media.Color)System.Windows.Application.Current.FindResource("ShadowColor")), null, new Rect(0, 0, width, height));
             context.DrawRectangle(new VisualBrush(window), null, new Rect(0, 0, width, height));
         }
 

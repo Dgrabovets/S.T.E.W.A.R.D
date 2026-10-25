@@ -1,0 +1,128 @@
+<Window x:Class="Steward.Views.DesignWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Дизайн"
+        Width="1400"
+        SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        FontFamily="{StaticResource FontBase}">
+    <Window.Resources>
+        <Style x:Key="Section" TargetType="TextBlock" BasedOn="{StaticResource TextTitle}">
+            <Setter Property="Margin" Value="0,24,0,8"/>
+        </Style>
+
+        <DataTemplate x:Key="SwatchTemplate">
+            <StackPanel Width="112" Margin="0,0,8,8">
+                <Border Height="56" Background="{Binding Brush}" CornerRadius="{StaticResource RadiusField}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"/>
+                <TextBlock Text="{Binding Name}" Style="{StaticResource TextBody}" Margin="0,4,0,0"/>
+                <TextBlock Text="{Binding Hex}" Style="{StaticResource TextMono}"/>
+            </StackPanel>
+        </DataTemplate>
+
+        <ItemsPanelTemplate x:Key="WrapPanelTemplate">
+            <WrapPanel/>
+        </ItemsPanelTemplate>
+    </Window.Resources>
+
+    <Border Style="{StaticResource WindowChrome}">
+        <StackPanel Margin="24,16,24,24">
+            <TextBlock Text="Дизайн-система Steward" Style="{StaticResource TextHeadline}"/>
+            <TextBlock Text="Все цвета, размеры и состояния приложения. Цвета заданы в Themes/Colors.xaml, всё остальное берёт их по имени." Style="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="460"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,32,0">
+            <TextBlock Text="Цвета" Style="{StaticResource Section}"/>
+            <ItemsControl ItemsSource="{Binding Surfaces}" ItemTemplate="{StaticResource SwatchTemplate}" ItemsPanel="{StaticResource WrapPanelTemplate}"/>
+            <ItemsControl ItemsSource="{Binding TextAndAccent}" ItemTemplate="{StaticResource SwatchTemplate}" ItemsPanel="{StaticResource WrapPanelTemplate}"/>
+            <ItemsControl ItemsSource="{Binding States}" ItemTemplate="{StaticResource SwatchTemplate}" ItemsPanel="{StaticResource WrapPanelTemplate}"/>
+
+            <TextBlock Text="Текст" Style="{StaticResource Section}"/>
+            <StackPanel>
+                <TextBlock Text="Headline 24: заголовок страницы" Style="{StaticResource TextHeadline}"/>
+                <TextBlock Text="Title 18: заголовок карточки" Style="{StaticResource TextTitle}" Margin="0,4,0,0"/>
+                <TextBlock Text="BodyLarge 16: название задачи" Style="{StaticResource TextBodyLarge}" Margin="0,4,0,0"/>
+                <TextBlock Text="Body 14: основной текст и подробности" Style="{StaticResource TextBody}" Margin="0,4,0,0"/>
+                <TextBlock Text="Secondary 14: поддерживающий текст" Style="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+                <TextBlock Text="Caption 12: подписи и время" Style="{StaticResource TextCaption}" Margin="0,4,0,0"/>
+                <TextBlock Text="Mono 12: config/jobs.json, mail, 09:00" Style="{StaticResource TextMono}" Margin="0,4,0,0"/>
+            </StackPanel>
+
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+            <TextBlock Text="Кнопки" Style="{StaticResource Section}"/>
+            <WrapPanel>
+                <Button Content="Запустить" Style="{StaticResource PrimaryButton}" Margin="0,0,8,8"/>
+                <Button Content="Настройки" Style="{StaticResource ActionButton}" Margin="0,0,8,8"/>
+                <Button Content="Скрыть" Style="{StaticResource GhostButton}" Margin="0,0,8,8"/>
+                <Button Content="Выключена" Style="{StaticResource PrimaryButton}" IsEnabled="False" Margin="0,0,8,8"/>
+                <Button Content="Выключена" Style="{StaticResource ActionButton}" IsEnabled="False" Margin="0,0,8,8"/>
+            </WrapPanel>
+
+            <TextBlock Text="Поля" Style="{StaticResource Section}"/>
+            <StackPanel>
+                <TextBlock Text="Обычное" Style="{StaticResource FieldTitle}" Margin="0,0,0,4"/>
+                <TextBox Text="Расписание" Style="{StaticResource Field}"/>
+                <TextBlock Text="Подсказка под полем" Style="{StaticResource Hint}"/>
+                <TextBlock Text="С ошибкой" Style="{StaticResource FieldTitle}"/>
+                <TextBox Text="200" Style="{StaticResource FieldInvalid}"/>
+                <TextBlock Text="Интервал: целое число минут от 1 до 180" Style="{StaticResource HintError}"/>
+                <TextBlock Text="Выключено" Style="{StaticResource FieldTitle}"/>
+                <TextBox Text="Europe/Moscow" Style="{StaticResource Field}" IsEnabled="False"/>
+            </StackPanel>
+            <TextBlock Text="Состояния" Style="{StaticResource Section}"/>
+            <ItemsControl ItemsSource="{Binding Tones}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,8">
+                            <Control Width="16" Height="16" Style="{StaticResource ToneDot}" Margin="0,0,8,0"/>
+                            <Border Style="{StaticResource ToneBadge}" Padding="12,4">
+                                <TextBlock Text="{Binding Label}" Style="{StaticResource ToneBadgeText}"/>
+                            </Border>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Форма" Style="{StaticResource Section}"/>
+            <StackPanel Orientation="Horizontal">
+                <Border Width="96" Height="56" Background="{StaticResource SurfaceBrush}" CornerRadius="{StaticResource RadiusField}" Margin="0,0,16,0">
+                    <TextBlock Text="Field 8" Style="{StaticResource TextCaption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="96" Height="56" Background="{StaticResource SurfaceBrush}" CornerRadius="{StaticResource RadiusBadge}" Margin="0,0,16,0">
+                    <TextBlock Text="Badge 12" Style="{StaticResource TextCaption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="96" Height="56" Background="{StaticResource SurfaceBrush}" CornerRadius="{StaticResource RadiusCard}" Margin="0,0,16,0">
+                    <TextBlock Text="Card 16" Style="{StaticResource TextCaption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="96" Height="56" Background="{StaticResource SurfaceBrush}" CornerRadius="{StaticResource RadiusWindow}">
+                    <TextBlock Text="Window 22" Style="{StaticResource TextCaption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+
+            <TextBlock Text="Карточка" Style="{StaticResource Section}"/>
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Почта" Style="{StaticResource TextBodyLarge}" FontWeight="SemiBold"/>
+                    <TextBlock Text="Новых важных писем нет. Следующий запуск сегодня в 19:00" Style="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>

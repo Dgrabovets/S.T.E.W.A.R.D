@@ -1,0 +1,18 @@
+---
+description: Правила дизайн-системы Steward: токены вместо чисел в разметке
+alwaysApply: false
+globs: "**/*.xaml"
+---
+
+# Дизайн-система
+
+Подробности в `Steward/Themes/DESIGN.md`.
+
+- Цвета только из `Themes/Colors.xaml`, в разметке и коде их нет в виде `#RRGGBB` или `Color.FromRgb`. Меню трея берёт цвета у `TrayPalette`.
+- Размер текста из шкалы: `FontSizeCaption`, `FontSizeBody`, `FontSizeBodyLarge`, `FontSizeTitle`, `FontSizeHeadline`.
+- Скругления из `Radius*`, отступы кратны 4.
+- Акцент как текст или рамка на тёмном фоне это `AccentTextBrush`, заливка кнопки это `AccentBrush` с текстом `OnAccentBrush`.
+- Состояние показывается цветом и словом вместе, один цвет не несёт смысла.
+- Стиль, который нужен в двух местах, идёт в `Themes/Controls.xaml`.
+- На экране одна главная кнопка (`PrimaryButton`).
+- Проверка: тесты `DesignTokensTests` и снимок `Steward.exe --snapshot файл.png design`.

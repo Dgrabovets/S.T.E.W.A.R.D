@@ -134,7 +134,7 @@ public sealed class IntervalBar : FrameworkElement
     /// <param name="drawingContext">Контекст кадра</param>
     protected override void OnRender(DrawingContext drawingContext)
     {
-        var accent = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        var accent = (SolidColorBrush)FindResource("AccentBrush");
         var line = (System.Windows.Media.Brush)FindResource("LineBrush");
         var span = Math.Max(1, ActualWidth - THUMB_RADIUS * 2);
         var ratio = (Math.Clamp(Value, MIN_VALUE, MAX_VALUE) - MIN_VALUE) / (MAX_VALUE - MIN_VALUE);
@@ -154,17 +154,17 @@ public sealed class IntervalBar : FrameworkElement
         }
 
         drawingContext.DrawEllipse(Glow(accent), null, new System.Windows.Point(thumbX, centerY), GLOW_RADIUS, GLOW_RADIUS);
-        drawingContext.DrawEllipse(accent, new System.Windows.Media.Pen(System.Windows.Media.Brushes.White, 2), new System.Windows.Point(thumbX, centerY), THUMB_RADIUS, THUMB_RADIUS);
+        drawingContext.DrawEllipse(accent, new System.Windows.Media.Pen((System.Windows.Media.Brush)FindResource("TextBrush"), 2), new System.Windows.Point(thumbX, centerY), THUMB_RADIUS, THUMB_RADIUS);
     }
 
     /// <summary>
-    /// Мягкое фиолетовое пятно под бегунком
+    /// Мягкое акцентное пятно под бегунком
     /// </summary>
     /// <param name="accent">Основной цвет панели</param>
     /// <returns>Кисть, которую можно рисовать много раз</returns>
-    private static System.Windows.Media.Brush Glow(System.Windows.Media.Brush accent)
+    private static System.Windows.Media.Brush Glow(SolidColorBrush accent)
     {
-        var color = accent is SolidColorBrush solid ? solid.Color : System.Windows.Media.Color.FromRgb(139, 108, 255);
+        var color = accent.Color;
         var glow = new RadialGradientBrush(color, System.Windows.Media.Color.FromArgb(0, color.R, color.G, color.B));
 
         glow.Freeze();

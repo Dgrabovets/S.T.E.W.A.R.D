@@ -1,0 +1,26 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- Скругления: четыре значения по назначению -->
+    <CornerRadius x:Key="RadiusSmall">4</CornerRadius>
+    <CornerRadius x:Key="RadiusField">8</CornerRadius>
+    <CornerRadius x:Key="RadiusFocus">10</CornerRadius>
+    <CornerRadius x:Key="RadiusBadge">12</CornerRadius>
+    <CornerRadius x:Key="RadiusCard">16</CornerRadius>
+    <CornerRadius x:Key="RadiusWindow">22</CornerRadius>
+
+    <!-- Отступы: шаг 4. Число в разметке берётся из этой шкалы -->
+    <sys:Double x:Key="Space1">4</sys:Double>
+    <sys:Double x:Key="Space2">8</sys:Double>
+    <sys:Double x:Key="Space3">12</sys:Double>
+    <sys:Double x:Key="Space4">16</sys:Double>
+    <sys:Double x:Key="Space5">24</sys:Double>
+
+    <!-- Готовые отступы для повторяющихся мест -->
+    <Thickness x:Key="PadCard">16,12,16,12</Thickness>
+    <Thickness x:Key="PadControl">16,8,16,8</Thickness>
+    <Thickness x:Key="PadField">12,8,12,8</Thickness>
+    <Thickness x:Key="GapCard">0,0,0,12</Thickness>
+
+</ResourceDictionary>
