@@ -14,7 +14,8 @@ using Steward.Status.State;
 
 namespace Steward.Hosting;
 
-/// <summary>
+
+    /// <summary>
 /// Запускает задачи из <c>config/jobs.json</c> по их условиям и отдаёт панелям готовые строки статуса
 /// </summary>
 public sealed class JobHost : IDisposable
@@ -58,6 +59,8 @@ public sealed class JobHost : IDisposable
     /// Папка домашних заданий: занятия и выбранные форматы
     /// </summary>
     private readonly HomeworkStore _homework;
+
+    /// <summary>
     /// Папка идей из рилсов
     /// </summary>
     private readonly IdeaStore _ideas;
@@ -164,6 +167,12 @@ public sealed class JobHost : IDisposable
     /// <returns>Занятия от свежих к старым с их форматами</returns>
     public IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> Lessons() =>
         [.. _homework.LoadLessons().Select(lesson => (lesson, _homework.FormatFor(lesson.Id)))];
+
+    /// <summary>
+    /// Читает найденные домашние задания
+    /// </summary>
+    /// <returns>Задания по занятиям от свежих к старым</returns>
+    public IReadOnlyList<HomeworkRow> HomeworkRows() => _homework.LoadRows();
 
     /// <summary>
     /// Проверяет, лежит ли расшифровка занятия

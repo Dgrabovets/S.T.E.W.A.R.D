@@ -75,6 +75,51 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
+    /// Файл с ключами задач, которые уже созданы в SingularityApp
+    /// </summary>
+    private string CreatedFile => Path.Combine(directory, "created.json");
+
+    /// <summary>
+    /// Читает ключи задач, которые уже созданы
+    /// </summary>
+    /// <returns>Ключи вида <c>hw:&lt;занятие&gt;:&lt;номер&gt;</c></returns>
+    public IReadOnlySet<string> LoadCreated() => Read<List<string>>(CreatedFile)?.ToHashSet(StringComparer.Ordinal) ?? [];
+
+    /// <summary>
+    /// Запоминает ключи задач, которые созданы или уже были в SingularityApp
+    /// </summary>
+    /// <param name="externalIds">Ключи задач</param>
+    public void MarkCreated(IEnumerable<string> externalIds)
+    {
+        var all = LoadCreated().Union(externalIds).Order(StringComparer.Ordinal).ToList();
+
+        Directory.CreateDirectory(directory);
+
+        var temp = CreatedFile + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(all, Json));
+        File.Move(temp, CreatedFile, overwrite: true);
+    }
+
+    /// <summary>
+    /// Собирает все найденные задания по занятиям от свежих к старым
+    /// </summary>
+    /// <returns>Задания с форматом и отметкой, создана ли задача. Занятия, по которым заданий ещё не искали, не попадают в список</returns>
+    public IReadOnlyList<HomeworkRow> LoadRows()
+    {
+        var created = LoadCreated();
+
+        return
+        [
+            .. LoadLessons().SelectMany(lesson =>
+            {
+                var items = ReadItems(lesson.Id) ?? [];
+
+                return items.Select((item, index) => new HomeworkRow(lesson, FormatFor(lesson.Id), item, index + 1, created.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1))));
+            })
+        ];
+    }
+
+    /// <summary>
     /// Путь к расшифровке занятия
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>

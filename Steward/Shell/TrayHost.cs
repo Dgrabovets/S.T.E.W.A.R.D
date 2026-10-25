@@ -339,7 +339,7 @@ public sealed class TrayHost : IDisposable
         if (_window.IsVisible)
             _window.Apply(_snapshot, _jobRows, scrollToProblem: false);
         if (_main is { IsVisible: true })
-            _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
+            ApplyMain();
 
         NotifyJobProblems(_jobRows);
     }
@@ -450,7 +450,7 @@ public sealed class TrayHost : IDisposable
         }
 
         _jobRows = _jobs.Rows();
-        _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
+        ApplyMain();
         _main.ShowAndActivate();
     }
 
@@ -490,6 +490,15 @@ public sealed class TrayHost : IDisposable
     {
         if (Uri.TryCreate(link, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    /// <summary>
+    /// Показывает в главном окне свежие статусы, журнал, идеи и домашние задания
+    /// </summary>
+    private void ApplyMain()
+    {
+        _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
+        _main.ApplyHomework(_jobs.HomeworkRows());
     }
 
     /// <summary>

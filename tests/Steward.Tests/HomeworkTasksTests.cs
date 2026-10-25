@@ -103,6 +103,35 @@ public class HomeworkTasksTests
         }
     }
 
+
+    /// <summary>
+    /// Созданные задачи запоминаются, и страница видит, по каким заданиям задача уже есть, а по каким ещё нет
+    /// </summary>
+    [Fact]
+    public async Task Created_tasks_are_remembered_and_shown_in_the_rows()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-homework-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            File.WriteAllText(Path.Combine(directory.FullName, "lessons.json"), """[{"id":"db-1022","title":"БД","date":"2026-10-22"}]""");
+            Directory.CreateDirectory(Path.Combine(directory.FullName, "items"));
+            File.WriteAllText(store.ItemsPath("db-1022"), """[{"title":"Первое"},{"title":"Второе"}]""");
+            Assert.All(store.LoadRows(), row => Assert.False(row.Created));
+
+            store.MarkCreated(["hw:db-1022:1"]);
+
+            Assert.Equal([true, false], store.LoadRows().Select(row => row.Created).ToArray());
+
+            await new HomeworkTaskCreator(store, new RecordingSingularity(), null, TimeProvider.System, _ => { }).RunAsync(CancellationToken.None);
+
+            Assert.All(store.LoadRows(), row => Assert.True(row.Created));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
     /// <summary>
     /// Просьба называет занятие и оба пути, называет расшифровку данными и не содержит её текст
     /// </summary>

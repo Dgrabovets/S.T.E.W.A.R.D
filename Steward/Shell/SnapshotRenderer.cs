@@ -56,6 +56,7 @@ public static class SnapshotRenderer
         {
             var main = new MainWindow();
             main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"], SampleIdeas(now));
+            main.ApplyHomework(SampleHomework());
             if (parts.Length > 1 && Enum.TryParse<AppPageEnum>(parts[1], ignoreCase: true, out var page))
                 main.Model.Page = page;
 
@@ -157,6 +158,24 @@ public static class SnapshotRenderer
         (new Lesson("db-1022", "Базы данных: нормализация", new DateOnly(2026, 10, 22)), HomeworkFormatEnum.Word),
         (new Lesson("en-1020", "Английский: эссе", new DateOnly(2026, 10, 20)), HomeworkFormatEnum.Skip),
     ];
+
+    /// <summary>
+    /// Выдуманные найденные задания: создана, ждёт и не готовить
+    /// </summary>
+    /// <returns>Задания от свежих занятий к старым</returns>
+    private static IReadOnlyList<HomeworkRow> SampleHomework()
+    {
+        var game = new Lesson("ux-1025", "Гейм-дизайн: игровые механики", new DateOnly(2026, 10, 25));
+        var db = new Lesson("db-1022", "Базы данных: нормализация", new DateOnly(2026, 10, 22));
+        var english = new Lesson("en-1020", "Английский: эссе", new DateOnly(2026, 10, 20));
+
+        return
+        [
+            new HomeworkRow(game, HomeworkFormatEnum.Presentation, new HomeworkItem("Описать три игровые механики и показать их в презентации", new DateOnly(2026, 11, 1), "Не больше десяти слайдов, на каждом механика, пример из игры и вывод.", ""), 1, false),
+            new HomeworkRow(db, HomeworkFormatEnum.Word, new HomeworkItem("Привести схему интернет-магазина к третьей нормальной форме", new DateOnly(2026, 10, 30), "Диаграмма и пояснение на двух страницах. Сдавать в LMS.", "https://lms.example/1"), 1, true),
+            new HomeworkRow(english, HomeworkFormatEnum.Skip, new HomeworkItem("Эссе о любимой книге", null, "", ""), 1, false),
+        ];
+    }
 
     /// <summary>
     /// Выдуманные идеи из рилсов

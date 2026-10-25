@@ -32,23 +32,30 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
 
         var created = 0;
         var existing = 0;
+        var handled = new List<string>();
         foreach (var lesson in ready)
         {
             var items = store.ReadItems(lesson.Id)!;
             for (var index = 0; index < items.Count; index++)
             {
-                if (known.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1)))
+                var externalId = HomeworkTaskBuilder.ExternalId(lesson, index + 1);
+                if (known.Contains(externalId))
                 {
                     existing++;
+                    handled.Add(externalId);
 
                     continue;
                 }
 
                 await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, items[index], index + 1, store.FormatFor(lesson.Id), projectId, offset), cancellationToken);
+                handled.Add(externalId);
+                store.MarkCreated([externalId]);
                 log($"ДЗ: {items[index].Title} ({lesson.Title})");
                 created++;
             }
         }
+
+        store.MarkCreated(handled);
 
         return (created, existing);
     }

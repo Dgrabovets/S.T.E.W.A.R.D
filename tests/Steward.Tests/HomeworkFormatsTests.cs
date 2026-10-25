@@ -116,6 +116,40 @@ public class HomeworkFormatsTests
     }
 
     /// <summary>
+    /// Карточка задания показывает срок, формат и статус задачи: создана, ждёт или не готовить
+    /// </summary>
+    [Fact]
+    public void The_card_shows_due_format_and_task_status()
+    {
+        var lesson = new Lesson("a", "А", new DateOnly(2026, 10, 25));
+        var item = new HomeworkItem("Схема", new DateOnly(2026, 10, 29), "Две страницы", "");
+
+        var created = new HomeworkCardViewModel(new HomeworkRow(lesson, HomeworkFormatEnum.Word, item, 1, true));
+        var waiting = new HomeworkCardViewModel(new HomeworkRow(lesson, HomeworkFormatEnum.Presentation, item with { Due = null }, 1, false));
+        var skipped = new HomeworkCardViewModel(new HomeworkRow(lesson, HomeworkFormatEnum.Skip, item, 1, false));
+
+        Assert.Equal(("Срок: 29.10.2026", "Word", "Задача создана", PanelToneEnum.Running), (created.Due, created.Format, created.Status, created.Tone));
+        Assert.Equal(("Срок не назван", "Ждёт создания задачи", PanelToneEnum.Attention), (waiting.Due, waiting.Status, waiting.Tone));
+        Assert.Equal("Не готовить", skipped.Status);
+        Assert.True(created.HasRequirements);
+    }
+
+    /// <summary>
+    /// Страница заданий пуста, пока заданий нет, и заполняется строками
+    /// </summary>
+    [Fact]
+    public void The_homework_page_fills_from_rows()
+    {
+        var model = new MainViewModel();
+        Assert.True(model.IsHomeworkEmpty);
+
+        model.ApplyHomework([new HomeworkRow(new Lesson("a", "А", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word, new HomeworkItem("Схема", null, "", ""), 1, false)]);
+
+        Assert.False(model.IsHomeworkEmpty);
+        Assert.Equal("Схема", model.Homework.Single().Title);
+    }
+
+    /// <summary>
     /// Запуск Claude идёт без сохранения сессии, только с чтением и записью файлов и только в рабочей папке
     /// </summary>
     [Fact]

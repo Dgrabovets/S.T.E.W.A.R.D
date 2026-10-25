@@ -1,4 +1,5 @@
 using Steward.Controls;
+using Steward.Homework.Models;
 using Steward.Ideas.Models;
 using Steward.Models;
 using Steward.Mvvm;
@@ -8,7 +9,8 @@ using Steward.Status.Running;
 
 namespace Steward.ViewModels;
 
-/// <summary>
+
+    /// <summary>
 /// Состояние главного окна: раздел, задачи, журнал и общий итог
 /// </summary>
 public sealed class MainViewModel : PanelViewModel
@@ -29,6 +31,11 @@ public sealed class MainViewModel : PanelViewModel
     private IReadOnlyList<RunRowViewModel> _records = [];
 
     /// <summary>
+    /// Карточки найденных домашних заданий
+    /// </summary>
+    private IReadOnlyList<HomeworkCardViewModel> _homework = [];
+
+    /// <summary>
     /// Задачи, которые выполнялись при прошлом обновлении
     /// </summary>
     private HashSet<string> _working = [];
@@ -37,6 +44,8 @@ public sealed class MainViewModel : PanelViewModel
     /// Когда закончились задачи, которым ещё показывается галочка
     /// </summary>
     private readonly Dictionary<string, DateTimeOffset> _finished = [];
+
+    /// <summary>
     /// Карточки идей, которые ждут решения
     /// </summary>
     private IReadOnlyList<IdeaCardViewModel> _ideas = [];
@@ -74,6 +83,8 @@ public sealed class MainViewModel : PanelViewModel
     /// Просит открыть окно выбора форматов ДЗ
     /// </summary>
     public event EventHandler? FormatsRequested;
+
+    /// <summary>
     /// Решено делать идею: параметр — идея
     /// </summary>
     public event Action<Idea>? IdeaApproved;
@@ -176,6 +187,26 @@ public sealed class MainViewModel : PanelViewModel
     public bool IsJournalEmpty => Records.Count == 0;
 
     /// <summary>
+    /// Карточки найденных домашних заданий
+    /// </summary>
+    public IReadOnlyList<HomeworkCardViewModel> Homework
+    {
+        get => _homework;
+        private set
+        {
+            if (!Set(ref _homework, value))
+                return;
+
+            Raise(nameof(IsHomeworkEmpty));
+        }
+    }
+
+    /// <summary>
+    /// Найденных заданий пока нет
+    /// </summary>
+    public bool IsHomeworkEmpty => Homework.Count == 0;
+
+    /// <summary>
     /// Карточки идей, которые ждут решения
     /// </summary>
     public IReadOnlyList<IdeaCardViewModel> Ideas
@@ -243,6 +274,12 @@ public sealed class MainViewModel : PanelViewModel
 
         ApplySummary(rows);
     }
+
+    /// <summary>
+    /// Показывает найденные домашние задания
+    /// </summary>
+    /// <param name="rows">Задания с занятиями от свежих к старым</param>
+    public void ApplyHomework(IReadOnlyList<HomeworkRow> rows) => Homework = [.. rows.Select(row => new HomeworkCardViewModel(row))];
 
     /// <summary>
     /// Замечает задачи, которые перестали выполняться с прошлого обновления, и запоминает, когда это случилось. Сбойные не отмечаются: им галочка не положена

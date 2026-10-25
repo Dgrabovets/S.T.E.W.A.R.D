@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows.Input;
 using System.Windows;
+using Steward.Homework.Models;
 using Steward.Ideas.Models;
 using Steward.Monitoring.Models;
 using Steward.Status.Rows;
@@ -44,6 +45,12 @@ public partial class MainWindow : Window
     /// <param name="registryErrors">Ошибки чтения реестра</param>
     public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors, IReadOnlyList<Idea> ideas) =>
         Model.Apply(snapshot, jobs, records, registryErrors, ideas);
+
+    /// <summary>
+    /// Показывает найденные домашние задания
+    /// </summary>
+    /// <param name="rows">Задания с занятиями от свежих к старым</param>
+    public void ApplyHomework(IReadOnlyList<HomeworkRow> rows) => Model.ApplyHomework(rows);
 
     /// <summary>
     /// Показывает окно и выводит его на передний план
