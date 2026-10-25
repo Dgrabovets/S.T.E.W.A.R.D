@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:ui="clr-namespace:Steward.Models">
+                    xmlns:ui="clr-namespace:Steward.Models"
+                    xmlns:ctl="clr-namespace:Steward.Controls">
 
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Colors.xaml"/>
@@ -101,6 +102,27 @@
             </DataTrigger>
             <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
                 <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+    <!-- Индикатор процесса на карточке задачи: точка состояния, вращающаяся сфера во время работы, галочка после неё -->
+    <Style x:Key="ActivityOrb" TargetType="ctl:ActivityOrb">
+        <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
+        <Setter Property="DoneBrush" Value="{StaticResource OkBrush}"/>
+        <Setter Property="State" Value="{Binding Activity}"/>
+        <Setter Property="Since" Value="{Binding ActivitySince}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
+                <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Activity}" Value="{x:Static ui:ActivityStateEnum.Working}">
+                <Setter Property="Foreground" Value="{StaticResource WorkingBrush}"/>
             </DataTrigger>
         </Style.Triggers>
     </Style>

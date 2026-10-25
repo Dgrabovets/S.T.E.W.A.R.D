@@ -11,7 +11,8 @@ namespace Steward.Models;
 /// <param name="Muted">
 /// <see langword="true"/> для выключенной задачи: она не влияет на общий статус
 /// </param>
+/// <param name="Working">Задача выполняется прямо сейчас</param>
 /// <param name="CanRun">
 /// <see langword="true"/>, если задачу можно запустить кнопкой
 /// </param>
-public sealed record TaskStatusRow(string Id, string Name, string Headline, string Detail, PanelToneEnum Tone, bool Muted = false, bool CanRun = false);
+public sealed record TaskStatusRow(string Id, string Name, string Headline, string Detail, PanelToneEnum Tone, bool Muted = false, bool CanRun = false, bool Working = false);

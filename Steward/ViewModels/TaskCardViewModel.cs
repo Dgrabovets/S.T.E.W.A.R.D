@@ -13,8 +13,12 @@ public sealed class TaskCardViewModel
     /// </summary>
     /// <param name="row">Строка задачи</param>
     /// <param name="run">Действие кнопки «Запустить»</param>
-    public TaskCardViewModel(TaskStatusRow row, Action<string> run)
+    /// <param name="activity">Что показывает индикатор процесса</param>
+    /// <param name="activitySince">Когда процесс закончился, если индикатор показывает галочку</param>
+    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default)
     {
+        Activity = activity;
+        ActivitySince = activitySince;
         Name = row.Name;
         Headline = row.Headline;
         Detail = row.Detail;
@@ -23,6 +27,16 @@ public sealed class TaskCardViewModel
         CanRun = row.CanRun;
         RunCommand = new RelayCommand(() => run(row.Id), () => row.CanRun);
     }
+
+    /// <summary>
+    /// Что показывает индикатор процесса
+    /// </summary>
+    public ActivityStateEnum Activity { get; }
+
+    /// <summary>
+    /// Когда процесс закончился: от этого момента рисуется галочка
+    /// </summary>
+    public DateTimeOffset ActivitySince { get; }
 
     /// <summary>
     /// Название задачи

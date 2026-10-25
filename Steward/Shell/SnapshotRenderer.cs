@@ -31,6 +31,7 @@ public static class SnapshotRenderer
     public static bool Render(string path, string which)
     {
         var now = DateTimeOffset.Now;
+        var settleSeconds = 0.0;
         var snapshot = SampleSnapshot(now);
         var jobs = SampleJobs();
 
@@ -57,6 +58,13 @@ public static class SnapshotRenderer
             if (parts.Length > 1 && Enum.TryParse<AppPageEnum>(parts[1], ignoreCase: true, out var page))
                 main.Model.Page = page;
 
+            // «main:done»: задача «telegram» только что закончилась, на её карточке рисуется галочка
+            if (parts.Length > 1 && string.Equals(parts[1], "done", StringComparison.OrdinalIgnoreCase))
+            {
+                main.Apply(snapshot, [.. jobs.Select(job => job.Id == "telegram" ? job with { Tone = RowToneEnum.Ok, Headline = "Выполнено только что" } : job)], SampleRecords(now), []);
+                settleSeconds = 1.2;
+            }
+
             window = main;
         }
 
@@ -66,6 +74,13 @@ public static class SnapshotRenderer
         window.ShowInTaskbar = false;
         window.Show();
         window.UpdateLayout();
+        if (settleSeconds > 0)
+        {
+            window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+            Thread.Sleep(TimeSpan.FromSeconds(settleSeconds));
+            Redraw(window);
+            window.UpdateLayout();
+        }
 
         var width = (int)Math.Ceiling(window.ActualWidth);
         var height = (int)Math.Ceiling(window.ActualHeight);
@@ -86,6 +101,19 @@ public static class SnapshotRenderer
 
         window.Close();
         return true;
+    }
+
+    /// <summary>
+    /// Перерисовывает все индикаторы процесса: без показа на экране кадры не идут, а рисунок зависит от времени
+    /// </summary>
+    /// <param name="element">Корень поддерева</param>
+    private static void Redraw(DependencyObject element)
+    {
+        if (element is UIElement orb and Controls.ActivityOrb)
+            orb.InvalidateVisual();
+
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
+            Redraw(VisualTreeHelper.GetChild(element, index));
     }
 
     /// <summary>
