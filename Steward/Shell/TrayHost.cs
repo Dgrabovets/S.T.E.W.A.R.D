@@ -181,9 +181,7 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Удаляет значок, созданный через <c>GetHicon</c>
     /// </summary>
-    /// <param name="handle">
-    /// Дескриптор значка
-    /// </param>
+    /// <param name="handle">Дескриптор значка</param>
     /// <returns>
     /// <see langword="true"/>, если значок удалён
     /// </returns>
@@ -217,12 +215,8 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Рисует скруглённый значок календаря
     /// </summary>
-    /// <param name="color">
-    /// Цвет фона значка
-    /// </param>
-    /// <returns>
-    /// Иконка 32 на 32
-    /// </returns>
+    /// <param name="color">Цвет фона значка</param>
+    /// <returns>Иконка 32 на 32</returns>
     private static Icon CreateIcon(Color color)
     {
         using var bitmap = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
@@ -257,15 +251,9 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Строит скруглённый контур значка
     /// </summary>
-    /// <param name="bounds">
-    /// Прямоугольник контура
-    /// </param>
-    /// <param name="radius">
-    /// Радиус угла в пикселях
-    /// </param>
-    /// <returns>
-    /// Контур, который нужно освободить
-    /// </returns>
+    /// <param name="bounds">Прямоугольник контура</param>
+    /// <param name="radius">Радиус угла в пикселях</param>
+    /// <returns>Контур, который нужно освободить</returns>
     private static GraphicsPath Rounded(Rectangle bounds, int radius)
     {
         var path = new GraphicsPath();
@@ -289,9 +277,7 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Обновляет иконку и при новой ошибке показывает уведомление
     /// </summary>
-    /// <returns>
-    /// Задача одного опроса
-    /// </returns>
+    /// <returns>Задача одного опроса</returns>
     private async Task RefreshAsync()
     {
         if (_refreshing || _exiting)
@@ -349,9 +335,7 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Один раз сообщает о каждой новой проблеме включённой задачи. Когда проблема уходит, о ней можно будет сообщить снова
     /// </summary>
-    /// <param name="rows">
-    /// Строки задач
-    /// </param>
+    /// <param name="rows">Строки задач</param>
     private void NotifyJobProblems(IReadOnlyList<JobRow> rows)
     {
         var current = rows
@@ -374,9 +358,7 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Один раз сообщает об отмене, переносе или правке занятия, которые появились после прошлого уведомления
     /// </summary>
-    /// <param name="snapshot">
-    /// Текущее состояние
-    /// </param>
+    /// <param name="snapshot">Текущее состояние</param>
     private void NotifyChanges(SyncSnapshot snapshot)
     {
         var text = ChangeNotice.Build(snapshot.Entries, _notifiedChangeAt, out var newest);
@@ -396,9 +378,7 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Красит иконку и пишет короткую подсказку
     /// </summary>
-    /// <param name="snapshot">
-    /// Текущее состояние
-    /// </param>
+    /// <param name="snapshot">Текущее состояние</param>
     private void ApplyIcon(SyncSnapshot snapshot)
     {
         var failed = _jobRows.FirstOrDefault(row => row.Enabled && row.Tone == RowTone.Problem);
@@ -474,15 +454,9 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Пункт меню в цветах панели
     /// </summary>
-    /// <param name="text">
-    /// Подпись
-    /// </param>
-    /// <param name="onClick">
-    /// Действие
-    /// </param>
-    /// <returns>
-    /// Пункт меню
-    /// </returns>
+    /// <param name="text">Подпись</param>
+    /// <param name="onClick">Действие</param>
+    /// <returns>Пункт меню</returns>
     private static ToolStripMenuItem Item(string text, EventHandler onClick)
     {
         return new ToolStripMenuItem(text, null, onClick)
@@ -509,9 +483,7 @@ public sealed class TrayHost : IDisposable
         /// <summary>
         /// Пишет текст пункта светлым цветом
         /// </summary>
-        /// <param name="e">
-        /// Аргументы текста
-        /// </param>
+        /// <param name="e">Аргументы текста</param>
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
             e.TextColor = e.Item.Enabled ? TrayPalette.Text : TrayPalette.Muted;
@@ -521,9 +493,7 @@ public sealed class TrayHost : IDisposable
         /// <summary>
         /// Убирает рамку выделения
         /// </summary>
-        /// <param name="e">
-        /// Аргументы рамки
-        /// </param>
+        /// <param name="e">Аргументы рамки</param>
         protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
         {
             var bounds = new Rectangle(4, 0, e.Item.Width - 8, e.Item.Height);

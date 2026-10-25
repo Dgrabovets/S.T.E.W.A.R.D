@@ -72,9 +72,7 @@ public sealed class SyncSettings
     /// <param name="path">
     /// Полный путь к <c>.env</c>
     /// </param>
-    /// <returns>
-    /// Значения как в файле. Недостающий или нецелый интервал не подменяется
-    /// </returns>
+    /// <returns>Значения как в файле. Недостающий или нецелый интервал не подменяется</returns>
     public static SyncSettings Load(string path)
     {
         var file = EnvFile.Load(path);
@@ -121,12 +119,8 @@ public sealed class SyncSettings
     /// <summary>
     /// Разбирает введённые минуты
     /// </summary>
-    /// <param name="text">
-    /// Текст числового поля
-    /// </param>
-    /// <param name="minutes">
-    /// Целое число внутри границ
-    /// </param>
+    /// <param name="text">Текст числового поля</param>
+    /// <param name="minutes">Целое число внутри границ</param>
     /// <returns>
     /// <see langword="false"/>, если текст не целое число минут от 1 до 180
     /// </returns>
@@ -144,9 +138,7 @@ public sealed class SyncSettings
     /// <summary>
     /// Проверяет, можно ли записать параметры
     /// </summary>
-    /// <returns>
-    /// Фраза для пользователя. Пусто, если записывать можно
-    /// </returns>
+    /// <returns>Фраза для пользователя. Пусто, если записывать можно</returns>
     public string? Rejection()
     {
         if (HasLineBreak(ProjectTitle) || HasLineBreak(GroupColumn) || HasLineBreak(TimeZone)
@@ -169,9 +161,7 @@ public sealed class SyncSettings
     /// <summary>
     /// Сообщает, что в тексте есть перевод строки
     /// </summary>
-    /// <param name="value">
-    /// Поле, которое попадёт в файл настроек
-    /// </param>
+    /// <param name="value">Поле, которое попадёт в файл настроек</param>
     /// <returns>
     /// <see langword="true"/>, если значение разбило бы файл на несколько строк
     /// </returns>

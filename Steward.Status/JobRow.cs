@@ -36,27 +36,13 @@ public enum RowTone
 /// <summary>
 /// Готовая к показу строка задачи
 /// </summary>
-/// <param name="Id">
-/// Идентификатор задачи
-/// </param>
-/// <param name="Title">
-/// Название задачи
-/// </param>
-/// <param name="Headline">
-/// Короткий статус рядом с названием
-/// </param>
-/// <param name="Detail">
-/// Подробности под названием
-/// </param>
-/// <param name="Tone">
-/// Цвет строки
-/// </param>
-/// <param name="Awaiting">
-/// Сколько результатов ждёт решения пользователя
-/// </param>
-/// <param name="Enabled">
-/// Включена ли задача. Выключенная не влияет на общий статус
-/// </param>
+/// <param name="Id">Идентификатор задачи</param>
+/// <param name="Title">Название задачи</param>
+/// <param name="Headline">Короткий статус рядом с названием</param>
+/// <param name="Detail">Подробности под названием</param>
+/// <param name="Tone">Цвет строки</param>
+/// <param name="Awaiting">Сколько результатов ждёт решения пользователя</param>
+/// <param name="Enabled">Включена ли задача. Выключенная не влияет на общий статус</param>
 public sealed record JobRow(string Id, string Title, string Headline, string Detail, RowTone Tone, int Awaiting, bool Enabled);
 
 /// <summary>
@@ -77,21 +63,15 @@ public static class JobRowBuilder
     /// <summary>
     /// Сводит описание задачи и статус в строку для показа
     /// </summary>
-    /// <param name="job">
-    /// Описание задачи из реестра
-    /// </param>
+    /// <param name="job">Описание задачи из реестра</param>
     /// <param name="status">
     /// Файл статуса или <see langword="null"/>, если задача ещё не запускалась
     /// </param>
     /// <param name="nextRun">
     /// Время следующего запуска по расписанию или <see langword="null"/>
     /// </param>
-    /// <param name="now">
-    /// Текущий момент. Дни «сегодня» и «вчера» считаются в его часовом поясе
-    /// </param>
-    /// <returns>
-    /// Строка с цветом, статусом и подробностями
-    /// </returns>
+    /// <param name="now">Текущий момент. Дни «сегодня» и «вчера» считаются в его часовом поясе</param>
+    /// <returns>Строка с цветом, статусом и подробностями</returns>
     public static JobRow Build(JobDefinition job, ProcessStatus? status, DateTimeOffset? nextRun, DateTimeOffset now)
     {
         var title = string.IsNullOrWhiteSpace(job.Title) ? job.Id : job.Title;
@@ -135,12 +115,8 @@ public static class JobRowBuilder
     /// <summary>
     /// Склеивает непустые части через точку
     /// </summary>
-    /// <param name="parts">
-    /// Фразы, часть из которых может быть пустой
-    /// </param>
-    /// <returns>
-    /// Одна строка
-    /// </returns>
+    /// <param name="parts">Фразы, часть из которых может быть пустой</param>
+    /// <returns>Одна строка</returns>
     private static string Join(params string?[] parts) =>
         string.Join(". ", parts.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim().TrimEnd('.')));
 
@@ -150,9 +126,7 @@ public static class JobRowBuilder
     /// <param name="error">
     /// Сообщение или <see langword="null"/>
     /// </param>
-    /// <returns>
-    /// Короткий текст
-    /// </returns>
+    /// <returns>Короткий текст</returns>
     private static string Short(string? error)
     {
         var text = string.IsNullOrWhiteSpace(error) ? "Причина не записана" : error.Trim();
@@ -162,15 +136,9 @@ public static class JobRowBuilder
     /// <summary>
     /// Говорит о моменте словами: сегодня, вчера или датой
     /// </summary>
-    /// <param name="time">
-    /// Момент события
-    /// </param>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
-    /// <returns>
-    /// Фраза вида «сегодня в 09:00»
-    /// </returns>
+    /// <param name="time">Момент события</param>
+    /// <param name="now">Текущий момент</param>
+    /// <returns>Фраза вида «сегодня в 09:00»</returns>
     private static string When(DateTimeOffset time, DateTimeOffset now)
     {
         var local = time.ToOffset(now.Offset);
@@ -189,12 +157,8 @@ public static class JobRowBuilder
     /// <param name="next">
     /// Время следующего запуска или <see langword="null"/>
     /// </param>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
-    /// <returns>
-    /// Фраза вида «Следующий запуск завтра в 09:00» или пустая строка, если запуска по времени нет
-    /// </returns>
+    /// <param name="now">Текущий момент</param>
+    /// <returns>Фраза вида «Следующий запуск завтра в 09:00» или пустая строка, если запуска по времени нет</returns>
     private static string NextText(DateTimeOffset? next, DateTimeOffset now)
     {
         if (next is null)

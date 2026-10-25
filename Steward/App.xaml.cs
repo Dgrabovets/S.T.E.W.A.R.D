@@ -32,9 +32,7 @@ public partial class App : System.Windows.Application
     /// <summary>
     /// Поднимает одну иконку
     /// </summary>
-    /// <param name="e">
-    /// Аргументы запуска
-    /// </param>
+    /// <param name="e">Аргументы запуска</param>
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -63,9 +61,7 @@ public partial class App : System.Windows.Application
     /// <summary>
     /// Отпускает иконку и мьютекс
     /// </summary>
-    /// <param name="e">
-    /// Аргументы выхода
-    /// </param>
+    /// <param name="e">Аргументы выхода</param>
     protected override void OnExit(System.Windows.ExitEventArgs e)
     {
         _host?.Dispose();

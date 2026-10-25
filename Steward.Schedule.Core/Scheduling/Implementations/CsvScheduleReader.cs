@@ -21,12 +21,8 @@ public sealed class CsvScheduleReader : IScheduleSource
     /// <summary>
     /// Создаёт читатель таблицы из <paramref name="options"/>
     /// </summary>
-    /// <param name="http">
-    /// Клиент, используемый для запроса экспорта
-    /// </param>
-    /// <param name="options">
-    /// Идентификатор таблицы и gid листа
-    /// </param>
+    /// <param name="http">Клиент, используемый для запроса экспорта</param>
+    /// <param name="options">Идентификатор таблицы и gid листа</param>
     public CsvScheduleReader(HttpClient http, SyncOptions options)
     {
         _http = http;
@@ -36,12 +32,8 @@ public sealed class CsvScheduleReader : IScheduleSource
     /// <summary>
     /// Скачивает экспорт листа
     /// </summary>
-    /// <param name="cancellationToken">
-    /// Токен отмены загрузки
-    /// </param>
-    /// <returns>
-    /// Текст листа в виде CSV. Значение объединённой ячейки повторено во всём диапазоне
-    /// </returns>
+    /// <param name="cancellationToken">Токен отмены загрузки</param>
+    /// <returns>Текст листа в виде CSV. Значение объединённой ячейки повторено во всём диапазоне</returns>
     /// <exception cref="InvalidOperationException">
     /// Таблица не открыта по ссылке, либо Google вернул страницу ошибки
     /// </exception>

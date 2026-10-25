@@ -55,12 +55,8 @@ public static partial class LogJournal
     /// <summary>
     /// Собирает записи от новых к старым и выбрасывает служебные строки
     /// </summary>
-    /// <param name="logs">
-    /// Журнал контейнера с метками времени
-    /// </param>
-    /// <returns>
-    /// Записи для окна. Пустой список, если полезных прогонов нет
-    /// </returns>
+    /// <param name="logs">Журнал контейнера с метками времени</param>
+    /// <returns>Записи для окна. Пустой список, если полезных прогонов нет</returns>
     public static IReadOnlyList<LogEntry> Read(string logs)
     {
         var entries = new List<LogEntry>();
@@ -119,12 +115,8 @@ public static partial class LogJournal
     /// <summary>
     /// Достаёт текст сообщения, пропуская категорию логгера и кадры стека
     /// </summary>
-    /// <param name="logs">
-    /// Сырой журнал
-    /// </param>
-    /// <returns>
-    /// Сообщения по порядку
-    /// </returns>
+    /// <param name="logs">Сырой журнал</param>
+    /// <returns>Сообщения по порядку</returns>
     private static IEnumerable<Message> Messages(string logs)
     {
         var lines = logs.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
@@ -146,12 +138,8 @@ public static partial class LogJournal
     /// <summary>
     /// Убирает метку времени из строки
     /// </summary>
-    /// <param name="line">
-    /// Строка журнала
-    /// </param>
-    /// <returns>
-    /// Текст без метки
-    /// </returns>
+    /// <param name="line">Строка журнала</param>
+    /// <returns>Текст без метки</returns>
     private static string StripTimestamp(string line)
     {
         var match = TimestampPattern().Match(line);
@@ -164,12 +152,8 @@ public static partial class LogJournal
     /// <summary>
     /// Читает метку времени Docker
     /// </summary>
-    /// <param name="line">
-    /// Строка журнала
-    /// </param>
-    /// <param name="timestamp">
-    /// Момент в UTC, если метка найдена
-    /// </param>
+    /// <param name="line">Строка журнала</param>
+    /// <param name="timestamp">Момент в UTC, если метка найдена</param>
     /// <returns>
     /// <see langword="true"/>, если метка прочитана
     /// </returns>
@@ -192,9 +176,7 @@ public static partial class LogJournal
     /// <summary>
     /// Сообщает, что строка относится к транспорту, а не к расписанию
     /// </summary>
-    /// <param name="text">
-    /// Текст сообщения
-    /// </param>
+    /// <param name="text">Текст сообщения</param>
     /// <returns>
     /// <see langword="true"/> для запросов HTTP и строк запуска приложения
     /// </returns>
@@ -216,12 +198,8 @@ public static partial class LogJournal
     /// <summary>
     /// Переводит известное действие синхронизации
     /// </summary>
-    /// <param name="text">
-    /// Текст сообщения
-    /// </param>
-    /// <param name="change">
-    /// Человеческая строка. Пусто для пропуска уже выполненной задачи
-    /// </param>
+    /// <param name="text">Текст сообщения</param>
+    /// <param name="change">Человеческая строка. Пусто для пропуска уже выполненной задачи</param>
     /// <param name="skipped">
     /// <see langword="true"/>, если задача уже была выполнена и её не трогали
     /// </param>
@@ -281,15 +259,9 @@ public static partial class LogJournal
     /// <summary>
     /// Собирает строку о создании или обновлении занятия
     /// </summary>
-    /// <param name="verb">
-    /// Глагол на русском
-    /// </param>
-    /// <param name="rest">
-    /// Внешний идентификатор и название
-    /// </param>
-    /// <returns>
-    /// Строка с названием. Пусто, если идентификатор не распознан
-    /// </returns>
+    /// <param name="verb">Глагол на русском</param>
+    /// <param name="rest">Внешний идентификатор и название</param>
+    /// <returns>Строка с названием. Пусто, если идентификатор не распознан</returns>
     private static string? Action(string verb, string rest)
     {
         var match = ExternalIdPattern().Match(rest);
@@ -303,9 +275,7 @@ public static partial class LogJournal
     /// <summary>
     /// Достаёт день и время из внешнего идентификатора
     /// </summary>
-    /// <param name="text">
-    /// Текст, в котором есть идентификатор
-    /// </param>
+    /// <param name="text">Текст, в котором есть идентификатор</param>
     /// <returns>
     /// Строка вида <c>16.10 в 20:10</c>. Если идентификатора нет, слово «занятие»
     /// </returns>
@@ -325,12 +295,8 @@ public static partial class LogJournal
     /// <summary>
     /// Убирает из текста сбоя адреса, тип исключения и служебные коды
     /// </summary>
-    /// <param name="raw">
-    /// Строка исключения
-    /// </param>
-    /// <returns>
-    /// Короткая причина для человека
-    /// </returns>
+    /// <param name="raw">Строка исключения</param>
+    /// <returns>Короткая причина для человека</returns>
     private static string HumanizeFailure(string raw)
     {
         var text = raw.Trim();
@@ -368,9 +334,7 @@ public static partial class LogJournal
     /// <summary>
     /// Дописывает удаление из итога, если подробная строка не попала в хвост журнала
     /// </summary>
-    /// <param name="cycle">
-    /// Текущий прогон
-    /// </param>
+    /// <param name="cycle">Текущий прогон</param>
     /// <param name="deletedGroup">
     /// Группа <c>deleted</c> из строки итога
     /// </param>
@@ -390,12 +354,8 @@ public static partial class LogJournal
     /// <summary>
     /// Кладёт итог прогона в список и схлопывает подряд идущие тихие прогоны
     /// </summary>
-    /// <param name="entries">
-    /// Уже собранные записи, от старых к новым
-    /// </param>
-    /// <param name="cycle">
-    /// Только что закончившийся прогон
-    /// </param>
+    /// <param name="entries">Уже собранные записи, от старых к новым</param>
+    /// <param name="cycle">Только что закончившийся прогон</param>
     private static void Emit(List<LogEntry> entries, Cycle cycle)
     {
         if (cycle.Failed || cycle.Failure is not null)
@@ -429,12 +389,8 @@ public static partial class LogJournal
     /// <summary>
     /// Склоняет фразу о уже выполненных задачах
     /// </summary>
-    /// <param name="count">
-    /// Сколько задач пропущено
-    /// </param>
-    /// <returns>
-    /// Фраза для карточки
-    /// </returns>
+    /// <param name="count">Сколько задач пропущено</param>
+    /// <returns>Фраза для карточки</returns>
     private static string AlreadyDone(int count) =>
         count == 1
             ? "Одно прошедшее занятие уже закрыто"
@@ -443,12 +399,8 @@ public static partial class LogJournal
     /// <summary>
     /// Строит запись о сбое
     /// </summary>
-    /// <param name="cycle">
-    /// Прогон, в котором случился сбой
-    /// </param>
-    /// <returns>
-    /// Запись с понятной причиной
-    /// </returns>
+    /// <param name="cycle">Прогон, в котором случился сбой</param>
+    /// <returns>Запись с понятной причиной</returns>
     private static LogEntry Problem(Cycle cycle) =>
         new(cycle.Time, LogTone.Problem, "Не удалось обновить", cycle.Failure ?? "Синхронизация остановилась", 1);
 
@@ -459,12 +411,8 @@ public static partial class LogJournal
     /// <summary>
     /// Одно полезное сообщение журнала
     /// </summary>
-    /// <param name="Time">
-    /// Местное время строки
-    /// </param>
-    /// <param name="Text">
-    /// Текст без метки времени
-    /// </param>
+    /// <param name="Time">Местное время строки</param>
+    /// <param name="Text">Текст без метки времени</param>
     private sealed record Message(DateTimeOffset Time, string Text);
 
     /// <summary>

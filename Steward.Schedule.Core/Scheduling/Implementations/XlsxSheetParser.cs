@@ -28,9 +28,7 @@ public static class XlsxSheetParser
     /// <summary>
     /// Превращает книгу в CSV, копируя значение левой верхней ячейки на весь объединённый диапазон
     /// </summary>
-    /// <param name="xlsx">
-    /// Байты файла xlsx
-    /// </param>
+    /// <param name="xlsx">Байты файла xlsx</param>
     /// <returns>
     /// Текст CSV. Числовые даты Excel записываются как <c>DD.MM</c>. Адрес гиперссылки ячейки дописывается отдельной строкой
     /// </returns>
@@ -56,12 +54,8 @@ public static class XlsxSheetParser
     /// <summary>
     /// Читает общую таблицу строк книги
     /// </summary>
-    /// <param name="archive">
-    /// Открытая книга xlsx
-    /// </param>
-    /// <returns>
-    /// Строки в порядке индексов. Пустой список, если таблицы нет
-    /// </returns>
+    /// <param name="archive">Открытая книга xlsx</param>
+    /// <returns>Строки в порядке индексов. Пустой список, если таблицы нет</returns>
     private static List<string> ReadSharedStrings(ZipArchive archive)
     {
         var entry = archive.GetEntry("xl/sharedStrings.xml");
@@ -78,15 +72,9 @@ public static class XlsxSheetParser
     /// <summary>
     /// Собирает непустые ячейки первого листа
     /// </summary>
-    /// <param name="document">
-    /// Документ листа
-    /// </param>
-    /// <param name="sharedStrings">
-    /// Общая таблица строк
-    /// </param>
-    /// <returns>
-    /// Текст ячеек по координатам с нуля
-    /// </returns>
+    /// <param name="document">Документ листа</param>
+    /// <param name="sharedStrings">Общая таблица строк</param>
+    /// <returns>Текст ячеек по координатам с нуля</returns>
     private static Dictionary<(int Row, int Column), string> ReadCells(XDocument document, List<string> sharedStrings)
     {
         var cells = new Dictionary<(int Row, int Column), string>();
@@ -107,12 +95,8 @@ public static class XlsxSheetParser
     /// <summary>
     /// Копирует значение левой верхней ячейки в пустые ячейки её объединения
     /// </summary>
-    /// <param name="document">
-    /// Документ листа
-    /// </param>
-    /// <param name="cells">
-    /// Уже прочитанные ячейки. Пустые позиции объединения заполняются на месте
-    /// </param>
+    /// <param name="document">Документ листа</param>
+    /// <param name="cells">Уже прочитанные ячейки. Пустые позиции объединения заполняются на месте</param>
     private static void ApplyMerges(XDocument document, Dictionary<(int Row, int Column), string> cells)
     {
         foreach (var merge in document.Descendants(Spreadsheet + "mergeCell"))
@@ -144,12 +128,8 @@ public static class XlsxSheetParser
     /// <summary>
     /// Записывает сетку в CSV
     /// </summary>
-    /// <param name="cells">
-    /// Ячейки по координатам с нуля
-    /// </param>
-    /// <returns>
-    /// Текст CSV
-    /// </returns>
+    /// <param name="cells">Ячейки по координатам с нуля</param>
+    /// <returns>Текст CSV</returns>
     private static string WriteCsv(Dictionary<(int Row, int Column), string> cells)
     {
         if (cells.Count == 0)
@@ -180,15 +160,9 @@ public static class XlsxSheetParser
     /// <summary>
     /// Читает внешние гиперссылки листа
     /// </summary>
-    /// <param name="archive">
-    /// Открытая книга xlsx
-    /// </param>
-    /// <param name="document">
-    /// Документ листа
-    /// </param>
-    /// <returns>
-    /// Адрес ссылки по координатам ячейки с нуля. Внутренние ссылки пропускаются
-    /// </returns>
+    /// <param name="archive">Открытая книга xlsx</param>
+    /// <param name="document">Документ листа</param>
+    /// <returns>Адрес ссылки по координатам ячейки с нуля. Внутренние ссылки пропускаются</returns>
     private static Dictionary<(int Row, int Column), string> ReadHyperlinks(ZipArchive archive, XDocument document)
     {
         var targets = ReadHyperlinkTargets(archive);
@@ -216,12 +190,8 @@ public static class XlsxSheetParser
     /// <summary>
     /// Читает цели внешних гиперссылок из связей листа
     /// </summary>
-    /// <param name="archive">
-    /// Открытая книга xlsx
-    /// </param>
-    /// <returns>
-    /// Адрес по идентификатору связи. Пустой словарь, если файла связей нет
-    /// </returns>
+    /// <param name="archive">Открытая книга xlsx</param>
+    /// <returns>Адрес по идентификатору связи. Пустой словарь, если файла связей нет</returns>
     private static Dictionary<string, string> ReadHyperlinkTargets(ZipArchive archive)
     {
         var entry = archive.GetEntry("xl/worksheets/_rels/sheet1.xml.rels");
@@ -248,12 +218,8 @@ public static class XlsxSheetParser
     /// <summary>
     /// Копирует ссылку левой верхней ячейки на пустые позиции объединения
     /// </summary>
-    /// <param name="document">
-    /// Документ листа
-    /// </param>
-    /// <param name="links">
-    /// Уже прочитанные ссылки. Пустые позиции объединения заполняются на месте
-    /// </param>
+    /// <param name="document">Документ листа</param>
+    /// <param name="links">Уже прочитанные ссылки. Пустые позиции объединения заполняются на месте</param>
     private static void ApplyMergeLinks(XDocument document, Dictionary<(int Row, int Column), string> links)
     {
         foreach (var merge in document.Descendants(Spreadsheet + "mergeCell"))
@@ -285,12 +251,8 @@ public static class XlsxSheetParser
     /// <summary>
     /// Дописывает адрес ссылки отдельной строкой, если его ещё нет в тексте ячейки
     /// </summary>
-    /// <param name="cells">
-    /// Текст ячеек. Строка со ссылкой добавляется на месте
-    /// </param>
-    /// <param name="links">
-    /// Ссылки по координатам
-    /// </param>
+    /// <param name="cells">Текст ячеек. Строка со ссылкой добавляется на месте</param>
+    /// <param name="links">Ссылки по координатам</param>
     private static void AppendLinks(Dictionary<(int Row, int Column), string> cells, Dictionary<(int Row, int Column), string> links)
     {
         foreach (var (cell, url) in links)
@@ -309,12 +271,8 @@ public static class XlsxSheetParser
     /// <summary>
     /// Перечисляет ячейки адреса <c>H3</c> или диапазона <c>G3:H3</c>
     /// </summary>
-    /// <param name="reference">
-    /// Адрес гиперссылки
-    /// </param>
-    /// <returns>
-    /// Координаты с нуля. Пустая последовательность, если адрес не разбирается
-    /// </returns>
+    /// <param name="reference">Адрес гиперссылки</param>
+    /// <returns>Координаты с нуля. Пустая последовательность, если адрес не разбирается</returns>
     private static IEnumerable<(int Row, int Column)> CellsInReference(string reference)
     {
         var bounds = reference.Split(':');
@@ -338,15 +296,9 @@ public static class XlsxSheetParser
     /// <summary>
     /// Возвращает видимый текст ячейки
     /// </summary>
-    /// <param name="cell">
-    /// Элемент ячейки
-    /// </param>
-    /// <param name="sharedStrings">
-    /// Общая таблица строк
-    /// </param>
-    /// <returns>
-    /// Текст ячейки. Число без типа строки считается датой Excel
-    /// </returns>
+    /// <param name="cell">Элемент ячейки</param>
+    /// <param name="sharedStrings">Общая таблица строк</param>
+    /// <returns>Текст ячейки. Число без типа строки считается датой Excel</returns>
     private static string CellText(XElement cell, List<string> sharedStrings)
     {
         var type = (string?)cell.Attribute("t");
@@ -377,15 +329,9 @@ public static class XlsxSheetParser
     /// <summary>
     /// Разбирает адрес ячейки вроде <c>H3</c>
     /// </summary>
-    /// <param name="reference">
-    /// Адрес или левая верхняя граница диапазона
-    /// </param>
-    /// <param name="row">
-    /// Номер строки с нуля
-    /// </param>
-    /// <param name="column">
-    /// Номер колонки с нуля
-    /// </param>
+    /// <param name="reference">Адрес или левая верхняя граница диапазона</param>
+    /// <param name="row">Номер строки с нуля</param>
+    /// <param name="column">Номер колонки с нуля</param>
     /// <returns>
     /// <see langword="true"/>, если адрес состоит из букв колонки и номера строки
     /// </returns>
@@ -415,12 +361,8 @@ public static class XlsxSheetParser
     /// <summary>
     /// Заключает поле в кавычки, если в нём есть запятая, кавычка или перевод строки
     /// </summary>
-    /// <param name="value">
-    /// Текст поля
-    /// </param>
-    /// <returns>
-    /// Поле CSV
-    /// </returns>
+    /// <param name="value">Текст поля</param>
+    /// <returns>Поле CSV</returns>
     private static string Quote(string value)
     {
         if (value.IndexOfAny([',', '"', '\n', '\r']) < 0)

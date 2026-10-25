@@ -11,24 +11,12 @@ public sealed class PanelStatus
     /// <summary>
     /// Собирает тексты из уже посчитанных фраз
     /// </summary>
-    /// <param name="subtitle">
-    /// Строка под заголовком
-    /// </param>
-    /// <param name="summary">
-    /// Фраза о текущем состоянии
-    /// </param>
-    /// <param name="label">
-    /// Короткий текст плашки
-    /// </param>
-    /// <param name="tone">
-    /// Цвет плашки
-    /// </param>
-    /// <param name="emptyText">
-    /// Строка вместо пустого журнала
-    /// </param>
-    /// <param name="cards">
-    /// Карточки журнала
-    /// </param>
+    /// <param name="subtitle">Строка под заголовком</param>
+    /// <param name="summary">Фраза о текущем состоянии</param>
+    /// <param name="label">Короткий текст плашки</param>
+    /// <param name="tone">Цвет плашки</param>
+    /// <param name="emptyText">Строка вместо пустого журнала</param>
+    /// <param name="cards">Карточки журнала</param>
     private PanelStatus(string subtitle,
                         string summary,
                         string label,
@@ -79,12 +67,8 @@ public sealed class PanelStatus
     /// <summary>
     /// Собирает тексты панели из снимка
     /// </summary>
-    /// <param name="snapshot">
-    /// Текущее состояние синхронизации
-    /// </param>
-    /// <returns>
-    /// Фразы и карточки для окна
-    /// </returns>
+    /// <param name="snapshot">Текущее состояние синхронизации</param>
+    /// <returns>Фразы и карточки для окна</returns>
     public static PanelStatus From(SyncSnapshot snapshot)
     {
         var tone = snapshot.CurrentError is not null
@@ -106,12 +90,8 @@ public sealed class PanelStatus
     /// <summary>
     /// Короткая подпись состояния
     /// </summary>
-    /// <param name="snapshot">
-    /// Текущий снимок
-    /// </param>
-    /// <returns>
-    /// Текст плашки
-    /// </returns>
+    /// <param name="snapshot">Текущий снимок</param>
+    /// <returns>Текст плашки</returns>
     private static string LabelOf(SyncSnapshot snapshot)
     {
         if (snapshot.CurrentError is not null)
@@ -125,12 +105,8 @@ public sealed class PanelStatus
     /// <summary>
     /// Одной фразой говорит, что сейчас происходит
     /// </summary>
-    /// <param name="snapshot">
-    /// Текущий снимок
-    /// </param>
-    /// <returns>
-    /// Строка под временем обновления
-    /// </returns>
+    /// <param name="snapshot">Текущий снимок</param>
+    /// <returns>Строка под временем обновления</returns>
     private static string SummaryOf(SyncSnapshot snapshot)
     {
         if (!snapshot.DockerAvailable)
@@ -154,12 +130,8 @@ public sealed class PanelStatus
     /// <summary>
     /// Формулирует время последнего успешного прогона
     /// </summary>
-    /// <param name="lastSuccess">
-    /// Местное время прогона. Пусто, если его ещё не было
-    /// </param>
-    /// <returns>
-    /// Строка под заголовком
-    /// </returns>
+    /// <param name="lastSuccess">Местное время прогона. Пусто, если его ещё не было</param>
+    /// <returns>Строка под заголовком</returns>
     private static string When(DateTimeOffset? lastSuccess)
     {
         if (lastSuccess is null)

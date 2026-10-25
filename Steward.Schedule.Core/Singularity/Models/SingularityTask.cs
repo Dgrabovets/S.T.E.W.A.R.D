@@ -14,24 +14,14 @@ public sealed record SingularityTask
     /// <param name="externalId">
     /// Ключ, записанный этой синхронизацией, или <see langword="null"/> у задачи, созданной вручную
     /// </param>
-    /// <param name="title">
-    /// Текущее название
-    /// </param>
-    /// <param name="note">
-    /// Текущая заметка: обычный текст или дельта Quill
-    /// </param>
-    /// <param name="start">
-    /// Значение начала, которое вернул API
-    /// </param>
+    /// <param name="title">Текущее название</param>
+    /// <param name="note">Текущая заметка: обычный текст или дельта Quill</param>
+    /// <param name="start">Значение начала, которое вернул API</param>
     /// <param name="useTime">
     /// <see langword="true"/>, если у задачи указано время, а не весь день
     /// </param>
-    /// <param name="timeLength">
-    /// Длительность в минутах, если API её прислал
-    /// </param>
-    /// <param name="checked">
-    /// Состояние отметки: 0 пусто, 1 выполнено, 2 отменено
-    /// </param>
+    /// <param name="timeLength">Длительность в минутах, если API её прислал</param>
+    /// <param name="checked">Состояние отметки: 0 пусто, 1 выполнено, 2 отменено</param>
     /// <param name="journalDate">
     /// Дата архивации или <see langword="null"/>, если задача активна
     /// </param>

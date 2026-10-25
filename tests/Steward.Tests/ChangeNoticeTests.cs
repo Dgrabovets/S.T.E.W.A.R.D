@@ -90,12 +90,8 @@ public class ChangeNoticeTests
     /// <param name="change">
     /// Строка действия синхронизации или <see langword="null"/>, если прогон тихий
     /// </param>
-    /// <param name="minute">
-    /// Минута прогона в часе 09:00 UTC
-    /// </param>
-    /// <returns>
-    /// Строки с префиксом контейнера и меткой времени
-    /// </returns>
+    /// <param name="minute">Минута прогона в часе 09:00 UTC</param>
+    /// <returns>Строки с префиксом контейнера и меткой времени</returns>
     private static string Run(string? change, int minute)
     {
         var stamp = $"2026-10-25T09:{minute:00}:00.000000000Z";

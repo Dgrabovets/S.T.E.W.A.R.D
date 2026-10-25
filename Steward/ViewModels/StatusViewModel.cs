@@ -365,12 +365,8 @@ public sealed class StatusViewModel : Bindable
     /// <summary>
     /// Показывает свежий снимок журнала и статусы задач
     /// </summary>
-    /// <param name="snapshot">
-    /// Текущее состояние синхронизации
-    /// </param>
-    /// <param name="jobs">
-    /// Строки задач из реестра
-    /// </param>
+    /// <param name="snapshot">Текущее состояние синхронизации</param>
+    /// <param name="jobs">Строки задач из реестра</param>
     public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs)
     {
         var panel = PanelStatus.From(snapshot);

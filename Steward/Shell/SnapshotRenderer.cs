@@ -23,9 +23,7 @@ public static class SnapshotRenderer
     /// <summary>
     /// Рисует окно и сохраняет картинку
     /// </summary>
-    /// <param name="path">
-    /// Куда сохранить PNG
-    /// </param>
+    /// <param name="path">Куда сохранить PNG</param>
     /// <param name="which">
     /// Какое окно: <c>main</c> или <c>popup</c>
     /// </param>
@@ -87,12 +85,8 @@ public static class SnapshotRenderer
     /// <summary>
     /// Выдуманное состояние контейнера: работает, одна правка в журнале
     /// </summary>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
-    /// <returns>
-    /// Снимок для рисунка
-    /// </returns>
+    /// <param name="now">Текущий момент</param>
+    /// <returns>Снимок для рисунка</returns>
     private static SyncSnapshot SampleSnapshot(DateTimeOffset now) => new()
     {
         DockerAvailable = true,
@@ -108,9 +102,7 @@ public static class SnapshotRenderer
     /// <summary>
     /// Выдуманные задачи: по одной на каждый цвет
     /// </summary>
-    /// <returns>
-    /// Строки задач
-    /// </returns>
+    /// <returns>Строки задач</returns>
     private static IReadOnlyList<JobRow> SampleJobs() =>
     [
         new JobRow("mail", "Почта", "Выполнено сегодня в 09:00", "Новых важных писем нет. Следующий запуск сегодня в 19:00", RowTone.Ok, 0, true),
@@ -123,12 +115,8 @@ public static class SnapshotRenderer
     /// <summary>
     /// Выдуманный журнал запусков
     /// </summary>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
-    /// <returns>
-    /// Записи от новых к старым
-    /// </returns>
+    /// <param name="now">Текущий момент</param>
+    /// <returns>Записи от новых к старым</returns>
     private static IReadOnlyList<RunRecord> SampleRecords(DateTimeOffset now) =>
     [
         new RunRecord("telegram", "Telegram-бот", JobTrigger.START, now.AddMinutes(-5), now.AddMinutes(-4), 0, RunOutcome.Ok, null),

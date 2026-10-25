@@ -78,12 +78,8 @@ public partial class StatusWindow : Window
     /// <summary>
     /// Показывает свежий снимок
     /// </summary>
-    /// <param name="snapshot">
-    /// Текущее состояние синхронизации
-    /// </param>
-    /// <param name="jobs">
-    /// Строки задач из реестра
-    /// </param>
+    /// <param name="snapshot">Текущее состояние синхронизации</param>
+    /// <param name="jobs">Строки задач из реестра</param>
     /// <param name="scrollToProblem">
     /// <see langword="true"/>, если журнал нужно открыть сверху
     /// </param>
@@ -97,9 +93,7 @@ public partial class StatusWindow : Window
     /// <summary>
     /// Пишет итог перезапуска
     /// </summary>
-    /// <param name="text">
-    /// Короткая фраза
-    /// </param>
+    /// <param name="text">Короткая фраза</param>
     public void SetSettingsStatus(string text) => Model.SettingsMessage = text;
 
     #region Opening
@@ -124,9 +118,7 @@ public partial class StatusWindow : Window
     /// <summary>
     /// Прячет панель по Escape
     /// </summary>
-    /// <param name="e">
-    /// Аргументы клавиши
-    /// </param>
+    /// <param name="e">Аргументы клавиши</param>
     protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
@@ -163,12 +155,8 @@ public partial class StatusWindow : Window
     /// <summary>
     /// Прячет панель, когда фокус ушёл. Щелчок, который её открыл, сюда не попадает
     /// </summary>
-    /// <param name="sender">
-    /// Окно
-    /// </param>
-    /// <param name="e">
-    /// Аргументы события
-    /// </param>
+    /// <param name="sender">Окно</param>
+    /// <param name="e">Аргументы события</param>
     private void OnDeactivated(object? sender, EventArgs e)
     {
         if (_ignoreToggle || !IsVisible)
@@ -188,12 +176,8 @@ public partial class StatusWindow : Window
     /// <summary>
     /// Даёт перетащить панель за шапку
     /// </summary>
-    /// <param name="sender">
-    /// Шапка
-    /// </param>
-    /// <param name="e">
-    /// Аргументы нажатия
-    /// </param>
+    /// <param name="sender">Шапка</param>
+    /// <param name="e">Аргументы нажатия</param>
     private void Header_OnDrag(object sender, MouseButtonEventArgs e)
     {
         if (e.LeftButton == MouseButtonState.Pressed)
@@ -207,12 +191,8 @@ public partial class StatusWindow : Window
     /// <summary>
     /// Включает или гасит свечение, когда контейнер начинает или перестаёт работать
     /// </summary>
-    /// <param name="sender">
-    /// Модель представления
-    /// </param>
-    /// <param name="e">
-    /// Имя изменившегося свойства
-    /// </param>
+    /// <param name="sender">Модель представления</param>
+    /// <param name="e">Имя изменившегося свойства</param>
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is not (null or nameof(StatusViewModel.IsRunning)))
@@ -236,12 +216,8 @@ public partial class StatusWindow : Window
     /// <summary>
     /// Ставит окно над курсором и не выпускает его за край экрана
     /// </summary>
-    /// <param name="cursor">
-    /// Точка курсора в физических пикселях
-    /// </param>
-    /// <param name="screen">
-    /// Экран, на котором лежит курсор
-    /// </param>
+    /// <param name="cursor">Точка курсора в физических пикселях</param>
+    /// <param name="screen">Экран, на котором лежит курсор</param>
     private void PlaceNearCursor(System.Drawing.Point cursor, System.Windows.Forms.Screen screen)
     {
         var area = screen.WorkingArea;

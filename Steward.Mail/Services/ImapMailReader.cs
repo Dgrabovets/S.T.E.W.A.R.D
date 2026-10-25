@@ -19,12 +19,8 @@ public sealed class ImapMailReader(MailSettings settings) : IMailReader
     /// <summary>
     /// Подключается к ящику и собирает непрочитанные письма из «Входящих» и из папки преподавателей
     /// </summary>
-    /// <param name="ct">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Письма за последние дни, которые указаны в настройках. Папки открываются только для чтения, флаг «прочитано» не ставится
-    /// </returns>
+    /// <param name="ct">Токен отмены запроса</param>
+    /// <returns>Письма за последние дни, которые указаны в настройках. Папки открываются только для чтения, флаг «прочитано» не ставится</returns>
     public async Task<IReadOnlyList<MailItem>> GetUnreadAsync(CancellationToken ct)
     {
         using var client = new ImapClient();
@@ -53,18 +49,10 @@ public sealed class ImapMailReader(MailSettings settings) : IMailReader
     /// <summary>
     /// Читает из папки непрочитанные письма, полученные не раньше указанной даты. Берутся только заголовки и превью текста
     /// </summary>
-    /// <param name="folder">
-    /// Папка ящика
-    /// </param>
-    /// <param name="since">
-    /// Дата, с которой письма считаются свежими
-    /// </param>
-    /// <param name="ct">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Письма папки. Пустой список, если свежих непрочитанных нет
-    /// </returns>
+    /// <param name="folder">Папка ящика</param>
+    /// <param name="since">Дата, с которой письма считаются свежими</param>
+    /// <param name="ct">Токен отмены запроса</param>
+    /// <returns>Письма папки. Пустой список, если свежих непрочитанных нет</returns>
     private static async Task<IReadOnlyList<MailItem>> ReadFolderAsync(IMailFolder folder, DateTime since, CancellationToken ct)
     {
         await folder.OpenAsync(FolderAccess.ReadOnly, ct);
@@ -98,15 +86,9 @@ public sealed class ImapMailReader(MailSettings settings) : IMailReader
     /// Ищет папку по отображаемому имени
     /// В Яндексе пользовательские папки могут лежать внутри «Входящих»
     /// </summary>
-    /// <param name="client">
-    /// Подключённый IMAP-клиент
-    /// </param>
-    /// <param name="name">
-    /// Название папки без учёта регистра
-    /// </param>
-    /// <param name="ct">
-    /// Токен отмены запроса
-    /// </param>
+    /// <param name="client">Подключённый IMAP-клиент</param>
+    /// <param name="name">Название папки без учёта регистра</param>
+    /// <param name="ct">Токен отмены запроса</param>
     /// <returns>
     /// Первая найденная папка или <see langword="null"/>, если такой нет
     /// </returns>

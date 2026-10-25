@@ -10,12 +10,8 @@ public static class JobSchedule
     /// <summary>
     /// Сообщает, есть ли у задачи условие заданного вида
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
-    /// <param name="type">
-    /// Вид условия
-    /// </param>
+    /// <param name="job">Задача</param>
+    /// <param name="type">Вид условия</param>
     /// <returns>
     /// <see langword="true"/>, если такое условие есть
     /// </returns>
@@ -25,15 +21,11 @@ public static class JobSchedule
     /// <summary>
     /// Говорит, пора ли запускать задачу по времени. Пропущенный запуск наверстывается один раз, как «запустить при первой возможности» в Планировщике
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
+    /// <param name="job">Задача</param>
     /// <param name="lastRunAt">
     /// Когда задача запускалась в последний раз или <see langword="null"/>, если ни разу
     /// </param>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
+    /// <param name="now">Текущий момент</param>
     /// <param name="zone">
     /// Часовой пояс, в котором понимаются времена <c>daily</c>
     /// </param>
@@ -62,15 +54,11 @@ public static class JobSchedule
     /// <summary>
     /// Находит ближайший будущий запуск по времени
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
+    /// <param name="job">Задача</param>
     /// <param name="lastRunAt">
     /// Когда задача запускалась в последний раз или <see langword="null"/>
     /// </param>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
+    /// <param name="now">Текущий момент</param>
     /// <param name="zone">
     /// Часовой пояс для <c>daily</c>
     /// </param>
@@ -100,18 +88,10 @@ public static class JobSchedule
     /// <summary>
     /// Последний момент <paramref name="time"/> не позже <paramref name="now"/>
     /// </summary>
-    /// <param name="time">
-    /// Местное время суток
-    /// </param>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
-    /// <param name="zone">
-    /// Часовой пояс
-    /// </param>
-    /// <returns>
-    /// Момент сегодняшнего или вчерашнего запуска
-    /// </returns>
+    /// <param name="time">Местное время суток</param>
+    /// <param name="now">Текущий момент</param>
+    /// <param name="zone">Часовой пояс</param>
+    /// <returns>Момент сегодняшнего или вчерашнего запуска</returns>
     private static DateTimeOffset PreviousDaily(TimeOnly time, DateTimeOffset now, TimeZoneInfo zone)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
@@ -122,18 +102,10 @@ public static class JobSchedule
     /// <summary>
     /// Первый момент <paramref name="time"/> строго после <paramref name="now"/>
     /// </summary>
-    /// <param name="time">
-    /// Местное время суток
-    /// </param>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
-    /// <param name="zone">
-    /// Часовой пояс
-    /// </param>
-    /// <returns>
-    /// Момент ближайшего запуска
-    /// </returns>
+    /// <param name="time">Местное время суток</param>
+    /// <param name="now">Текущий момент</param>
+    /// <param name="zone">Часовой пояс</param>
+    /// <returns>Момент ближайшего запуска</returns>
     private static DateTimeOffset NextDaily(TimeOnly time, DateTimeOffset now, TimeZoneInfo zone)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
@@ -144,18 +116,10 @@ public static class JobSchedule
     /// <summary>
     /// Переводит местные дату и время в момент. Несуществующее время при переходе на летнее сдвигается на час вперёд, повторяющееся при переходе на зимнее берётся первым из двух
     /// </summary>
-    /// <param name="day">
-    /// Местная дата
-    /// </param>
-    /// <param name="time">
-    /// Местное время суток
-    /// </param>
-    /// <param name="zone">
-    /// Часовой пояс
-    /// </param>
-    /// <returns>
-    /// Момент со смещением, верным для этой даты
-    /// </returns>
+    /// <param name="day">Местная дата</param>
+    /// <param name="time">Местное время суток</param>
+    /// <param name="zone">Часовой пояс</param>
+    /// <returns>Момент со смещением, верным для этой даты</returns>
     internal static DateTimeOffset Occurrence(DateOnly day, TimeOnly time, TimeZoneInfo zone)
     {
         var local = day.ToDateTime(time);
@@ -174,9 +138,7 @@ public static class JobSchedule
     /// <param name="trigger">
     /// Условие вида <c>daily</c>
     /// </param>
-    /// <param name="time">
-    /// Время суток
-    /// </param>
+    /// <param name="time">Время суток</param>
     /// <returns>
     /// <see langword="true"/>, если время записано правильно
     /// </returns>
@@ -186,15 +148,9 @@ public static class JobSchedule
     /// <summary>
     /// Выбирает более поздний из двух моментов
     /// </summary>
-    /// <param name="first">
-    /// Первый момент
-    /// </param>
-    /// <param name="second">
-    /// Второй момент
-    /// </param>
-    /// <returns>
-    /// Более поздний
-    /// </returns>
+    /// <param name="first">Первый момент</param>
+    /// <param name="second">Второй момент</param>
+    /// <returns>Более поздний</returns>
     private static DateTimeOffset Max(DateTimeOffset first, DateTimeOffset second) => first >= second ? first : second;
 
     #endregion Daily

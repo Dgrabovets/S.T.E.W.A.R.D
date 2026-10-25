@@ -14,9 +14,7 @@ public static class Program
     /// <param name="args">
     /// Аргумент <c>--once</c> выполняет один прогон и завершает процесс, иначе повтор идёт по заданному интервалу
     /// </param>
-    /// <returns>
-    /// Задача, которая завершается вместе с остановкой хоста
-    /// </returns>
+    /// <returns>Задача, которая завершается вместе с остановкой хоста</returns>
     public static async Task Main(string[] args)
     {
         var runOnce = args.Any(arg => arg == "--once");

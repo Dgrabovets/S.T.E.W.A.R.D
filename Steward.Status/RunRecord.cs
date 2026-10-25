@@ -33,27 +33,15 @@ public enum RunOutcome
 /// <summary>
 /// Запись журнала об одном запуске
 /// </summary>
-/// <param name="JobId">
-/// Идентификатор задачи
-/// </param>
-/// <param name="Title">
-/// Название задачи
-/// </param>
-/// <param name="Reason">
-/// Почему запущена: start, daily, interval или manual
-/// </param>
-/// <param name="StartedAt">
-/// Когда запуск начался
-/// </param>
-/// <param name="FinishedAt">
-/// Когда запуск закончился
-/// </param>
+/// <param name="JobId">Идентификатор задачи</param>
+/// <param name="Title">Название задачи</param>
+/// <param name="Reason">Почему запущена: start, daily, interval или manual</param>
+/// <param name="StartedAt">Когда запуск начался</param>
+/// <param name="FinishedAt">Когда запуск закончился</param>
 /// <param name="ExitCode">
 /// Код завершения программы или <see langword="null"/>, если она не завершилась сама
 /// </param>
-/// <param name="Outcome">
-/// Итог запуска
-/// </param>
+/// <param name="Outcome">Итог запуска</param>
 /// <param name="Detail">
 /// Пояснение к ошибке или <see langword="null"/>
 /// </param>
@@ -103,9 +91,7 @@ public sealed class RunHistory
     /// <summary>
     /// Создаёт журнал в папке данных
     /// </summary>
-    /// <param name="dataDirectory">
-    /// Папка данных
-    /// </param>
+    /// <param name="dataDirectory">Папка данных</param>
     public RunHistory(string dataDirectory)
     {
         _path = Path.Combine(dataDirectory, "runs.jsonl");
@@ -114,9 +100,7 @@ public sealed class RunHistory
     /// <summary>
     /// Дописывает запись. Сбой записи не мешает работе: журнал нужен только для показа
     /// </summary>
-    /// <param name="record">
-    /// Запись о запуске
-    /// </param>
+    /// <param name="record">Запись о запуске</param>
     public void Append(RunRecord record)
     {
         lock (_gate)
@@ -137,12 +121,8 @@ public sealed class RunHistory
     /// <summary>
     /// Читает последние записи
     /// </summary>
-    /// <param name="count">
-    /// Сколько записей нужно
-    /// </param>
-    /// <returns>
-    /// Записи от новых к старым. Повреждённые строки пропускаются
-    /// </returns>
+    /// <param name="count">Сколько записей нужно</param>
+    /// <returns>Записи от новых к старым. Повреждённые строки пропускаются</returns>
     public IReadOnlyList<RunRecord> Load(int count)
     {
         lock (_gate)
@@ -169,9 +149,7 @@ public sealed class RunHistory
     /// <summary>
     /// Разбирает одну строку журнала
     /// </summary>
-    /// <param name="line">
-    /// Строка файла
-    /// </param>
+    /// <param name="line">Строка файла</param>
     /// <returns>
     /// Запись или <see langword="null"/>, если строка повреждена
     /// </returns>

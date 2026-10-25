@@ -10,12 +10,8 @@ public static class CsvTableParser
     /// <summary>
     /// Делит текст CSV на строки полей
     /// </summary>
-    /// <param name="text">
-    /// Весь документ CSV. Начальная метка порядка байтов отбрасывается
-    /// </param>
-    /// <returns>
-    /// Строки в порядке файла. Завершающий перевод строки не добавляет пустую строку, если в ней нет поля
-    /// </returns>
+    /// <param name="text">Весь документ CSV. Начальная метка порядка байтов отбрасывается</param>
+    /// <returns>Строки в порядке файла. Завершающий перевод строки не добавляет пустую строку, если в ней нет поля</returns>
     public static List<string[]> Parse(string text)
     {
         if (text.StartsWith('\uFEFF'))

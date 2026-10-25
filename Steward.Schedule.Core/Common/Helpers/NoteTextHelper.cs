@@ -30,9 +30,7 @@ public static class NoteTextHelper
     /// <param name="note">
     /// Обычный текст, объект дельты Quill или массив операций. <see langword="null"/> считается пустой заметкой
     /// </param>
-    /// <returns>
-    /// Обычный текст. Завершающий перевод строки, который добавляет Quill, отбрасывается. Нечитаемый JSON возвращается как есть
-    /// </returns>
+    /// <returns>Обычный текст. Завершающий перевод строки, который добавляет Quill, отбрасывается. Нечитаемый JSON возвращается как есть</returns>
     public static string GetPlainText(string? note)
     {
         if (string.IsNullOrWhiteSpace(note))
@@ -70,9 +68,7 @@ public static class NoteTextHelper
     /// <summary>
     /// Сообщает, описывают ли сохранённая и ожидаемая заметки один текст и одну ссылку
     /// </summary>
-    /// <param name="stored">
-    /// Заметка из API: обычный текст или дельта Quill
-    /// </param>
+    /// <param name="stored">Заметка из API: обычный текст или дельта Quill</param>
     /// <param name="expected">
     /// Текст ячейки. Последняя строка с адресом <c>http</c> или <c>https</c> считается ссылкой
     /// </param>
@@ -98,12 +94,8 @@ public static class NoteTextHelper
     /// <summary>
     /// Дописывает строковые операции <c>insert</c> из массива операций Quill
     /// </summary>
-    /// <param name="ops">
-    /// JSON-массив операций. Значения другого вида пропускаются
-    /// </param>
-    /// <param name="text">
-    /// Буфер, в который попадают вставленные строки
-    /// </param>
+    /// <param name="ops">JSON-массив операций. Значения другого вида пропускаются</param>
+    /// <param name="text">Буфер, в который попадают вставленные строки</param>
     private static void AppendInserts(JsonElement ops, StringBuilder text)
     {
         if (ops.ValueKind != JsonValueKind.Array)
@@ -121,9 +113,7 @@ public static class NoteTextHelper
     /// <summary>
     /// Возвращает адрес из атрибута <c>link</c> или из последней строки обычного текста
     /// </summary>
-    /// <param name="note">
-    /// Заметка из API
-    /// </param>
+    /// <param name="note">Заметка из API</param>
     /// <returns>
     /// Адрес или <see langword="null"/>, если ссылки нет
     /// </returns>
@@ -176,9 +166,7 @@ public static class NoteTextHelper
     /// <summary>
     /// Сообщает, что заметка хранится массивом операций Quill, а не объектом <c>ops</c> и не обычным текстом
     /// </summary>
-    /// <param name="note">
-    /// Заметка из API
-    /// </param>
+    /// <param name="note">Заметка из API</param>
     /// <returns>
     /// <see langword="true"/>, если корень JSON — массив
     /// </returns>
@@ -205,12 +193,8 @@ public static class NoteTextHelper
     /// <summary>
     /// Готовит заметку для API. Строка <c>---</c> становится разделителем, а последняя строка-адрес — словом <c>Ссылка</c>
     /// </summary>
-    /// <param name="note">
-    /// Текст ячейки. Адрес, прикреплённый к ячейке, стоит последней строкой
-    /// </param>
-    /// <returns>
-    /// Массив операций, если в заметке есть ссылка. Иначе исходный текст
-    /// </returns>
+    /// <param name="note">Текст ячейки. Адрес, прикреплённый к ячейке, стоит последней строкой</param>
+    /// <returns>Массив операций, если в заметке есть ссылка. Иначе исходный текст</returns>
     public static string Format(string note)
     {
         if (!TrySplitLink(note, out var body, out var url))
@@ -226,12 +210,8 @@ public static class NoteTextHelper
     /// <summary>
     /// Пишет текст и превращает строку <c>---</c> во вставку разделителя Quill
     /// </summary>
-    /// <param name="ops">
-    /// Операции заметки
-    /// </param>
-    /// <param name="body">
-    /// Текст до адреса. Строка из трёх дефисов означает горизонтальную линию
-    /// </param>
+    /// <param name="ops">Операции заметки</param>
+    /// <param name="body">Текст до адреса. Строка из трёх дефисов означает горизонтальную линию</param>
     private static void AppendBody(List<object> ops, string body)
     {
         if (body.Length == 0)
@@ -259,12 +239,8 @@ public static class NoteTextHelper
     /// <summary>
     /// Добавляет накопленный текст отдельной операцией и закрывает его переводом строки
     /// </summary>
-    /// <param name="ops">
-    /// Операции заметки
-    /// </param>
-    /// <param name="text">
-    /// Буфер текста. После записи очищается
-    /// </param>
+    /// <param name="ops">Операции заметки</param>
+    /// <param name="text">Буфер текста. После записи очищается</param>
     private static void FlushText(List<object> ops, StringBuilder text)
     {
         if (text.Length == 0)
@@ -280,9 +256,7 @@ public static class NoteTextHelper
     /// <summary>
     /// Убирает строки разделителя из ожидаемого текста, чтобы сравнивать его с видимыми вставками
     /// </summary>
-    /// <param name="body">
-    /// Текст до адреса
-    /// </param>
+    /// <param name="body">Текст до адреса</param>
     /// <returns>
     /// Тот же текст без строк <c>---</c>
     /// </returns>
@@ -297,9 +271,7 @@ public static class NoteTextHelper
     /// <summary>
     /// Сообщает, что в тексте есть строка горизонтального разделителя
     /// </summary>
-    /// <param name="body">
-    /// Текст до адреса
-    /// </param>
+    /// <param name="body">Текст до адреса</param>
     /// <returns>
     /// <see langword="true"/>, если одна из строк равна <c>---</c>
     /// </returns>
@@ -309,9 +281,7 @@ public static class NoteTextHelper
     /// <summary>
     /// Сообщает, что заметка содержит вставку разделителя Quill
     /// </summary>
-    /// <param name="note">
-    /// Заметка из API
-    /// </param>
+    /// <param name="note">Заметка из API</param>
     /// <returns>
     /// <see langword="true"/>, если среди операций есть объект <c>divider</c>
     /// </returns>
@@ -348,12 +318,8 @@ public static class NoteTextHelper
     /// <summary>
     /// Отделяет последнюю строку, если это адрес <c>http</c> или <c>https</c>
     /// </summary>
-    /// <param name="note">
-    /// Текст заметки
-    /// </param>
-    /// <param name="body">
-    /// Текст до адреса. Пустая строка, если адрес занимает всю заметку
-    /// </param>
+    /// <param name="note">Текст заметки</param>
+    /// <param name="body">Текст до адреса. Пустая строка, если адрес занимает всю заметку</param>
     /// <param name="url">
     /// Адрес последней строки, если метод вернул <see langword="true"/>
     /// </param>

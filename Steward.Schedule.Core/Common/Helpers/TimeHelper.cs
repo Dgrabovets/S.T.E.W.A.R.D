@@ -11,9 +11,7 @@
         /// <param name="timeZoneId">
         /// Идентификатор, например <c>Europe/Moscow</c>
         /// </param>
-        /// <returns>
-        /// Найденный пояс.
-        /// </returns>
+        /// <returns>Найденный пояс.</returns>
         /// <exception cref="InvalidOperationException">
         /// Идентификатор неизвестен на этой машине
         /// </exception>

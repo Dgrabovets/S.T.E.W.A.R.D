@@ -576,15 +576,9 @@ public class ScheduleSyncTests
     /// <summary>
     /// Запускает синхронизацию с включёнными тегами предметов
     /// </summary>
-    /// <param name="source">
-    /// Источник CSV
-    /// </param>
-    /// <param name="client">
-    /// Клиент Singularity, который записывает вызовы
-    /// </param>
-    /// <returns>
-    /// Отчёт синхронизации
-    /// </returns>
+    /// <param name="source">Источник CSV</param>
+    /// <param name="client">Клиент Singularity, который записывает вызовы</param>
+    /// <returns>Отчёт синхронизации</returns>
     private static Task<SyncReport> SyncWithSubjectTags(FakeSource source, FakeClient client)
     {
         var options = new SyncOptions
@@ -607,15 +601,9 @@ public class ScheduleSyncTests
     /// <summary>
     /// Запускает синхронизацию на подделках с фиксированной датой
     /// </summary>
-    /// <param name="source">
-    /// Источник CSV
-    /// </param>
-    /// <param name="client">
-    /// Клиент Singularity, который записывает вызовы
-    /// </param>
-    /// <returns>
-    /// Отчёт синхронизации
-    /// </returns>
+    /// <param name="source">Источник CSV</param>
+    /// <param name="client">Клиент Singularity, который записывает вызовы</param>
+    /// <returns>Отчёт синхронизации</returns>
     private static Task<SyncReport> Sync(FakeSource source, FakeClient client)
     {
         var options = new SyncOptions
@@ -639,15 +627,9 @@ public class ScheduleSyncTests
     /// <param name="externalId">
     /// Ключ, который заканчивается на <c>yyyy-MM-dd:HHmm</c>
     /// </param>
-    /// <param name="title">
-    /// Название задачи
-    /// </param>
-    /// <param name="note">
-    /// Заметка задачи
-    /// </param>
-    /// <returns>
-    /// Занятие на 80 минут с московским смещением
-    /// </returns>
+    /// <param name="title">Название задачи</param>
+    /// <param name="note">Заметка задачи</param>
+    /// <returns>Занятие на 80 минут с московским смещением</returns>
     private static Lesson SampleLesson(string externalId, string title, string note)
     {
         var parts = externalId.Split(':');
@@ -662,12 +644,8 @@ public class ScheduleSyncTests
     /// <summary>
     /// Оборачивает занятие в снимок сохранённой задачи
     /// </summary>
-    /// <param name="lesson">
-    /// Желаемые значения занятия
-    /// </param>
-    /// <param name="id">
-    /// Идентификатор задачи Singularity
-    /// </param>
+    /// <param name="lesson">Желаемые значения занятия</param>
+    /// <param name="id">Идентификатор задачи Singularity</param>
     /// <param name="checkState">
     /// Состояние отметки. <c>1</c> значит, что задача выполнена
     /// </param>
@@ -677,9 +655,7 @@ public class ScheduleSyncTests
     /// <param name="withReminder">
     /// <see langword="false"/>, если у снимка нет напоминания за 15 минут
     /// </param>
-    /// <returns>
-    /// Снимок
-    /// </returns>
+    /// <returns>Снимок</returns>
     private static SingularityTask TaskFrom(Lesson lesson, string id, int checkState, string? journalDate = null, bool withReminder = true) =>
         new(
             id,
@@ -731,12 +707,8 @@ public class ScheduleSyncTests
         /// <summary>
         /// Возвращает заранее заданный CSV
         /// </summary>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
-        /// <returns>
-        /// CSV, переданный в конструктор
-        /// </returns>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>CSV, переданный в конструктор</returns>
         public Task<string> ReadCsvAsync(CancellationToken cancellationToken) => Task.FromResult(csv);
     }
 
@@ -788,12 +760,8 @@ public class ScheduleSyncTests
         /// <summary>
         /// Записывает название проекта и возвращает фиксированный идентификатор
         /// </summary>
-        /// <param name="title">
-        /// Запрошенное название проекта
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
+        /// <param name="title">Запрошенное название проекта</param>
+        /// <param name="cancellationToken">Не используется</param>
         /// <returns>
         /// <c>P-1</c>
         /// </returns>
@@ -806,12 +774,8 @@ public class ScheduleSyncTests
         /// <summary>
         /// Сообщает, что отдельного проекта группы нет
         /// </summary>
-        /// <param name="title">
-        /// Не используется
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
+        /// <param name="title">Не используется</param>
+        /// <param name="cancellationToken">Не используется</param>
         /// <returns>
         /// <see langword="null"/>
         /// </returns>
@@ -831,12 +795,8 @@ public class ScheduleSyncTests
         /// <summary>
         /// Записывает запрос тега
         /// </summary>
-        /// <param name="title">
-        /// Название тега
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
+        /// <param name="title">Название тега</param>
+        /// <param name="cancellationToken">Не используется</param>
         /// <returns>
         /// Идентификатор вида <c>A-название</c>
         /// </returns>
@@ -852,15 +812,9 @@ public class ScheduleSyncTests
         /// <summary>
         /// Возвращает <see cref="Tasks"/>
         /// </summary>
-        /// <param name="projectId">
-        /// Не используется
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
-        /// <returns>
-        /// Заранее заданный список задач
-        /// </returns>
+        /// <param name="projectId">Не используется</param>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>Заранее заданный список задач</returns>
         public Task<IReadOnlyList<SingularityTask>> ListProjectTasksAsync(
             string projectId,
             CancellationToken cancellationToken) =>
@@ -869,15 +823,9 @@ public class ScheduleSyncTests
         /// <summary>
         /// Записывает создание
         /// </summary>
-        /// <param name="projectId">
-        /// Не используется
-        /// </param>
-        /// <param name="lesson">
-        /// Занятие, которое было бы создано
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
+        /// <param name="projectId">Не используется</param>
+        /// <param name="lesson">Занятие, которое было бы создано</param>
+        /// <param name="cancellationToken">Не используется</param>
         /// <returns>
         /// Идентификатор вида <c>T-1</c>, <c>T-2</c> и далее по порядку созданий
         /// </returns>
@@ -890,21 +838,11 @@ public class ScheduleSyncTests
         /// <summary>
         /// Записывает обновление
         /// </summary>
-        /// <param name="taskId">
-        /// Не используется
-        /// </param>
-        /// <param name="projectId">
-        /// Не используется
-        /// </param>
-        /// <param name="lesson">
-        /// Занятие, которое было бы записано
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
-        /// <returns>
-        /// Завершённая задача
-        /// </returns>
+        /// <param name="taskId">Не используется</param>
+        /// <param name="projectId">Не используется</param>
+        /// <param name="lesson">Занятие, которое было бы записано</param>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>Завершённая задача</returns>
         public Task UpdateTaskAsync(
             string taskId,
             string projectId,
@@ -918,15 +856,9 @@ public class ScheduleSyncTests
         /// <summary>
         /// Записывает удаление
         /// </summary>
-        /// <param name="taskId">
-        /// Идентификатор удаляемой задачи
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
-        /// <returns>
-        /// Завершённая задача
-        /// </returns>
+        /// <param name="taskId">Идентификатор удаляемой задачи</param>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>Завершённая задача</returns>
         public Task DeleteTaskAsync(string taskId, CancellationToken cancellationToken)
         {
             Deleted.Add(taskId);
@@ -936,18 +868,10 @@ public class ScheduleSyncTests
         /// <summary>
         /// Записывает архивацию
         /// </summary>
-        /// <param name="taskId">
-        /// Идентификатор архивируемой задачи
-        /// </param>
-        /// <param name="journalDate">
-        /// Не используется
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
-        /// <returns>
-        /// Завершённая задача
-        /// </returns>
+        /// <param name="taskId">Идентификатор архивируемой задачи</param>
+        /// <param name="journalDate">Не используется</param>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>Завершённая задача</returns>
         public Task ArchiveTaskAsync(string taskId, DateTimeOffset journalDate, CancellationToken cancellationToken)
         {
             Archived.Add(taskId);
@@ -957,15 +881,9 @@ public class ScheduleSyncTests
         /// <summary>
         /// Записывает отметку выполнения
         /// </summary>
-        /// <param name="taskId">
-        /// Идентификатор выполняемой задачи
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
-        /// <returns>
-        /// Завершённая задача
-        /// </returns>
+        /// <param name="taskId">Идентификатор выполняемой задачи</param>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>Завершённая задача</returns>
         public Task CompleteTaskAsync(string taskId, CancellationToken cancellationToken)
         {
             Completed.Add(taskId);
@@ -975,15 +893,9 @@ public class ScheduleSyncTests
         /// <summary>
         /// Записывает возврат из архива
         /// </summary>
-        /// <param name="taskId">
-        /// Идентификатор возвращаемой задачи
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Не используется
-        /// </param>
-        /// <returns>
-        /// Завершённая задача
-        /// </returns>
+        /// <param name="taskId">Идентификатор возвращаемой задачи</param>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>Завершённая задача</returns>
         public Task UnarchiveTaskAsync(string taskId, CancellationToken cancellationToken)
         {
             Unarchived.Add(taskId);

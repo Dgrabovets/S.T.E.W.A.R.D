@@ -44,21 +44,11 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Создаёт прогон синхронизации
     /// </summary>
-    /// <param name="source">
-    /// Читает таблицу
-    /// </param>
-    /// <param name="client">
-    /// Пишет задачи в Singularity
-    /// </param>
-    /// <param name="clock">
-    /// Дата для выбора года и текущего момента
-    /// </param>
-    /// <param name="options">
-    /// Колонка, проект и часовой пояс
-    /// </param>
-    /// <param name="logger">
-    /// Принимает строку на каждое изменение и итоговую сводку
-    /// </param>
+    /// <param name="source">Читает таблицу</param>
+    /// <param name="client">Пишет задачи в Singularity</param>
+    /// <param name="clock">Дата для выбора года и текущего момента</param>
+    /// <param name="options">Колонка, проект и часовой пояс</param>
+    /// <param name="logger">Принимает строку на каждое изменение и итоговую сводку</param>
     public ScheduleSyncer(
         IScheduleSource source,
         ISingularityClient client,
@@ -76,12 +66,8 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Читает таблицу и создаёт, обновляет, возвращает из архива, отмечает выполненными или удаляет подходящие задачи
     /// </summary>
-    /// <param name="cancellationToken">
-    /// Отменяет прогон
-    /// </param>
-    /// <returns>
-    /// Счётчики каждого действия. Уже выполненная задача прошедшего занятия не меняется
-    /// </returns>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    /// <returns>Счётчики каждого действия. Уже выполненная задача прошедшего занятия не меняется</returns>
     public async Task<SyncReport> RunAsync(CancellationToken cancellationToken)
     {
         #region Load
@@ -265,18 +251,10 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Сопоставляет опустевшей ячейке занятие, в заметку которого нужно дописать перенос или отмену
     /// </summary>
-    /// <param name="slots">
-    /// Слоты текущего листа
-    /// </param>
-    /// <param name="byExternalId">
-    /// Уже сохранённые задачи группы
-    /// </param>
-    /// <param name="now">
-    /// Текущий момент. По нему видно, какое выполненное занятие этот прогон создаст заново
-    /// </param>
-    /// <returns>
-    /// Строки заметки по внешнему идентификатору занятия, которое их получит
-    /// </returns>
+    /// <param name="slots">Слоты текущего листа</param>
+    /// <param name="byExternalId">Уже сохранённые задачи группы</param>
+    /// <param name="now">Текущий момент. По нему видно, какое выполненное занятие этот прогон создаст заново</param>
+    /// <returns>Строки заметки по внешнему идентификатору занятия, которое их получит</returns>
     private static Dictionary<string, List<string>> RemovalNotices(
         IReadOnlyList<Scheduling.Models.ScheduleSlot> slots,
         Dictionary<string, Singularity.Models.SingularityTask> byExternalId,
@@ -322,21 +300,11 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Ищет открытое занятие того же предмета в этот день, иначе следующую пару
     /// </summary>
-    /// <param name="live">
-    /// Занятия, которые ещё есть в таблице
-    /// </param>
-    /// <param name="byExternalId">
-    /// Сохранённые задачи. Выполненная задача прошедшего занятия не получает новую пометку
-    /// </param>
-    /// <param name="title">
-    /// Название удалённого занятия
-    /// </param>
-    /// <param name="removedStart">
-    /// Начало удалённого занятия
-    /// </param>
-    /// <param name="now">
-    /// Текущий момент
-    /// </param>
+    /// <param name="live">Занятия, которые ещё есть в таблице</param>
+    /// <param name="byExternalId">Сохранённые задачи. Выполненная задача прошедшего занятия не получает новую пометку</param>
+    /// <param name="title">Название удалённого занятия</param>
+    /// <param name="removedStart">Начало удалённого занятия</param>
+    /// <param name="now">Текущий момент</param>
     /// <returns>
     /// Занятие для пометки или <see langword="null"/>, если писать некуда
     /// </returns>
@@ -364,15 +332,9 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Сообщает, что занятие ещё можно дополнить пометкой
     /// </summary>
-    /// <param name="lesson">
-    /// Занятие из таблицы
-    /// </param>
-    /// <param name="byExternalId">
-    /// Сохранённые задачи
-    /// </param>
-    /// <param name="now">
-    /// Текущий момент. Выполненная задача занятия, которое ещё не закончилось, будет создана заново в этом прогоне
-    /// </param>
+    /// <param name="lesson">Занятие из таблицы</param>
+    /// <param name="byExternalId">Сохранённые задачи</param>
+    /// <param name="now">Текущий момент. Выполненная задача занятия, которое ещё не закончилось, будет создана заново в этом прогоне</param>
     /// <returns>
     /// <see langword="true"/>, если задачи нет, она не выполнена или этот прогон создаст её заново
     /// </returns>
@@ -387,15 +349,9 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Добавляет в начало заметки строки об отмене и переносе, не трогая адрес в конце
     /// </summary>
-    /// <param name="lesson">
-    /// Занятие из таблицы
-    /// </param>
-    /// <param name="notices">
-    /// Строки по внешнему идентификатору
-    /// </param>
-    /// <returns>
-    /// То же занятие, если пометок нет. Иначе копия с дополненной заметкой
-    /// </returns>
+    /// <param name="lesson">Занятие из таблицы</param>
+    /// <param name="notices">Строки по внешнему идентификатору</param>
+    /// <returns>То же занятие, если пометок нет. Иначе копия с дополненной заметкой</returns>
     private static Lesson WithNotices(Lesson lesson, Dictionary<string, List<string>> notices)
     {
         if (!notices.TryGetValue(lesson.ExternalId, out var lines) || lines.Count == 0)
@@ -413,15 +369,9 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Находит или создаёт по одному тегу на каждый предмет таблицы
     /// </summary>
-    /// <param name="slots">
-    /// Слоты текущего листа
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Отменяет прогон
-    /// </param>
-    /// <returns>
-    /// Идентификаторы тегов по названию предмета. Пусто, если токену не хватает доступа к тегам: прогон тогда идёт без тегов
-    /// </returns>
+    /// <param name="slots">Слоты текущего листа</param>
+    /// <param name="cancellationToken">Отменяет прогон</param>
+    /// <returns>Идентификаторы тегов по названию предмета. Пусто, если токену не хватает доступа к тегам: прогон тогда идёт без тегов</returns>
     private async Task<Dictionary<string, string>> ResolveSubjectTagsAsync(
         IReadOnlyList<Scheduling.Models.ScheduleSlot> slots,
         CancellationToken cancellationToken)
@@ -444,18 +394,12 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Добавляет к занятию тег его предмета, сохраняя теги, которые пользователь уже поставил на задачу
     /// </summary>
-    /// <param name="lesson">
-    /// Занятие из таблицы
-    /// </param>
+    /// <param name="lesson">Занятие из таблицы</param>
     /// <param name="existing">
     /// Сохранённая задача или <see langword="null"/>, если задачу ещё создают
     /// </param>
-    /// <param name="subjectTags">
-    /// Идентификаторы тегов по названию предмета
-    /// </param>
-    /// <returns>
-    /// То же занятие, если тега для предмета нет. Иначе копия с тегами задачи и тегом предмета
-    /// </returns>
+    /// <param name="subjectTags">Идентификаторы тегов по названию предмета</param>
+    /// <returns>То же занятие, если тега для предмета нет. Иначе копия с тегами задачи и тегом предмета</returns>
     private static Lesson WithTags(Lesson lesson, Singularity.Models.SingularityTask? existing, Dictionary<string, string> subjectTags)
     {
         if (!subjectTags.TryGetValue(lesson.Subject, out var tagId))
@@ -472,12 +416,8 @@ public sealed class ScheduleSyncer
     /// <summary>
     /// Сообщает, попадает ли день занятия в текущую календарную неделю
     /// </summary>
-    /// <param name="start">
-    /// Начало занятия в часовом поясе расписания
-    /// </param>
-    /// <param name="now">
-    /// Текущий момент в том же поясе
-    /// </param>
+    /// <param name="start">Начало занятия в часовом поясе расписания</param>
+    /// <param name="now">Текущий момент в том же поясе</param>
     /// <returns>
     /// <see langword="true"/>, если день занятия лежит между понедельником и воскресеньем этой недели
     /// </returns>

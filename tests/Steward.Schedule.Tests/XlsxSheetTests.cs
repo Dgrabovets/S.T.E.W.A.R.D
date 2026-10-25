@@ -43,9 +43,7 @@ public class XlsxSheetTests
     /// <summary>
     /// Собирает книгу, где занятие записано в <c>РКИ-1-26</c> и объединено с <c>РКИ-2-26</c>
     /// </summary>
-    /// <returns>
-    /// Байты xlsx
-    /// </returns>
+    /// <returns>Байты xlsx</returns>
     private static byte[] Workbook()
     {
         using var stream = new MemoryStream();
@@ -91,9 +89,7 @@ public class XlsxSheetTests
     /// <summary>
     /// Собирает ту же книгу, где у объединённой ячейки есть внешняя гиперссылка
     /// </summary>
-    /// <returns>
-    /// Байты xlsx
-    /// </returns>
+    /// <returns>Байты xlsx</returns>
     private static byte[] WorkbookWithLink()
     {
         using var stream = new MemoryStream();
@@ -148,15 +144,9 @@ public class XlsxSheetTests
     /// <summary>
     /// Кладёт текст в запись архива
     /// </summary>
-    /// <param name="archive">
-    /// Создаваемая книга
-    /// </param>
-    /// <param name="path">
-    /// Путь записи внутри архива
-    /// </param>
-    /// <param name="content">
-    /// Текст XML
-    /// </param>
+    /// <param name="archive">Создаваемая книга</param>
+    /// <param name="path">Путь записи внутри архива</param>
+    /// <param name="content">Текст XML</param>
     private static void Write(ZipArchive archive, string path, string content)
     {
         var entry = archive.CreateEntry(path);

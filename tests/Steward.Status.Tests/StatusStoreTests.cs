@@ -88,9 +88,7 @@ public class StatusStoreTests
     /// <summary>
     /// Идентификатор с путём не превращается в имя файла
     /// </summary>
-    /// <param name="id">
-    /// Идентификатор, который не должен быть принят
-    /// </param>
+    /// <param name="id">Идентификатор, который не должен быть принят</param>
     [Theory]
     [InlineData("..\\evil")]
     [InlineData("a/b")]

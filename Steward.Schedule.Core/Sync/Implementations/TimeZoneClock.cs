@@ -17,9 +17,7 @@ public sealed class TimeZoneClock : IScheduleClock
     /// <summary>
     /// Создаёт часы для пояса, указанного в <paramref name="options"/>
     /// </summary>
-    /// <param name="options">
-    /// Настройки, чей идентификатор пояса разрешается один раз
-    /// </param>
+    /// <param name="options">Настройки, чей идентификатор пояса разрешается один раз</param>
     public TimeZoneClock(SyncOptions options)
     {
         _timeZone = TimeHelper.ResolveTimeZone(options.TimeZoneId);

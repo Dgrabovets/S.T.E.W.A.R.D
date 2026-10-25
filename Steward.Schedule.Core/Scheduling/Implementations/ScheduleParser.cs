@@ -16,15 +16,9 @@ public static partial class ScheduleParser
     /// <summary>
     /// Читает все датированные временные слоты колонки <paramref name="groupColumn"/>
     /// </summary>
-    /// <param name="csv">
-    /// Экспорт листа вместе с заголовком
-    /// </param>
-    /// <param name="groupColumn">
-    /// Заголовок копируемой колонки
-    /// </param>
-    /// <param name="timeZone">
-    /// Пояс, в котором ставится время начала
-    /// </param>
+    /// <param name="csv">Экспорт листа вместе с заголовком</param>
+    /// <param name="groupColumn">Заголовок копируемой колонки</param>
+    /// <param name="timeZone">Пояс, в котором ставится время начала</param>
     /// <param name="today">
     /// Сегодняшняя дата в <paramref name="timeZone"/>, по ней выбирается год даты <c>DD.MM</c>
     /// </param>
@@ -111,9 +105,7 @@ public static partial class ScheduleParser
     /// <summary>
     /// Общий префикс внешних идентификаторов группы, включая завершающее двоеточие
     /// </summary>
-    /// <param name="groupColumn">
-    /// Заголовок колонки, из которого получается slug
-    /// </param>
+    /// <param name="groupColumn">Заголовок колонки, из которого получается slug</param>
     /// <returns>
     /// Значение вроде <c>up:rki-2-26:</c>
     /// </returns>
@@ -122,9 +114,7 @@ public static partial class ScheduleParser
     /// <summary>
     /// Ключ проекта группы. Начинается не с <c>up:</c>, чтобы его не приняли за ключ задачи занятия
     /// </summary>
-    /// <param name="groupColumn">
-    /// Заголовок колонки, из которого получается slug
-    /// </param>
+    /// <param name="groupColumn">Заголовок колонки, из которого получается slug</param>
     /// <returns>
     /// Значение вроде <c>up-project:rki-2-26</c>
     /// </returns>
@@ -133,9 +123,7 @@ public static partial class ScheduleParser
     /// <summary>
     /// Превращает заголовок колонки в строчный slug, пригодный для внешнего идентификатора
     /// </summary>
-    /// <param name="value">
-    /// Заголовок колонки. Кириллица транслитерируется
-    /// </param>
+    /// <param name="value">Заголовок колонки. Кириллица транслитерируется</param>
     /// <returns>
     /// Slug вроде <c>rki-2-26</c>
     /// </returns>
@@ -178,18 +166,10 @@ public static partial class ScheduleParser
     /// <summary>
     /// Разбирает <c>DD.MM</c> и выбирает год по <paramref name="today"/>
     /// </summary>
-    /// <param name="text">
-    /// Ячейка с датой
-    /// </param>
-    /// <param name="today">
-    /// Текущая дата в часовом поясе расписания
-    /// </param>
-    /// <param name="rowNumber">
-    /// Номер строки с единицы, попадает в текст ошибки
-    /// </param>
-    /// <returns>
-    /// Дата. Значение старше четырёх месяцев переносится на следующий год
-    /// </returns>
+    /// <param name="text">Ячейка с датой</param>
+    /// <param name="today">Текущая дата в часовом поясе расписания</param>
+    /// <param name="rowNumber">Номер строки с единицы, попадает в текст ошибки</param>
+    /// <returns>Дата. Значение старше четырёх месяцев переносится на следующий год</returns>
     /// <exception cref="FormatException">
     /// В ячейке нет существующего дня и месяца
     /// </exception>
@@ -261,12 +241,8 @@ public static partial class ScheduleParser
     /// <summary>
     /// Разбирает одну пару часов и минут
     /// </summary>
-    /// <param name="hourText">
-    /// Час от 0 до 23
-    /// </param>
-    /// <param name="minuteText">
-    /// Минута от 0 до 59
-    /// </param>
+    /// <param name="hourText">Час от 0 до 23</param>
+    /// <param name="minuteText">Минута от 0 до 59</param>
     /// <param name="time">
     /// Разобранное время, если метод вернул <see langword="true"/>
     /// </param>
@@ -295,9 +271,7 @@ public static partial class ScheduleParser
     /// <summary>
     /// Собирает название задачи из первой строки до запятой и добавляет тип занятия, если он стоит дальше
     /// </summary>
-    /// <param name="note">
-    /// Нормализованный текст ячейки
-    /// </param>
+    /// <param name="note">Нормализованный текст ячейки</param>
     /// <returns>
     /// Название. Уже написанные в предмете <c>Лекция</c> или <c>Практика</c> не повторяются
     /// </returns>
@@ -320,9 +294,7 @@ public static partial class ScheduleParser
     /// <summary>
     /// Собирает описание: имя преподавателя, разделитель и адрес ячейки последней строкой
     /// </summary>
-    /// <param name="note">
-    /// Нормализованный текст ячейки. Адрес, если он есть, стоит последней строкой
-    /// </param>
+    /// <param name="note">Нормализованный текст ячейки. Адрес, если он есть, стоит последней строкой</param>
     /// <returns>
     /// Текст вида <c>Преподаватель: Имя</c>, затем <c>---</c> и адрес. Без адреса остаётся только строка преподавателя
     /// </returns>
@@ -347,12 +319,8 @@ public static partial class ScheduleParser
     /// <summary>
     /// Берёт имя преподавателя со следующей строки после предмета или после первой запятой
     /// </summary>
-    /// <param name="lines">
-    /// Строки ячейки без адреса
-    /// </param>
-    /// <returns>
-    /// Имя без должности и без типа занятия. Пустая строка, если имени нет
-    /// </returns>
+    /// <param name="lines">Строки ячейки без адреса</param>
+    /// <returns>Имя без должности и без типа занятия. Пустая строка, если имени нет</returns>
     private static string TeacherName(List<string> lines)
     {
         if (lines.Count == 0)
@@ -374,9 +342,7 @@ public static partial class ScheduleParser
     /// <summary>
     /// Сообщает, что строка является адресом http или https
     /// </summary>
-    /// <param name="line">
-    /// Одна строка ячейки
-    /// </param>
+    /// <param name="line">Одна строка ячейки</param>
     /// <returns>
     /// <see langword="true"/>, если строка начинается с <c>http://</c> или <c>https://</c> и не содержит пробелов
     /// </returns>
@@ -389,9 +355,7 @@ public static partial class ScheduleParser
     /// <summary>
     /// Находит первое слово типа занятия в <paramref name="text"/>
     /// </summary>
-    /// <param name="text">
-    /// Фрагмент ячейки
-    /// </param>
+    /// <param name="text">Фрагмент ячейки</param>
     /// <returns>
     /// <c>Практика</c>, <c>Лекция</c> или <see langword="null"/>
     /// </returns>
@@ -409,12 +373,8 @@ public static partial class ScheduleParser
     /// <summary>
     /// Обрезает каждую строку и выбрасывает пустые
     /// </summary>
-    /// <param name="raw">
-    /// Значение ячейки, как оно пришло из CSV
-    /// </param>
-    /// <returns>
-    /// Нормализованный текст. Пустая ячейка или ячейка из пробелов становится пустой строкой
-    /// </returns>
+    /// <param name="raw">Значение ячейки, как оно пришло из CSV</param>
+    /// <returns>Нормализованный текст. Пустая ячейка или ячейка из пробелов становится пустой строкой</returns>
     private static string NormalizeCell(string raw)
     {
         var text = raw.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
@@ -432,29 +392,17 @@ public static partial class ScheduleParser
     /// <summary>
     /// Возвращает ячейку или пустую строку, если строка короче <paramref name="index"/>
     /// </summary>
-    /// <param name="row">
-    /// Строка CSV
-    /// </param>
-    /// <param name="index">
-    /// Индекс колонки с нуля
-    /// </param>
-    /// <returns>
-    /// Текст ячейки
-    /// </returns>
+    /// <param name="row">Строка CSV</param>
+    /// <param name="index">Индекс колонки с нуля</param>
+    /// <returns>Текст ячейки</returns>
     private static string Cell(string[] row, int index) => index < row.Length ? row[index] : "";
 
     /// <summary>
     /// Ищет заголовок по обрезанному имени без учёта регистра
     /// </summary>
-    /// <param name="header">
-    /// Строка заголовков
-    /// </param>
-    /// <param name="name">
-    /// Ожидаемый заголовок
-    /// </param>
-    /// <returns>
-    /// Индекс с нуля или -1, если заголовка нет
-    /// </returns>
+    /// <param name="header">Строка заголовков</param>
+    /// <param name="name">Ожидаемый заголовок</param>
+    /// <returns>Индекс с нуля или -1, если заголовка нет</returns>
     private static int FindColumn(string[] header, string name)
     {
         for (var i = 0; i < header.Length; i++)
@@ -473,9 +421,7 @@ public static partial class ScheduleParser
     /// <summary>
     /// Переводит одну строчную кириллическую букву в латиницу. Твёрдый и мягкий знаки дают пустую строку
     /// </summary>
-    /// <param name="character">
-    /// Уже приведённый к нижнему регистру символ
-    /// </param>
+    /// <param name="character">Уже приведённый к нижнему регистру символ</param>
     /// <returns>
     /// Латинский текст, пустая строка для знака или <see langword="null"/>, если символ не кириллический
     /// </returns>
@@ -524,27 +470,21 @@ public static partial class ScheduleParser
     /// <summary>
     /// Совпадает с днём и месяцем в виде <c>DD.MM</c>
     /// </summary>
-    /// <returns>
-    /// Шаблон даты
-    /// </returns>
+    /// <returns>Шаблон даты</returns>
     [GeneratedRegex(@"^(\d{1,2})\.(\d{1,2})$")]
     private static partial Regex DateCell();
 
     /// <summary>
     /// Совпадает с временем начала и конца, разделёнными дефисом или тире
     /// </summary>
-    /// <returns>
-    /// Шаблон диапазона времени
-    /// </returns>
+    /// <returns>Шаблон диапазона времени</returns>
     [GeneratedRegex(@"^(\d{1,2})[.:](\d{2})\s*[-–—]\s*(\d{1,2})[.:](\d{2})$")]
     private static partial Regex TimeRange();
 
     /// <summary>
     /// Совпадает со словами лекция и практика
     /// </summary>
-    /// <returns>
-    /// Шаблон типа занятия
-    /// </returns>
+    /// <returns>Шаблон типа занятия</returns>
     [GeneratedRegex(@"(?i)\b(лекция|практика)\b")]
     private static partial Regex LessonTypePattern();
 
@@ -557,18 +497,14 @@ public static partial class ScheduleParser
     /// <summary>
     /// Совпадает с подряд идущими пробелами или табуляциями, которые схлопываются в один пробел
     /// </summary>
-    /// <returns>
-    /// Шаблон пробелов
-    /// </returns>
+    /// <returns>Шаблон пробелов</returns>
     [GeneratedRegex(@"[ \t]{2,}")]
     private static partial Regex Whitespace();
 
     /// <summary>
     /// Совпадает с повторными дефисами, которые появляются при сборке slug
     /// </summary>
-    /// <returns>
-    /// Шаблон дефисов
-    /// </returns>
+    /// <returns>Шаблон дефисов</returns>
     [GeneratedRegex("-{2,}")]
     private static partial Regex RepeatedHyphen();
 

@@ -28,15 +28,11 @@ public static class ScheduleSyncRegistration
     /// <summary>
     /// Читает настройки и регистрирует чтение таблицы, клиент Singularity и цикл сверки
     /// </summary>
-    /// <param name="services">
-    /// Коллекция служб хоста
-    /// </param>
+    /// <param name="services">Коллекция служб хоста</param>
     /// <param name="runOnce">
     /// <see langword="true"/>, если нужен один прогон
     /// </param>
-    /// <returns>
-    /// Та же коллекция
-    /// </returns>
+    /// <returns>Та же коллекция</returns>
     public static IServiceCollection AddScheduleSync(this IServiceCollection services, bool runOnce)
     {
         services.AddSingleton(EnviromentalHelper.GetSyndOptionsFromEnvironment(runOnce));

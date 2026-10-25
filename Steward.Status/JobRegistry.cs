@@ -6,12 +6,8 @@ namespace Steward.Status;
 /// <summary>
 /// Результат чтения списка задач
 /// </summary>
-/// <param name="Jobs">
-/// Задачи, прошедшие проверку
-/// </param>
-/// <param name="Errors">
-/// Что не удалось прочитать и почему. Пусто, если всё в порядке
-/// </param>
+/// <param name="Jobs">Задачи, прошедшие проверку</param>
+/// <param name="Errors">Что не удалось прочитать и почему. Пусто, если всё в порядке</param>
 public sealed record JobRegistryResult(IReadOnlyList<JobDefinition> Jobs, IReadOnlyList<string> Errors);
 
 /// <summary>
@@ -44,9 +40,7 @@ public static class JobRegistry
     /// <param name="repoRoot">
     /// Корень репозитория для подстановки <c>{repo}</c> или <see langword="null"/>
     /// </param>
-    /// <returns>
-    /// Задачи и ошибки чтения
-    /// </returns>
+    /// <returns>Задачи и ошибки чтения</returns>
     public static JobRegistryResult Load(string path, string? repoRoot)
     {
         if (!File.Exists(path))
@@ -71,9 +65,7 @@ public static class JobRegistry
     /// <param name="repoRoot">
     /// Корень репозитория для подстановки <c>{repo}</c> или <see langword="null"/>
     /// </param>
-    /// <returns>
-    /// Задачи и ошибки разбора
-    /// </returns>
+    /// <returns>Задачи и ошибки разбора</returns>
     public static JobRegistryResult Parse(string json, string? repoRoot)
     {
         JobFile? file;
@@ -116,9 +108,7 @@ public static class JobRegistry
     /// <summary>
     /// Проверяет задачу
     /// </summary>
-    /// <param name="job">
-    /// Задача после подстановки
-    /// </param>
+    /// <param name="job">Задача после подстановки</param>
     /// <param name="repoKnown">
     /// <see langword="false"/>, если задача просит <c>{repo}</c>, а корень репозитория неизвестен
     /// </param>
@@ -155,15 +145,11 @@ public static class JobRegistry
     /// <summary>
     /// Подставляет корень репозитория вместо <c>{repo}</c>
     /// </summary>
-    /// <param name="job">
-    /// Задача из файла
-    /// </param>
+    /// <param name="job">Задача из файла</param>
     /// <param name="repoRoot">
     /// Корень репозитория или <see langword="null"/>
     /// </param>
-    /// <returns>
-    /// Задача с готовыми путями
-    /// </returns>
+    /// <returns>Задача с готовыми путями</returns>
     private static JobDefinition Expand(JobDefinition job, string? repoRoot)
     {
         if (repoRoot is null)
@@ -180,9 +166,7 @@ public static class JobRegistry
     /// <summary>
     /// Сообщает, что задача использует <c>{repo}</c>
     /// </summary>
-    /// <param name="job">
-    /// Задача из файла
-    /// </param>
+    /// <param name="job">Задача из файла</param>
     /// <returns>
     /// <see langword="true"/>, если токен есть в команде, аргументах или каталоге
     /// </returns>
@@ -196,8 +180,6 @@ public static class JobRegistry
     /// <summary>
     /// Корень файла: список задач
     /// </summary>
-    /// <param name="Jobs">
-    /// Задачи как они записаны
-    /// </param>
+    /// <param name="Jobs">Задачи как они записаны</param>
     private sealed record JobFile(List<JobDefinition>? Jobs);
 }

@@ -17,9 +17,7 @@ public static class ChangeStamp
     /// <summary>
     /// Читает сохранённый момент. Если файла нет, начинает с текущего времени, чтобы старый журнал не всплыл уведомлениями
     /// </summary>
-    /// <returns>
-    /// Момент, после которого правки считаются новыми
-    /// </returns>
+    /// <returns>Момент, после которого правки считаются новыми</returns>
     public static DateTimeOffset Load()
     {
         try
@@ -45,9 +43,7 @@ public static class ChangeStamp
     /// <summary>
     /// Записывает момент. Сбой записи не мешает работе иконки: уведомление тогда может повториться после перезапуска
     /// </summary>
-    /// <param name="stamp">
-    /// Момент самой свежей правки, о которой сказано
-    /// </param>
+    /// <param name="stamp">Момент самой свежей правки, о которой сказано</param>
     public static void Save(DateTimeOffset stamp)
     {
         try

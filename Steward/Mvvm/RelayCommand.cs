@@ -20,12 +20,8 @@ public sealed class RelayCommand : ICommand
     /// <summary>
     /// Создаёт команду
     /// </summary>
-    /// <param name="execute">
-    /// Действие по нажатию
-    /// </param>
-    /// <param name="canExecute">
-    /// Проверка доступности. Пусто, если кнопка всегда доступна
-    /// </param>
+    /// <param name="execute">Действие по нажатию</param>
+    /// <param name="canExecute">Проверка доступности. Пусто, если кнопка всегда доступна</param>
     public RelayCommand(Action execute, Func<bool>? canExecute = null)
     {
         _execute = execute;
@@ -46,9 +42,7 @@ public sealed class RelayCommand : ICommand
     /// <summary>
     /// Проверяет, можно ли выполнить команду
     /// </summary>
-    /// <param name="parameter">
-    /// Аргумент кнопки. Эта команда его не использует
-    /// </param>
+    /// <param name="parameter">Аргумент кнопки. Эта команда его не использует</param>
     /// <returns>
     /// <see langword="true"/>, если кнопку можно нажать
     /// </returns>
@@ -57,9 +51,7 @@ public sealed class RelayCommand : ICommand
     /// <summary>
     /// Выполняет действие кнопки
     /// </summary>
-    /// <param name="parameter">
-    /// Аргумент кнопки. Эта команда его не использует
-    /// </param>
+    /// <param name="parameter">Аргумент кнопки. Эта команда его не использует</param>
     public void Execute(object? parameter) => _execute();
 
     #endregion Execution

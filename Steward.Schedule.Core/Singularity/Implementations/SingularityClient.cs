@@ -48,12 +48,8 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Создаёт клиент, авторизованный токеном из <paramref name="options"/>
     /// </summary>
-    /// <param name="http">
-    /// Клиент, у которого базовый адрес — API Singularity
-    /// </param>
-    /// <param name="options">
-    /// Даёт токен доступа
-    /// </param>
+    /// <param name="http">Клиент, у которого базовый адрес — API Singularity</param>
+    /// <param name="options">Даёт токен доступа</param>
     public SingularityClient(HttpClient http, SyncOptions options)
     {
         _http = http;
@@ -65,15 +61,9 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Ищет активный проект группы по устойчивому ключу, затем по точному названию, и создаёт его, если такого нет
     /// </summary>
-    /// <param name="title">
-    /// Название проекта. По нему проект находится, пока на нём нет ключа, и с ним создаётся новый
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Идентификатор проекта. Проект, найденный по названию без ключа, получает ключ, и дальше переименование ему не мешает
-    /// </returns>
+    /// <param name="title">Название проекта. По нему проект находится, пока на нём нет ключа, и с ним создаётся новый</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Идентификатор проекта. Проект, найденный по названию без ключа, получает ключ, и дальше переименование ему не мешает</returns>
     /// <exception cref="InvalidOperationException">
     /// Singularity не вернула идентификатор созданного проекта
     /// </exception>
@@ -116,12 +106,8 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Ищет активный проект по точному названию и не создаёт его
     /// </summary>
-    /// <param name="title">
-    /// Название проекта
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
+    /// <param name="title">Название проекта</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>
     /// Идентификатор проекта или <see langword="null"/>, если проекта нет
     /// </returns>
@@ -134,12 +120,8 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Загружает все активные проекты: в API нет фильтра по <c>externalId</c>, поэтому поиск идёт на стороне клиента
     /// </summary>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Проекты всех страниц
-    /// </returns>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Проекты всех страниц</returns>
     private async Task<IReadOnlyList<ProjectResponse>> ListProjectsAsync(CancellationToken cancellationToken)
     {
         var projects = new List<ProjectResponse>();
@@ -164,12 +146,8 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Находит проект по точному названию без крайних пробелов
     /// </summary>
-    /// <param name="projects">
-    /// Загруженные проекты
-    /// </param>
-    /// <param name="title">
-    /// Название проекта
-    /// </param>
+    /// <param name="projects">Загруженные проекты</param>
+    /// <param name="title">Название проекта</param>
     /// <returns>
     /// Первый подходящий проект или <see langword="null"/>
     /// </returns>
@@ -183,15 +161,9 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Находит активный тег по названию без учёта регистра или создаёт его
     /// </summary>
-    /// <param name="title">
-    /// Название тега
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Идентификатор тега
-    /// </returns>
+    /// <param name="title">Название тега</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Идентификатор тега</returns>
     /// <exception cref="InvalidOperationException">
     /// Токену не хватает доступа к тегам, либо Singularity не вернула идентификатор созданного тега
     /// </exception>
@@ -232,15 +204,9 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Загружает все задачи проекта, включая архивные
     /// </summary>
-    /// <param name="projectId">
-    /// Идентификатор проекта
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Сопоставленные задачи. Ответы без идентификатора отбрасываются
-    /// </returns>
+    /// <param name="projectId">Идентификатор проекта</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Сопоставленные задачи. Ответы без идентификатора отбрасываются</returns>
     public async Task<IReadOnlyList<SingularityTask>> ListProjectTasksAsync(
         string projectId,
         CancellationToken cancellationToken)
@@ -269,18 +235,10 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Создаёт задачу со временем и сохраняет внешний идентификатор занятия
     /// </summary>
-    /// <param name="projectId">
-    /// Проект назначения
-    /// </param>
-    /// <param name="lesson">
-    /// Занятие, которое нужно создать
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Идентификатор созданной задачи
-    /// </returns>
+    /// <param name="projectId">Проект назначения</param>
+    /// <param name="lesson">Занятие, которое нужно создать</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Идентификатор созданной задачи</returns>
     /// <exception cref="InvalidOperationException">
     /// Singularity не вернула идентификатор созданной задачи
     /// </exception>
@@ -301,21 +259,11 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Меняет поля, которыми владеет расписание
     /// </summary>
-    /// <param name="taskId">
-    /// Идентификатор задачи
-    /// </param>
-    /// <param name="projectId">
-    /// Проект, в котором задача должна остаться
-    /// </param>
-    /// <param name="lesson">
-    /// Желаемые значения
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Задача, которая завершается, когда API принимает тело
-    /// </returns>
+    /// <param name="taskId">Идентификатор задачи</param>
+    /// <param name="projectId">Проект, в котором задача должна остаться</param>
+    /// <param name="lesson">Желаемые значения</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда API принимает тело</returns>
     public Task UpdateTaskAsync(
         string taskId,
         string projectId,
@@ -330,18 +278,12 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Архивирует задачу датой <paramref name="journalDate"/>
     /// </summary>
-    /// <param name="taskId">
-    /// Идентификатор задачи
-    /// </param>
+    /// <param name="taskId">Идентификатор задачи</param>
     /// <param name="journalDate">
     /// Момент архивации. API принимает его только с явным смещением, например <c>2026-10-16T18:00:00+03:00</c>
     /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Задача, которая завершается, когда API архивирует задачу
-    /// </returns>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда API архивирует задачу</returns>
     public Task ArchiveTaskAsync(string taskId, DateTimeOffset journalDate, CancellationToken cancellationToken) =>
         SendAsync<TaskResponse>(
             HttpMethod.Post,
@@ -352,15 +294,9 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Ставит у задачи отметку выполнения
     /// </summary>
-    /// <param name="taskId">
-    /// Идентификатор задачи
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Задача, которая завершается, когда API принимает отметку
-    /// </returns>
+    /// <param name="taskId">Идентификатор задачи</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда API принимает отметку</returns>
     public Task CompleteTaskAsync(string taskId, CancellationToken cancellationToken) =>
         SendAsync<TaskResponse>(
             HttpMethod.Patch,
@@ -371,15 +307,9 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Возвращает задачу из архива
     /// </summary>
-    /// <param name="taskId">
-    /// Идентификатор задачи
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Задача, которая завершается, когда API возвращает задачу из архива
-    /// </returns>
+    /// <param name="taskId">Идентификатор задачи</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда API возвращает задачу из архива</returns>
     public Task UnarchiveTaskAsync(string taskId, CancellationToken cancellationToken) =>
         SendAsync<TaskResponse>(
             HttpMethod.Post,
@@ -390,12 +320,8 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Удаляет задачу. Ответ API пустой
     /// </summary>
-    /// <param name="taskId">
-    /// Идентификатор задачи
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
+    /// <param name="taskId">Идентификатор задачи</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>
     /// Задача, которая завершается после ответа <c>204</c>
     /// </returns>
@@ -423,12 +349,8 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Сообщает, отличается ли сохранённая задача от занятия названием, заметкой, временем, длительностью или напоминанием
     /// </summary>
-    /// <param name="task">
-    /// Задача, которая сейчас хранится в Singularity
-    /// </param>
-    /// <param name="lesson">
-    /// Занятие, разобранное из таблицы
-    /// </param>
+    /// <param name="task">Задача, которая сейчас хранится в Singularity</param>
+    /// <param name="lesson">Занятие, разобранное из таблицы</param>
     /// <returns>
     /// <see langword="true"/>, если нужно частичное обновление
     /// </returns>
@@ -445,9 +367,7 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Форматирует момент начала так, как в примерах API, с числовым смещением
     /// </summary>
-    /// <param name="start">
-    /// Местное начало занятия
-    /// </param>
+    /// <param name="start">Местное начало занятия</param>
     /// <returns>
     /// Значение вроде <c>2026-10-01T17:20:00+03:00</c>
     /// </returns>
@@ -457,18 +377,12 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Собирает JSON-тело, общее для создания и обновления
     /// </summary>
-    /// <param name="projectId">
-    /// Проект назначения
-    /// </param>
-    /// <param name="lesson">
-    /// Значения занятия
-    /// </param>
+    /// <param name="projectId">Проект назначения</param>
+    /// <param name="lesson">Значения занятия</param>
     /// <param name="includeExternalId">
     /// <see langword="true"/> при создании, чтобы сохранить устойчивый ключ
     /// </param>
-    /// <returns>
-    /// Анонимное тело. Null во внешнем идентификаторе сериализатор пропускает
-    /// </returns>
+    /// <returns>Анонимное тело. Null во внешнем идентификаторе сериализатор пропускает</returns>
     private static object WriteBody(string projectId, Lesson lesson, bool includeExternalId) => new
     {
         title = lesson.Title,
@@ -485,12 +399,8 @@ public sealed class SingularityClient : ISingularityClient
     /// <summary>
     /// Сравнивает сохранённую строку начала с ожидаемым моментом, не обращая внимания на формат
     /// </summary>
-    /// <param name="stored">
-    /// Значение начала из API
-    /// </param>
-    /// <param name="expected">
-    /// Начало, разобранное из таблицы
-    /// </param>
+    /// <param name="stored">Значение начала из API</param>
+    /// <param name="expected">Начало, разобранное из таблицы</param>
     /// <returns>
     /// <see langword="true"/>, если оба значения описывают один и тот же момент UTC
     /// </returns>
@@ -513,9 +423,7 @@ public sealed class SingularityClient : ISingularityClient
     /// <param name="task">
     /// Десериализованная задача. <see cref="TaskResponse.Id"/> должен быть задан
     /// </param>
-    /// <returns>
-    /// Снимок
-    /// </returns>
+    /// <returns>Снимок</returns>
     private static SingularityTask Map(TaskResponse task) => new(
         task.Id!,
         task.ExternalId,
@@ -540,21 +448,13 @@ public sealed class SingularityClient : ISingularityClient
     /// <typeparam name="T">
     /// Контракт ответа
     /// </typeparam>
-    /// <param name="method">
-    /// Метод HTTP
-    /// </param>
-    /// <param name="path">
-    /// Путь относительно хоста API
-    /// </param>
+    /// <param name="method">Метод HTTP</param>
+    /// <param name="path">Путь относительно хоста API</param>
     /// <param name="body">
     /// Тело JSON или <see langword="null"/>, если у вызова его нет
     /// </param>
-    /// <param name="cancellationToken">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Десериализованное тело
-    /// </returns>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Десериализованное тело</returns>
     /// <exception cref="InvalidOperationException">
     /// Статус неуспешный, либо тело пустое или нечитаемое
     /// </exception>

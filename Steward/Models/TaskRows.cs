@@ -16,15 +16,9 @@ public static class TaskRows
     /// <summary>
     /// Сводит снимок контейнера и строки задач в один список для панели
     /// </summary>
-    /// <param name="snapshot">
-    /// Состояние контейнера синхронизации
-    /// </param>
-    /// <param name="jobs">
-    /// Строки задач из реестра
-    /// </param>
-    /// <returns>
-    /// Сначала расписание, затем задачи по порядку реестра
-    /// </returns>
+    /// <param name="snapshot">Состояние контейнера синхронизации</param>
+    /// <param name="jobs">Строки задач из реестра</param>
+    /// <returns>Сначала расписание, затем задачи по порядку реестра</returns>
     public static IReadOnlyList<TaskStatusRow> Build(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs)
     {
         var panel = PanelStatus.From(snapshot);
@@ -40,12 +34,8 @@ public static class TaskRows
     /// <summary>
     /// Переводит цвет строки задачи в цвет панели: выполняющаяся задача тоже зелёная
     /// </summary>
-    /// <param name="tone">
-    /// Цвет из библиотеки статусов
-    /// </param>
-    /// <returns>
-    /// Цвет панели
-    /// </returns>
+    /// <param name="tone">Цвет из библиотеки статусов</param>
+    /// <returns>Цвет панели</returns>
     private static PanelTone ToneOf(RowTone tone) => tone switch
     {
         RowTone.Ok or RowTone.Working => PanelTone.Running,
@@ -58,26 +48,16 @@ public static class TaskRows
 /// <summary>
 /// Общий итог по всем задачам: цвет плашки и две фразы
 /// </summary>
-/// <param name="Tone">
-/// Цвет плашки
-/// </param>
-/// <param name="Label">
-/// Короткий текст плашки
-/// </param>
-/// <param name="Subtitle">
-/// Строка под заголовком
-/// </param>
+/// <param name="Tone">Цвет плашки</param>
+/// <param name="Label">Короткий текст плашки</param>
+/// <param name="Subtitle">Строка под заголовком</param>
 public sealed record TaskSummary(PanelTone Tone, string Label, string Subtitle)
 {
     /// <summary>
     /// Считает итог. Выключенные задачи в нём не участвуют
     /// </summary>
-    /// <param name="rows">
-    /// Строки задач
-    /// </param>
-    /// <returns>
-    /// Сбой важнее ожидания решения, ожидание важнее покоя
-    /// </returns>
+    /// <param name="rows">Строки задач</param>
+    /// <returns>Сбой важнее ожидания решения, ожидание важнее покоя</returns>
     public static TaskSummary Of(IReadOnlyList<TaskStatusRow> rows)
     {
         var active = rows.Where(row => !row.Muted).ToArray();

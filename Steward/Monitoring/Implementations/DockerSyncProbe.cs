@@ -54,12 +54,8 @@ public sealed class DockerSyncProbe
     /// <summary>
     /// Читает состояние сервиса <c>schedule</c>
     /// </summary>
-    /// <param name="cancellationToken">
-    /// Отменяет ожидание ответа Docker
-    /// </param>
-    /// <returns>
-    /// Снимок для иконки
-    /// </returns>
+    /// <param name="cancellationToken">Отменяет ожидание ответа Docker</param>
+    /// <returns>Снимок для иконки</returns>
     public async Task<SyncSnapshot> ReadAsync(CancellationToken cancellationToken)
     {
         var state = await RunAsync("docker", "compose ps -a --format {{.Service}}|{{.State}}", cancellationToken);
@@ -84,9 +80,7 @@ public sealed class DockerSyncProbe
     /// <summary>
     /// Пересоздаёт контейнер, чтобы он прочитал файл настроек заново
     /// </summary>
-    /// <param name="cancellationToken">
-    /// Отменяет ожидание Docker
-    /// </param>
+    /// <param name="cancellationToken">Отменяет ожидание Docker</param>
     /// <returns>
     /// <see langword="true"/>, если контейнер перезапущен
     /// </returns>
@@ -99,18 +93,10 @@ public sealed class DockerSyncProbe
     /// <summary>
     /// Запускает команду Docker и собирает её вывод
     /// </summary>
-    /// <param name="fileName">
-    /// Имя программы
-    /// </param>
-    /// <param name="arguments">
-    /// Аргументы без кавычек оболочки
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Отменяет ожидание
-    /// </param>
-    /// <returns>
-    /// Код выхода и объединённый вывод
-    /// </returns>
+    /// <param name="fileName">Имя программы</param>
+    /// <param name="arguments">Аргументы без кавычек оболочки</param>
+    /// <param name="cancellationToken">Отменяет ожидание</param>
+    /// <returns>Код выхода и объединённый вывод</returns>
     private async Task<CommandResult> RunAsync(string fileName, string arguments, CancellationToken cancellationToken)
     {
         Process? process = null;
@@ -156,12 +142,8 @@ public sealed class DockerSyncProbe
     /// <summary>
     /// Код и текст одной команды
     /// </summary>
-    /// <param name="ExitCode">
-    /// Код выхода процесса
-    /// </param>
-    /// <param name="Text">
-    /// Стандартный вывод и стандартный поток ошибок
-    /// </param>
+    /// <param name="ExitCode">Код выхода процесса</param>
+    /// <param name="Text">Стандартный вывод и стандартный поток ошибок</param>
     private sealed record CommandResult(int ExitCode, string Text);
 
     #endregion Result

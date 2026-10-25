@@ -25,9 +25,7 @@ public sealed class EnvFile
     /// <param name="path">
     /// Полный путь к <c>.env</c>
     /// </param>
-    /// <param name="lines">
-    /// Строки файла
-    /// </param>
+    /// <param name="lines">Строки файла</param>
     private EnvFile(string path, List<string> lines)
     {
         _path = path;
@@ -40,9 +38,7 @@ public sealed class EnvFile
     /// <param name="path">
     /// Полный путь к <c>.env</c>
     /// </param>
-    /// <returns>
-    /// Набор строк
-    /// </returns>
+    /// <returns>Набор строк</returns>
     public static EnvFile Load(string path)
     {
         var lines = File.Exists(path)
@@ -54,12 +50,8 @@ public sealed class EnvFile
     /// <summary>
     /// Возвращает значение ключа
     /// </summary>
-    /// <param name="key">
-    /// Имя переменной
-    /// </param>
-    /// <returns>
-    /// Значение без кавычек. Пусто, если ключа нет
-    /// </returns>
+    /// <param name="key">Имя переменной</param>
+    /// <returns>Значение без кавычек. Пусто, если ключа нет</returns>
     public string Get(string key)
     {
         foreach (var line in _lines)
@@ -80,12 +72,8 @@ public sealed class EnvFile
     /// <summary>
     /// Заменяет значение ключа или дописывает его в конец
     /// </summary>
-    /// <param name="key">
-    /// Имя переменной
-    /// </param>
-    /// <param name="value">
-    /// Новое значение
-    /// </param>
+    /// <param name="key">Имя переменной</param>
+    /// <param name="value">Новое значение</param>
     public void Set(string key, string value)
     {
         if (value.Contains('\r') || value.Contains('\n'))
@@ -120,15 +108,9 @@ public sealed class EnvFile
     /// <summary>
     /// Делит строку на имя и значение
     /// </summary>
-    /// <param name="line">
-    /// Строка файла
-    /// </param>
-    /// <param name="key">
-    /// Имя слева от знака равенства
-    /// </param>
-    /// <param name="value">
-    /// Значение без обрамляющих кавычек
-    /// </param>
+    /// <param name="line">Строка файла</param>
+    /// <param name="key">Имя слева от знака равенства</param>
+    /// <param name="value">Значение без обрамляющих кавычек</param>
     /// <returns>
     /// <see langword="false"/> для пустых строк и комментариев
     /// </returns>
@@ -155,12 +137,8 @@ public sealed class EnvFile
     /// <summary>
     /// Берёт значение в кавычки, если в нём есть пробел, решётка или знак равенства. Перевод строки сюда не доходит
     /// </summary>
-    /// <param name="value">
-    /// Исходный текст
-    /// </param>
-    /// <returns>
-    /// Фрагмент справа от знака равенства
-    /// </returns>
+    /// <param name="value">Исходный текст</param>
+    /// <returns>Фрагмент справа от знака равенства</returns>
     private static string Quote(string value)
     {
         if (value.IndexOfAny([' ', '\t', '#', '"', '=']) < 0)

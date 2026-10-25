@@ -23,9 +23,7 @@ public static class DataLocation
     /// <summary>
     /// Поднимается от каталога и ищет корень репозитория
     /// </summary>
-    /// <param name="startDirectory">
-    /// Откуда начинать. По умолчанию каталог программы
-    /// </param>
+    /// <param name="startDirectory">Откуда начинать. По умолчанию каталог программы</param>
     /// <returns>
     /// Корень репозитория или <see langword="null"/>, если программа лежит вне репозитория
     /// </returns>
@@ -49,12 +47,8 @@ public static class DataLocation
     /// <param name="explicitDirectory">
     /// Путь из настроек или <see langword="null"/>
     /// </param>
-    /// <param name="startDirectory">
-    /// Откуда искать корень репозитория. По умолчанию каталог программы
-    /// </param>
-    /// <returns>
-    /// Путь к папке данных. Папка создаётся при первой записи
-    /// </returns>
+    /// <param name="startDirectory">Откуда искать корень репозитория. По умолчанию каталог программы</param>
+    /// <returns>Путь к папке данных. Папка создаётся при первой записи</returns>
     public static string DataDirectory(string? explicitDirectory = null, string? startDirectory = null)
     {
         if (!string.IsNullOrWhiteSpace(explicitDirectory))
@@ -74,9 +68,7 @@ public static class DataLocation
     /// <param name="explicitDirectory">
     /// Папка данных из настроек или <see langword="null"/>
     /// </param>
-    /// <param name="startDirectory">
-    /// Откуда искать корень репозитория
-    /// </param>
+    /// <param name="startDirectory">Откуда искать корень репозитория</param>
     /// <returns>
     /// Путь к папке <c>status</c>
     /// </returns>
@@ -86,12 +78,8 @@ public static class DataLocation
     /// <summary>
     /// Файл со списком задач: переменная окружения, затем <c>config/jobs.json</c> в корне репозитория
     /// </summary>
-    /// <param name="startDirectory">
-    /// Откуда искать корень репозитория
-    /// </param>
-    /// <returns>
-    /// Путь к файлу. Файла может не быть: тогда задач нет
-    /// </returns>
+    /// <param name="startDirectory">Откуда искать корень репозитория</param>
+    /// <returns>Путь к файлу. Файла может не быть: тогда задач нет</returns>
     public static string JobsFile(string? startDirectory = null)
     {
         var fromEnvironment = Environment.GetEnvironmentVariable(JOBS_ENVIRONMENT_VARIABLE);

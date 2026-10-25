@@ -11,18 +11,10 @@ public sealed record Lesson
     /// <param name="externalId">
     /// Стабильный ключ, сохраняемый в <c>externalId</c> задачи
     /// </param>
-    /// <param name="title">
-    /// Короткое название предмета, с типом занятия, если он найден
-    /// </param>
-    /// <param name="note">
-    /// Полный текст ячейки, который уходит в заметку задачи
-    /// </param>
-    /// <param name="start">
-    /// Местное время начала занятия со смещением часового пояса расписания
-    /// </param>
-    /// <param name="timeLengthMinutes">
-    /// Длительность занятия в минутах
-    /// </param>
+    /// <param name="title">Короткое название предмета, с типом занятия, если он найден</param>
+    /// <param name="note">Полный текст ячейки, который уходит в заметку задачи</param>
+    /// <param name="start">Местное время начала занятия со смещением часового пояса расписания</param>
+    /// <param name="timeLengthMinutes">Длительность занятия в минутах</param>
     public Lesson(string externalId, string title, string note, DateTimeOffset start, int timeLengthMinutes)
     {
         ExternalId = externalId;

@@ -21,15 +21,9 @@ public abstract class Bindable : INotifyPropertyChanged
     /// <typeparam name="T">
     /// Тип свойства
     /// </typeparam>
-    /// <param name="field">
-    /// Поле, в котором лежит значение
-    /// </param>
-    /// <param name="value">
-    /// Новое значение
-    /// </param>
-    /// <param name="name">
-    /// Имя свойства. Подставляется компилятором
-    /// </param>
+    /// <param name="field">Поле, в котором лежит значение</param>
+    /// <param name="value">Новое значение</param>
+    /// <param name="name">Имя свойства. Подставляется компилятором</param>
     /// <returns>
     /// <see langword="true"/>, если значение изменилось
     /// </returns>
@@ -46,9 +40,7 @@ public abstract class Bindable : INotifyPropertyChanged
     /// <summary>
     /// Сообщает окну, что свойство изменилось
     /// </summary>
-    /// <param name="name">
-    /// Имя свойства. Подставляется компилятором
-    /// </param>
+    /// <param name="name">Имя свойства. Подставляется компилятором</param>
     protected void Raise([CallerMemberName] string? name = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

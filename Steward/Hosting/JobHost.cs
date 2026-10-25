@@ -102,9 +102,7 @@ public sealed class JobHost : IDisposable
     /// <summary>
     /// Запускает задачу по просьбе пользователя
     /// </summary>
-    /// <param name="id">
-    /// Идентификатор задачи
-    /// </param>
+    /// <param name="id">Идентификатор задачи</param>
     /// <returns>
     /// <see langword="true"/>, если такая задача есть
     /// </returns>
@@ -122,9 +120,7 @@ public sealed class JobHost : IDisposable
     /// <summary>
     /// Собирает строки статуса всех задач реестра
     /// </summary>
-    /// <returns>
-    /// Строки по порядку реестра
-    /// </returns>
+    /// <returns>Строки по порядку реестра</returns>
     public IReadOnlyList<JobRow> Rows()
     {
         var now = DateTimeOffset.Now;
@@ -134,17 +130,13 @@ public sealed class JobHost : IDisposable
     /// <summary>
     /// Читает последние записи журнала запусков
     /// </summary>
-    /// <returns>
-    /// Записи от новых к старым
-    /// </returns>
+    /// <returns>Записи от новых к старым</returns>
     public IReadOnlyList<RunRecord> Records() => _runner.History.Load(RECORD_COUNT);
 
     /// <summary>
     /// Читает файл статуса и не падает от повреждённого файла
     /// </summary>
-    /// <param name="id">
-    /// Идентификатор задачи
-    /// </param>
+    /// <param name="id">Идентификатор задачи</param>
     /// <returns>
     /// Статус или <see langword="null"/>
     /// </returns>

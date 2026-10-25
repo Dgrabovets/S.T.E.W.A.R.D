@@ -40,12 +40,8 @@ public sealed class TaskCardViewModel
     /// <summary>
     /// Создаёт карточку
     /// </summary>
-    /// <param name="row">
-    /// Строка задачи
-    /// </param>
-    /// <param name="run">
-    /// Действие кнопки «Запустить»
-    /// </param>
+    /// <param name="row">Строка задачи</param>
+    /// <param name="run">Действие кнопки «Запустить»</param>
     public TaskCardViewModel(TaskStatusRow row, Action<string> run)
     {
         Name = row.Name;
@@ -101,9 +97,7 @@ public sealed class RunRowViewModel
     /// <summary>
     /// Создаёт строку по записи журнала
     /// </summary>
-    /// <param name="record">
-    /// Запись о запуске
-    /// </param>
+    /// <param name="record">Запись о запуске</param>
     public RunRowViewModel(RunRecord record)
     {
         When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm:ss", CultureInfo.InvariantCulture);
@@ -356,18 +350,10 @@ public sealed class MainViewModel : Bindable
     /// <summary>
     /// Показывает свежие данные
     /// </summary>
-    /// <param name="snapshot">
-    /// Состояние контейнера расписания
-    /// </param>
-    /// <param name="jobs">
-    /// Строки задач из реестра
-    /// </param>
-    /// <param name="records">
-    /// Последние запуски
-    /// </param>
-    /// <param name="registryErrors">
-    /// Ошибки чтения реестра
-    /// </param>
+    /// <param name="snapshot">Состояние контейнера расписания</param>
+    /// <param name="jobs">Строки задач из реестра</param>
+    /// <param name="records">Последние запуски</param>
+    /// <param name="registryErrors">Ошибки чтения реестра</param>
     public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors)
     {
         var rows = TaskRows.Build(snapshot, jobs);
@@ -387,9 +373,7 @@ public sealed class MainViewModel : Bindable
     /// <param name="selected">
     /// <see langword="true"/>, если раздел выбран. Снятие выбора игнорируется: его делает выбор соседнего раздела
     /// </param>
-    /// <param name="page">
-    /// Раздел
-    /// </param>
+    /// <param name="page">Раздел</param>
     private void Select(bool selected, AppPage page)
     {
         if (!selected || _page == page)

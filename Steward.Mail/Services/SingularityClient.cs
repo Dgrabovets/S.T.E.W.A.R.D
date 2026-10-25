@@ -25,9 +25,7 @@ public sealed class SingularityClient : ISingularityClient, IDisposable
     /// <summary>
     /// Создаёт клиент, авторизованный токеном из настроек
     /// </summary>
-    /// <param name="settings">
-    /// Адрес API и токен доступа
-    /// </param>
+    /// <param name="settings">Адрес API и токен доступа</param>
     public SingularityClient(SingularitySettings settings)
     {
         _http = new HttpClient { BaseAddress = new Uri(settings.BaseUrl.TrimEnd('/') + "/") };
@@ -41,15 +39,9 @@ public sealed class SingularityClient : ISingularityClient, IDisposable
     /// <summary>
     /// Создаёт задачу запросом POST /v2/task
     /// </summary>
-    /// <param name="request">
-    /// Поля новой задачи
-    /// </param>
-    /// <param name="ct">
-    /// Токен отмены запроса
-    /// </param>
-    /// <returns>
-    /// Задача, которая завершается, когда SingularityApp принимает запрос
-    /// </returns>
+    /// <param name="request">Поля новой задачи</param>
+    /// <param name="ct">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда SingularityApp принимает запрос</returns>
     /// <exception cref="HttpRequestException">
     /// SingularityApp ответил ошибкой. В тексте код ответа и тело
     /// </exception>

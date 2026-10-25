@@ -14,9 +14,7 @@ namespace Steward.Schedule.Common.Helpers
         /// <param name="runOnce">
         /// <see langword="true"/>, если в командной строке передан <c>--once</c>
         /// </param>
-        /// <returns>
-        /// Настройки из окружения: у всех полей есть значения по умолчанию, кроме токена
-        /// </returns>
+        /// <returns>Настройки из окружения: у всех полей есть значения по умолчанию, кроме токена</returns>
         /// <exception cref="InvalidOperationException">
         /// Токен отсутствует, либо интервал не является положительным целым числом
         /// </exception>
@@ -40,9 +38,7 @@ namespace Steward.Schedule.Common.Helpers
         /// <summary>
         /// Читает паузу в минутах из <c><see cref="EnviromentalParamsNames.SYNC_INTERVAL_MINUTES"/></c> или из <c><see cref="EnviromentalParamsNames.SYNC_INTERVAL_HOURS"/></c>
         /// </summary>
-        /// <returns>
-        /// Положительное число минут
-        /// </returns>
+        /// <returns>Положительное число минут</returns>
         /// <exception cref="InvalidOperationException">
         /// Интервал задан не положительным целым числом
         /// </exception>
@@ -65,12 +61,8 @@ namespace Steward.Schedule.Common.Helpers
         /// <summary>
         /// Возвращает обязательную переменную окружения без крайних пробелов
         /// </summary>
-        /// <param name="name">
-        /// Имя переменной
-        /// </param>
-        /// <returns>
-        /// Обрезанное значение
-        /// </returns>
+        /// <param name="name">Имя переменной</param>
+        /// <returns>Обрезанное значение</returns>
         /// <exception cref="ArgumentNullException">
         /// Переменная отсутствует или пустая
         /// </exception>
@@ -87,9 +79,7 @@ namespace Steward.Schedule.Common.Helpers
         /// <summary>
         /// Возвращает необязательную переменную окружения без крайних пробелов
         /// </summary>
-        /// <param name="name">
-        /// Имя переменной
-        /// </param>
+        /// <param name="name">Имя переменной</param>
         /// <returns>
         /// Обрезанное значение или <see langword="null"/>, если переменной нет или она пустая
         /// </returns>
@@ -102,15 +92,9 @@ namespace Steward.Schedule.Common.Helpers
         /// <summary>
         /// Разбирает положительное целое число из текста настройки
         /// </summary>
-        /// <param name="text">
-        /// Текст переменной окружения
-        /// </param>
-        /// <param name="name">
-        /// Имя переменной для текста ошибки
-        /// </param>
-        /// <returns>
-        /// Число больше нуля
-        /// </returns>
+        /// <param name="text">Текст переменной окружения</param>
+        /// <param name="name">Имя переменной для текста ошибки</param>
+        /// <returns>Число больше нуля</returns>
         /// <exception cref="InvalidOperationException">
         /// Текст не является положительным целым числом
         /// </exception>

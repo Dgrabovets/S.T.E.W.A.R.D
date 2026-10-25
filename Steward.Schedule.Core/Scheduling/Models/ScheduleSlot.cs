@@ -10,9 +10,7 @@ public sealed record ScheduleSlot
     /// <summary>
     /// Создаёт слот, в котором занятие может отсутствовать
     /// </summary>
-    /// <param name="externalId">
-    /// Ключ даты и времени начала, даже если ячейка пустая
-    /// </param>
+    /// <param name="externalId">Ключ даты и времени начала, даже если ячейка пустая</param>
     /// <param name="lesson">
     /// Занятие в этом слоте или <see langword="null"/>, если ячейка пустая
     /// </param>

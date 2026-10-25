@@ -35,18 +35,10 @@ public partial class MainWindow : Window
     /// <summary>
     /// Показывает свежие данные
     /// </summary>
-    /// <param name="snapshot">
-    /// Состояние контейнера расписания
-    /// </param>
-    /// <param name="jobs">
-    /// Строки задач из реестра
-    /// </param>
-    /// <param name="records">
-    /// Последние запуски
-    /// </param>
-    /// <param name="registryErrors">
-    /// Ошибки чтения реестра
-    /// </param>
+    /// <param name="snapshot">Состояние контейнера расписания</param>
+    /// <param name="jobs">Строки задач из реестра</param>
+    /// <param name="records">Последние запуски</param>
+    /// <param name="registryErrors">Ошибки чтения реестра</param>
     public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors) =>
         Model.Apply(snapshot, jobs, records, registryErrors);
 
@@ -74,9 +66,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// Вместо закрытия прячет окно, пока приложение не завершается
     /// </summary>
-    /// <param name="e">
-    /// Аргументы закрытия
-    /// </param>
+    /// <param name="e">Аргументы закрытия</param>
     protected override void OnClosing(CancelEventArgs e)
     {
         if (!_closing)
@@ -92,12 +82,8 @@ public partial class MainWindow : Window
     /// <summary>
     /// Даёт перетащить окно за заголовок
     /// </summary>
-    /// <param name="sender">
-    /// Заголовок
-    /// </param>
-    /// <param name="e">
-    /// Аргументы нажатия
-    /// </param>
+    /// <param name="sender">Заголовок</param>
+    /// <param name="e">Аргументы нажатия</param>
     private void TitleBar_OnDrag(object sender, MouseButtonEventArgs e)
     {
         if (e.LeftButton == MouseButtonState.Pressed)
@@ -107,22 +93,14 @@ public partial class MainWindow : Window
     /// <summary>
     /// Сворачивает окно
     /// </summary>
-    /// <param name="sender">
-    /// Кнопка
-    /// </param>
-    /// <param name="e">
-    /// Аргументы нажатия
-    /// </param>
+    /// <param name="sender">Кнопка</param>
+    /// <param name="e">Аргументы нажатия</param>
     private void Minimize_OnClick(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
     /// <summary>
     /// Прячет окно в трей
     /// </summary>
-    /// <param name="sender">
-    /// Кнопка
-    /// </param>
-    /// <param name="e">
-    /// Аргументы нажатия
-    /// </param>
+    /// <param name="sender">Кнопка</param>
+    /// <param name="e">Аргументы нажатия</param>
     private void Close_OnClick(object sender, RoutedEventArgs e) => Close();
 }

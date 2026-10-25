@@ -18,12 +18,8 @@ public static class SyncLogInterpreter
     /// <param name="serviceState">
     /// Состояние сервиса <c>schedule</c>, например <c>running</c>. Пустая строка, если контейнера нет
     /// </param>
-    /// <param name="logs">
-    /// Журнал с метками времени
-    /// </param>
-    /// <returns>
-    /// Состояние для иконки и окна
-    /// </returns>
+    /// <param name="logs">Журнал с метками времени</param>
+    /// <returns>Состояние для иконки и окна</returns>
     public static SyncSnapshot Interpret(bool dockerAvailable, string serviceState, string logs)
     {
         var entries = LogJournal.Read(logs);

@@ -15,12 +15,8 @@ public sealed class MailClassifier(MailSettings mail, ClassifierSettings setting
     /// <summary>
     /// Относит письмо к категории: из папки преподавателей это отзыв, от системного отправителя это справка, остальное личное письмо
     /// </summary>
-    /// <param name="item">
-    /// Письмо из почтового ящика
-    /// </param>
-    /// <returns>
-    /// Категория, от которой зависит, будет ли создана задача
-    /// </returns>
+    /// <param name="item">Письмо из почтового ящика</param>
+    /// <returns>Категория, от которой зависит, будет ли создана задача</returns>
     public MailCategory Classify(MailItem item)
     {
         if (string.Equals(item.Folder, mail.TeachersFolder, StringComparison.OrdinalIgnoreCase))
@@ -43,9 +39,7 @@ public sealed class MailClassifier(MailSettings mail, ClassifierSettings setting
     /// <summary>
     /// Проверяет, что письмо отправила система, а не человек: адрес есть в списке игнорируемых или в его имени есть noreply, no-reply или notification
     /// </summary>
-    /// <param name="address">
-    /// Адрес отправителя
-    /// </param>
+    /// <param name="address">Адрес отправителя</param>
     /// <returns>
     /// <see langword="true"/> для системного отправителя
     /// </returns>

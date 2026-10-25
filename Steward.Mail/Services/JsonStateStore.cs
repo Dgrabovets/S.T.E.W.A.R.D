@@ -37,9 +37,7 @@ public sealed class JsonStateStore : IStateStore
     /// <summary>
     /// Загружает список из файла. Если файла нет, список пуст
     /// </summary>
-    /// <param name="path">
-    /// Путь к JSON-файлу
-    /// </param>
+    /// <param name="path">Путь к JSON-файлу</param>
     public JsonStateStore(string path)
     {
         _path = path;
@@ -56,9 +54,7 @@ public sealed class JsonStateStore : IStateStore
     /// <summary>
     /// Проверяет, обработано ли письмо раньше
     /// </summary>
-    /// <param name="messageId">
-    /// Идентификатор письма из заголовка Message-ID
-    /// </param>
+    /// <param name="messageId">Идентификатор письма из заголовка Message-ID</param>
     /// <returns>
     /// <see langword="true"/>, если идентификатор уже есть в списке
     /// </returns>
@@ -67,9 +63,7 @@ public sealed class JsonStateStore : IStateStore
     /// <summary>
     /// Добавляет идентификатор в список. Повторное добавление ничего не меняет
     /// </summary>
-    /// <param name="messageId">
-    /// Идентификатор письма из заголовка Message-ID
-    /// </param>
+    /// <param name="messageId">Идентификатор письма из заголовка Message-ID</param>
     public void MarkProcessed(string messageId)
     {
         if (_lookup.Add(messageId))

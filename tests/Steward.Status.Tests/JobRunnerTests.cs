@@ -10,12 +10,8 @@ public class JobRunnerTests
     /// <summary>
     /// Собирает раннер, хранилище и папку данных внутри временной папки теста
     /// </summary>
-    /// <param name="dir">
-    /// Временная папка теста
-    /// </param>
-    /// <returns>
-    /// Раннер и хранилище
-    /// </returns>
+    /// <param name="dir">Временная папка теста</param>
+    /// <returns>Раннер и хранилище</returns>
     private static (JobRunner Runner, StatusStore Store) Create(TempDir dir)
     {
         var store = new StatusStore(dir.StatusPath);

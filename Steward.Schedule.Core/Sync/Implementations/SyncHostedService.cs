@@ -32,18 +32,10 @@ public sealed class SyncHostedService : BackgroundService
     /// <summary>
     /// Создаёт цикл синхронизации внутри хоста
     /// </summary>
-    /// <param name="sync">
-    /// Операция, которая читает таблицу и пишет задачи в Singularity
-    /// </param>
-    /// <param name="options">
-    /// Выбирает одиночный прогон и паузу между повторами
-    /// </param>
-    /// <param name="lifetime">
-    /// Останавливает хост после одиночного прогона
-    /// </param>
-    /// <param name="logger">
-    /// Принимает ошибки, которые иначе оборвали бы цикл
-    /// </param>
+    /// <param name="sync">Операция, которая читает таблицу и пишет задачи в Singularity</param>
+    /// <param name="options">Выбирает одиночный прогон и паузу между повторами</param>
+    /// <param name="lifetime">Останавливает хост после одиночного прогона</param>
+    /// <param name="logger">Принимает ошибки, которые иначе оборвали бы цикл</param>
     public SyncHostedService(
         ScheduleSyncer sync,
         SyncOptions options,
@@ -59,12 +51,8 @@ public sealed class SyncHostedService : BackgroundService
     /// <summary>
     /// Сразу выполняет синхронизацию, затем завершается или ждёт <see cref="SyncOptions.IntervalMinutes"/>
     /// </summary>
-    /// <param name="stoppingToken">
-    /// Отменяется, когда хост останавливается
-    /// </param>
-    /// <returns>
-    /// Задача, которая завершается вместе с циклом
-    /// </returns>
+    /// <param name="stoppingToken">Отменяется, когда хост останавливается</param>
+    /// <returns>Задача, которая завершается вместе с циклом</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         #region One shot

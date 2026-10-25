@@ -36,12 +36,8 @@ public sealed class JobRunner
     /// <summary>
     /// Создаёт раннер
     /// </summary>
-    /// <param name="store">
-    /// Хранилище статусов
-    /// </param>
-    /// <param name="dataDirectory">
-    /// Папка данных
-    /// </param>
+    /// <param name="store">Хранилище статусов</param>
+    /// <param name="dataDirectory">Папка данных</param>
     public JobRunner(StatusStore store, string dataDirectory)
     {
         _store = store;
@@ -69,9 +65,7 @@ public sealed class JobRunner
     /// <summary>
     /// Сообщает, выполняется ли задача сейчас
     /// </summary>
-    /// <param name="id">
-    /// Идентификатор задачи
-    /// </param>
+    /// <param name="id">Идентификатор задачи</param>
     /// <returns>
     /// <see langword="true"/>, если запуск ещё не закончился
     /// </returns>
@@ -84,18 +78,10 @@ public sealed class JobRunner
     /// <summary>
     /// Запускает задачу. Если она уже выполняется, возвращает тот же запуск, а не начинает второй
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
-    /// <param name="reason">
-    /// Почему запускается: start, daily, interval или manual
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Останавливает процесс, например при закрытии приложения
-    /// </param>
-    /// <returns>
-    /// Запись о запуске. Задача не бросает исключений: ошибка попадает в запись и в статус
-    /// </returns>
+    /// <param name="job">Задача</param>
+    /// <param name="reason">Почему запускается: start, daily, interval или manual</param>
+    /// <param name="cancellationToken">Останавливает процесс, например при закрытии приложения</param>
+    /// <returns>Запись о запуске. Задача не бросает исключений: ошибка попадает в запись и в статус</returns>
     public Task<RunRecord> RunAsync(JobDefinition job, string reason, CancellationToken cancellationToken = default)
     {
         lock (_gate)
@@ -116,18 +102,10 @@ public sealed class JobRunner
     /// <summary>
     /// Выполняет один запуск от начала до записи итога
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
-    /// <param name="reason">
-    /// Причина запуска
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Останавливает процесс
-    /// </param>
-    /// <returns>
-    /// Запись о запуске
-    /// </returns>
+    /// <param name="job">Задача</param>
+    /// <param name="reason">Причина запуска</param>
+    /// <param name="cancellationToken">Останавливает процесс</param>
+    /// <returns>Запись о запуске</returns>
     private async Task<RunRecord> ExecuteAsync(JobDefinition job, string reason, CancellationToken cancellationToken)
     {
         var title = string.IsNullOrWhiteSpace(job.Title) ? job.Id : job.Title;
@@ -172,15 +150,9 @@ public sealed class JobRunner
     /// <summary>
     /// Запускает процесс и ждёт его конца, но не дольше таймаута задачи
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Останавливает процесс
-    /// </param>
-    /// <returns>
-    /// Итог, код завершения и пояснение к ошибке
-    /// </returns>
+    /// <param name="job">Задача</param>
+    /// <param name="cancellationToken">Останавливает процесс</param>
+    /// <returns>Итог, код завершения и пояснение к ошибке</returns>
     private async Task<(RunOutcome Outcome, int? ExitCode, string? Detail)> StartAndWaitAsync(JobDefinition job, CancellationToken cancellationToken)
     {
         var temp = Path.Combine(_dataDirectory, "tmp");
@@ -245,30 +217,14 @@ public sealed class JobRunner
     /// <summary>
     /// Записывает итог запуска, если процесс не рассказал о себе сам
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
-    /// <param name="title">
-    /// Название задачи
-    /// </param>
-    /// <param name="previous">
-    /// Статус до запуска
-    /// </param>
-    /// <param name="started">
-    /// Когда запуск начался
-    /// </param>
-    /// <param name="finished">
-    /// Когда запуск закончился
-    /// </param>
-    /// <param name="outcome">
-    /// Итог процесса
-    /// </param>
-    /// <param name="exitCode">
-    /// Код завершения
-    /// </param>
-    /// <param name="detail">
-    /// Пояснение к ошибке
-    /// </param>
+    /// <param name="job">Задача</param>
+    /// <param name="title">Название задачи</param>
+    /// <param name="previous">Статус до запуска</param>
+    /// <param name="started">Когда запуск начался</param>
+    /// <param name="finished">Когда запуск закончился</param>
+    /// <param name="outcome">Итог процесса</param>
+    /// <param name="exitCode">Код завершения</param>
+    /// <param name="detail">Пояснение к ошибке</param>
     private void Finish(JobDefinition job, string title, ProcessStatus? previous, DateTimeOffset started, DateTimeOffset finished, RunOutcome outcome, int? exitCode, string? detail)
     {
         var current = SafeRead(job.Id);
@@ -294,27 +250,13 @@ public sealed class JobRunner
     /// <summary>
     /// Записывает статус от имени раннера
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
-    /// <param name="title">
-    /// Название задачи
-    /// </param>
-    /// <param name="previous">
-    /// Статус до запуска: из него берутся прошлый успех и число ожидающих
-    /// </param>
-    /// <param name="state">
-    /// Новое состояние
-    /// </param>
-    /// <param name="at">
-    /// Момент записи
-    /// </param>
-    /// <param name="summary">
-    /// Сводка
-    /// </param>
-    /// <param name="error">
-    /// Текст ошибки
-    /// </param>
+    /// <param name="job">Задача</param>
+    /// <param name="title">Название задачи</param>
+    /// <param name="previous">Статус до запуска: из него берутся прошлый успех и число ожидающих</param>
+    /// <param name="state">Новое состояние</param>
+    /// <param name="at">Момент записи</param>
+    /// <param name="summary">Сводка</param>
+    /// <param name="error">Текст ошибки</param>
     /// <param name="success">
     /// <see langword="true"/>, если запуск удался и нужно обновить время успеха
     /// </param>
@@ -342,9 +284,7 @@ public sealed class JobRunner
     /// <summary>
     /// Читает статус и не падает, если идентификатор или файл плохие
     /// </summary>
-    /// <param name="id">
-    /// Идентификатор задачи
-    /// </param>
+    /// <param name="id">Идентификатор задачи</param>
     /// <returns>
     /// Статус или <see langword="null"/>
     /// </returns>
@@ -363,12 +303,8 @@ public sealed class JobRunner
     /// <summary>
     /// Выбирает рабочий каталог: заданный, иначе каталог программы
     /// </summary>
-    /// <param name="job">
-    /// Задача
-    /// </param>
-    /// <returns>
-    /// Каталог или пустая строка, если подойдёт текущий
-    /// </returns>
+    /// <param name="job">Задача</param>
+    /// <returns>Каталог или пустая строка, если подойдёт текущий</returns>
     private static string WorkingDirectoryOf(JobDefinition job)
     {
         if (!string.IsNullOrWhiteSpace(job.WorkingDirectory))
@@ -381,9 +317,7 @@ public sealed class JobRunner
     /// <summary>
     /// Берёт последнюю непустую строку вывода об ошибках
     /// </summary>
-    /// <param name="text">
-    /// Весь вывод
-    /// </param>
+    /// <param name="text">Весь вывод</param>
     /// <returns>
     /// Строка не длиннее лимита или <see langword="null"/>
     /// </returns>
@@ -396,9 +330,7 @@ public sealed class JobRunner
     /// <summary>
     /// Останавливает процесс вместе с дочерними
     /// </summary>
-    /// <param name="process">
-    /// Процесс
-    /// </param>
+    /// <param name="process">Процесс</param>
     private static void Kill(Process process)
     {
         try

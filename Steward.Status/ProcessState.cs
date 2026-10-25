@@ -48,15 +48,9 @@ public sealed class ProcessStateConverter : JsonConverter<ProcessState>
     /// <summary>
     /// Читает состояние из строки
     /// </summary>
-    /// <param name="reader">
-    /// Читатель JSON
-    /// </param>
-    /// <param name="typeToConvert">
-    /// Тип состояния
-    /// </param>
-    /// <param name="options">
-    /// Настройки сериализатора
-    /// </param>
+    /// <param name="reader">Читатель JSON</param>
+    /// <param name="typeToConvert">Тип состояния</param>
+    /// <param name="options">Настройки сериализатора</param>
     /// <returns>
     /// Состояние или <see cref="ProcessState.Unknown"/>
     /// </returns>
@@ -74,15 +68,9 @@ public sealed class ProcessStateConverter : JsonConverter<ProcessState>
     /// <summary>
     /// Пишет состояние строкой с маленькой первой буквой
     /// </summary>
-    /// <param name="writer">
-    /// Писатель JSON
-    /// </param>
-    /// <param name="value">
-    /// Состояние
-    /// </param>
-    /// <param name="options">
-    /// Настройки сериализатора
-    /// </param>
+    /// <param name="writer">Писатель JSON</param>
+    /// <param name="value">Состояние</param>
+    /// <param name="options">Настройки сериализатора</param>
     public override void Write(Utf8JsonWriter writer, ProcessState value, JsonSerializerOptions options)
     {
         var name = value.ToString();

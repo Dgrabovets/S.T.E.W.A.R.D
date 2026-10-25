@@ -32,9 +32,7 @@ public sealed partial class StatusStore
     /// <summary>
     /// Создаёт хранилище в папке. Папка появляется при первой записи
     /// </summary>
-    /// <param name="directory">
-    /// Папка статусов
-    /// </param>
+    /// <param name="directory">Папка статусов</param>
     public StatusStore(string directory)
     {
         Directory = directory;
@@ -50,9 +48,7 @@ public sealed partial class StatusStore
     /// <summary>
     /// Записывает статус целиком и атомарно: читатель видит либо старый файл, либо новый
     /// </summary>
-    /// <param name="status">
-    /// Статус процесса
-    /// </param>
+    /// <param name="status">Статус процесса</param>
     /// <exception cref="ArgumentException">
     /// Идентификатор не подходит для имени файла
     /// </exception>
@@ -89,9 +85,7 @@ public sealed partial class StatusStore
     /// <summary>
     /// Читает статус одного процесса
     /// </summary>
-    /// <param name="id">
-    /// Идентификатор процесса
-    /// </param>
+    /// <param name="id">Идентификатор процесса</param>
     /// <returns>
     /// Статус или <see langword="null"/>, если файла нет или он не читается
     /// </returns>
@@ -100,9 +94,7 @@ public sealed partial class StatusStore
     /// <summary>
     /// Читает все статусы в папке. Повреждённые и недописанные файлы пропускаются
     /// </summary>
-    /// <returns>
-    /// Статусы по порядку идентификаторов
-    /// </returns>
+    /// <returns>Статусы по порядку идентификаторов</returns>
     public IReadOnlyList<ProcessStatus> ReadAll()
     {
         if (!System.IO.Directory.Exists(Directory))
@@ -118,9 +110,7 @@ public sealed partial class StatusStore
     /// <summary>
     /// Читает один файл, не мешая тому, кто его пишет
     /// </summary>
-    /// <param name="path">
-    /// Путь к файлу
-    /// </param>
+    /// <param name="path">Путь к файлу</param>
     /// <returns>
     /// Статус или <see langword="null"/>
     /// </returns>
@@ -142,9 +132,7 @@ public sealed partial class StatusStore
     /// <summary>
     /// Проверяет, можно ли использовать идентификатор как имя файла
     /// </summary>
-    /// <param name="id">
-    /// Идентификатор процесса
-    /// </param>
+    /// <param name="id">Идентификатор процесса</param>
     /// <returns>
     /// <see langword="true"/>, если в нём только латиница, цифры, дефис и подчёркивание
     /// </returns>
@@ -153,12 +141,8 @@ public sealed partial class StatusStore
     /// <summary>
     /// Собирает путь к файлу и отвергает идентификатор с точками, слэшами и прочим
     /// </summary>
-    /// <param name="id">
-    /// Идентификатор процесса
-    /// </param>
-    /// <returns>
-    /// Полный путь к файлу статуса
-    /// </returns>
+    /// <param name="id">Идентификатор процесса</param>
+    /// <returns>Полный путь к файлу статуса</returns>
     /// <exception cref="ArgumentException">
     /// Идентификатор не подходит для имени файла
     /// </exception>

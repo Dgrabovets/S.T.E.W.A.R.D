@@ -175,9 +175,7 @@ public class SingularityClientTests
     /// <summary>
     /// Собирает клиент, который отправляет запросы подмене
     /// </summary>
-    /// <param name="http">
-    /// Подмена HTTP
-    /// </param>
+    /// <param name="http">Подмена HTTP</param>
     /// <param name="parentId">
     /// Идентификатор родительского проекта или <see langword="null"/>
     /// </param>
@@ -208,15 +206,9 @@ public class SingularityClientTests
     /// <summary>
     /// Один запрос, который получила подмена
     /// </summary>
-    /// <param name="Method">
-    /// Метод HTTP
-    /// </param>
-    /// <param name="Path">
-    /// Путь и строка запроса
-    /// </param>
-    /// <param name="Body">
-    /// Тело запроса. Пусто, если его нет
-    /// </param>
+    /// <param name="Method">Метод HTTP</param>
+    /// <param name="Path">Путь и строка запроса</param>
+    /// <param name="Body">Тело запроса. Пусто, если его нет</param>
     private sealed record RecordedRequest(HttpMethod Method, string Path, string Body)
     {
         /// <summary>
@@ -228,9 +220,7 @@ public class SingularityClientTests
     /// <summary>
     /// Подмена HTTP, которая записывает запросы и отвечает заранее заданным JSON
     /// </summary>
-    /// <param name="respond">
-    /// Строит тело ответа по запросу
-    /// </param>
+    /// <param name="respond">Строит тело ответа по запросу</param>
     private sealed class StubHttp(Func<RecordedRequest, string> respond) : HttpMessageHandler
     {
         /// <summary>
@@ -241,12 +231,8 @@ public class SingularityClientTests
         /// <summary>
         /// Записывает запрос и возвращает успешный ответ
         /// </summary>
-        /// <param name="request">
-        /// Запрос клиента
-        /// </param>
-        /// <param name="cancellationToken">
-        /// Токен отмены
-        /// </param>
+        /// <param name="request">Запрос клиента</param>
+        /// <param name="cancellationToken">Токен отмены</param>
         /// <returns>
         /// Ответ <c>200</c> с JSON
         /// </returns>

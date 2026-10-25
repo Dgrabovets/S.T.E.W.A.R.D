@@ -65,12 +65,8 @@ public sealed class IntervalBar : FrameworkElement
     /// <summary>
     /// Перерисовывает полосу, когда число изменилось снаружи
     /// </summary>
-    /// <param name="element">
-    /// Эта полоса
-    /// </param>
-    /// <param name="args">
-    /// Старое и новое значение
-    /// </param>
+    /// <param name="element">Эта полоса</param>
+    /// <param name="args">Старое и новое значение</param>
     private static void OnValueChanged(DependencyObject element, DependencyPropertyChangedEventArgs args)
     {
         ((IntervalBar)element).InvalidateVisual();
@@ -81,9 +77,7 @@ public sealed class IntervalBar : FrameworkElement
     /// <summary>
     /// Ставит бегунок в точку нажатия
     /// </summary>
-    /// <param name="e">
-    /// Аргументы нажатия
-    /// </param>
+    /// <param name="e">Аргументы нажатия</param>
     protected override void OnMouseLeftButtonDown(System.Windows.Input.MouseButtonEventArgs e)
     {
         CaptureMouse();
@@ -94,9 +88,7 @@ public sealed class IntervalBar : FrameworkElement
     /// <summary>
     /// Тянет бегунок за курсором
     /// </summary>
-    /// <param name="e">
-    /// Аргументы движения
-    /// </param>
+    /// <param name="e">Аргументы движения</param>
     protected override void OnMouseMove(System.Windows.Input.MouseEventArgs e)
     {
         if (!IsMouseCaptured)
@@ -109,9 +101,7 @@ public sealed class IntervalBar : FrameworkElement
     /// <summary>
     /// Отпускает бегунок
     /// </summary>
-    /// <param name="e">
-    /// Аргументы отпускания
-    /// </param>
+    /// <param name="e">Аргументы отпускания</param>
     protected override void OnMouseLeftButtonUp(System.Windows.Input.MouseButtonEventArgs e)
     {
         if (!IsMouseCaptured)
@@ -124,9 +114,7 @@ public sealed class IntervalBar : FrameworkElement
     /// <summary>
     /// Переводит координату курсора в целое число минут
     /// </summary>
-    /// <param name="x">
-    /// Горизонталь курсора внутри полосы
-    /// </param>
+    /// <param name="x">Горизонталь курсора внутри полосы</param>
     private void MoveTo(double x)
     {
         var span = Math.Max(1, ActualWidth - THUMB_RADIUS * 2);
@@ -142,9 +130,7 @@ public sealed class IntervalBar : FrameworkElement
     /// <summary>
     /// Рисует дорожку слева направо и круглый бегунок
     /// </summary>
-    /// <param name="drawingContext">
-    /// Контекст кадра
-    /// </param>
+    /// <param name="drawingContext">Контекст кадра</param>
     protected override void OnRender(DrawingContext drawingContext)
     {
         var accent = (System.Windows.Media.Brush)FindResource("AccentBrush");
@@ -173,12 +159,8 @@ public sealed class IntervalBar : FrameworkElement
     /// <summary>
     /// Мягкое фиолетовое пятно под бегунком
     /// </summary>
-    /// <param name="accent">
-    /// Основной цвет панели
-    /// </param>
-    /// <returns>
-    /// Кисть, которую можно рисовать много раз
-    /// </returns>
+    /// <param name="accent">Основной цвет панели</param>
+    /// <returns>Кисть, которую можно рисовать много раз</returns>
     private static System.Windows.Media.Brush Glow(System.Windows.Media.Brush accent)
     {
         var color = accent is SolidColorBrush solid ? solid.Color : System.Windows.Media.Color.FromRgb(139, 108, 255);

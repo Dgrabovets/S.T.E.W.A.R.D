@@ -43,12 +43,8 @@ public sealed class JournalCard
     /// <summary>
     /// Собирает карточки из записей журнала
     /// </summary>
-    /// <param name="entries">
-    /// Записи от новых к старым
-    /// </param>
-    /// <returns>
-    /// Карточки с подписью дня только у первой записи этого дня
-    /// </returns>
+    /// <param name="entries">Записи от новых к старым</param>
+    /// <returns>Карточки с подписью дня только у первой записи этого дня</returns>
     public static IReadOnlyList<JournalCard> From(IReadOnlyList<LogEntry> entries)
     {
         var cards = new List<JournalCard>();
@@ -78,12 +74,8 @@ public sealed class JournalCard
     /// <summary>
     /// Добавляет к тихому прогону число таких же сверок
     /// </summary>
-    /// <param name="entry">
-    /// Запись журнала
-    /// </param>
-    /// <returns>
-    /// Текст подробностей
-    /// </returns>
+    /// <param name="entry">Запись журнала</param>
+    /// <returns>Текст подробностей</returns>
     private static string ShownDetail(LogEntry entry)
     {
         if (entry.Tone != LogTone.Quiet || entry.Repeat <= 1)
@@ -96,12 +88,8 @@ public sealed class JournalCard
     /// <summary>
     /// Склоняет слово «сверка»
     /// </summary>
-    /// <param name="count">
-    /// Число сверок
-    /// </param>
-    /// <returns>
-    /// Число и слово в нужном падеже
-    /// </returns>
+    /// <param name="count">Число сверок</param>
+    /// <returns>Число и слово в нужном падеже</returns>
     private static string Checks(int count)
     {
         var mod100 = count % 100;
@@ -119,12 +107,8 @@ public sealed class JournalCard
     /// <summary>
     /// Подпись дня
     /// </summary>
-    /// <param name="time">
-    /// Время записи
-    /// </param>
-    /// <returns>
-    /// «Сегодня», «Вчера» или дата
-    /// </returns>
+    /// <param name="time">Время записи</param>
+    /// <returns>«Сегодня», «Вчера» или дата</returns>
     private static string DayLabel(DateTimeOffset time)
     {
         var day = time.Date;
