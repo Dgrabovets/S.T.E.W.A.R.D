@@ -1,0 +1,22 @@
+{
+  // Задачи, которые приложение в трее запускает само и статус которых показывает.
+  // {repo} заменяется корнем репозитория. Расписание пар сюда не входит: им занимается Docker.
+  // Условия запуска: start (при запуске приложения), daily (каждый день в HH:mm), interval (через N минут).
+  "jobs": [
+    {
+      "id": "mail",
+      "title": "Почта",
+      // Включай, когда настроишь MailToSingularity/appsettings.json и соберёшь программу:
+      //   dotnet publish MailToSingularity -c Release -o MailToSingularity/publish
+      "enabled": false,
+      "command": "{repo}\\MailToSingularity\\publish\\MailToSingularity.exe",
+      "triggers": [
+        { "type": "start" },
+        { "type": "daily", "at": "09:00" },
+        { "type": "daily", "at": "19:00" }
+      ],
+      "timeoutMinutes": 10,
+      "staleAfterMinutes": 960
+    }
+  ]
+}
