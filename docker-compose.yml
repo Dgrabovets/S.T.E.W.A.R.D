@@ -1,0 +1,8 @@
+name: steward
+
+services:
+  schedule:
+    build: .
+    env_file:
+      - .env
+    restart: unless-stopped

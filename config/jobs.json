@@ -6,10 +6,10 @@
     {
       "id": "mail",
       "title": "Почта",
-      // Включай, когда настроишь MailToSingularity/appsettings.json и соберёшь программу:
-      //   dotnet publish MailToSingularity -c Release -o MailToSingularity/publish
+      // Включай, когда настроишь Steward.Mail/appsettings.json и соберёшь программу:
+      //   dotnet publish Steward.Mail -c Release -o Steward.Mail/publish
       "enabled": false,
-      "command": "{repo}\\MailToSingularity\\publish\\MailToSingularity.exe",
+      "command": "{repo}\\Steward.Mail\\publish\\Steward.Mail.exe",
       "triggers": [
         { "type": "start" },
         { "type": "daily", "at": "09:00" },
