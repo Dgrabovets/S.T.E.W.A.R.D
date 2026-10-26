@@ -16,7 +16,7 @@ namespace Steward.Shell;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>Steward.exe --snapshot файл.png [popup | settings | tray | formats | design | main[:status|ideas|homework|journal]]</c>
+/// Запуск: <c>Steward.exe --snapshot файл.png [popup | appicon | logo | social | settings | tray | formats | design | main[:status|ideas|homework|journal]]</c>
 /// </summary>
 public static class SnapshotRenderer
 {
@@ -32,6 +32,20 @@ public static class SnapshotRenderer
     /// </returns>
     public static bool Render(string path, string which)
     {
+        if (string.Equals(which, "logo", StringComparison.OrdinalIgnoreCase))
+        {
+            AppIconWriter.WritePng(path, 512);
+
+            return true;
+        }
+
+        if (string.Equals(which, "social", StringComparison.OrdinalIgnoreCase))
+        {
+            AppIconWriter.WriteSocial(path);
+
+            return true;
+        }
+
         if (string.Equals(which, "appicon", StringComparison.OrdinalIgnoreCase))
         {
             AppIconWriter.Write(path);

@@ -10,7 +10,7 @@ using Brush = System.Windows.Media.Brush;
 namespace Steward.Shell;
 
 /// <summary>
-/// Рисует иконку в трее: та же сфера из точек, что и в окнах, вид и цвет по состоянию приложения
+/// Рисует иконку в трее: та же плитка со сферой, что у значка приложения, вид и цвет сферы по состоянию
 /// </summary>
 public static class TrayOrbIcon
 {
@@ -20,16 +20,6 @@ public static class TrayOrbIcon
     private const int SIZE = 32;
 
     /// <summary>
-    /// Рисуется каждая вторая точка: на мелкой иконке сто пятьдесят точек слиплись бы в пятно
-    /// </summary>
-    private const int STRIDE = 2;
-
-    /// <summary>
-    /// Точки на иконке крупнее, чтобы читались в шестнадцать пикселей
-    /// </summary>
-    private const double DOT_SCALE = 1.9;
-
-    /// <summary>
     /// Рисует иконку на текущий момент
     /// </summary>
     /// <param name="kind">Вид сферы</param>
@@ -37,12 +27,8 @@ public static class TrayOrbIcon
     /// <returns>Иконка, которую нужно освободить</returns>
     public static Icon Render(ActivityKindEnum kind, Brush brush)
     {
-        var orb = new ActivityOrb { Width = SIZE, Height = SIZE, Kind = kind, Foreground = brush, Stride = kind == ActivityKindEnum.Dormant ? 1 : STRIDE, DotScale = DOT_SCALE };
-        orb.Measure(new System.Windows.Size(SIZE, SIZE));
-        orb.Arrange(new Rect(0, 0, SIZE, SIZE));
-
         var target = new RenderTargetBitmap(SIZE, SIZE, 96, 96, PixelFormats.Pbgra32);
-        target.Render(orb);
+        target.Render(AppIconWriter.Tile(SIZE, kind, brush));
 
         var pixels = new byte[SIZE * SIZE * 4];
         target.CopyPixels(pixels, SIZE * 4, 0);

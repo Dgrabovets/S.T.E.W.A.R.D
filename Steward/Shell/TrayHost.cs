@@ -227,7 +227,7 @@ public sealed class TrayHost : IDisposable
                 ? (ActivityKindEnum.Working, "WorkingBrush")
                 : enabled.Any(row => row.Tone == RowToneEnum.Attention)
                     ? (ActivityKindEnum.Attention, "AttentionBrush")
-                    : snapshot.ContainerRunning ? (ActivityKindEnum.Alive, "OkBrush") : (ActivityKindEnum.Dormant, "IdleBrush");
+                    : snapshot.ContainerRunning ? (ActivityKindEnum.Alive, "AccentTextBrush") : (ActivityKindEnum.Dormant, "IdleBrush");
 
         if (next != _orb)
         {

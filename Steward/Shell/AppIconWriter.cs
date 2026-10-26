@@ -66,6 +66,25 @@ public static class AppIconWriter
     /// <returns>Байты PNG</returns>
     private static byte[] Render(int size)
     {
+        var tile = Tile(size, ActivityKindEnum.Working, (Brush)System.Windows.Application.Current.Resources["AccentTextBrush"]);
+        tile.Measure(new System.Windows.Size(size, size));
+        tile.Arrange(new Rect(0, 0, size, size));
+
+        var target = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
+        target.Render(tile);
+
+        return size >= PNG_FROM ? Png(target) : Dib(target, size);
+    }
+
+    /// <summary>
+    /// Рисует плитку значка: тёмный скруглённый квадрат с тонкой рамкой и сферой из точек внутри. Из неё сделаны значок приложения, значок в трее и картинки для GitHub
+    /// </summary>
+    /// <param name="size">Сторона плитки в пикселях</param>
+    /// <param name="kind">Вид сферы</param>
+    /// <param name="brush">Цвет точек</param>
+    /// <returns>Плитка с готовой раскладкой</returns>
+    public static Border Tile(int size, ActivityKindEnum kind, Brush brush)
+    {
         var resources = System.Windows.Application.Current.Resources;
         var small = size <= 32;
         var tile = new Border
@@ -79,8 +98,8 @@ public static class AppIconWriter
             Padding = new Thickness(size * 0.1),
             Child = new ActivityOrb
             {
-                Kind = ActivityKindEnum.Working,
-                Foreground = (Brush)resources["AccentTextBrush"],
+                Kind = kind,
+                Foreground = brush,
                 Stride = small ? 2 : 1,
                 DotScale = small ? 2.1 : Math.Max(1.4, size / 56.0),
             },
@@ -88,10 +107,61 @@ public static class AppIconWriter
         tile.Measure(new System.Windows.Size(size, size));
         tile.Arrange(new Rect(0, 0, size, size));
 
-        var target = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
-        target.Render(tile);
+        return tile;
+    }
 
-        return size >= PNG_FROM ? Png(target) : Dib(target, size);
+    /// <summary>
+    /// Рисует плитку в PNG-файл
+    /// </summary>
+    /// <param name="path">Куда сохранить</param>
+    /// <param name="size">Сторона в пикселях</param>
+    public static void WritePng(string path, int size)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        File.WriteAllBytes(path, Png(Draw(Tile(size, ActivityKindEnum.Working, (Brush)System.Windows.Application.Current.Resources["AccentTextBrush"]), size, size)));
+    }
+
+    /// <summary>
+    /// Рисует широкую картинку для предпросмотра репозитория на GitHub: плитка слева, название и описание справа
+    /// </summary>
+    /// <param name="path">Куда сохранить</param>
+    public static void WriteSocial(string path)
+    {
+        var resources = System.Windows.Application.Current.Resources;
+        var grid = new Grid { Width = 1280, Height = 640, Background = (Brush)resources["WindowBrush"] };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(640) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var tile = Tile(400, ActivityKindEnum.Working, (Brush)resources["AccentTextBrush"]);
+        tile.HorizontalAlignment = System.Windows.HorizontalAlignment.Center;
+        tile.VerticalAlignment = VerticalAlignment.Center;
+        grid.Children.Add(tile);
+
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 40, 0) };
+        text.Children.Add(new TextBlock { Text = "Steward", FontFamily = new System.Windows.Media.FontFamily("Segoe UI"), FontWeight = FontWeights.SemiBold, FontSize = 96, Foreground = (Brush)resources["TextBrush"] });
+        text.Children.Add(new TextBlock { Text = "Личные утилиты в трее: расписание, почта, рилсы и домашние задания в SingularityApp", FontFamily = new System.Windows.Media.FontFamily("Segoe UI"), FontSize = 32, Foreground = (Brush)resources["MutedBrush"], TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0) });
+        Grid.SetColumn(text, 1);
+        grid.Children.Add(text);
+
+        grid.Measure(new System.Windows.Size(1280, 640));
+        grid.Arrange(new Rect(0, 0, 1280, 640));
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        File.WriteAllBytes(path, Png(Draw(grid, 1280, 640)));
+    }
+
+    /// <summary>
+    /// Рисует элемент в картинку
+    /// </summary>
+    /// <param name="element">Элемент с готовой раскладкой</param>
+    /// <param name="width">Ширина в пикселях</param>
+    /// <param name="height">Высота в пикселях</param>
+    /// <returns>Нарисованная картинка</returns>
+    private static RenderTargetBitmap Draw(UIElement element, int width, int height)
+    {
+        var target = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        target.Render(element);
+
+        return target;
     }
 
     /// <summary>
