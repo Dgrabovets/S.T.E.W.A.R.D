@@ -84,6 +84,17 @@ public class IdeaTests
     }
 
     /// <summary>
+    /// Просьба с запасом укладывается в ссылку: русские буквы в адресе занимают по шесть знаков, а предел командной строки Windows около тридцати двух тысяч
+    /// </summary>
+    [Fact]
+    public void The_prompt_fits_into_a_link_with_room_to_spare()
+    {
+        var url = ClaudeLauncher.BuildUrl(IdeaPrompt.Build(Sample, @"D:\MyRepositories\Tools\Steward", @"D:\MyRepositories\Tools\Steward\data\ideas\r1-1.json"), @"D:\MyRepositories\Tools\Steward");
+
+        Assert.True(url.Length < 16000, $"ссылка {url.Length} знаков");
+    }
+
+    /// <summary>
     /// Ссылка для Claude содержит папку и просьбу в закодированном виде
     /// </summary>
     [Fact]
