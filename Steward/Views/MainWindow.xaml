@@ -210,9 +210,9 @@
                                     <TextBlock Text="В каком виде готовить ДЗ по каждому занятию" Style="{StaticResource PageHint}" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </ToggleButton>
-                            <ContentControl Style="{StaticResource CollapsibleBody}" Tag="{Binding IsFormatsOpen}">
+                            <ctl:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsFormatsOpen}">
                                 <views:HomeworkFormatsView DataContext="{Binding Formats}" Margin="0,8,0,0"/>
-                            </ContentControl>
+                            </ctl:CollapsibleBody>
                             <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,8,0,16"/>
                             <Border Style="{StaticResource Card}" Visibility="{Binding IsHomeworkEmpty, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
