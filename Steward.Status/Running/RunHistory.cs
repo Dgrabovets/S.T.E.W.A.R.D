@@ -86,6 +86,32 @@ public sealed class RunHistory
     }
 
     /// <summary>
+    /// Стирает записи одной задачи, остальные остаются. Сбой записи не мешает работе: файл просто останется как был
+    /// </summary>
+    /// <param name="jobId">Идентификатор задачи</param>
+    public void Clear(string jobId)
+    {
+        lock (_gate)
+        {
+            try
+            {
+                if (!File.Exists(_path))
+                    return;
+
+                var kept = File.ReadLines(_path)
+                    .Where(line => Parse(line) is not { } record || !string.Equals(record.JobId, jobId, StringComparison.Ordinal))
+                    .ToArray();
+
+                File.WriteAllLines(_path, kept);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // ignore
+            }
+        }
+    }
+
+    /// <summary>
     /// Читает последние записи
     /// </summary>
     /// <param name="count">Сколько записей нужно</param>

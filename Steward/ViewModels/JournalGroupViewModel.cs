@@ -75,13 +75,15 @@ public sealed class JournalGroupViewModel : Bindable
     /// <param name="title">Название раздела</param>
     /// <param name="isOpen">Раскрыт ли раздел сначала</param>
     /// <param name="opened">Вызывается, когда человек раскрыл или свернул раздел</param>
-    public JournalGroupViewModel(string id, string title, bool isOpen, Action<string, bool> opened)
+    /// <param name="clear">Вызывается, когда человек просит стереть записи раздела</param>
+    public JournalGroupViewModel(string id, string title, bool isOpen, Action<string, bool> opened, Action<string> clear)
     {
         Id = id;
         Title = title;
         _isOpen = isOpen;
         _opened = opened;
         ShowMoreCommand = new RelayCommand(ShowMore);
+        ClearCommand = new RelayCommand(() => clear(id));
     }
 
     /// <summary>
@@ -93,6 +95,11 @@ public sealed class JournalGroupViewModel : Bindable
     /// Название раздела
     /// </summary>
     public string Title { get; }
+
+    /// <summary>
+    /// Стирает записи только этого раздела
+    /// </summary>
+    public RelayCommand ClearCommand { get; }
 
     /// <summary>
     /// Показывает ещё одну страницу записей

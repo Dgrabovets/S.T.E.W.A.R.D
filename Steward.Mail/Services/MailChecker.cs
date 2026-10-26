@@ -5,11 +5,12 @@ using Steward.Mail.Models;
 namespace Steward.Mail.Services;
 
 /// <summary>
-/// Одна проверка почты: читает непрочитанные письма, создаёт задачи для тех, у кого её ещё нет, и показывает уведомление. Флаг «прочитано» не ставится: пока вы не открыли письмо, оно считается требующим внимания, а повторную задачу не даёт внешний ключ в SingularityApp
+/// Одна проверка почты: читает непрочитанные письма, создаёт задачи для тех, у кого её ещё нет, и показывает уведомление. Флаг «прочитано» в ящике не ставится: пока вы не открыли письмо, оно считается требующим внимания. Повторную задачу не даёт внешний ключ в SingularityApp, а повторный разбор письма без задачи не даёт память о разобранных
 /// </summary>
 /// <param name="reader">Читает непрочитанные письма</param>
 /// <param name="classifier">Относит письмо к категории</param>
 /// <param name="singularity">Создаёт задачи в SingularityApp и подсказывает, для каких писем они уже есть</param>
+/// <param name="handled">Помнит письма, которые уже разобраны, в том числе информационные без задач</param>
 /// <param name="notifier">Показывает уведомление со сводкой</param>
 /// <param name="settings">Настройки приложения</param>
 /// <param name="timeProvider">Часы: от них берётся день начала задачи</param>
@@ -18,6 +19,7 @@ public sealed class MailChecker(
     IMailReader reader,
     IMailClassifier classifier,
     ISingularityClient singularity,
+    IHandledMail handled,
     INotifier notifier,
     AppSettings settings,
     TimeProvider timeProvider,
@@ -41,7 +43,7 @@ public sealed class MailChecker(
             ? new HashSet<string>()
             : await singularity.ListExternalIdsAsync(dayStart.AddDays(-(settings.Mail.LookbackDays + 1)), cancellationToken);
 
-        var fresh = unread.Where(item => !existing.Contains(MailTaskBuilder.ExternalId(item))).OrderBy(item => item.Date).ToList();
+        var fresh = unread.Where(item => !existing.Contains(MailTaskBuilder.ExternalId(item)) && !handled.Contains(item.MessageId)).OrderBy(item => item.Date).ToList();
 
         var feedback = new List<MailItem>();
         var replies = new List<MailItem>();
@@ -54,6 +56,9 @@ public sealed class MailChecker(
 
             if (task is not null && !dryRun)
                 await singularity.CreateTaskAsync(task, cancellationToken);
+
+            if (!dryRun)
+                handled.Add(mail.MessageId);
 
             (category switch
             {

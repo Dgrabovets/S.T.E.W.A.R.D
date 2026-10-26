@@ -43,7 +43,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Grid x:Name="TitleBar" Grid.Row="0" Margin="24,16,16,8" Background="Transparent" MouseLeftButtonDown="TitleBar_OnDrag">
+            <Grid x:Name="TitleBar" Grid.Row="0" Margin="24,16,16,8" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -51,8 +51,8 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal">
-                    <Grid Width="52" Height="52" Margin="0,0,16,0" VerticalAlignment="Center">
-                        <Ellipse Width="88" Height="88" Opacity="0.35" IsHitTestVisible="False">
+                    <Grid Width="80" Height="80" Margin="-14,-14,2,-14" VerticalAlignment="Center">
+                        <Ellipse Opacity="0.35" IsHitTestVisible="False">
                             <Ellipse.Fill>
                                 <RadialGradientBrush>
                                     <GradientStop Color="{StaticResource AccentColor}" Offset="0.3"/>
@@ -78,7 +78,7 @@
                                 </Style>
                             </Ellipse.Style>
                         </Ellipse>
-                        <Image Source="pack://application:,,,/Assets/steward.ico" Margin="3" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <Image Source="pack://application:,,,/Assets/steward.ico" Width="52" Height="52" RenderOptions.BitmapScalingMode="HighQuality"/>
                     </Grid>
                     <TextBlock Text="S.T.E.W.A.R.D" Style="{StaticResource TextDisplay}" VerticalAlignment="Center">
                         <TextBlock.Foreground>
@@ -191,7 +191,6 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <TextBlock Text="Идеи" Style="{StaticResource PageTitle}"/>
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding IsReelsBusy, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel Orientation="Horizontal">
                                         <ctl:ActivityOrb Width="26" Height="26" Kind="Composing" Foreground="{StaticResource WorkingBrush}" Margin="-4,-2,12,-2"/>
@@ -241,7 +240,6 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                            <TextBlock Text="Домашние задания" Style="{StaticResource PageTitle}"/>
                             <Border Style="{StaticResource Card}" Visibility="{Binding IsHomeworkEmpty, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <TextBlock Text="Заданий пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
@@ -297,7 +295,7 @@
                             <StackPanel Margin="0,0,12,0">
                                 <Grid Margin="0,0,0,20">
                                     <TextBlock Text="Журнал" Style="{StaticResource PageTitle}" VerticalAlignment="Center"/>
-                                    <Button Content="Очистить журнал" Style="{StaticResource ActionButton}" HorizontalAlignment="Right"
+                                    <Button Content="Очистить журнал" Style="{StaticResource OutlineButton}" HorizontalAlignment="Right"
                                             Command="{Binding ClearJournalCommand}" Visibility="{Binding HasRecords, Converter={StaticResource BoolToVisibility}}"/>
                                 </Grid>
                                 <TextBlock Text="Записей пока нет" Style="{StaticResource PageHint}" Margin="4,0,0,0"
@@ -318,6 +316,7 @@
                                                     </ToggleButton>
                                                     <ctl:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsOpen}">
                                                         <StackPanel Margin="4,0,4,0">
+                                                            <Button Content="Очистить вкладку" Style="{StaticResource OutlineButton}" HorizontalAlignment="Right" Margin="0,8,0,0" Padding="12,5" Command="{Binding ClearCommand}"/>
                                                             <ItemsControl ItemsSource="{Binding Runs}">
                                                                 <ItemsControl.ItemTemplate>
                                                                     <DataTemplate>
@@ -336,10 +335,10 @@
                                                                                         <TextBlock Text="{Binding Facts}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"/>
                                                                                     </StackPanel>
                                                                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                                                        <Border Style="{StaticResource ToneBadge}" Padding="12,3">
+                                                                                        <Border Style="{StaticResource ToneBadge}" Padding="14,8" VerticalAlignment="Center">
                                                                                             <TextBlock Text="{Binding Outcome}" Style="{StaticResource ToneBadgeText}"/>
                                                                                         </Border>
-                                                                                        <Button Content="Починить с Claude" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
+                                                                                        <Button Content="Починить с Claude" Style="{StaticResource OutlineButton}" Margin="8,0,0,0" VerticalAlignment="Center"
                                                                                                 Command="{Binding FixCommand}" Visibility="{Binding CanFix, Converter={StaticResource BoolToVisibility}}"/>
                                                                                     </StackPanel>
                                                                                 </Grid>
@@ -391,7 +390,7 @@
                                                                                         <TextBlock Text="{Binding Repeats}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"
                                                                                                    Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVisibility}}"/>
                                                                                     </StackPanel>
-                                                                                    <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="12,3">
+                                                                                    <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="14,6">
                                                                                         <TextBlock Text="{Binding Outcome}" Style="{StaticResource ToneBadgeText}"/>
                                                                                     </Border>
                                                                                 </Grid>

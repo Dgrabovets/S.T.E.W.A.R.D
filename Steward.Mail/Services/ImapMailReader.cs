@@ -14,7 +14,7 @@ namespace Steward.Mail.Services;
 
 /// <summary>
 /// Чтение писем по IMAP через MailKit
-/// Письма читаются только по заголовкам и превью, флаг «прочитано» не ставится
+/// Письма читаются только по заголовкам и превью, флаг «прочитано» не ставится. Разобранные письма запоминает отдельный файл
 /// </summary>
 public sealed partial class ImapMailReader(MailSettings settings) : IMailReader
 {

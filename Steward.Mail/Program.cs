@@ -49,6 +49,7 @@ internal static class Program
                 new ImapMailReader(settings.Mail),
                 new MailClassifier(settings.Mail, settings.Classifier),
                 singularity,
+                new HandledMailFile(Path.Combine(DataLocation.DataDirectory(), "mail", "handled.json")),
                 new ToastNotifier(),
                 settings,
                 TimeProvider.System,

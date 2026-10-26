@@ -26,6 +26,9 @@ internal static class Program
     /// <returns>0, если всё прошло, и 1, если случилась ошибка</returns>
     private static async Task<int> Main()
     {
+        // Приложение в трее читает вывод как UTF-8, а консоль по умолчанию пишет в кодировке DOS: без этого русский текст ошибок превращается в кракозябры
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+
         var statusStore = new StatusStore(DataLocation.StatusDirectory());
 
         try

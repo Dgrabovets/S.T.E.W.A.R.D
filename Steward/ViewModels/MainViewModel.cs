@@ -92,6 +92,11 @@ public sealed class MainViewModel : PanelViewModel
     public event EventHandler? ClearJournalRequested;
 
     /// <summary>
+    /// Просит стереть записи одного раздела журнала: параметр — идентификатор задачи или «schedule»
+    /// </summary>
+    public event Action<string>? ClearGroupRequested;
+
+    /// <summary>
     /// Решено делать идею: параметр — идея
     /// </summary>
     public event Action<Idea>? IdeaApproved;
@@ -348,7 +353,7 @@ public sealed class MainViewModel : PanelViewModel
         if (_groupById.TryGetValue(id, out var existing))
             return existing;
 
-        var created = new JournalGroupViewModel(id, title, _groupOpen.TryGetValue(id, out var open) ? open : failed, (key, value) => _groupOpen[key] = value);
+        var created = new JournalGroupViewModel(id, title, _groupOpen.TryGetValue(id, out var open) ? open : failed, (key, value) => _groupOpen[key] = value, key => ClearGroupRequested?.Invoke(key));
         _groupById[id] = created;
 
         return created;

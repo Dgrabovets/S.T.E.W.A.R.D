@@ -249,6 +249,16 @@ public sealed class JobHost : IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Стирает запуски одной задачи и сообщает панелям
+    /// </summary>
+    /// <param name="jobId">Идентификатор задачи</param>
+    public void ClearRecords(string jobId)
+    {
+        _runner.History.Clear(jobId);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     #endregion Reading
 
     #region Events

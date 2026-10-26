@@ -27,6 +27,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SourceInitialized += (_, _) => Steward.Shell.WindowCorners.Round(this);
+        Steward.Shell.WindowDragging.Attach(this, TitleBar);
         Model = new MainViewModel();
         DataContext = Model;
     }
@@ -88,17 +89,6 @@ public partial class MainWindow : Window
         }
 
         base.OnClosing(e);
-    }
-
-    /// <summary>
-    /// Даёт перетащить окно за заголовок
-    /// </summary>
-    /// <param name="sender">Заголовок</param>
-    /// <param name="e">Аргументы нажатия</param>
-    private void TitleBar_OnDrag(object sender, MouseButtonEventArgs e)
-    {
-        if (e.LeftButton == MouseButtonState.Pressed)
-            DragMove();
     }
 
     /// <summary>

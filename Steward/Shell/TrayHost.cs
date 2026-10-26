@@ -402,6 +402,7 @@ public sealed class TrayHost : IDisposable
             _main.Model.RunRequested += id => _jobs.RunNow(id);
             _main.Model.FixRequested += OpenFix;
             _main.Model.ClearJournalRequested += (_, _) => ClearJournal();
+            _main.Model.ClearGroupRequested += ClearGroup;
             _main.Model.IdeaApproved += ApproveIdea;
             _main.Model.IdeaRejected += idea => _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Rejected);
             _main.Model.LinkRequested += OpenLink;
@@ -425,6 +426,24 @@ public sealed class TrayHost : IDisposable
         ScheduleHistory.Clear();
         _snapshot = _snapshot with { Entries = [] };
         ApplyAll();
+    }
+
+    /// <summary>
+    /// Стирает записи одного раздела журнала
+    /// </summary>
+    /// <param name="id">Идентификатор задачи или «schedule» для сверок расписания</param>
+    private void ClearGroup(string id)
+    {
+        if (id == "schedule")
+        {
+            ScheduleHistory.Clear();
+            _snapshot = _snapshot with { Entries = [] };
+            ApplyAll();
+
+            return;
+        }
+
+        _jobs.ClearRecords(id);
     }
 
     /// <summary>

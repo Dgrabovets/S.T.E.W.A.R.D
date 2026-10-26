@@ -16,6 +16,7 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         SourceInitialized += (_, _) => Steward.Shell.WindowCorners.Round(this);
+        Steward.Shell.WindowDragging.Attach(this, Header);
         Model = new SettingsViewModel();
         DataContext = Model;
     }
@@ -31,16 +32,6 @@ public partial class SettingsWindow : Window
     /// <param name="text">Короткий итог</param>
     public void SetStatus(string text) => Model.SettingsMessage = text;
 
-    /// <summary>
-    /// Даёт перетащить окно за шапку
-    /// </summary>
-    /// <param name="sender">Шапка</param>
-    /// <param name="e">Аргументы нажатия</param>
-    private void Header_OnDrag(object sender, MouseButtonEventArgs e)
-    {
-        if (e.LeftButton == MouseButtonState.Pressed && e.OriginalSource is not System.Windows.Controls.Button)
-            DragMove();
-    }
 
     /// <summary>
     /// Закрывает окно
