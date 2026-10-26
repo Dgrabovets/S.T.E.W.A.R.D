@@ -231,7 +231,7 @@ public static class SnapshotRenderer
         {
             case 0:
                 root.Children.Add(new System.Windows.Shapes.Ellipse { Fill = brush, Margin = new Thickness(pad) });
-                root.Children.Add(new System.Windows.Shapes.Ellipse { Fill = Brush("TextBrush"), Opacity = 0.3, Width = size * 0.34, Height = size * 0.26, HorizontalAlignment = System.Windows.HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(size * 0.2, size * 0.14, 0, 0) });
+                root.Children.Add(new System.Windows.Shapes.Ellipse { Fill = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["TextBrush"], Opacity = 0.3, Width = size * 0.34, Height = size * 0.26, HorizontalAlignment = System.Windows.HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(size * 0.2, size * 0.14, 0, 0) });
                 break;
             case 1:
                 root.Children.Add(new Controls.ActivityOrb { Kind = kind, Foreground = brush, Stride = 1, DotScale = Math.Max(1.2, size / 17.0), Margin = new Thickness(-size * 0.02) });
