@@ -1,4 +1,4 @@
-namespace Steward.Models;
+namespace Steward.DevTools.Design;
 
 /// <summary>
 /// Образец цвета для страницы «Дизайн»: имя, кисть и шестнадцатеричная запись

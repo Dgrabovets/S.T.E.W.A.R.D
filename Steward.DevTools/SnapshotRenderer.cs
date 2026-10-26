@@ -11,12 +11,14 @@ using Steward.Status.Rows;
 using Steward.Status.Running;
 using Steward.ViewModels;
 using Steward.Views;
+using Steward.Shell;
+using Steward.DevTools.Design;
 
-namespace Steward.Shell;
+namespace Steward.DevTools;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>Steward.exe --snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal]]</c>
+/// Запуск: <c>dotnet run --project Steward.DevTools -- snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal]]</c>
 /// </summary>
 public static class SnapshotRenderer
 {

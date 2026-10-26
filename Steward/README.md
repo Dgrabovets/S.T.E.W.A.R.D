@@ -29,7 +29,7 @@ dotnet run --project Steward/Steward.csproj
 Окна можно нарисовать в PNG на выдуманных данных, не открывая их на рабочем столе:
 
 ```bash
-Steward.exe --snapshot файл.png [main[:status|ideas|homework|journal]]
+dotnet run --project Steward.DevTools -- snapshot файл.png [main[:status|ideas|homework|journal]]
 ```
 
 ## Устройство

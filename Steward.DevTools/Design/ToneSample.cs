@@ -1,4 +1,6 @@
-namespace Steward.Models;
+using Steward.Models;
+
+namespace Steward.DevTools.Design;
 
 /// <summary>
 /// Образец состояния для страницы «Дизайн»: цвет плашки и её подпись

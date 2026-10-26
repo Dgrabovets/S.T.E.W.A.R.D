@@ -14,7 +14,6 @@
     <File Path="docker-compose.yml" />
     <File Path="start-steward.ps1" />
     <File Path="config/jobs.json" />
-    <File Path="tools/DocScan.cs" />
   </Folder>
   <Folder Name="/Whisper/">
     <File Path="Whisper/README.md" />
@@ -30,6 +29,7 @@
     <Project Path="tests/Steward.Schedule.Tests/Steward.Schedule.Tests.csproj" />
   </Folder>
   <Project Path="Steward/Steward.csproj" />
+  <Project Path="Steward.DevTools/Steward.DevTools.csproj" />
   <Project Path="Steward.Status/Steward.Status.csproj" />
   <Project Path="Steward.Schedule/Steward.Schedule.csproj" />
   <Project Path="Steward.Schedule.Core/Steward.Schedule.Core.csproj" />

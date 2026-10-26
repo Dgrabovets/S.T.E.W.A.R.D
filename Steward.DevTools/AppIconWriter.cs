@@ -7,7 +7,7 @@ using Steward.Controls;
 using Steward.Models;
 using Brush = System.Windows.Media.Brush;
 
-namespace Steward.Shell;
+namespace Steward.DevTools;
 
 /// <summary>
 /// Собирает файл значка приложения: сфера из точек на тёмной плитке, несколько размеров в одном файле. Запускается командой <c>Steward.exe --snapshot файл.ico appicon</c>

@@ -1,5 +1,5 @@
 ﻿<Window x:Class="Steward.Views.MainWindow"
-        Icon="pack://application:,,,/Assets/steward.ico"
+        Icon="pack://application:,,,/Steward;component/Assets/steward.ico"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:Steward.Models"
@@ -79,7 +79,7 @@
                                 </Style>
                             </Ellipse.Style>
                         </Ellipse>
-                        <Image Source="pack://application:,,,/Assets/steward.ico" Width="52" Height="52" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <Image Source="pack://application:,,,/Steward;component/Assets/steward.ico" Width="52" Height="52" RenderOptions.BitmapScalingMode="HighQuality"/>
                     </Grid>
                     <TextBlock Text="S.T.E.W.A.R.D" Style="{StaticResource TextDisplay}" VerticalAlignment="Center">
                         <TextBlock.Foreground>

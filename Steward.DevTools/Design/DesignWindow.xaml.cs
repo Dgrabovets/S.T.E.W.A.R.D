@@ -1,10 +1,10 @@
 using System.Windows;
 using Steward.Models;
 
-namespace Steward.Views;
+namespace Steward.DevTools.Design;
 
 /// <summary>
-/// Страница-образец дизайн-системы: цвета, шкала текста, кнопки, поля и плашки в одном окне. Открывается только ключом <c>--snapshot</c>
+/// Страница-образец дизайн-системы: цвета, шкала текста, кнопки, поля и плашки в одном окне. Открывается только инструментом <c>Steward.DevTools</c>
 /// </summary>
 public partial class DesignWindow : Window
 {

@@ -20,6 +20,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Steward.DevTools" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Steward.Ideas\Steward.Ideas.csproj" />
     <ProjectReference Include="..\Steward.Schedule.Shared\Steward.Schedule.Shared.csproj" />
     <ProjectReference Include="..\Steward.Homework\Steward.Homework.csproj" />
