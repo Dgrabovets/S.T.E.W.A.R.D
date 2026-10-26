@@ -25,7 +25,8 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        if (args.Length < 2 || !string.Equals(args[0], "snapshot", StringComparison.OrdinalIgnoreCase))
+        var check = args.Length == 1 && args[0] is "check-tray" or "measure-tray";
+        if (!check && (args.Length < 2 || !string.Equals(args[0], "snapshot", StringComparison.OrdinalIgnoreCase)))
         {
             Console.Error.WriteLine(USAGE);
 
@@ -37,7 +38,11 @@ public static class Program
         app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(THEME) });
         app.Startup += (_, _) =>
         {
-            SnapshotRenderer.Render(args[1], args.Length > 2 ? args[2] : "main");
+            if (check)
+                Console.WriteLine(args[0] == "measure-tray" ? TrayCheck.Measure() : TrayCheck.Run());
+            else
+                SnapshotRenderer.Render(args[1], args.Length > 2 ? args[2] : "main");
+
             app.Shutdown();
         };
 

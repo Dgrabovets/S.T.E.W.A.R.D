@@ -145,6 +145,12 @@ public sealed class TrayHost : IDisposable
             Text = "Расписание",
         };
 
+        _icon.MouseDown += (_, args) =>
+        {
+            if (args.Button is MouseButtons.Left or MouseButtons.Right)
+                _menu.NotifyIconPressed();
+        };
+
         _icon.MouseClick += (_, args) =>
         {
             if (args.Button is MouseButtons.Left or MouseButtons.Right)
@@ -172,6 +178,9 @@ public sealed class TrayHost : IDisposable
 
         _jobs.Changed += (_, _) => ApplyAll();
         _jobs.Start();
+
+        // Быстрый статус прогревается заранее, чтобы первый щелчок по иконке не ждал разбор разметки
+        System.Windows.Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, _menu.Warm);
     }
 
     /// <summary>
