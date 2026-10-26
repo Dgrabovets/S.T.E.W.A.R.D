@@ -95,29 +95,33 @@ public static class SnapshotRenderer
         }
         else if (string.Equals(parts[0], "settings", StringComparison.OrdinalIgnoreCase))
         {
-            window = new SettingsWindow();
+            var settings = new SettingsWindow();
+            settings.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)));
+
+            // «settings:formats»: раскрыт блок «Форматы заданий»
+            if (parts.Length > 1 && string.Equals(parts[1], "formats", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.FormatsToggle.IsChecked = true;
+                settleSeconds = 1.0;
+            }
+
+            window = settings;
         }
         else
         {
             var main = new MainWindow();
             main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"], SampleIdeas(now));
             main.ApplyHomework(SampleHomework());
-            main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)));
             if (parts.Length > 1 && string.Equals(parts[1], "homework", StringComparison.OrdinalIgnoreCase))
                 settleSeconds = 1.0;
 
-            // «main:homework:closed»: блок «Форматы заданий» свёрнут
-            if (parts.Length > 2 && string.Equals(parts[2], "closed", StringComparison.OrdinalIgnoreCase))
-            {
-                main.Model.IsFormatsOpen = false;
-                settleSeconds = 3.0;
-            }
             if (parts.Length > 1 && Enum.TryParse<AppPageEnum>(parts[1], ignoreCase: true, out var page))
                 main.Model.Page = page;
 
             // «main:journal:open»: все разделы журнала раскрыты
             if (parts.Length > 2 && string.Equals(parts[2], "open", StringComparison.OrdinalIgnoreCase))
             {
+                main.Height = 1700;
                 foreach (var group in main.Model.Groups)
                     group.IsOpen = true;
 
@@ -420,6 +424,7 @@ public static class SnapshotRenderer
     [
         new RunRecord("telegram", "Telegram-бот", JobTrigger.START, now.AddMinutes(-5), now.AddMinutes(-4), 0, RunOutcomeEnum.Ok, null),
         new RunRecord("mts", "MTS Link", JobTrigger.DAILY, now.AddHours(-17), now.AddHours(-17).AddMinutes(1), 1, RunOutcomeEnum.Failed, "Код завершения 1: нет доступа к LMS", null, "17.10.2026 18:50:01  Ошибка: System.InvalidOperationException: нет доступа к LMS\nat Lms.Client.SignIn() in LmsClient.cs:line 41\n17.10.2026 18:50:02  Ошибка: проверьте вход в браузере"),
+        new RunRecord("reels", "Рилсы", "manual", now.AddMinutes(-30), now.AddMinutes(-30).AddMilliseconds(400), 1, RunOutcomeEnum.Failed, "InvalidOperationException: Нет файла appsettings.json рядом с программой: скопируйте appsettings.example.json и впишите токен бота", null, "26.10.2026 08:34:40  Ошибка: System.InvalidOperationException: Нет файла appsettings.json рядом с программой: скопируйте appsettings.example.json и впишите токен бота\nat Steward.Reels.Program.LoadSettings() in D:\\MyRepositories\\Tools\\Steward\\Steward.Reels\\Program.cs:line 75\nat Steward.Reels.Program.Main(String[] args) in D:\\MyRepositories\\Tools\\Steward\\Steward.Reels\\Program.cs:line 35"),
         new RunRecord("mail", "Почта", "manual", now.AddHours(-3), now.AddHours(-3).AddSeconds(8), 0, RunOutcomeEnum.Ok, null, "Ответить: 1 (Иванов И. И.)", "25.10.2026 14:11:06  Ответить: Иванов Иван — Вопрос → задача «Пришёл ответ от Иванов И. И.»\n25.10.2026 14:11:06  Инфо: Яндекс ID  — Вы создали пароль для приложения\n25.10.2026 14:11:07  Ответить: 1 (Иванов И. И.)\n25.10.2026 14:11:07  Прочее: 1"),
     ];
 }

@@ -44,7 +44,7 @@ public sealed class RunRowViewModel
         Output = record.Output ?? string.Empty;
         OutputLines = LogLines.Parse(Output);
         IsManual = record.Reason == "manual";
-        Facts = string.Join(" · ", new[] { Duration(record.FinishedAt - record.StartedAt), record.ExitCode is { } code and not 0 ? $"код выхода {code}" : null }.Where(part => part is not null));
+        Facts = Duration(record.FinishedAt - record.StartedAt);
         (Tone, Kind) = record.Outcome switch
         {
             RunOutcomeEnum.Ok => (PanelToneEnum.Running, ActivityKindEnum.Sealed),
@@ -130,7 +130,7 @@ public sealed class RunRowViewModel
     public bool IsManual { get; }
 
     /// <summary>
-    /// Строка фактов: сколько шёл запуск и каким кодом закончился
+    /// Сколько шёл запуск
     /// </summary>
     public string Facts { get; }
 
@@ -162,8 +162,8 @@ public sealed class RunRowViewModel
     private static string Duration(TimeSpan span) => span.TotalSeconds switch
     {
         < 1 => "меньше секунды",
-        < 60 => $"{(int)span.TotalSeconds} с",
-        < 3600 => $"{(int)span.TotalMinutes} мин {span.Seconds} с",
-        _ => $"{(int)span.TotalHours} ч {span.Minutes} мин",
+        < 60 => $"{(int)span.TotalSeconds} с.",
+        < 3600 => $"{(int)span.TotalMinutes} мин. {span.Seconds} с.",
+        _ => $"{(int)span.TotalHours} ч. {span.Minutes} мин.",
     };
 }

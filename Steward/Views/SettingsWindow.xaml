@@ -4,9 +4,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:behaviors="clr-namespace:Steward.Behaviors"
         xmlns:controls="clr-namespace:Steward.Controls"
+        xmlns:views="clr-namespace:Steward.Views"
         Title="Настройки"
-        Width="560"
-        Height="800"
+        Width="680"
+        Height="860"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -35,6 +36,11 @@
                         <TextBlock Text="{Binding SettingsMessage}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"
                                    Visibility="{Binding HasSettingsMessage, Converter={StaticResource BoolToVisibility}}"/>
 
+                        <ToggleButton x:Name="ScheduleToggle" IsChecked="True" Style="{StaticResource SectionToggle}" Margin="0,8,0,0">
+                            <TextBlock Text="Расписание" Style="{StaticResource TextTitle}"/>
+                        </ToggleButton>
+                        <controls:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsChecked, ElementName=ScheduleToggle}">
+                        <StackPanel>
                         <TextBlock Text="Интервал сверки" Style="{StaticResource FieldTitle}" Margin="0,8,0,4"/>
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
                                    Text="Как часто сервис заглядывает в таблицу, в минутах. Ползунок и число задают одно значение, от 1 до 180. После сохранения контейнер перезапускается и начинает ходить с новым интервалом."/>
@@ -107,16 +113,24 @@
                         <PasswordBox Style="{StaticResource SecretField}"
                                      behaviors:PasswordBinding.Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button Content="Где выпустить токен" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Command="{Binding OpenTokenPageCommand}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,24,0,8">
+                            <Button Content="Сохранить и перезапустить" Style="{StaticResource PrimaryButton}" Command="{Binding SaveAndRestartCommand}"/>
+                            <Button Content="Перезапустить" Style="{StaticResource ActionButton}" Command="{Binding RestartCommand}" Margin="8,0,0,0"/>
+                        </StackPanel>
+                        </StackPanel>
+                        </controls:CollapsibleBody>
+
+                        <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,12,0,12"/>
+
+                        <ToggleButton x:Name="FormatsToggle" Style="{StaticResource SectionToggle}">
+                            <TextBlock Text="Форматы заданий" Style="{StaticResource TextTitle}"/>
+                        </ToggleButton>
+                        <controls:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsChecked, ElementName=FormatsToggle}">
+                            <views:HomeworkFormatsView DataContext="{Binding Formats}" Margin="0,8,0,8"/>
+                        </controls:CollapsibleBody>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
-
-            <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="16,0,16,8" Padding="8,10">
-                <StackPanel Orientation="Horizontal">
-                    <Button Content="Сохранить и перезапустить" Style="{StaticResource PrimaryButton}" Command="{Binding SaveAndRestartCommand}"/>
-                    <Button Content="Перезапустить" Style="{StaticResource ActionButton}" Command="{Binding RestartCommand}" Margin="8,0,0,0"/>
-                </StackPanel>
-            </Border>
         </Grid>
     </Border>
 </Window>

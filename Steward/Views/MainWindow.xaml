@@ -6,17 +6,22 @@
         xmlns:ctl="clr-namespace:Steward.Controls"
         xmlns:views="clr-namespace:Steward.Views"
         Title="Задачи"
-        Width="1020"
-        Height="700"
+        Width="1080"
+        Height="860"
+        MinWidth="900"
+        MinHeight="680"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         FontFamily="{StaticResource FontBase}">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="8" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
     <Window.Resources>
         <Style x:Key="PageTitle" TargetType="TextBlock" BasedOn="{StaticResource TextHeadline}">
             <Setter Property="Margin" Value="4,0,0,4"/>
@@ -46,7 +51,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal">
-                    <Grid Width="44" Height="44" Margin="0,0,14,0" VerticalAlignment="Center">
+                    <Grid Width="52" Height="52" Margin="0,0,16,0" VerticalAlignment="Center">
                         <Ellipse Fill="{StaticResource AccentBrush}" Opacity="0.35">
                             <Ellipse.Effect>
                                 <BlurEffect Radius="16"/>
@@ -72,10 +77,14 @@
                         </Ellipse>
                         <Image Source="pack://application:,,,/Assets/steward.ico" Margin="3" RenderOptions.BitmapScalingMode="HighQuality"/>
                     </Grid>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="S.T.E.W.A.R.D" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,2,0,0"/>
-                    </StackPanel>
+                    <TextBlock Text="S.T.E.W.A.R.D" Style="{StaticResource TextDisplay}" VerticalAlignment="Center">
+                        <TextBlock.Foreground>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="{StaticResource TextColor}" Offset="0.25"/>
+                                <GradientStop Color="{StaticResource AccentTextColor}" Offset="1"/>
+                            </LinearGradientBrush>
+                        </TextBlock.Foreground>
+                    </TextBlock>
                 </StackPanel>
                 <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="10,4,16,4" VerticalAlignment="Center" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">
@@ -230,20 +239,11 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                             <TextBlock Text="Домашние задания" Style="{StaticResource PageTitle}"/>
-                            <ToggleButton IsChecked="{Binding IsFormatsOpen, Mode=TwoWay}" Style="{StaticResource SectionToggle}">
-                                <StackPanel>
-                                    <TextBlock Text="Форматы заданий" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                                </StackPanel>
-                            </ToggleButton>
-                            <ctl:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsFormatsOpen}">
-                                <views:HomeworkFormatsView DataContext="{Binding Formats}" Margin="0,8,0,0"/>
-                            </ctl:CollapsibleBody>
-                            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,8,0,16"/>
                             <Border Style="{StaticResource Card}" Visibility="{Binding IsHomeworkEmpty, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <TextBlock Text="Заданий пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
                                     <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
-                                               Text="Задания появятся здесь, когда по занятию с расшифровкой нажмёшь «Подготовить задания» в блоке «Форматы заданий». Для каждого будет видно срок, формат и создана ли задача в SingularityApp."/>
+                                               Text="Задания появятся здесь, когда по занятию с расшифровкой нажмёшь «Подготовить задания» в настройках, в блоке «Форматы заданий». Для каждого будет видно срок, формат и создана ли задача в SingularityApp."/>
                                 </StackPanel>
                             </Border>
                             <ItemsControl ItemsSource="{Binding Homework}">

@@ -62,6 +62,11 @@ public sealed class SettingsViewModel : Bindable
     private string _token = string.Empty;
 
     /// <summary>
+    /// Список занятий с выбором формата ДЗ
+    /// </summary>
+    private HomeworkFormatsViewModel? _formats;
+
+    /// <summary>
     /// Ссылка на таблицу, из которой берётся идентификатор
     /// </summary>
     private string _spreadsheetLink = string.Empty;
@@ -96,9 +101,9 @@ public sealed class SettingsViewModel : Bindable
     }
 
     /// <summary>
-    /// Страница с описанием API Singularity, где рассказано, как выпустить токен
+    /// Страница Singularity, где выпускают токен
     /// </summary>
-    public const string TOKEN_PAGE = "https://api.singularity-app.com/";
+    public const string TOKEN_PAGE = "https://me.singularity-app.com/rest-tokens";
 
     /// <summary>
     /// Просит пересоздать контейнер
@@ -124,6 +129,15 @@ public sealed class SettingsViewModel : Bindable
     /// Открывает страницу, где выпускают токен
     /// </summary>
     public RelayCommand OpenTokenPageCommand { get; }
+
+    /// <summary>
+    /// Список занятий с выбором формата ДЗ. Общий с остальным приложением: идущая подготовка заданий не сбрасывается
+    /// </summary>
+    public HomeworkFormatsViewModel? Formats
+    {
+        get => _formats;
+        set => Set(ref _formats, value);
+    }
 
     /// <summary>
     /// Пояса, из которых выбирается пояс таблицы

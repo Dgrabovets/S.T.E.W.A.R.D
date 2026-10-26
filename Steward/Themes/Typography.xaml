@@ -15,6 +15,7 @@
     <sys:Double x:Key="FontSizeBodyLarge">16</sys:Double>
     <sys:Double x:Key="FontSizeTitle">18</sys:Double>
     <sys:Double x:Key="FontSizeHeadline">24</sys:Double>
+    <sys:Double x:Key="FontSizeDisplay">34</sys:Double>
 
     <Style x:Key="TextCaption" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
@@ -44,6 +45,11 @@
     <Style x:Key="TextHeadline" TargetType="TextBlock" BasedOn="{StaticResource TextBody}">
         <Setter Property="FontSize" Value="{StaticResource FontSizeHeadline}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style x:Key="TextDisplay" TargetType="TextBlock" BasedOn="{StaticResource TextBody}">
+        <Setter Property="FontSize" Value="{StaticResource FontSizeDisplay}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
     </Style>
 
     <Style x:Key="TextMono" TargetType="TextBlock" BasedOn="{StaticResource TextBody}">

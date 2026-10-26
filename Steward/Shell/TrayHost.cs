@@ -299,6 +299,8 @@ public sealed class TrayHost : IDisposable
             _menu.Apply(_snapshot, _jobRows);
         if (_main is { IsVisible: true })
             ApplyMain();
+        if (_settings is { IsVisible: true })
+            _settings.Model.Formats = Formats();
 
         NotifyJobProblems(_jobRows);
     }
@@ -469,7 +471,6 @@ public sealed class TrayHost : IDisposable
     private void ApplyMain()
     {
         _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
-        _main.Model.Formats = Formats();
         _main.ApplyHomework(_jobs.HomeworkRows());
     }
 
@@ -501,6 +502,8 @@ public sealed class TrayHost : IDisposable
             window.Closed += (_, _) => _settings = null;
             _settings = window;
         }
+
+        _settings.Model.Formats = Formats();
 
         _settings.Show();
         _settings.Activate();

@@ -75,14 +75,31 @@ public sealed class CollapsibleBody : ContentControl
             _clip.BeginAnimation(OpacityProperty, null);
             _scale.ScaleY = height;
             _clip.Opacity = opacity;
+            _clip.CacheMode = null;
+            _clip.Visibility = IsOpen ? Visibility.Visible : Visibility.Collapsed;
 
             return;
         }
 
-        _scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(height, TimeSpan.FromSeconds(IsOpen ? 0.35 : 0.28))
+        // Пока идёт анимация, содержимое рисуется одной картинкой: иначе каждый кадр пересчитывал бы все строки внутри. Закрытое содержимое скрывается совсем и не занимает расчётов
+        _clip.CacheMode = new BitmapCache();
+        _clip.Visibility = Visibility.Visible;
+        var scaleAnimation = new DoubleAnimation(height, TimeSpan.FromSeconds(IsOpen ? 0.35 : 0.28))
         {
             EasingFunction = new CubicEase { EasingMode = IsOpen ? EasingMode.EaseOut : EasingMode.EaseInOut },
-        });
+        };
+
+        scaleAnimation.Completed += (_, _) =>
+        {
+            if (_clip is null)
+                return;
+
+            _clip.CacheMode = null;
+            if (!IsOpen)
+                _clip.Visibility = Visibility.Collapsed;
+        };
+
+        _scale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation);
 
         _clip.BeginAnimation(OpacityProperty, new DoubleAnimation(opacity, TimeSpan.FromSeconds(IsOpen ? 0.3 : 0.18))
         {

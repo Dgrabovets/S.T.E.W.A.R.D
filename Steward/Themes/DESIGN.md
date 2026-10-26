@@ -51,6 +51,7 @@
 | 14 | `FontSizeBody` | `TextBody`, `TextSecondary` | Основной текст, подробности, кнопки |
 | 16 | `FontSizeBodyLarge` | `TextBodyLarge` | Название задачи |
 | 18 | `FontSizeTitle` | `TextTitle` | Заголовок карточки |
+| 34 | `FontSizeDisplay` | `TextDisplay` | Название приложения в шапке главного окна |
 | 24 | `FontSizeHeadline` | `TextHeadline` | Заголовок страницы |
 
 Числом размер не пишется: `FontSize="{StaticResource FontSizeBody}"`.
