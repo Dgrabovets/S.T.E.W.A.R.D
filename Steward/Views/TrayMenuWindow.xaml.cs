@@ -20,7 +20,7 @@ public partial class TrayMenuWindow : TrayPopupWindow
         InitializeComponent();
         Model = new TrayMenuViewModel();
         DataContext = Model;
-        Model.ExitRequested += (_, _) => Hide();
+        Model.ExitRequested += (_, _) => Dismiss();
         IsVisibleChanged += (_, _) =>
         {
             if (!IsVisible)
@@ -73,7 +73,7 @@ public partial class TrayMenuWindow : TrayPopupWindow
     /// <param name="item">Нажатая кнопка</param>
     private void Activate(GooeyItem item)
     {
-        Hide();
+        Dismiss();
         item.Activate();
     }
 }

@@ -62,8 +62,18 @@ public partial class MainWindow : Window
         if (WindowState == WindowState.Minimized)
             WindowState = WindowState.Normal;
 
-        Show();
-        Activate();
+        if (IsVisible)
+        {
+            Activate();
+
+            return;
+        }
+
+        Shell.WindowGenie.Expand(this, () =>
+        {
+            Show();
+            Activate();
+        });
     }
 
     /// <summary>
@@ -84,7 +94,8 @@ public partial class MainWindow : Window
         if (!_closing)
         {
             e.Cancel = true;
-            Hide();
+            Shell.WindowGenie.Collapse(this, Hide);
+
             return;
         }
 

@@ -52,12 +52,14 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal">
-                    <Grid Width="80" Height="80" Margin="-14,-14,2,-14" VerticalAlignment="Center">
-                        <Ellipse Opacity="0.35" IsHitTestVisible="False">
+                    <Image Source="pack://application:,,,/Steward;component/Assets/steward.ico" Width="52" Height="52" Margin="0,0,16,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <Grid VerticalAlignment="Center">
+                        <!-- Мягкое свечение за первой буквой: пульсирует, пока всё работает -->
+                        <Ellipse Width="76" Height="76" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-27,-14,0,-14" Opacity="0.4" IsHitTestVisible="False">
                             <Ellipse.Fill>
                                 <RadialGradientBrush>
-                                    <GradientStop Color="{StaticResource AccentColor}" Offset="0.3"/>
-                                    <GradientStop Color="Transparent" Offset="1"/>
+                                    <GradientStop Color="{StaticResource AccentColor}" Offset="0.15"/>
+                                    <GradientStop Color="{StaticResource AccentClearColor}" Offset="1"/>
                                 </RadialGradientBrush>
                             </Ellipse.Fill>
                             <Ellipse.Style>
@@ -67,7 +69,11 @@
                                             <DataTrigger.EnterActions>
                                                 <BeginStoryboard x:Name="GlowPulse">
                                                     <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.35" To="1" Duration="0:0:1.4"/>
+                                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.3" To="0.85" Duration="0:0:1.8">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <SineEase EasingMode="EaseInOut"/>
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </DataTrigger.EnterActions>
@@ -79,16 +85,21 @@
                                 </Style>
                             </Ellipse.Style>
                         </Ellipse>
-                        <Image Source="pack://application:,,,/Steward;component/Assets/steward.ico" Width="52" Height="52" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <TextBlock Text="S.T.E.W.A.R.D" Style="{StaticResource TextDisplay}">
+                            <TextBlock.Foreground>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="{StaticResource TextColor}" Offset="0.25"/>
+                                    <GradientStop Color="{StaticResource AccentTextColor}" Offset="1"/>
+                                </LinearGradientBrush>
+                            </TextBlock.Foreground>
+                        </TextBlock>
+                        <!-- Первая буква поверх: белая, с ореолом цвета акцента, как будто подсвечена изнутри -->
+                        <TextBlock Text="S" Style="{StaticResource TextDisplay}" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Left">
+                            <TextBlock.Effect>
+                                <DropShadowEffect Color="{StaticResource AccentTextColor}" BlurRadius="20" ShadowDepth="0" Opacity="0.9"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
                     </Grid>
-                    <TextBlock Text="S.T.E.W.A.R.D" Style="{StaticResource TextDisplay}" VerticalAlignment="Center">
-                        <TextBlock.Foreground>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                <GradientStop Color="{StaticResource TextColor}" Offset="0.25"/>
-                                <GradientStop Color="{StaticResource AccentTextColor}" Offset="1"/>
-                            </LinearGradientBrush>
-                        </TextBlock.Foreground>
-                    </TextBlock>
                 </StackPanel>
                 <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="10,4,16,4" VerticalAlignment="Center" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">
