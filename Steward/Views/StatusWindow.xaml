@@ -32,7 +32,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Margin="20,20,20,8">
@@ -57,47 +56,19 @@
                         </Border>
                     </Grid>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Задачи" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeHeadline}" FontWeight="SemiBold"/>
+                        <TextBlock Text="Сверки расписания" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeHeadline}" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
                     <Border Grid.Column="2" Style="{StaticResource ToneBadge}" Padding="12,8" VerticalAlignment="Top" Margin="12,8,0,0">
                         <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource ToneBadgeText}"/>
                     </Border>
                 </Grid>
-                <ItemsControl ItemsSource="{Binding Tasks}" Margin="0,16,0,4">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,4,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Control Width="14" Height="14" Style="{StaticResource ToneDot}" VerticalAlignment="Top" Margin="0,8,12,0"/>
-                                <StackPanel Grid.Column="1">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"/>
-                                        <TextBlock Text="{Binding Headline}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBodyLarge}" Margin="12,0,0,0"/>
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                </StackPanel>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                
             </StackPanel>
 
             <Grid Grid.Row="1">
                 <Grid>
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Visible"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
+                    
                     <ScrollViewer x:Name="JournalScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="12,0,12,8">
                         <StackPanel>
                             <TextBlock Text="История сверок расписания" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="8,4,0,12"/>
@@ -157,85 +128,10 @@
                     </ScrollViewer>
                 </Grid>
 
-                <Grid>
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,0,8,8">
-                        <StackPanel>
-                            <TextBlock Text="{Binding SettingsMessage}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,4"/>
-
-                            <TextBlock Text="Интервал сверки" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Сколько минут ждать между проверками таблицы. Ползунок и число — одно и то же значение, от 1 до 180. После сохранения контейнер перезапускается и начинает ходить с новым интервалом."/>
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="72"/>
-                                </Grid.ColumnDefinitions>
-                                <controls:IntervalBar VerticalAlignment="Center" Margin="0,0,12,0"
-                                                   Value="{Binding IntervalMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                <TextBox Grid.Column="1" Style="{StaticResource Field}" TextAlignment="Center"
-                                         Text="{Binding MinutesText, UpdateSourceTrigger=PropertyChanged}"/>
-                            </Grid>
-
-                            <TextBlock Text="Название проекта" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Имя проекта в Singularity, куда записываются занятия. Сервис ищет проект с этим названием и создаёт его, если такого нет."/>
-                            <TextBox Style="{StaticResource Field}" Text="{Binding ProjectTitle, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            <TextBlock Text="Колонка группы" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Заголовок столбца на листе, из которого берутся ваши пары. Пишите его так же, как в таблице, например РКИ-2-26."/>
-                            <TextBox Style="{StaticResource Field}" Text="{Binding GroupColumn, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            <TextBlock Text="Часовой пояс таблицы" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Пояс, в котором в таблице указано время начала пар. Для этой таблицы оставьте Europe/Moscow: время в ней московское, даже если на компьютере другой пояс."/>
-                            <TextBox Style="{StaticResource Field}" Text="{Binding TimeZone, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            <TextBlock Text="Идентификатор таблицы" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Часть ссылки на Google Таблицу между /d/ и /edit. По ней сервис скачивает расписание."/>
-                            <TextBox Style="{StaticResource Field}" Text="{Binding SpreadsheetId, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            <TextBlock Text="Номер листа" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Число gid из адреса вкладки. Это не название листа, а номер вкладки внутри файла."/>
-                            <TextBox Style="{StaticResource Field}" Text="{Binding SheetGid, UpdateSourceTrigger=PropertyChanged}"/>
-
-                            <TextBlock Text="Токен Singularity" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Ключ, по которому сервис входит в ваш аккаунт. Здесь уже лежит значение из файла настроек, на экране оно закрыто точками. Если выпустите новый ключ, вставьте его вместо текущего и сохраните."/>
-                            <PasswordBox Style="{StaticResource SecretField}"
-                                         behaviors:PasswordBinding.Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                        </StackPanel>
-                    </ScrollViewer>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="20,4,20,12">
-                        <Button Content="Сохранить и перезапустить" Style="{StaticResource ActionButton}" Command="{Binding SaveAndRestartCommand}"/>
-                        <Button Content="Перезапустить" Style="{StaticResource ActionButton}" Command="{Binding RestartCommand}"/>
-                    </StackPanel>
-                </Grid>
+                
             </Grid>
 
-            <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="16,0,16,8" Padding="4,8">
-                <DockPanel LastChildFill="False">
-                    <Button Content="{Binding ModeCaption}" Style="{StaticResource GhostButton}" DockPanel.Dock="Left" Command="{Binding ToggleSettingsCommand}"/>
-                    <Button Content="Приложение" Style="{StaticResource GhostButton}" DockPanel.Dock="Left" Command="{Binding OpenAppCommand}"/>
-                    <Button Content="Выход" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Command="{Binding ExitCommand}"/>
-                </DockPanel>
-            </Border>
+            
         </Grid>
     </Border>
 </views:TrayPopupWindow>

@@ -53,6 +53,11 @@ public sealed class TrayHost : IDisposable
     private readonly StatusWindow _window = new();
 
     /// <summary>
+    /// Окно настроек, пока оно открыто
+    /// </summary>
+    private SettingsWindow? _settings;
+
+    /// <summary>
     /// Меню из капель, которое открывается по щелчку на иконку
     /// </summary>
     private readonly TrayMenuWindow _menu = new();
@@ -151,33 +156,13 @@ public sealed class TrayHost : IDisposable
         _icon.BalloonTipClicked += (_, _) => ShowMain();
         _menu.SetItems(
         [
-            new GooeyItem("\uE80F", "Приложение", () => ShowMain()),
+            new GooeyItem("\uE80F", "Статусы", () => ShowMain(AppPageEnum.Status)),
             new GooeyItem("\uEA80", "Идеи", () => ShowMain(AppPageEnum.Ideas)),
             new GooeyItem("\uE7BE", "Домашние задания", () => ShowMain(AppPageEnum.Homework)),
             new GooeyItem("\uE81C", "Журнал", () => ShowMain(AppPageEnum.Journal)),
-            new GooeyItem("\uE713", "Настройки", ShowWindow),
+            new GooeyItem("\uE713", "Настройки", ShowSettings, DividerBefore: true),
             new GooeyItem("\uE7E8", "Выход", Exit),
         ]);
-        _window.ExitRequested += (_, _) => Exit();
-        _window.OpenAppRequested += (_, _) =>
-        {
-            _window.Hide();
-            ShowMain();
-        };
-
-        _window.RestartRequested += async (_, _) =>
-        {
-            var restarted = await _probe.RestartAsync(CancellationToken.None);
-            if (_exiting)
-                return;
-
-            _window.SetSettingsStatus(restarted
-                ? "Контейнер перезапущен"
-                : "Не удалось перезапустить контейнер");
-
-            if (restarted)
-                await RefreshAsync();
-        };
 
         _timer.Tick += async (_, _) => await RefreshAsync();
         _timer.Start();
@@ -212,6 +197,7 @@ public sealed class TrayHost : IDisposable
         _icon.Dispose();
         _window.Close();
         _menu.Close();
+        _settings?.Close();
         _main?.CloseForExit();
         _runningIcon.Dispose();
         _stoppedIcon.Dispose();
@@ -336,7 +322,7 @@ public sealed class TrayHost : IDisposable
         _jobRows = _jobs.Rows();
         ApplyIcon(_snapshot);
         if (_window.IsVisible)
-            _window.Apply(_snapshot, _jobRows, scrollToProblem: false);
+            _window.Apply(_snapshot, scrollToProblem: false);
         if (_menu.IsVisible)
             _menu.Apply(_snapshot, _jobRows);
         if (_main is { IsVisible: true })
@@ -419,12 +405,12 @@ public sealed class TrayHost : IDisposable
     #region Window
 
     /// <summary>
-    /// Открывает или прячет панель у курсора
+    /// Открывает или прячет окно истории сверок расписания у курсора
     /// </summary>
-    private void ShowWindow()
+    private void ShowScheduleHistory()
     {
         if (!_window.IsVisible)
-            _window.Apply(_snapshot, _jobRows, scrollToProblem: _snapshot.CurrentError is not null);
+            _window.Apply(_snapshot, scrollToProblem: _snapshot.CurrentError is not null);
 
         _window.ToggleFromIcon();
     }
@@ -455,7 +441,8 @@ public sealed class TrayHost : IDisposable
             _main.Model.RunRequested += id => _jobs.RunNow(id);
             _main.Model.FixRequested += OpenFix;
             _main.Model.ClearJournalRequested += (_, _) => _jobs.ClearRecords();
-            _main.Model.FormatsRequested += (_, _) => ShowFormats();
+            _main.Model.FormatsRequested += (_, _) => ShowFormats(_main);
+            _main.Model.ScheduleHistoryRequested += (_, _) => ShowScheduleHistory();
             _main.Model.IdeaApproved += ApproveIdea;
             _main.Model.IdeaRejected += idea => _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Rejected);
             _main.Model.LinkRequested += OpenLink;
@@ -520,8 +507,46 @@ public sealed class TrayHost : IDisposable
     /// <summary>
     /// Открывает окно, где для каждого занятия выбирается формат ДЗ
     /// </summary>
-    private void ShowFormats() =>
-        new HomeworkFormatsWindow(new HomeworkFormatsViewModel(_jobs.Lessons(), _jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None))) { Owner = _main }.ShowDialog();
+    /// <param name="owner">Окно, поверх которого открывается выбор</param>
+    private void ShowFormats(System.Windows.Window? owner) =>
+        new HomeworkFormatsWindow(new HomeworkFormatsViewModel(_jobs.Lessons(), _jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None))) { Owner = owner }.ShowDialog();
+
+    /// <summary>
+    /// Открывает окно настроек или выводит открытое на передний план
+    /// </summary>
+    private void ShowSettings()
+    {
+        if (_exiting)
+            return;
+
+        if (_settings is null)
+        {
+            var window = new SettingsWindow();
+            window.Model.RestartRequested += async (_, _) => await RestartContainerAsync(window);
+            window.Model.FormatsRequested += (_, _) => ShowFormats(window);
+            window.Closed += (_, _) => _settings = null;
+            _settings = window;
+        }
+
+        _settings.Show();
+        _settings.Activate();
+    }
+
+    /// <summary>
+    /// Пересоздаёт контейнер расписания и пишет итог в окно настроек
+    /// </summary>
+    /// <param name="window">Окно настроек, в которое пишется итог</param>
+    /// <returns>Задача, которая завершается, когда перезапуск закончился</returns>
+    private async Task RestartContainerAsync(SettingsWindow window)
+    {
+        var restarted = await _probe.RestartAsync(CancellationToken.None);
+        if (_exiting)
+            return;
+
+        window.SetStatus(restarted ? "Контейнер перезапущен" : "Не удалось перезапустить контейнер");
+        if (restarted)
+            await RefreshAsync();
+    }
 
     /// <summary>
     /// Убирает иконку и завершает процесс

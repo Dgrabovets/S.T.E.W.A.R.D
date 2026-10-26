@@ -5,7 +5,7 @@
         xmlns:ctl="clr-namespace:Steward.Controls"
         xmlns:ui="clr-namespace:Steward.Models"
         Title="Steward"
-        Width="480"
+        Width="500"
         SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"

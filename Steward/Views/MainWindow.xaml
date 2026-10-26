@@ -253,8 +253,11 @@
                                         <TextBlock Text="Журнал запусков" Style="{StaticResource PageTitle}"/>
                                         <TextBlock Text="Что приложение запускало и чем это закончилось. Последние сто записей." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
                                     </StackPanel>
-                                    <Button Grid.Column="1" Content="Очистить журнал" Style="{StaticResource ActionButton}" VerticalAlignment="Top" Margin="16,0,0,0"
-                                            Command="{Binding ClearJournalCommand}" Visibility="{Binding HasRecords, Converter={StaticResource BoolToVisibility}}"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="16,0,0,0">
+                                        <Button Content="Сверки расписания" Style="{StaticResource ActionButton}" Command="{Binding OpenScheduleHistoryCommand}"/>
+                                        <Button Content="Очистить журнал" Style="{StaticResource ActionButton}" Margin="8,0,0,0"
+                                                Command="{Binding ClearJournalCommand}" Visibility="{Binding HasRecords, Converter={StaticResource BoolToVisibility}}"/>
+                                    </StackPanel>
                                 </Grid>
                                 <TextBlock Text="Запусков пока не было" Style="{StaticResource PageHint}" Margin="4,0,0,0"
                                            Visibility="{Binding IsJournalEmpty, Converter={StaticResource BoolToVisibility}}"/>

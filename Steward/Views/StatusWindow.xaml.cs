@@ -11,7 +11,7 @@ using Steward.ViewModels;
 namespace Steward.Views;
 
 /// <summary>
-/// Окно панели. Рисует то, что отдаёт модель представления, и само только открывается и прячется
+/// Окно истории сверок расписания: что менялось в таблице и когда. Рисует то, что отдаёт модель представления
 /// </summary>
 public partial class StatusWindow : TrayPopupWindow
 {
@@ -24,9 +24,6 @@ public partial class StatusWindow : TrayPopupWindow
         Model = new StatusViewModel();
         DataContext = Model;
         Model.PropertyChanged += OnModelChanged;
-        Model.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
-        Model.RestartRequested += (_, _) => RestartRequested?.Invoke(this, EventArgs.Empty);
-        Model.OpenAppRequested += (_, _) => OpenAppRequested?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -35,40 +32,18 @@ public partial class StatusWindow : TrayPopupWindow
     public StatusViewModel Model { get; }
 
     /// <summary>
-    /// Просит завершить процесс
-    /// </summary>
-    public event EventHandler? ExitRequested;
-
-    /// <summary>
-    /// Просит пересоздать контейнер
-    /// </summary>
-    public event EventHandler? RestartRequested;
-
-    /// <summary>
-    /// Просит открыть главное окно приложения
-    /// </summary>
-    public event EventHandler? OpenAppRequested;
-
-    /// <summary>
     /// Показывает свежий снимок
     /// </summary>
     /// <param name="snapshot">Текущее состояние синхронизации</param>
-    /// <param name="jobs">Строки задач из реестра</param>
     /// <param name="scrollToProblem">
     /// <see langword="true"/>, если журнал нужно открыть сверху
     /// </param>
-    public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, bool scrollToProblem)
+    public void Apply(SyncSnapshot snapshot, bool scrollToProblem)
     {
-        Model.Apply(snapshot, jobs);
+        Model.Apply(snapshot);
         if (scrollToProblem)
             JournalScroll.ScrollToTop();
     }
-
-    /// <summary>
-    /// Пишет итог перезапуска
-    /// </summary>
-    /// <param name="text">Короткая фраза</param>
-    public void SetSettingsStatus(string text) => Model.SettingsMessage = text;
 
     #region Dragging
 

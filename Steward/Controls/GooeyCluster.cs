@@ -41,6 +41,11 @@ public sealed class GooeyCluster : FrameworkElement
     private const double SPACING = 60;
 
     /// <summary>
+    /// Дополнительный промежуток перед кнопкой, у которой есть разделитель
+    /// </summary>
+    private const double GROUP_GAP = 16;
+
+    /// <summary>
     /// Отступ центра главной капли от правого края
     /// </summary>
     private const double EDGE = 38;
@@ -259,7 +264,7 @@ public sealed class GooeyCluster : FrameworkElement
     /// <param name="availableSize">Доступное место</param>
     /// <returns>Размер меню</returns>
     protected override Size MeasureOverride(Size availableSize) =>
-        new(double.IsInfinity(availableSize.Width) ? EDGE * 2 + FIRST_GAP + SPACING * Math.Max(0, Items.Count - 1) + ITEM_RADIUS : availableSize.Width, LABEL_BAND + MAIN_RADIUS * 2 + 8);
+        new(double.IsInfinity(availableSize.Width) ? EDGE + FIRST_GAP + SPACING * Math.Max(0, Items.Count - 1) + GROUP_GAP * Items.Count(item => item.DividerBefore) + ITEM_RADIUS + 8 : availableSize.Width, LABEL_BAND + MAIN_RADIUS * 2 + 8);
 
     /// <summary>
     /// Рисует капли, перемычки, значки и подпись
@@ -289,6 +294,8 @@ public sealed class GooeyCluster : FrameworkElement
 
         drawingContext.DrawGeometry(null, new Pen(Outline, 2.4), shapes);
         drawingContext.DrawGeometry(Fill, null, shapes);
+
+        DrawDividers(drawingContext);
 
         DrawMain(drawingContext, main);
         DrawItems(drawingContext, circles);
@@ -460,6 +467,24 @@ public sealed class GooeyCluster : FrameworkElement
     }
 
     /// <summary>
+    /// Рисует вертикальную черту перед кнопками, которые начинают новую группу
+    /// </summary>
+    /// <param name="context">Контекст рисования</param>
+    private void DrawDividers(DrawingContext context)
+    {
+        var pen = new Pen(Outline, 1);
+        for (var index = 1; index < Items.Count; index++)
+        {
+            if (!Items[index].DividerBefore || _open[index] < 0.9 || _open[index - 1] < 0.9)
+                continue;
+
+            var middle = (ItemCenter(index).X + ItemCenter(index - 1).X) / 2;
+            var y = MainCenter().Y;
+            context.DrawLine(pen, new Point(middle, y - ITEM_RADIUS), new Point(middle, y + ITEM_RADIUS));
+        }
+    }
+
+    /// <summary>
     /// Рисует значки кнопок и обводку клавиатурного выбора
     /// </summary>
     /// <param name="context">Контекст рисования</param>
@@ -537,7 +562,7 @@ public sealed class GooeyCluster : FrameworkElement
     /// </summary>
     /// <param name="index">Номер кнопки</param>
     /// <returns>Центр кнопки</returns>
-    private Point ItemCenter(int index) => new(MainCenter().X - FIRST_GAP - SPACING * index, MainCenter().Y);
+    private Point ItemCenter(int index) => new(MainCenter().X - FIRST_GAP - SPACING * index - GROUP_GAP * Items.Take(index + 1).Count(item => item.DividerBefore), MainCenter().Y);
 
     /// <summary>
     /// Точка между двумя на нужной доле пути, доля может выходить за единицу, это даёт отскок

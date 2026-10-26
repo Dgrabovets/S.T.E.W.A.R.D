@@ -56,6 +56,7 @@ public sealed class MainViewModel : PanelViewModel
     {
         ClearJournalCommand = new RelayCommand(() => ClearJournalRequested?.Invoke(this, EventArgs.Empty));
         OpenFormatsCommand = new RelayCommand(() => FormatsRequested?.Invoke(this, EventArgs.Empty));
+        OpenScheduleHistoryCommand = new RelayCommand(() => ScheduleHistoryRequested?.Invoke(this, EventArgs.Empty));
     }
 
     /// <summary>
@@ -77,6 +78,11 @@ public sealed class MainViewModel : PanelViewModel
     /// Просит открыть окно выбора форматов ДЗ
     /// </summary>
     public event EventHandler? FormatsRequested;
+
+    /// <summary>
+    /// Просит открыть окно с историей сверок расписания
+    /// </summary>
+    public event EventHandler? ScheduleHistoryRequested;
 
     /// <summary>
     /// Решено делать идею: параметр — идея
@@ -102,6 +108,11 @@ public sealed class MainViewModel : PanelViewModel
     /// Открывает окно выбора форматов ДЗ
     /// </summary>
     public RelayCommand OpenFormatsCommand { get; }
+
+    /// <summary>
+    /// Открывает окно с историей сверок расписания
+    /// </summary>
+    public RelayCommand OpenScheduleHistoryCommand { get; }
 
     #region State
 

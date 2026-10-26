@@ -1,0 +1,97 @@
+<Window x:Class="Steward.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:Steward.Behaviors"
+        xmlns:controls="clr-namespace:Steward.Controls"
+        Title="Настройки"
+        Width="560"
+        Height="720"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        FontFamily="{StaticResource FontBase}">
+    <Border Style="{StaticResource WindowChrome}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Margin="24,20,20,12" MouseLeftButtonDown="Header_OnDrag" Background="Transparent">
+                <StackPanel>
+                    <TextBlock Text="Настройки" Style="{StaticResource TextHeadline}"/>
+                    <TextBlock Text="Параметры расписания, форматы домашних заданий и перезапуск сервиса" Style="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Button Content="Закрыть" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" VerticalAlignment="Top" Click="Close_OnClick"/>
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,0,12,8">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SettingsMessage}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,4"/>
+
+                            <TextBlock Text="Интервал сверки" Style="{StaticResource FieldTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Сколько минут ждать между проверками таблицы. Ползунок и число — одно и то же значение, от 1 до 180. После сохранения контейнер перезапускается и начинает ходить с новым интервалом."/>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="72"/>
+                                </Grid.ColumnDefinitions>
+                                <controls:IntervalBar VerticalAlignment="Center" Margin="0,0,12,0"
+                                                   Value="{Binding IntervalMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBox Grid.Column="1" Style="{StaticResource Field}" TextAlignment="Center"
+                                         Text="{Binding MinutesText, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+
+                            <TextBlock Text="Название проекта" Style="{StaticResource FieldTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Имя проекта в Singularity, куда записываются занятия. Сервис ищет проект с этим названием и создаёт его, если такого нет."/>
+                            <TextBox Style="{StaticResource Field}" Text="{Binding ProjectTitle, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Text="Колонка группы" Style="{StaticResource FieldTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Заголовок столбца на листе, из которого берутся ваши пары. Пишите его так же, как в таблице, например РКИ-2-26."/>
+                            <TextBox Style="{StaticResource Field}" Text="{Binding GroupColumn, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Text="Часовой пояс таблицы" Style="{StaticResource FieldTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Пояс, в котором в таблице указано время начала пар. Для этой таблицы оставьте Europe/Moscow: время в ней московское, даже если на компьютере другой пояс."/>
+                            <TextBox Style="{StaticResource Field}" Text="{Binding TimeZone, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Text="Идентификатор таблицы" Style="{StaticResource FieldTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Часть ссылки на Google Таблицу между /d/ и /edit. По ней сервис скачивает расписание."/>
+                            <TextBox Style="{StaticResource Field}" Text="{Binding SpreadsheetId, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Text="Номер листа" Style="{StaticResource FieldTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Число gid из адреса вкладки. Это не название листа, а номер вкладки внутри файла."/>
+                            <TextBox Style="{StaticResource Field}" Text="{Binding SheetGid, UpdateSourceTrigger=PropertyChanged}"/>
+
+                            <TextBlock Text="Токен Singularity" Style="{StaticResource FieldTitle}"/>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Ключ, по которому сервис входит в ваш аккаунт. Здесь уже лежит значение из файла настроек, на экране оно закрыто точками. Если выпустите новый ключ, вставьте его вместо текущего и сохраните."/>
+                            <PasswordBox Style="{StaticResource SecretField}"
+                                         behaviors:PasswordBinding.Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                    </ScrollViewer>
+            </Grid>
+
+            <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="16,0,16,8" Padding="8,10">
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Сохранить и перезапустить" Style="{StaticResource PrimaryButton}" Command="{Binding SaveAndRestartCommand}"/>
+                    <Button Content="Перезапустить" Style="{StaticResource ActionButton}" Command="{Binding RestartCommand}" Margin="8,0,0,0"/>
+                    <Border Width="1" Background="{StaticResource LineBrush}" Margin="16,4"/>
+                    <Button Content="Форматы ДЗ" Style="{StaticResource ActionButton}" Command="{Binding OpenFormatsCommand}"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

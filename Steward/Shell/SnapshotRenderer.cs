@@ -16,7 +16,7 @@ namespace Steward.Shell;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>Steward.exe --snapshot файл.png [popup | design | main[:status|ideas|homework|journal]]</c>
+/// Запуск: <c>Steward.exe --snapshot файл.png [popup | settings | tray | formats | design | main[:status|ideas|homework|journal]]</c>
 /// </summary>
 public static class SnapshotRenderer
 {
@@ -50,11 +50,11 @@ public static class SnapshotRenderer
             menu.Apply(snapshot, jobs);
             menu.SetItems(
             [
-                new GooeyItem("\uE80F", "Приложение", () => { }),
+                new GooeyItem("\uE80F", "Статусы", () => { }),
                 new GooeyItem("\uEA80", "Идеи", () => { }),
                 new GooeyItem("\uE7BE", "Домашние задания", () => { }),
                 new GooeyItem("\uE81C", "Журнал", () => { }),
-                new GooeyItem("\uE713", "Настройки", () => { }),
+                new GooeyItem("\uE713", "Настройки", () => { }, DividerBefore: true),
                 new GooeyItem("\uE7E8", "Выход", () => { }),
             ]);
             window = menu;
@@ -67,8 +67,12 @@ public static class SnapshotRenderer
         else if (string.Equals(parts[0], "popup", StringComparison.OrdinalIgnoreCase))
         {
             var popup = new StatusWindow();
-            popup.Apply(snapshot, jobs, scrollToProblem: false);
+            popup.Apply(snapshot, scrollToProblem: false);
             window = popup;
+        }
+        else if (string.Equals(parts[0], "settings", StringComparison.OrdinalIgnoreCase))
+        {
+            window = new SettingsWindow();
         }
         else
         {
