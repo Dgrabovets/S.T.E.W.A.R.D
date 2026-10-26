@@ -331,7 +331,7 @@ public sealed class ActivityOrb : FrameworkElement
 
         for (var index = 0; index < Points.Length; index++)
         {
-            var motion = Motion(kind, seconds, Points[index].Y, Scatter[index], index);
+            var motion = Motion(kind, seconds, Points[index].Y, Math.Atan2(Points[index].Z, Points[index].X), Scatter[index], index);
             if (!motion.Show || index % stride != 0)
                 continue;
 
@@ -367,10 +367,11 @@ public sealed class ActivityOrb : FrameworkElement
     /// <param name="kind">Вид сферы</param>
     /// <param name="seconds">Время, секунд</param>
     /// <param name="height">Высота точки на единичной сфере от -1 до 1</param>
+    /// <param name="azimuth">Угол точки вокруг вертикальной оси, радианы</param>
     /// <param name="scatter">Постоянное случайное число точки от 0 до 1</param>
     /// <param name="index">Номер точки</param>
     /// <returns>Дальность от центра в долях радиуса, добавка яркости, скорость вращения и показывается ли точка</returns>
-    private static (double Reach, double Glow, double Turn, bool Show) Motion(ActivityKindEnum kind, double seconds, double height, double scatter, int index)
+    private static (double Reach, double Glow, double Turn, bool Show) Motion(ActivityKindEnum kind, double seconds, double height, double azimuth, double scatter, int index)
     {
         switch (kind)
         {
@@ -405,6 +406,28 @@ public sealed class ActivityOrb : FrameworkElement
                 var wobble = 0.5 + 0.5 * Math.Sin(seconds * 5 + index);
 
                 return (1 + (scatter - 0.5) * 0.35 * wobble + (scatter > 0.85 ? 0.45 : 0), 0, 0.4, true);
+
+            case ActivityKindEnum.Waiting:
+                return (0.9 + 0.06 * Math.Sin(seconds * 0.7), -0.12, 0.12, index % 2 == 0);
+
+            case ActivityKindEnum.Sealed:
+                var line = Math.Abs(height * 5 - Math.Round(height * 5)) < 0.32 && Math.Abs(height) < 0.85;
+
+                return (1, line ? 0.3 : 0, 0.3, line);
+
+            case ActivityKindEnum.Shattered:
+                var drift = (seconds * 0.35 + scatter) % 1;
+                var shard = scatter > 0.72;
+
+                return (shard ? 1 + 0.8 * drift : 1, shard ? -0.6 * drift : 0, 0.3, true);
+
+            case ActivityKindEnum.Sweep:
+                var behind = (((seconds * 1.1 - azimuth / (Math.PI * 2)) % 1) + 1) % 1;
+
+                return (1, Math.Max(0, 0.7 - behind * 2.2), 0, true);
+
+            case ActivityKindEnum.Hollow:
+                return (1, 0.3, 0.5, Math.Abs(height) < 0.12);
 
             case ActivityKindEnum.Beacon:
                 var belt = Math.Abs(height) < 0.14;

@@ -32,6 +32,13 @@ public static class SnapshotRenderer
     /// </returns>
     public static bool Render(string path, string which)
     {
+        if (string.Equals(which, "appicon", StringComparison.OrdinalIgnoreCase))
+        {
+            AppIconWriter.Write(path);
+
+            return true;
+        }
+
         var now = DateTimeOffset.Now;
         var settleSeconds = 0.0;
         Action? afterShow = null;
@@ -194,11 +201,16 @@ public static class SnapshotRenderer
             (ActivityKindEnum.Failed, "DangerBrush", "Не удалось"),
             (ActivityKindEnum.Beacon, "OkBrush", "Общий статус"),
             (ActivityKindEnum.Working, "WorkingBrush", "Выполняется"),
+            (ActivityKindEnum.Waiting, "OkBrush", "Ждёт срока"),
+            (ActivityKindEnum.Sealed, "OkBrush", "Журнал: успех"),
+            (ActivityKindEnum.Shattered, "DangerBrush", "Журнал: ошибка"),
+            (ActivityKindEnum.Sweep, "AttentionBrush", "Журнал: время"),
+            (ActivityKindEnum.Hollow, "IdleBrush", "Журнал: не запущена"),
         };
         var ages = new[] { 0.12, 0.4, 0.8, 1.2, 1.7 };
         var styles = new[] { (ActivityDoneStyleEnum.Ripple, "А. Волна"), (ActivityDoneStyleEnum.DotTick, "Б. Галочка из точек"), (ActivityDoneStyleEnum.Burst, "В. Вспышка") };
 
-        for (var row = 0; row < 1 + styles.Length; row++)
+        for (var row = 0; row < 2 + styles.Length; row++)
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
 
         for (var column = 0; column < 8; column++)
@@ -217,7 +229,8 @@ public static class SnapshotRenderer
         {
             var orb = new Controls.ActivityOrb { Width = 72, Height = 72, Kind = kinds[index].Kind, Foreground = Brush(kinds[index].Brush) };
             var cell = Cell(orb, kinds[index].Label);
-            System.Windows.Controls.Grid.SetColumn(cell, index);
+            System.Windows.Controls.Grid.SetRow(cell, index / 6);
+            System.Windows.Controls.Grid.SetColumn(cell, index % 6);
             grid.Children.Add(cell);
         }
 
@@ -237,7 +250,7 @@ public static class SnapshotRenderer
                     Since = DateTimeOffset.UtcNow.AddSeconds(-ages[column]),
                 };
                 var cell = Cell(orb, column == 0 ? $"{styles[row].Item2}  {ages[column]:0.0} с" : $"{ages[column]:0.0} с");
-                System.Windows.Controls.Grid.SetRow(cell, row + 1);
+                System.Windows.Controls.Grid.SetRow(cell, row + 2);
                 System.Windows.Controls.Grid.SetColumn(cell, column);
                 grid.Children.Add(cell);
             }
@@ -245,8 +258,8 @@ public static class SnapshotRenderer
 
         return new Window
         {
-            Width = 760,
-            Height = 540,
+            Width = 800,
+            Height = 700,
             WindowStyle = WindowStyle.None,
             Background = Brush("WindowBrush"),
             Content = grid,

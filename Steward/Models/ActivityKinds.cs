@@ -28,7 +28,7 @@ public static class ActivityKinds
         { Muted: true } => ActivityKindEnum.Dormant,
         { Tone: PanelToneEnum.Problem } => ActivityKindEnum.Failed,
         { Tone: PanelToneEnum.Attention } => ActivityKindEnum.Attention,
-        { Tone: PanelToneEnum.Running } when row.Headline.StartsWith("Выполнено", StringComparison.Ordinal) => ActivityKindEnum.Calm,
+        { Tone: PanelToneEnum.Running } when row.Headline.StartsWith("Выполнено", StringComparison.Ordinal) => ActivityKindEnum.Waiting,
         { Tone: PanelToneEnum.Running } => ActivityKindEnum.Alive,
         _ => ActivityKindEnum.Dormant,
     };

@@ -1,0 +1,28 @@
+<Window x:Class="Steward.Views.ConfirmWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Steward"
+        Width="440"
+        SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        FontFamily="{StaticResource FontBase}">
+    <Border Style="{StaticResource WindowChrome}">
+        <StackPanel Margin="28,24,28,22">
+            <TextBlock x:Name="Heading" Style="{StaticResource TextHeadline}" TextWrapping="Wrap"/>
+            <TextBlock x:Name="Body" Style="{StaticResource TextSecondary}" Margin="0,8,0,20" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="Cancel" IsCancel="True" Style="{StaticResource GhostButton}" Click="Cancel_OnClick"/>
+                <Button x:Name="Confirm" IsDefault="True" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Click="Confirm_OnClick"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

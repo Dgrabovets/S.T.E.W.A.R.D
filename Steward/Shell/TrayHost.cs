@@ -528,6 +528,9 @@ public sealed class TrayHost : IDisposable
         if (_exiting)
             return;
 
+        if (!ConfirmWindow.Ask("Вы действительно хотите выйти?", "Приложение перестанет проверять почту, рилсы и расписание, пока вы его снова не запустите.", "Выйти", "Остаться"))
+            return;
+
         Dispose();
         System.Windows.Application.Current.Shutdown();
     }
