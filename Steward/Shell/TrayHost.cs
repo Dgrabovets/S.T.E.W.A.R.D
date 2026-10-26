@@ -147,16 +147,11 @@ public sealed class TrayHost : IDisposable
 
         _icon.MouseClick += (_, args) =>
         {
-            TrayAnchor.Remember(Cursor.Position);
             if (args.Button is MouseButtons.Left or MouseButtons.Right)
                 ShowMenu();
         };
 
-        _icon.DoubleClick += (_, _) =>
-        {
-            TrayAnchor.Remember(Cursor.Position);
-            ShowMain();
-        };
+        _icon.DoubleClick += (_, _) => ShowMain();
         _icon.BalloonTipClicked += (_, _) => ShowMain();
         _menu.SetItems(
         [
