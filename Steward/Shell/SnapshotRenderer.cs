@@ -77,6 +77,10 @@ public static class SnapshotRenderer
             popup.Apply(snapshot, scrollToProblem: false);
             window = popup;
         }
+        else if (string.Equals(parts[0], "slider", StringComparison.OrdinalIgnoreCase))
+        {
+            window = SliderSheet();
+        }
         else if (string.Equals(parts[0], "icons", StringComparison.OrdinalIgnoreCase))
         {
             window = IconSheet();
@@ -142,6 +146,25 @@ public static class SnapshotRenderer
 
         window.Close();
         return true;
+    }
+
+    /// <summary>
+    /// Собирает лист с ползунком в покое и в движении: бегунок догоняет значение, а хвост отстаёт
+    /// </summary>
+    /// <returns>Окно с образцами</returns>
+    private static Window SliderSheet()
+    {
+        var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(24), Width = 420 };
+        foreach (var (value, thumb, tail) in new[] { (60.0, 230.0, 230.0), (60.0, 250.0, 215.0), (60.0, 250.0, 190.0), (60.0, 250.0, 160.0), (60.0, 180.0, 215.0) })
+        {
+            var bar = new Controls.IntervalBar { Value = value };
+            panel.Children.Add(bar);
+            bar.Measure(new System.Windows.Size(420, 32));
+            bar.Arrange(new Rect(0, 0, 420, 32));
+            bar.Pose(thumb, tail);
+        }
+
+        return new Window { Width = 470, Height = 240, WindowStyle = WindowStyle.None, Background = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["WindowBrush"], Content = panel };
     }
 
     /// <summary>
