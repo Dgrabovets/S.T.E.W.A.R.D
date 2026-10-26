@@ -1,3 +1,4 @@
+using Steward.ViewModels;
 using Steward.Shell;
 
 namespace Steward;
@@ -26,6 +27,11 @@ public partial class App : System.Windows.Application
     /// Иконка и опрос контейнера
     /// </summary>
     private TrayHost? _host;
+
+    /// <summary>
+    /// Ключ запуска: сразу открыть главное окно на странице, например <c>--open Homework</c>
+    /// </summary>
+    private const string OPEN_ARGUMENT = "--open";
 
     #region Lifetime
 
@@ -57,6 +63,10 @@ public partial class App : System.Windows.Application
         }
 
         _host = new TrayHost();
+
+        var open = Array.IndexOf(e.Args, OPEN_ARGUMENT);
+        if (open >= 0 && open + 1 < e.Args.Length && Enum.TryParse<AppPageEnum>(e.Args[open + 1], ignoreCase: true, out var page))
+            _host.ShowMain(page);
     }
 
     /// <summary>

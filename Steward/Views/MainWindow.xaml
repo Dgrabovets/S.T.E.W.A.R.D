@@ -218,7 +218,7 @@
                                 <StackPanel>
                                     <TextBlock Text="Заданий пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
                                     <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
-                                               Text="Задания появятся здесь, когда по занятию с расшифровкой нажмёшь «Подготовить задания» в окне «Форматы ДЗ». Для каждого будет видно срок, формат и создана ли задача в SingularityApp."/>
+                                               Text="Задания появятся здесь, когда по занятию с расшифровкой нажмёшь «Подготовить задания» в блоке «Форматы заданий». Для каждого будет видно срок, формат и создана ли задача в SingularityApp."/>
                                 </StackPanel>
                             </Border>
                             <ItemsControl ItemsSource="{Binding Homework}">

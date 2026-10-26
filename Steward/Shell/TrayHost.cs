@@ -407,7 +407,7 @@ public sealed class TrayHost : IDisposable
     /// Открывает главное окно приложения с самыми свежими данными
     /// </summary>
     /// <param name="page">Раздел, который нужно открыть, или <see langword="null"/>, чтобы оставить прежний</param>
-    private void ShowMain(AppPageEnum? page = null)
+    public void ShowMain(AppPageEnum? page = null)
     {
         if (_exiting)
             return;
@@ -505,7 +505,6 @@ public sealed class TrayHost : IDisposable
         {
             var window = new SettingsWindow();
             window.Model.RestartRequested += async (_, _) => await RestartContainerAsync(window);
-            window.Model.FormatsRequested += (_, _) => ShowMain(AppPageEnum.Homework);
             window.Closed += (_, _) => _settings = null;
             _settings = window;
         }

@@ -27,7 +27,7 @@
             <Grid Margin="24,20,20,12" MouseLeftButtonDown="Header_OnDrag" Background="Transparent">
                 <StackPanel>
                     <TextBlock Text="Настройки" Style="{StaticResource TextHeadline}"/>
-                    <TextBlock Text="Параметры расписания, форматы домашних заданий и перезапуск сервиса" Style="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    <TextBlock Text="Параметры расписания и перезапуск сервиса" Style="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
                 <Button Content="Закрыть" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" VerticalAlignment="Top" Click="Close_OnClick"/>
             </Grid>
@@ -89,8 +89,6 @@
                 <StackPanel Orientation="Horizontal">
                     <Button Content="Сохранить и перезапустить" Style="{StaticResource PrimaryButton}" Command="{Binding SaveAndRestartCommand}"/>
                     <Button Content="Перезапустить" Style="{StaticResource ActionButton}" Command="{Binding RestartCommand}" Margin="8,0,0,0"/>
-                    <Border Width="1" Background="{StaticResource LineBrush}" Margin="16,4"/>
-                    <Button Content="Форматы заданий" Style="{StaticResource ActionButton}" Command="{Binding OpenFormatsCommand}"/>
                 </StackPanel>
             </Border>
         </Grid>

@@ -68,7 +68,6 @@ public sealed class SettingsViewModel : Bindable
     {
         SaveAndRestartCommand = new RelayCommand(SaveAndRestart);
         RestartCommand = new RelayCommand(Restart);
-        OpenFormatsCommand = new RelayCommand(() => FormatsRequested?.Invoke(this, EventArgs.Empty));
         LoadSettings();
     }
 
@@ -76,11 +75,6 @@ public sealed class SettingsViewModel : Bindable
     /// Просит пересоздать контейнер
     /// </summary>
     public event EventHandler? RestartRequested;
-
-    /// <summary>
-    /// Просит открыть страницу «Домашние задания» с блоком форматов
-    /// </summary>
-    public event EventHandler? FormatsRequested;
 
     /// <summary>
     /// Записывает поля и просит перезапуск
@@ -92,10 +86,6 @@ public sealed class SettingsViewModel : Bindable
     /// </summary>
     public RelayCommand RestartCommand { get; }
 
-    /// <summary>
-    /// Открывает страницу «Домашние задания» с блоком форматов
-    /// </summary>
-    public RelayCommand OpenFormatsCommand { get; }
     /// <summary>
     /// Короткий итог сохранения или перезапуска
     /// </summary>
@@ -200,7 +190,6 @@ public sealed class SettingsViewModel : Bindable
         get => _token;
         set => Set(ref _token, value);
     }
-
 
     /// <summary>
     /// Записывает поля и просит перезапуск, если они заполнены

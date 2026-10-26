@@ -41,7 +41,7 @@ public partial class DesignWindow : Window
     /// <summary>
     /// Состояния задач
     /// </summary>
-    public IReadOnlyList<ColorSwatch> States { get; } = Swatches("Ok", "OkSurface", "Attention", "AttentionSurface", "Danger", "DangerSurface", "Idle", "Working");
+    public IReadOnlyList<ColorSwatch> States { get; } = Swatches("Ok", "OkSurface", "Attention", "AttentionSurface", "Danger", "DangerSurface", "Idle");
 
     /// <summary>
     /// Плашки всех состояний

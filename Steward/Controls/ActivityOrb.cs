@@ -397,7 +397,7 @@ public sealed class ActivityOrb : FrameworkElement
                 return (1, 0.15 * Math.Max(0, Math.Sin(seconds * 0.9 - height * 2)), 0.25, true);
 
             case ActivityKindEnum.Dormant:
-                return (0.9, -0.35, 0.2, index % 4 == 0);
+                return (0.92, -0.05, 0.2, index % 3 == 0);
 
             case ActivityKindEnum.Attention:
                 return (0.8 + 0.2 * Math.Sin(seconds * 3.2), 0.2 * Math.Max(0, Math.Sin(seconds * 3.2)), 0.7, true);
