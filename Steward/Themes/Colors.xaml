@@ -23,8 +23,6 @@
     <Color x:Key="AccentPressedColor">#1E40AF</Color>
     <Color x:Key="AccentTextColor">#60A5FA</Color>
     <Color x:Key="OnAccentColor">#FFFFFF</Color>
-    <!-- Тот же акцент, но полностью прозрачный: конец градиента свечения, чтобы край не серел -->
-    <Color x:Key="AccentClearColor">#002563EB</Color>
 
     <!-- Состояния задач: цвет и тёмная подложка под ним -->
     <Color x:Key="OkColor">#22C55E</Color>

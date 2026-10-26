@@ -39,7 +39,7 @@ public abstract class TrayPopupWindow : Window
     /// <summary>
     /// Момент последнего закрытия по потере фокуса
     /// </summary>
-    private long _dismissedAt = long.MinValue;
+    private long _dismissedAt;
 
     /// <summary>
     /// Создаёт окно и подписывается на потерю фокуса
@@ -71,7 +71,7 @@ public abstract class TrayPopupWindow : Window
 
         if (Environment.TickCount64 - _dismissedAt < DISMISS_GRACE_MS)
         {
-            _dismissedAt = long.MinValue;
+            _dismissedAt = 0;
 
             return;
         }
