@@ -32,6 +32,11 @@ public sealed class LessonFormatViewModel : Bindable
     private bool _failed;
 
     /// <summary>
+    /// Есть ли у занятия расшифровка
+    /// </summary>
+    private bool _hasTranscript;
+
+    /// <summary>
     /// Создаёт строку
     /// </summary>
     /// <param name="lesson">Занятие</param>
@@ -41,7 +46,8 @@ public sealed class LessonFormatViewModel : Bindable
     /// <param name="prepare">Ищет задания в расшифровке: возвращает их число и текст ошибки, если не получилось</param>
     public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen, bool hasTranscript, Func<Lesson, Task<(int Count, string Error)>> prepare)
     {
-        HasTranscript = hasTranscript;
+        Id = lesson.Id;
+        _hasTranscript = hasTranscript;
         PrepareCommand = new RelayCommand(async () => await PrepareAsync(lesson, prepare), () => Activity != ActivityStateEnum.Working);
         Title = lesson.Title;
         Date = lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
@@ -61,9 +67,18 @@ public sealed class LessonFormatViewModel : Bindable
     }
 
     /// <summary>
+    /// Ключ занятия
+    /// </summary>
+    public string Id { get; }
+
+    /// <summary>
     /// Есть ли у занятия расшифровка: без неё готовить задания не из чего
     /// </summary>
-    public bool HasTranscript { get; }
+    public bool HasTranscript
+    {
+        get => _hasTranscript;
+        set => Set(ref _hasTranscript, value);
+    }
 
     /// <summary>
     /// Как движутся точки индикатора: идёт поиск по тексту расшифровки

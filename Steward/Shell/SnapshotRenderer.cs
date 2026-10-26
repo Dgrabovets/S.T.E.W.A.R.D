@@ -91,6 +91,10 @@ public static class SnapshotRenderer
             popup.Apply(snapshot, scrollToProblem: false);
             window = popup;
         }
+        else if (string.Equals(parts[0], "trayvariants", StringComparison.OrdinalIgnoreCase))
+        {
+            window = TrayVariantSheet();
+        }
         else if (string.Equals(parts[0], "slider", StringComparison.OrdinalIgnoreCase))
         {
             window = SliderSheet();
@@ -112,6 +116,9 @@ public static class SnapshotRenderer
             var main = new MainWindow();
             main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"], SampleIdeas(now));
             main.ApplyHomework(SampleHomework());
+            main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)));
+            if (parts.Length > 1 && string.Equals(parts[1], "homework", StringComparison.OrdinalIgnoreCase))
+                settleSeconds = 1.0;
             if (parts.Length > 1 && Enum.TryParse<AppPageEnum>(parts[1], ignoreCase: true, out var page))
                 main.Model.Page = page;
 
@@ -160,6 +167,93 @@ public static class SnapshotRenderer
 
         window.Close();
         return true;
+    }
+
+    /// <summary>
+    /// Собирает лист вариантов иконки трея: пять рисунков в пяти состояниях, настоящие 16 и 32 пикселя и увеличенные в четыре раза, чтобы разглядеть
+    /// </summary>
+    /// <returns>Окно с вариантами</returns>
+    private static Window TrayVariantSheet()
+    {
+        var resources = System.Windows.Application.Current.Resources;
+        System.Windows.Media.Brush Brush(string key) => (System.Windows.Media.Brush)resources[key];
+        var states = new (string Brush, ActivityKindEnum Kind)[] { ("AccentTextBrush", ActivityKindEnum.Alive), ("WorkingBrush", ActivityKindEnum.Working), ("AttentionBrush", ActivityKindEnum.Attention), ("DangerBrush", ActivityKindEnum.Failed), ("IdleBrush", ActivityKindEnum.Dormant) };
+        var names = new[] { "1. Диск", "2. Крупная сфера", "3. Кольцо и точка", "4. Монограмма S", "5. Светящийся диск" };
+
+        var grid = new System.Windows.Controls.Grid { Margin = new Thickness(16) };
+        for (var column = 0; column < 1 + states.Length; column++)
+            grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = GridLength.Auto });
+
+        for (var row = 0; row < names.Length; row++)
+        {
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            var label = new System.Windows.Controls.TextBlock { Text = names[row], Foreground = Brush("TextBrush"), FontSize = 15, Margin = new Thickness(0, 0, 24, 0), VerticalAlignment = VerticalAlignment.Center };
+            System.Windows.Controls.Grid.SetRow(label, row);
+            grid.Children.Add(label);
+
+            for (var column = 0; column < states.Length; column++)
+            {
+                var cell = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(8, 8, 18, 8) };
+                foreach (var (size, zoom) in new[] { (16, 1), (32, 1), (32, 3) })
+                {
+                    var target = new System.Windows.Media.Imaging.RenderTargetBitmap(size, size, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                    target.Render(TrayVariant(row, size, Brush(states[column].Brush), states[column].Kind));
+                    var image = new System.Windows.Controls.Image { Source = target, Width = size * zoom, Height = size * zoom, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+                    System.Windows.Media.RenderOptions.SetBitmapScalingMode(image, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                    cell.Children.Add(image);
+                }
+
+                System.Windows.Controls.Grid.SetRow(cell, row);
+                System.Windows.Controls.Grid.SetColumn(cell, column + 1);
+                grid.Children.Add(cell);
+            }
+        }
+
+        return new Window { Width = 1180, Height = 640, WindowStyle = WindowStyle.None, Background = Brush("WindowBrush"), Content = grid };
+    }
+
+    /// <summary>
+    /// Рисует один вариант иконки трея
+    /// </summary>
+    /// <param name="variant">Номер варианта с нуля</param>
+    /// <param name="size">Сторона в пикселях</param>
+    /// <param name="brush">Цвет состояния</param>
+    /// <param name="kind">Вид сферы для вариантов со сферой</param>
+    /// <returns>Элемент с готовой раскладкой</returns>
+    private static FrameworkElement TrayVariant(int variant, int size, System.Windows.Media.Brush brush, ActivityKindEnum kind)
+    {
+        var color = brush is System.Windows.Media.SolidColorBrush solid ? solid.Color : System.Windows.Media.Colors.Gray;
+        System.Windows.Media.Brush Shade(double alpha) => new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb((byte)(255 * alpha), color.R, color.G, color.B));
+        var root = new System.Windows.Controls.Grid { Width = size, Height = size };
+        var pad = size * 0.06;
+
+        switch (variant)
+        {
+            case 0:
+                root.Children.Add(new System.Windows.Shapes.Ellipse { Fill = brush, Margin = new Thickness(pad) });
+                root.Children.Add(new System.Windows.Shapes.Ellipse { Fill = new System.Windows.Media.RadialGradientBrush(System.Windows.Media.Color.FromArgb(150, 255, 255, 255), System.Windows.Media.Color.FromArgb(0, 255, 255, 255)) { Center = new System.Windows.Point(0.35, 0.3), GradientOrigin = new System.Windows.Point(0.35, 0.3), RadiusX = 0.55, RadiusY = 0.55 }, Margin = new Thickness(pad) });
+                break;
+            case 1:
+                root.Children.Add(new Controls.ActivityOrb { Kind = kind, Foreground = brush, Stride = 1, DotScale = Math.Max(1.2, size / 17.0), Margin = new Thickness(-size * 0.02) });
+                break;
+            case 2:
+                root.Children.Add(new System.Windows.Shapes.Ellipse { Stroke = brush, StrokeThickness = Math.Max(1.5, size / 11.0), Margin = new Thickness(pad + size * 0.04) });
+                root.Children.Add(new System.Windows.Shapes.Ellipse { Fill = brush, Margin = new Thickness(size * 0.32) });
+                break;
+            case 3:
+                root.Children.Add(new System.Windows.Controls.Border { Background = brush, CornerRadius = new CornerRadius(size * 0.24), Margin = new Thickness(pad) });
+                root.Children.Add(new System.Windows.Controls.TextBlock { Text = "S", Foreground = System.Windows.Media.Brushes.White, FontWeight = FontWeights.Bold, FontSize = size * 0.7, HorizontalAlignment = System.Windows.HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontFamily = new System.Windows.Media.FontFamily("Segoe UI") });
+                break;
+            default:
+                root.Children.Add(new System.Windows.Shapes.Ellipse { Fill = Shade(0.35), Margin = new Thickness(pad) });
+                root.Children.Add(new Controls.ActivityOrb { Kind = kind, Foreground = brush, Stride = 1, DotScale = Math.Max(1.1, size / 20.0), Margin = new Thickness(size * 0.06) });
+                break;
+        }
+
+        root.Measure(new System.Windows.Size(size, size));
+        root.Arrange(new Rect(0, 0, size, size));
+
+        return root;
     }
 
     /// <summary>

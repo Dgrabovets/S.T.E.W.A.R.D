@@ -53,6 +53,11 @@ public sealed class TrayHost : IDisposable
     private readonly StatusWindow _window = new();
 
     /// <summary>
+    /// Список занятий с выбором формата ДЗ: общий для окна и страницы, чтобы идущая подготовка заданий не сбрасывалась
+    /// </summary>
+    private HomeworkFormatsViewModel? _formats;
+
+    /// <summary>
     /// Окно настроек, пока оно открыто
     /// </summary>
     private SettingsWindow? _settings;
@@ -473,7 +478,20 @@ public sealed class TrayHost : IDisposable
     private void ApplyMain()
     {
         _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
+        _main.Model.Formats = Formats();
         _main.ApplyHomework(_jobs.HomeworkRows());
+    }
+
+    /// <summary>
+    /// Общий список занятий с форматами: создаётся один раз и каждый раз обновляется свежими данными
+    /// </summary>
+    /// <returns>Модель списка</returns>
+    private HomeworkFormatsViewModel Formats()
+    {
+        _formats ??= new HomeworkFormatsViewModel(_jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None));
+        _formats.Update(_jobs.Lessons());
+
+        return _formats;
     }
 
     /// <summary>
@@ -481,7 +499,7 @@ public sealed class TrayHost : IDisposable
     /// </summary>
     /// <param name="owner">Окно, поверх которого открывается выбор</param>
     private void ShowFormats(System.Windows.Window? owner) =>
-        new HomeworkFormatsWindow(new HomeworkFormatsViewModel(_jobs.Lessons(), _jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None))) { Owner = owner }.ShowDialog();
+        new HomeworkFormatsWindow(Formats()) { Owner = owner }.ShowDialog();
 
     /// <summary>
     /// Открывает окно настроек или выводит открытое на передний план

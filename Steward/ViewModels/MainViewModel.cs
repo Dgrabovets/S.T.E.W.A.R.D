@@ -50,6 +50,16 @@ public sealed class MainViewModel : PanelViewModel
     private bool _reelsBusy;
 
     /// <summary>
+    /// Блок «Форматы заданий» на странице домашних заданий развёрнут
+    /// </summary>
+    private bool _isFormatsOpen = true;
+
+    /// <summary>
+    /// Список занятий с выбором формата
+    /// </summary>
+    private HomeworkFormatsViewModel? _formats;
+
+    /// <summary>
     /// Что не удалось прочитать в реестре задач
     /// </summary>
     private string _registryErrors = string.Empty;
@@ -235,6 +245,24 @@ public sealed class MainViewModel : PanelViewModel
     /// Идей, которые ждут решения, нет
     /// </summary>
     public bool IsIdeasEmpty => Ideas.Count == 0;
+
+    /// <summary>
+    /// Блок «Форматы заданий» развёрнут
+    /// </summary>
+    public bool IsFormatsOpen
+    {
+        get => _isFormatsOpen;
+        set => Set(ref _isFormatsOpen, value);
+    }
+
+    /// <summary>
+    /// Список занятий с выбором формата для блока «Форматы заданий»
+    /// </summary>
+    public HomeworkFormatsViewModel? Formats
+    {
+        get => _formats;
+        set => Set(ref _formats, value);
+    }
 
     /// <summary>
     /// Бот сейчас разбирает рилс: на странице идей показывается сфера и пояснение
