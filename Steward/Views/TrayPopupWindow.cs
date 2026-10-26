@@ -27,19 +27,9 @@ public abstract class TrayPopupWindow : Window
     private const double CURSOR_OFFSET_Y = 8;
 
     /// <summary>
-    /// Сколько миллисекунд после закрытия по потере фокуса щелчок по иконке считается тем самым щелчком, который окно закрыл. Нажатие на иконку отбирает фокус раньше, чем приходит сам щелчок, и без этого окно тут же открывалось бы снова
-    /// </summary>
-    private const long DISMISS_GRACE_MS = 450;
-
-    /// <summary>
     /// Щелчок по иконке ещё не закончился, повторно открывать и закрывать окно нельзя
     /// </summary>
     private bool _ignoreToggle;
-
-    /// <summary>
-    /// Момент последнего закрытия по потере фокуса
-    /// </summary>
-    private long _dismissedAt;
 
     /// <summary>
     /// Создаёт окно и подписывается на потерю фокуса
@@ -65,13 +55,6 @@ public abstract class TrayPopupWindow : Window
         if (IsVisible)
         {
             Hide();
-
-            return;
-        }
-
-        if (Environment.TickCount64 - _dismissedAt < DISMISS_GRACE_MS)
-        {
-            _dismissedAt = 0;
 
             return;
         }
@@ -136,7 +119,6 @@ public abstract class TrayPopupWindow : Window
         if (_ignoreToggle || !IsVisible)
             return;
 
-        _dismissedAt = Environment.TickCount64;
         Hide();
         Dismissed?.Invoke(this, EventArgs.Empty);
         _ignoreToggle = true;

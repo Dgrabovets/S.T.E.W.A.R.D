@@ -25,8 +25,7 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        var check = args.Length == 1 && string.Equals(args[0], "check-toggle", StringComparison.OrdinalIgnoreCase);
-        if (!check && (args.Length < 2 || !string.Equals(args[0], "snapshot", StringComparison.OrdinalIgnoreCase)))
+        if (args.Length < 2 || !string.Equals(args[0], "snapshot", StringComparison.OrdinalIgnoreCase))
         {
             Console.Error.WriteLine(USAGE);
 
@@ -38,11 +37,7 @@ public static class Program
         app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(THEME) });
         app.Startup += (_, _) =>
         {
-            if (check)
-                Console.WriteLine(ToggleCheck.Run());
-            else
-                SnapshotRenderer.Render(args[1], args.Length > 2 ? args[2] : "main");
-
+            SnapshotRenderer.Render(args[1], args.Length > 2 ? args[2] : "main");
             app.Shutdown();
         };
 
