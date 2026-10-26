@@ -5,7 +5,7 @@ using Steward.Mail.Models;
 namespace Steward.Mail.Services;
 
 /// <summary>
-/// Одна проверка почты: читает непрочитанные письма, создаёт задачи для тех, у кого её ещё нет, и показывает уведомление. Флаг «прочитано» в ящике не ставится: пока вы не открыли письмо, оно считается требующим внимания. Повторную задачу не даёт внешний ключ в SingularityApp, а повторный разбор письма без задачи не даёт память о разобранных
+/// Одна проверка почты: читает непрочитанные письма, создаёт задачи для тех, у кого её ещё нет, помечает разобранные прочитанными и показывает уведомление. Разобранные письма помечаются прочитанными в ящике. Повторную задачу не даёт внешний ключ в SingularityApp, а повторный разбор письма без задачи не даёт память о разобранных
 /// </summary>
 /// <param name="reader">Читает непрочитанные письма</param>
 /// <param name="classifier">Относит письмо к категории</param>
@@ -72,6 +72,9 @@ public sealed class MailChecker(
 
         }
 
+        if (!dryRun && fresh.Count > 0)
+            await MarkSeenAsync(fresh, cancellationToken);
+
         var summary = MailSummary.Build(feedback, replies, info);
         log(summary.Replace('\n', ' '));
 
@@ -79,6 +82,24 @@ public sealed class MailChecker(
             notifier.Show("Учебная почта", summary);
 
         return new MailCheckResult(feedback, replies, info, summary);
+    }
+
+    /// <summary>
+    /// Помечает разобранные письма прочитанными. Сбой отметки не роняет проверку: задачи уже созданы, а письма записаны в память о разобранных и повторно не придут
+    /// </summary>
+    /// <param name="mails">Разобранные письма</param>
+    /// <param name="cancellationToken">Отменяет проверку</param>
+    /// <returns>Задача, которая завершается, когда отметки поставлены или не удались</returns>
+    private async Task MarkSeenAsync(IReadOnlyList<MailItem> mails, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await reader.MarkSeenAsync(mails, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            log($"Не удалось пометить письма прочитанными: {exception.Message}");
+        }
     }
 
     /// <summary>

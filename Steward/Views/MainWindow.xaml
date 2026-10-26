@@ -305,7 +305,8 @@
                                         <DataTemplate>
                                             <Border Style="{StaticResource Card}" Padding="8,6,8,8" Margin="0,0,0,12">
                                                 <StackPanel>
-                                                    <ToggleButton IsChecked="{Binding IsOpen, Mode=TwoWay}" Style="{StaticResource SectionToggle}">
+                                                    <Grid>
+                                                        <ToggleButton IsChecked="{Binding IsOpen, Mode=TwoWay}" Style="{StaticResource SectionToggle}">
                                                         <StackPanel Orientation="Horizontal">
                                                             <ctl:ActivityOrb Width="26" Height="26" Style="{StaticResource StatusOrb}" Margin="0,0,12,0"/>
                                                             <StackPanel VerticalAlignment="Center">
@@ -314,9 +315,10 @@
                                                             </StackPanel>
                                                         </StackPanel>
                                                     </ToggleButton>
+                                                        <Button Content="Очистить вкладку" Style="{StaticResource OutlineButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,48,0" Padding="12,5" Command="{Binding ClearCommand}"/>
+                                                    </Grid>
                                                     <ctl:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsOpen}">
                                                         <StackPanel Margin="4,0,4,0">
-                                                            <Button Content="Очистить вкладку" Style="{StaticResource OutlineButton}" HorizontalAlignment="Right" Margin="0,8,0,0" Padding="12,5" Command="{Binding ClearCommand}"/>
                                                             <ItemsControl ItemsSource="{Binding Runs}">
                                                                 <ItemsControl.ItemTemplate>
                                                                     <DataTemplate>

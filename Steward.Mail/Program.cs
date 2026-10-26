@@ -38,6 +38,9 @@ internal static class Program
     /// <returns>0, если проверка прошла, и 1, если случилась ошибка</returns>
     private static async Task<int> Main(string[] args)
     {
+        // Приложение в трее читает вывод как UTF-8, а консоль по умолчанию пишет в кодировке DOS: без этого русский текст превращается в кракозябры
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+
         var dryRun = args.Contains("--dry-run");
         var statusStore = new StatusStore(DataLocation.StatusDirectory());
 

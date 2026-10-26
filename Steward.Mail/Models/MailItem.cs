@@ -11,6 +11,8 @@ namespace Steward.Mail.Models;
 /// <param name="Date">Когда письмо отправлено</param>
 /// <param name="Body">Текст письма без разметки. Если тело не удалось прочитать, начало текста из превью</param>
 /// <param name="Links">Адреса, найденные в тексте и в ссылках письма, без повторов</param>
+/// <param name="Uid">Номер письма в папке: по нему письмо помечается прочитанным</param>
+/// <param name="UidValidity">Метка папки: если она изменилась, номера писем уже другие, и помечать нельзя</param>
 public sealed record MailItem(
     string MessageId,
     string Folder,
@@ -19,4 +21,6 @@ public sealed record MailItem(
     string Subject,
     DateTimeOffset Date,
     string Body,
-    IReadOnlyList<string> Links);
+    IReadOnlyList<string> Links,
+    uint Uid = 0,
+    uint UidValidity = 0);
