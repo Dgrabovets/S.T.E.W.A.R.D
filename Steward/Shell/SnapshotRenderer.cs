@@ -16,7 +16,7 @@ namespace Steward.Shell;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>Steward.exe --snapshot файл.png [popup | appicon | logo | social | settings | tray | formats | design | main[:status|ideas|homework|journal]]</c>
+/// Запуск: <c>Steward.exe --snapshot файл.png [popup | appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal]]</c>
 /// </summary>
 public static class SnapshotRenderer
 {
@@ -63,7 +63,7 @@ public static class SnapshotRenderer
         Window window;
         if (string.Equals(parts[0], "design", StringComparison.OrdinalIgnoreCase))
         {
-            window = new DesignWindow();
+            window = new DesignWindow { SizeToContent = SizeToContent.Manual, Height = 1560 };
         }
         else if (string.Equals(parts[0], "tray", StringComparison.OrdinalIgnoreCase))
         {
@@ -80,10 +80,6 @@ public static class SnapshotRenderer
             ]);
             window = menu;
             afterShow = () => menu.Expand(animate: false);
-        }
-        else if (string.Equals(parts[0], "formats", StringComparison.OrdinalIgnoreCase))
-        {
-            window = new HomeworkFormatsWindow(new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty))));
         }
         else if (string.Equals(parts[0], "popup", StringComparison.OrdinalIgnoreCase))
         {
@@ -157,13 +153,23 @@ public static class SnapshotRenderer
             window.UpdateLayout();
         }
 
+        // Страница дизайн-системы выше экрана, а окно Windows выше экрана не растёт, поэтому рисуем её содержимое целиком
+        Visual source = window;
         var width = (int)Math.Ceiling(window.ActualWidth);
         var height = (int)Math.Ceiling(window.ActualHeight);
+        if (window is DesignWindow { Content: FrameworkElement content })
+        {
+            content.Measure(new System.Windows.Size(width, double.PositiveInfinity));
+            content.Arrange(new Rect(0, 0, width, content.DesiredSize.Height));
+            source = content;
+            height = (int)Math.Ceiling(content.DesiredSize.Height);
+        }
+
         var visual = new DrawingVisual();
         using (var context = visual.RenderOpen())
         {
             context.DrawRectangle(new SolidColorBrush((System.Windows.Media.Color)System.Windows.Application.Current.FindResource("ShadowColor")), null, new Rect(0, 0, width, height));
-            context.DrawRectangle(new VisualBrush(window), null, new Rect(0, 0, width, height));
+            context.DrawRectangle(new VisualBrush(source), null, new Rect(0, 0, width, height));
         }
 
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);

@@ -8,7 +8,6 @@ using Steward.Status.Running;
 
 namespace Steward.ViewModels;
 
-
     /// <summary>
 /// Состояние главного окна: раздел, задачи, журнал и общий итог
 /// </summary>
@@ -70,7 +69,6 @@ public sealed class MainViewModel : PanelViewModel
     public MainViewModel() : base("Проверка")
     {
         ClearJournalCommand = new RelayCommand(() => ClearJournalRequested?.Invoke(this, EventArgs.Empty));
-        OpenFormatsCommand = new RelayCommand(() => FormatsRequested?.Invoke(this, EventArgs.Empty));
         OpenScheduleHistoryCommand = new RelayCommand(() => ScheduleHistoryRequested?.Invoke(this, EventArgs.Empty));
     }
 
@@ -88,11 +86,6 @@ public sealed class MainViewModel : PanelViewModel
     /// Просит стереть журнал запусков
     /// </summary>
     public event EventHandler? ClearJournalRequested;
-
-    /// <summary>
-    /// Просит открыть окно выбора форматов ДЗ
-    /// </summary>
-    public event EventHandler? FormatsRequested;
 
     /// <summary>
     /// Просит открыть окно с историей сверок расписания
@@ -118,11 +111,6 @@ public sealed class MainViewModel : PanelViewModel
     /// Стирает журнал запусков
     /// </summary>
     public RelayCommand ClearJournalCommand { get; }
-
-    /// <summary>
-    /// Открывает окно выбора форматов ДЗ
-    /// </summary>
-    public RelayCommand OpenFormatsCommand { get; }
 
     /// <summary>
     /// Открывает окно с историей сверок расписания

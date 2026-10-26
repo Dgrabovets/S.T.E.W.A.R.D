@@ -58,6 +58,39 @@
                 <TextBlock Text="Mono 12: config/jobs.json, mail, 09:00" Style="{StaticResource TextMono}" Margin="0,4,0,0"/>
             </StackPanel>
 
+            <TextBlock Text="Сферы состояния" Style="{StaticResource Section}"/>
+            <TextBlock Text="Сфера из точек вместо точки-индикатора: вид говорит о состоянии, цвет берётся из палитры состояний. Окончание процесса проигрывает волну от сферы." Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <WrapPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Alive" Foreground="{StaticResource OkBrush}"/><TextBlock Text="Работает" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Waiting" Foreground="{StaticResource OkBrush}"/><TextBlock Text="Выполнено, ждёт срока" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Dormant" Foreground="{StaticResource IdleBrush}"/><TextBlock Text="Отключена" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Attention" Foreground="{StaticResource AttentionBrush}"/><TextBlock Text="Ждёт решения" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Failed" Foreground="{StaticResource DangerBrush}"/><TextBlock Text="Не удалось" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Beacon" Foreground="{StaticResource OkBrush}"/><TextBlock Text="Общий статус" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Working" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Выполняется: работа" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Searching" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Поиск" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Connecting" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Связь" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Composing" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Сборка" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Breathing" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Ожидание" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Sealed" Foreground="{StaticResource OkBrush}"/><TextBlock Text="Журнал: успех" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Shattered" Foreground="{StaticResource DangerBrush}"/><TextBlock Text="Журнал: ошибка" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Sweep" Foreground="{StaticResource AttentionBrush}"/><TextBlock Text="Журнал: время" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+                <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Hollow" Foreground="{StaticResource IdleBrush}"/><TextBlock Text="Журнал: не запущена" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
+            </WrapPanel>
+
+            <TextBlock Text="Сворачиваемый блок" Style="{StaticResource Section}"/>
+            <ToggleButton IsChecked="True" Style="{StaticResource SectionToggle}">
+                <TextBlock Text="Форматы заданий" Style="{StaticResource TextTitle}"/>
+            </ToggleButton>
+            <ctl:CollapsibleBody Style="{StaticResource CollapsibleBody}">
+                <Border Style="{StaticResource Card}" Margin="0,8,0,0">
+                    <TextBlock Text="Содержимое плавно сворачивается: высота и прозрачность меняются вместе" Style="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                </Border>
+            </ctl:CollapsibleBody>
+
+            <TextBlock Text="Меню из капель" Style="{StaticResource Section}"/>
+            <ctl:GooeyCluster x:Name="Cluster" Fill="{StaticResource RaisedBrush}" Outline="{StaticResource LineStrongBrush}" Foreground="{StaticResource TextBrush}" StateBrush="{StaticResource OkBrush}"/>
+
                 </StackPanel>
                 <StackPanel Grid.Column="1">
             <TextBlock Text="Кнопки" Style="{StaticResource Section}"/>
@@ -98,15 +131,6 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-
-            <TextBlock Text="Индикаторы процесса" Style="{StaticResource Section}"/>
-            <StackPanel Orientation="Horizontal">
-                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Working" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Работа" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
-                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Searching" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Поиск" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
-                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Connecting" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Связь" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
-                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Composing" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Сборка" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
-                <StackPanel Margin="0,0,24,0"><ctl:ActivityOrb Width="64" Height="64" State="Working" Kind="Breathing" Foreground="{StaticResource WorkingBrush}"/><TextBlock Text="Ожидание" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/></StackPanel>
-            </StackPanel>
 
             <TextBlock Text="Форма" Style="{StaticResource Section}"/>
             <StackPanel Orientation="Horizontal">

@@ -47,20 +47,17 @@
                                 <BlurEffect Radius="18"/>
                             </Ellipse.Effect>
                         </Ellipse>
-                        <Border Background="{StaticResource AccentBrush}" CornerRadius="{StaticResource RadiusBadge}" Margin="4">
-                            <Grid>
-                                <Border Width="22" Height="16" BorderBrush="White" BorderThickness="1.6" CornerRadius="2" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                                <Rectangle Width="2" Height="6" Fill="White" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,12,0,0"/>
-                                <Rectangle Width="2" Height="6" Fill="White" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,16,0"/>
-                            </Grid>
-                        </Border>
+                        <Image Source="pack://application:,,,/Assets/steward.ico" Margin="4" RenderOptions.BitmapScalingMode="HighQuality"/>
                     </Grid>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock Text="Сверки расписания" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeHeadline}" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,2,0,0" TextWrapping="Wrap"/>
                     </StackPanel>
-                    <Border Grid.Column="2" Style="{StaticResource ToneBadge}" Padding="12,8" VerticalAlignment="Top" Margin="12,8,0,0">
-                        <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource ToneBadgeText}"/>
+                    <Border Grid.Column="2" Style="{StaticResource ToneBadge}" Padding="8,4,12,4" VerticalAlignment="Top" Margin="12,8,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:ActivityOrb Width="24" Height="24" Style="{StaticResource SummaryOrb}" Margin="0,0,6,0"/>
+                            <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource ToneBadgeText}" VerticalAlignment="Center"/>
+                        </StackPanel>
                     </Border>
                 </Grid>
                 
@@ -71,7 +68,7 @@
                     
                     <ScrollViewer x:Name="JournalScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="12,0,12,8">
                         <StackPanel>
-                            <TextBlock Text="История сверок расписания" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="8,4,0,12"/>
+                            <TextBlock Text="История сверок расписания" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="10,4,0,12"/>
                             <TextBlock Text="{Binding EmptyText}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}"
                                        Margin="8,24,8,24" TextWrapping="Wrap"
                                        Visibility="{Binding IsJournalEmpty, Converter={StaticResource BoolToVisibility}}"/>
@@ -79,7 +76,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Margin="8,0,8,12">
-                                            <TextBlock Text="{Binding Day}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="4,0,0,8">
+                                            <TextBlock Text="{Binding Day}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="10,0,0,8">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
                                                         <Setter Property="Visibility" Value="Collapsed"/>

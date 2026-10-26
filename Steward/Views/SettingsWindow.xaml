@@ -90,7 +90,7 @@
                     <Button Content="Сохранить и перезапустить" Style="{StaticResource PrimaryButton}" Command="{Binding SaveAndRestartCommand}"/>
                     <Button Content="Перезапустить" Style="{StaticResource ActionButton}" Command="{Binding RestartCommand}" Margin="8,0,0,0"/>
                     <Border Width="1" Background="{StaticResource LineBrush}" Margin="16,4"/>
-                    <Button Content="Форматы ДЗ" Style="{StaticResource ActionButton}" Command="{Binding OpenFormatsCommand}"/>
+                    <Button Content="Форматы заданий" Style="{StaticResource ActionButton}" Command="{Binding OpenFormatsCommand}"/>
                 </StackPanel>
             </Border>
         </Grid>

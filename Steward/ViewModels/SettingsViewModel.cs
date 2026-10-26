@@ -78,7 +78,7 @@ public sealed class SettingsViewModel : Bindable
     public event EventHandler? RestartRequested;
 
     /// <summary>
-    /// Просит открыть окно выбора форматов домашних заданий
+    /// Просит открыть страницу «Домашние задания» с блоком форматов
     /// </summary>
     public event EventHandler? FormatsRequested;
 
@@ -93,7 +93,7 @@ public sealed class SettingsViewModel : Bindable
     public RelayCommand RestartCommand { get; }
 
     /// <summary>
-    /// Открывает окно форматов домашних заданий
+    /// Открывает страницу «Домашние задания» с блоком форматов
     /// </summary>
     public RelayCommand OpenFormatsCommand { get; }
     /// <summary>

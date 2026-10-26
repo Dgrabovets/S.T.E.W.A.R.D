@@ -418,7 +418,6 @@ public sealed class TrayHost : IDisposable
             _main.Model.RunRequested += id => _jobs.RunNow(id);
             _main.Model.FixRequested += OpenFix;
             _main.Model.ClearJournalRequested += (_, _) => _jobs.ClearRecords();
-            _main.Model.FormatsRequested += (_, _) => ShowFormats(_main);
             _main.Model.ScheduleHistoryRequested += (_, _) => ShowScheduleHistory();
             _main.Model.IdeaApproved += ApproveIdea;
             _main.Model.IdeaRejected += idea => _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Rejected);
@@ -495,13 +494,6 @@ public sealed class TrayHost : IDisposable
     }
 
     /// <summary>
-    /// Открывает окно, где для каждого занятия выбирается формат ДЗ
-    /// </summary>
-    /// <param name="owner">Окно, поверх которого открывается выбор</param>
-    private void ShowFormats(System.Windows.Window? owner) =>
-        new HomeworkFormatsWindow(Formats()) { Owner = owner }.ShowDialog();
-
-    /// <summary>
     /// Открывает окно настроек или выводит открытое на передний план
     /// </summary>
     private void ShowSettings()
@@ -513,7 +505,7 @@ public sealed class TrayHost : IDisposable
         {
             var window = new SettingsWindow();
             window.Model.RestartRequested += async (_, _) => await RestartContainerAsync(window);
-            window.Model.FormatsRequested += (_, _) => ShowFormats(window);
+            window.Model.FormatsRequested += (_, _) => ShowMain(AppPageEnum.Homework);
             window.Closed += (_, _) => _settings = null;
             _settings = window;
         }
