@@ -1,17 +1,23 @@
+using System.Windows.Input;
 using Steward.Models;
 using Steward.Mvvm;
 
 namespace Steward.ViewModels;
 
 /// <summary>
-/// Раздел журнала: все запуски одной задачи или все сверки расписания. Раскрывается и сворачивается по нажатию. Объект живёт, пока раздел есть в журнале, а данные в нём обновляются только когда изменились, чтобы окно не перестраивалось при каждом опросе. Показывает по несколько записей, остальные подгружаются кнопкой
+/// Раздел журнала: все запуски одной задачи или все сверки расписания. Раскрывается и сворачивается по нажатию. Объект живёт, пока раздел есть в журнале, а данные в нём обновляются только когда изменились, чтобы окно не перестраивалось при каждом опросе. Показывает записи по страницам: размер страницы выбирается, листать можно стрелками
 /// </summary>
 public sealed class JournalGroupViewModel : Bindable
 {
     /// <summary>
-    /// Сколько записей показывается сразу и сколько добавляет кнопка «Показать ещё»
+    /// Размер страницы по умолчанию
     /// </summary>
-    public const int PAGE = 10;
+    public const int DEFAULT_PAGE_SIZE = 10;
+
+    /// <summary>
+    /// Какие размеры страницы можно выбрать
+    /// </summary>
+    public static readonly IReadOnlyList<int> PageSizes = [5, 10, 15];
 
     /// <summary>
     /// Запоминает выбор человека, чтобы обновление данных его не сбросило
@@ -24,9 +30,14 @@ public sealed class JournalGroupViewModel : Bindable
     private bool _isOpen;
 
     /// <summary>
-    /// Сколько записей сейчас показано
+    /// Сколько записей на странице
     /// </summary>
-    private int _shown = PAGE;
+    private int _pageSize = DEFAULT_PAGE_SIZE;
+
+    /// <summary>
+    /// Номер показанной страницы с нуля
+    /// </summary>
+    private int _pageIndex;
 
     /// <summary>
     /// Отпечаток последних данных: если он не изменился, обновлять нечего
@@ -82,7 +93,8 @@ public sealed class JournalGroupViewModel : Bindable
         Title = title;
         _isOpen = isOpen;
         _opened = opened;
-        ShowMoreCommand = new RelayCommand(ShowMore);
+        PreviousCommand = new RelayCommand(() => PageIndex--, () => CanGoBack);
+        NextCommand = new RelayCommand(() => PageIndex++, () => CanGoForward);
         ClearCommand = new RelayCommand(() => clear(id));
     }
 
@@ -102,9 +114,14 @@ public sealed class JournalGroupViewModel : Bindable
     public RelayCommand ClearCommand { get; }
 
     /// <summary>
-    /// Показывает ещё одну страницу записей
+    /// Переходит на страницу назад
     /// </summary>
-    public RelayCommand ShowMoreCommand { get; }
+    public RelayCommand PreviousCommand { get; }
+
+    /// <summary>
+    /// Переходит на страницу вперёд
+    /// </summary>
+    public RelayCommand NextCommand { get; }
 
     /// <summary>
     /// Короткая сводка под названием
@@ -152,19 +169,70 @@ public sealed class JournalGroupViewModel : Bindable
     }
 
     /// <summary>
-    /// Есть записи, которые ещё не показаны
+    /// Сколько записей на странице. При смене страница пересчитывается так, чтобы первая видимая запись осталась на экране
     /// </summary>
-    public bool HasMore => Hidden > 0;
+    public int PageSize
+    {
+        get => _pageSize;
+        set
+        {
+            if (value <= 0 || value == _pageSize)
+                return;
+
+            var first = _pageIndex * _pageSize;
+            _pageSize = value;
+            _pageIndex = first / value;
+            Raise(nameof(PageSize));
+            Refresh();
+        }
+    }
 
     /// <summary>
-    /// Подпись кнопки подгрузки
+    /// Номер показанной страницы с нуля
     /// </summary>
-    public string MoreLabel => $"Показать ещё ({Math.Min(PAGE, Hidden)} из {Hidden})";
+    public int PageIndex
+    {
+        get => _pageIndex;
+        set
+        {
+            var clamped = Math.Clamp(value, 0, PageCount - 1);
+            if (clamped == _pageIndex)
+                return;
+
+            _pageIndex = clamped;
+            Refresh();
+        }
+    }
 
     /// <summary>
-    /// Сколько записей не показано
+    /// Сколько всего записей в разделе
     /// </summary>
-    private int Hidden => Math.Max(_allRuns.Count, _allChecks.Count) - _shown;
+    private int Total => Math.Max(_allRuns.Count, _allChecks.Count);
+
+    /// <summary>
+    /// Сколько всего страниц, не меньше одной
+    /// </summary>
+    public int PageCount => Math.Max(1, (Total + _pageSize - 1) / _pageSize);
+
+    /// <summary>
+    /// Подпись «страница из страниц» для строки переключателя
+    /// </summary>
+    public string PageLabel => $"{_pageIndex + 1} из {PageCount}";
+
+    /// <summary>
+    /// Записей больше, чем влезает на самую короткую страницу: переключатель нужен
+    /// </summary>
+    public bool HasPaging => Total > PageSizes[0];
+
+    /// <summary>
+    /// Можно перейти на страницу назад
+    /// </summary>
+    private bool CanGoBack => _pageIndex > 0;
+
+    /// <summary>
+    /// Можно перейти на страницу вперёд
+    /// </summary>
+    private bool CanGoForward => _pageIndex < PageCount - 1;
 
     /// <summary>
     /// Раздел раскрыт
@@ -214,22 +282,17 @@ public sealed class JournalGroupViewModel : Bindable
     }
 
     /// <summary>
-    /// Добавляет страницу записей
-    /// </summary>
-    private void ShowMore()
-    {
-        _shown += PAGE;
-        Refresh();
-    }
-
-    /// <summary>
-    /// Пересобирает показанные записи и сообщает окну о кнопке подгрузки
+    /// Пересобирает показанную страницу и сообщает окну о переключателе
     /// </summary>
     private void Refresh()
     {
-        Runs = [.. _allRuns.Take(_shown)];
-        Checks = [.. _allChecks.Take(_shown)];
-        Raise(nameof(HasMore));
-        Raise(nameof(MoreLabel));
+        _pageIndex = Math.Clamp(_pageIndex, 0, PageCount - 1);
+        Runs = [.. _allRuns.Skip(_pageIndex * _pageSize).Take(_pageSize)];
+        Checks = [.. _allChecks.Skip(_pageIndex * _pageSize).Take(_pageSize)];
+        Raise(nameof(PageIndex));
+        Raise(nameof(PageCount));
+        Raise(nameof(PageLabel));
+        Raise(nameof(HasPaging));
+        CommandManager.InvalidateRequerySuggested();
     }
 }

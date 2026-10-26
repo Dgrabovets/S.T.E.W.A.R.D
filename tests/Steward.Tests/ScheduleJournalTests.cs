@@ -141,6 +141,36 @@ public class ScheduleJournalTests
     }
 
     /// <summary>
+    /// Записи листаются страницами: размер выбирается, стрелки не выходят за края, а при смене размера видимая запись остаётся на экране
+    /// </summary>
+    [Fact]
+    public void Entries_are_paged_with_a_chosen_step_and_the_arrows_stay_inside()
+    {
+        var start = DateTimeOffset.Now;
+        var rows = Enumerable.Range(0, 23).Select(index => new RunRowViewModel(new RunRecord("mail", "Почта", "manual", start.AddMinutes(-index), start.AddMinutes(-index).AddSeconds(2), 0, RunOutcomeEnum.Ok, null), _ => { })).ToArray();
+        var group = new JournalGroupViewModel("mail", "Почта", true, (_, _) => { }, _ => { });
+
+        group.Update("v1", "23 записи", PanelToneEnum.Running, ActivityKindEnum.Sealed, rows, []);
+
+        Assert.Equal((10, 3, "1 из 3", true), (group.Runs.Count, group.PageCount, group.PageLabel, group.HasPaging));
+        Assert.False(group.PreviousCommand.CanExecute(null));
+
+        group.NextCommand.Execute(null);
+        group.NextCommand.Execute(null);
+        Assert.Equal(3, group.Runs.Count);
+        Assert.False(group.NextCommand.CanExecute(null));
+        group.NextCommand.Execute(null);
+        Assert.Equal("3 из 3", group.PageLabel);
+
+        group.PageSize = 5;
+        Assert.Equal((3, 5, "5 из 5"), (group.Runs.Count, group.PageCount, group.PageLabel));
+        Assert.Same(rows[20], group.Runs[0]);
+
+        group.Update("v2", "5 записей", PanelToneEnum.Running, ActivityKindEnum.Sealed, rows[..5], []);
+        Assert.Equal(("1 из 1", false), (group.PageLabel, group.HasPaging));
+    }
+
+    /// <summary>
     /// Строка сверки с правками показывается выделенным блоком, а тихая обходится без него
     /// </summary>
     [Fact]

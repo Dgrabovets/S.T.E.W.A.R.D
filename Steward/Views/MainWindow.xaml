@@ -5,6 +5,7 @@
         xmlns:ui="clr-namespace:Steward.Models"
         xmlns:ctl="clr-namespace:Steward.Controls"
         xmlns:views="clr-namespace:Steward.Views"
+        xmlns:vm="clr-namespace:Steward.ViewModels"
         Title="Задачи"
         Width="1080"
         Height="860"
@@ -417,8 +418,20 @@
                                                                     </DataTemplate>
                                                                 </ItemsControl.ItemTemplate>
                                                             </ItemsControl>
-                                                            <Button Content="{Binding MoreLabel}" Style="{StaticResource ActionButton}" HorizontalAlignment="Center" Margin="0,12,0,4"
-                                                                    Command="{Binding ShowMoreCommand}" Visibility="{Binding HasMore, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <Grid Margin="0,12,0,4" Visibility="{Binding HasPaging, Converter={StaticResource BoolToVisibility}}">
+                                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                                    <TextBlock Text="Показывать по" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="4,0,8,0"/>
+                                                                    <ComboBox Style="{StaticResource FieldChoice}" Width="76" Margin="0" ItemsSource="{x:Static vm:JournalGroupViewModel.PageSizes}"
+                                                                              SelectedItem="{Binding PageSize, Mode=TwoWay}"/>
+                                                                </StackPanel>
+                                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                                    <Button Style="{StaticResource OutlineButton}" Padding="12,6" Command="{Binding PreviousCommand}" ToolTip="Назад"
+                                                                            FontFamily="Segoe MDL2 Assets" Content="&#xE76B;"/>
+                                                                    <TextBlock Text="{Binding PageLabel}" Style="{StaticResource TextBody}" VerticalAlignment="Center" Margin="14,0"/>
+                                                                    <Button Style="{StaticResource OutlineButton}" Padding="12,6" Command="{Binding NextCommand}" ToolTip="Вперёд"
+                                                                            FontFamily="Segoe MDL2 Assets" Content="&#xE76C;"/>
+                                                                </StackPanel>
+                                                            </Grid>
                                                         </StackPanel>
                                                     </ctl:CollapsibleBody>
                                                 </StackPanel>
