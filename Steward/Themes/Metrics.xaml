@@ -9,6 +9,7 @@
     <CornerRadius x:Key="RadiusBadge">12</CornerRadius>
     <CornerRadius x:Key="RadiusCard">16</CornerRadius>
     <CornerRadius x:Key="RadiusWindow">22</CornerRadius>
+    <CornerRadius x:Key="RadiusSystemWindow">8</CornerRadius>
 
     <!-- Отступы: шаг 4. Число в разметке берётся из этой шкалы -->
     <sys:Double x:Key="Space1">4</sys:Double>

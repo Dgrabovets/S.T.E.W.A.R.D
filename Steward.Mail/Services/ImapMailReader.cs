@@ -24,11 +24,42 @@ public sealed partial class ImapMailReader(MailSettings settings) : IMailReader
     private const int BODY_LIMIT = 20000;
 
     /// <summary>
+    /// Сколько раз пробовать прочитать ящик, если соединение оборвалось или ответ не разобрался
+    /// </summary>
+    private const int ATTEMPTS = 3;
+
+    /// <summary>
+    /// Пауза перед следующей попыткой
+    /// </summary>
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(3);
+
+    /// <summary>
     /// Подключается к ящику и собирает непрочитанные письма из «Входящих» и из папки преподавателей
     /// </summary>
     /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Письма за последние дни, которые указаны в настройках. Папки открываются только для чтения, флаг «прочитано» не ставится</returns>
     public async Task<IReadOnlyList<MailItem>> GetUnreadAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await ReadOnceAsync(cancellationToken);
+            }
+            catch (Exception exception) when (attempt < ATTEMPTS && exception is ImapProtocolException or IOException or System.Net.Sockets.SocketException)
+            {
+                // Сервер изредка отдаёт ответ с нарушенным порядком, и разбор рвётся. Новое подключение обычно проходит
+                await Task.Delay(RetryDelay, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Один заход в ящик: подключение, чтение папок и отключение
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Непрочитанные письма из «Входящих» и папки преподавателей</returns>
+    private async Task<IReadOnlyList<MailItem>> ReadOnceAsync(CancellationToken cancellationToken)
     {
         using var client = new ImapClient();
         await client.ConnectAsync(settings.Host, settings.Port, SecureSocketOptions.SslOnConnect, cancellationToken);

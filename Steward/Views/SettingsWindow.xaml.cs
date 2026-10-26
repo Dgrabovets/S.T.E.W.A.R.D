@@ -15,6 +15,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => Steward.Shell.WindowCorners.Round(this);
         Model = new SettingsViewModel();
         DataContext = Model;
     }

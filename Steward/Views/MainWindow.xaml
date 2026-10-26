@@ -11,8 +11,8 @@
         MinWidth="900"
         MinHeight="680"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent"
+        AllowsTransparency="False"
+        Background="{StaticResource WindowBrush}"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display"
@@ -36,7 +36,7 @@
         </Style>
     </Window.Resources>
 
-    <Border Style="{StaticResource WindowChrome}">
+    <Border Style="{StaticResource WindowChrome}" CornerRadius="{StaticResource RadiusSystemWindow}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -52,10 +52,13 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal">
                     <Grid Width="52" Height="52" Margin="0,0,16,0" VerticalAlignment="Center">
-                        <Ellipse Fill="{StaticResource AccentBrush}" Opacity="0.35">
-                            <Ellipse.Effect>
-                                <BlurEffect Radius="16"/>
-                            </Ellipse.Effect>
+                        <Ellipse Width="88" Height="88" Opacity="0.35" IsHitTestVisible="False">
+                            <Ellipse.Fill>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="{StaticResource AccentColor}" Offset="0.3"/>
+                                    <GradientStop Color="Transparent" Offset="1"/>
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
                             <Ellipse.Style>
                                 <Style TargetType="Ellipse">
                                     <Style.Triggers>
@@ -336,7 +339,7 @@
                                                                                         <Border Style="{StaticResource ToneBadge}" Padding="12,3">
                                                                                             <TextBlock Text="{Binding Outcome}" Style="{StaticResource ToneBadgeText}"/>
                                                                                         </Border>
-                                                                                        <Button Content="Починить с Claude" Style="{StaticResource ActionButton}" Margin="8,0,0,0"
+                                                                                        <Button Content="Починить с Claude" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"
                                                                                                 Command="{Binding FixCommand}" Visibility="{Binding CanFix, Converter={StaticResource BoolToVisibility}}"/>
                                                                                     </StackPanel>
                                                                                 </Grid>
@@ -356,7 +359,7 @@
                                                                                                         <ColumnDefinition Width="*"/>
                                                                                                     </Grid.ColumnDefinitions>
                                                                                                     <TextBlock Text="{Binding Time}" Style="{StaticResource TextMono}" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0"/>
-                                                                                                    <TextBox Grid.Column="1" Text="{Binding Text, Mode=OneWay}" Style="{StaticResource LogView}"/>
+                                                                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource TextMono}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
                                                                                                 </Grid>
                                                                                             </Border>
                                                                                         </DataTemplate>
@@ -413,6 +416,8 @@
                                                                     </DataTemplate>
                                                                 </ItemsControl.ItemTemplate>
                                                             </ItemsControl>
+                                                            <Button Content="{Binding MoreLabel}" Style="{StaticResource ActionButton}" HorizontalAlignment="Center" Margin="0,12,0,4"
+                                                                    Command="{Binding ShowMoreCommand}" Visibility="{Binding HasMore, Converter={StaticResource BoolToVisibility}}"/>
                                                         </StackPanel>
                                                     </ctl:CollapsibleBody>
                                                 </StackPanel>

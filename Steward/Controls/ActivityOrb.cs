@@ -25,6 +25,26 @@ public sealed class ActivityOrb : FrameworkElement
     private const int DEPTH_LEVELS = 6;
 
     /// <summary>
+    /// Занятая сфера перерисовывается каждый второй кадр: вращение остаётся плавным, а процессор не греется
+    /// </summary>
+    private const int BUSY_FRAME_STEP = 2;
+
+    /// <summary>
+    /// Сфера покоя перерисовывается каждый четвёртый кадр: она почти неподвижна
+    /// </summary>
+    private const int CALM_FRAME_STEP = 4;
+
+    /// <summary>
+    /// Сколько кистей держать про запас, прежде чем очистить кэш
+    /// </summary>
+    private const int BRUSH_CACHE_LIMIT = 512;
+
+    /// <summary>
+    /// Готовые замороженные кисти по цвету и прозрачности: без кэша каждый кадр каждой сферы создавал бы десяток новых
+    /// </summary>
+    private static readonly Dictionary<(byte R, byte G, byte B, byte Alpha), Brush> BrushCache = [];
+
+    /// <summary>
     /// Секунд на полный оборот сферы
     /// </summary>
     private const double TURN_SECONDS = 7;
@@ -283,8 +303,8 @@ public sealed class ActivityOrb : FrameworkElement
     /// <param name="e">Аргументы события</param>
     private void OnFrame(object? sender, EventArgs e)
     {
-        var busy = State != ActivityStateEnum.None || Kind is ActivityKindEnum.Working or ActivityKindEnum.Searching or ActivityKindEnum.Connecting or ActivityKindEnum.Composing or ActivityKindEnum.Breathing;
-        if (!busy && ++_frame % 2 == 0)
+        var busy = State != ActivityStateEnum.None || Kind is ActivityKindEnum.Working or ActivityKindEnum.Searching or ActivityKindEnum.Connecting or ActivityKindEnum.Composing or ActivityKindEnum.Breathing or ActivityKindEnum.Beacon or ActivityKindEnum.Sweep or ActivityKindEnum.Attention or ActivityKindEnum.Failed;
+        if (++_frame % (busy ? BUSY_FRAME_STEP : CALM_FRAME_STEP) != 0)
             return;
 
         InvalidateVisual();
@@ -306,8 +326,17 @@ public sealed class ActivityOrb : FrameworkElement
     /// <returns>Замороженная кисть нужной прозрачности</returns>
     private static Brush MakeBrush(int level, Color color, double strength)
     {
-        var brush = new SolidColorBrush(Color.FromArgb((byte)((70 + 185 * level / (DEPTH_LEVELS - 1)) * Math.Clamp(strength, 0, 1)), color.R, color.G, color.B));
+        var alpha = (byte)((70 + 185 * level / (DEPTH_LEVELS - 1)) * Math.Clamp(strength, 0, 1));
+        var key = (color.R, color.G, color.B, alpha);
+        if (BrushCache.TryGetValue(key, out var cached))
+            return cached;
+
+        if (BrushCache.Count > BRUSH_CACHE_LIMIT)
+            BrushCache.Clear();
+
+        var brush = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
         brush.Freeze();
+        BrushCache[key] = brush;
 
         return brush;
     }

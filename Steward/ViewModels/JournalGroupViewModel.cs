@@ -4,10 +4,15 @@ using Steward.Mvvm;
 namespace Steward.ViewModels;
 
 /// <summary>
-/// Раздел журнала: все запуски одной задачи или все сверки расписания. Раскрывается и сворачивается по нажатию. Объект живёт, пока раздел есть в журнале, а данные в нём обновляются, чтобы свёрнутый раздел не проигрывал анимацию заново
+/// Раздел журнала: все запуски одной задачи или все сверки расписания. Раскрывается и сворачивается по нажатию. Объект живёт, пока раздел есть в журнале, а данные в нём обновляются только когда изменились, чтобы окно не перестраивалось при каждом опросе. Показывает по несколько записей, остальные подгружаются кнопкой
 /// </summary>
 public sealed class JournalGroupViewModel : Bindable
 {
+    /// <summary>
+    /// Сколько записей показывается сразу и сколько добавляет кнопка «Показать ещё»
+    /// </summary>
+    public const int PAGE = 10;
+
     /// <summary>
     /// Запоминает выбор человека, чтобы обновление данных его не сбросило
     /// </summary>
@@ -17,6 +22,16 @@ public sealed class JournalGroupViewModel : Bindable
     /// Раздел раскрыт
     /// </summary>
     private bool _isOpen;
+
+    /// <summary>
+    /// Сколько записей сейчас показано
+    /// </summary>
+    private int _shown = PAGE;
+
+    /// <summary>
+    /// Отпечаток последних данных: если он не изменился, обновлять нечего
+    /// </summary>
+    private string _signature = string.Empty;
 
     /// <summary>
     /// Короткая сводка под названием
@@ -34,12 +49,22 @@ public sealed class JournalGroupViewModel : Bindable
     private ActivityKindEnum _kind;
 
     /// <summary>
-    /// Запуски задачи от новых к старым
+    /// Все запуски задачи от новых к старым
+    /// </summary>
+    private IReadOnlyList<RunRowViewModel> _allRuns = [];
+
+    /// <summary>
+    /// Все сверки расписания от новых к старым
+    /// </summary>
+    private IReadOnlyList<ScheduleCheckViewModel> _allChecks = [];
+
+    /// <summary>
+    /// Показанные запуски
     /// </summary>
     private IReadOnlyList<RunRowViewModel> _runs = [];
 
     /// <summary>
-    /// Сверки расписания от новых к старым
+    /// Показанные сверки
     /// </summary>
     private IReadOnlyList<ScheduleCheckViewModel> _checks = [];
 
@@ -56,6 +81,7 @@ public sealed class JournalGroupViewModel : Bindable
         Title = title;
         _isOpen = isOpen;
         _opened = opened;
+        ShowMoreCommand = new RelayCommand(ShowMore);
     }
 
     /// <summary>
@@ -67,6 +93,11 @@ public sealed class JournalGroupViewModel : Bindable
     /// Название раздела
     /// </summary>
     public string Title { get; }
+
+    /// <summary>
+    /// Показывает ещё одну страницу записей
+    /// </summary>
+    public RelayCommand ShowMoreCommand { get; }
 
     /// <summary>
     /// Короткая сводка под названием
@@ -96,7 +127,7 @@ public sealed class JournalGroupViewModel : Bindable
     }
 
     /// <summary>
-    /// Запуски задачи от новых к старым
+    /// Показанные запуски задачи от новых к старым
     /// </summary>
     public IReadOnlyList<RunRowViewModel> Runs
     {
@@ -105,13 +136,28 @@ public sealed class JournalGroupViewModel : Bindable
     }
 
     /// <summary>
-    /// Сверки расписания от новых к старым
+    /// Показанные сверки расписания от новых к старым
     /// </summary>
     public IReadOnlyList<ScheduleCheckViewModel> Checks
     {
         get => _checks;
         private set => Set(ref _checks, value);
     }
+
+    /// <summary>
+    /// Есть записи, которые ещё не показаны
+    /// </summary>
+    public bool HasMore => Hidden > 0;
+
+    /// <summary>
+    /// Подпись кнопки подгрузки
+    /// </summary>
+    public string MoreLabel => $"Показать ещё ({Math.Min(PAGE, Hidden)} из {Hidden})";
+
+    /// <summary>
+    /// Сколько записей не показано
+    /// </summary>
+    private int Hidden => Math.Max(_allRuns.Count, _allChecks.Count) - _shown;
 
     /// <summary>
     /// Раздел раскрыт
@@ -129,19 +175,54 @@ public sealed class JournalGroupViewModel : Bindable
     }
 
     /// <summary>
-    /// Кладёт в раздел свежие записи
+    /// Проверяет, что в разделе уже лежат именно эти данные
     /// </summary>
+    /// <param name="signature">Отпечаток данных</param>
+    /// <returns>
+    /// <see langword="true"/>, если обновлять нечего
+    /// </returns>
+    public bool IsCurrent(string signature) => signature == _signature;
+
+    /// <summary>
+    /// Кладёт в раздел свежие записи, если они отличаются от прежних
+    /// </summary>
+    /// <param name="signature">Отпечаток данных: при том же отпечатке ничего не меняется</param>
     /// <param name="summary">Короткая сводка</param>
     /// <param name="tone">Цвет по последней записи</param>
     /// <param name="kind">Вид сферы по последней записи</param>
     /// <param name="runs">Запуски задачи</param>
     /// <param name="checks">Сверки расписания</param>
-    public void Update(string summary, PanelToneEnum tone, ActivityKindEnum kind, IReadOnlyList<RunRowViewModel> runs, IReadOnlyList<ScheduleCheckViewModel> checks)
+    public void Update(string signature, string summary, PanelToneEnum tone, ActivityKindEnum kind, IReadOnlyList<RunRowViewModel> runs, IReadOnlyList<ScheduleCheckViewModel> checks)
     {
+        if (signature == _signature)
+            return;
+
+        _signature = signature;
+        _allRuns = runs;
+        _allChecks = checks;
         Summary = summary;
         Tone = tone;
         Kind = kind;
-        Runs = runs;
-        Checks = checks;
+        Refresh();
+    }
+
+    /// <summary>
+    /// Добавляет страницу записей
+    /// </summary>
+    private void ShowMore()
+    {
+        _shown += PAGE;
+        Refresh();
+    }
+
+    /// <summary>
+    /// Пересобирает показанные записи и сообщает окну о кнопке подгрузки
+    /// </summary>
+    private void Refresh()
+    {
+        Runs = [.. _allRuns.Take(_shown)];
+        Checks = [.. _allChecks.Take(_shown)];
+        Raise(nameof(HasMore));
+        Raise(nameof(MoreLabel));
     }
 }

@@ -9,15 +9,15 @@
         Width="680"
         Height="860"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent"
+        AllowsTransparency="False"
+        Background="{StaticResource WindowBrush}"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         FontFamily="{StaticResource FontBase}">
-    <Border Style="{StaticResource WindowChrome}">
+    <Border Style="{StaticResource WindowChrome}" CornerRadius="{StaticResource RadiusSystemWindow}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -112,7 +112,14 @@
                                    Text="Ключ, по которому сервис входит в ваш аккаунт. Он уже лежит в файле настроек и на экране закрыт точками. Если выпустите новый, вставьте его вместо текущего и сохраните."/>
                         <PasswordBox Style="{StaticResource SecretField}"
                                      behaviors:PasswordBinding.Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                        <Button Content="Где выпустить токен" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Command="{Binding OpenTokenPageCommand}"/>
+                        <ToggleButton x:Name="TokenHelp" Style="{StaticResource InlineLink}" Content="Где выпустить токен?"/>
+                        <controls:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsChecked, ElementName=TokenHelp}">
+                            <StackPanel Margin="0,4,0,4">
+                                <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Откройте страницу токенов Singularity, создайте токен с доступом к проектам и задачам на чтение и запись и вставьте его в поле выше."/>
+                                <Button Content="Открыть страницу токенов" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                        Command="{Binding OpenTokenPageCommand}"/>
+                            </StackPanel>
+                        </controls:CollapsibleBody>
                         <StackPanel Orientation="Horizontal" Margin="0,24,0,8">
                             <Button Content="Сохранить и перезапустить" Style="{StaticResource PrimaryButton}" Command="{Binding SaveAndRestartCommand}"/>
                             <Button Content="Перезапустить" Style="{StaticResource ActionButton}" Command="{Binding RestartCommand}" Margin="8,0,0,0"/>

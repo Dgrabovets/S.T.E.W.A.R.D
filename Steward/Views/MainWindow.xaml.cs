@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => Steward.Shell.WindowCorners.Round(this);
         Model = new MainViewModel();
         DataContext = Model;
     }

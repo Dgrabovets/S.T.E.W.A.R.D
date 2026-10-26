@@ -299,24 +299,35 @@ public sealed class MainViewModel : PanelViewModel
 
         foreach (var byJob in records.GroupBy(record => record.JobId, StringComparer.Ordinal))
         {
-            var rows = byJob.OrderByDescending(record => record.StartedAt).Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();
-            var group = GroupOf(byJob.Key, rows[0].Title, rows[0].Tone == PanelToneEnum.Problem);
-            group.Update($"{Entries(rows.Length)} · последняя {rows[0].When}", rows[0].Tone, rows[0].Kind, rows, []);
-            built.Add((byJob.Max(record => record.StartedAt), group));
+            var runsOfJob = byJob.OrderByDescending(record => record.StartedAt).ToArray();
+            var signature = string.Join('|', runsOfJob.Select(record => $"{record.StartedAt.Ticks}:{record.FinishedAt.Ticks}:{record.Outcome}"));
+            var group = GroupOf(byJob.Key, runsOfJob[0].Title, runsOfJob[0].Outcome != RunOutcomeEnum.Ok);
+            if (!group.IsCurrent(signature))
+            {
+                var rows = runsOfJob.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();
+                group.Update(signature, $"{Entries(rows.Length)} · последняя {rows[0].When}", rows[0].Tone, rows[0].Kind, rows, []);
+            }
+
+            built.Add((runsOfJob[0].StartedAt, group));
         }
 
         if (snapshot.Entries.Count > 0)
         {
-            var checks = snapshot.Entries.Select(entry => new ScheduleCheckViewModel(entry)).ToArray();
-            var group = GroupOf(SCHEDULE_GROUP, "Расписание", checks[0].Tone == PanelToneEnum.Problem);
-            var kind = checks[0].Tone switch
+            var signature = string.Join('|', snapshot.Entries.Select(entry => $"{entry.Time.Ticks}:{entry.Tone}:{entry.Repeat}:{entry.Detail.GetHashCode(StringComparison.Ordinal)}"));
+            var group = GroupOf(SCHEDULE_GROUP, "Расписание", snapshot.Entries[0].Tone == LogToneEnum.Problem);
+            if (!group.IsCurrent(signature))
             {
-                PanelToneEnum.Problem => ActivityKindEnum.Shattered,
-                PanelToneEnum.Attention => ActivityKindEnum.Sweep,
-                _ => ActivityKindEnum.Sealed,
-            };
+                var checks = snapshot.Entries.Select(entry => new ScheduleCheckViewModel(entry)).ToArray();
+                var kind = checks[0].Tone switch
+                {
+                    PanelToneEnum.Problem => ActivityKindEnum.Shattered,
+                    PanelToneEnum.Attention => ActivityKindEnum.Sweep,
+                    _ => ActivityKindEnum.Sealed,
+                };
 
-            group.Update($"{Entries(checks.Length)} · последняя {checks[0].When}", checks[0].Tone, kind, [], checks);
+                group.Update(signature, $"{Entries(checks.Length)} · последняя {checks[0].When}", checks[0].Tone, kind, [], checks);
+            }
+
             built.Add((snapshot.Entries[0].Time, group));
         }
 
