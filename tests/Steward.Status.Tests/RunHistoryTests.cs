@@ -32,6 +32,29 @@ public class RunHistoryTests
     }
 
     /// <summary>
+    /// Удаление одной записи убирает только её: такую же по задаче, но с другим временем начала и записи других задач оставляет
+    /// </summary>
+    [Fact]
+    public void Remove_deletes_only_the_matching_record_and_clear_by_job_keeps_the_others()
+    {
+        using var dir = new TempDir();
+        var history = new RunHistory(dir.Path);
+        var later = Record with { StartedAt = Record.StartedAt.AddHours(1), FinishedAt = Record.FinishedAt.AddHours(1) };
+        var other = Record with { JobId = "reels", Title = "Рилсы" };
+        history.Append(Record);
+        history.Append(later);
+        history.Append(other);
+
+        history.Remove(Record);
+
+        Assert.Equal([later.StartedAt, other.StartedAt], history.Load(10).Select(record => record.StartedAt).Reverse().ToArray());
+
+        history.Clear("mail");
+
+        Assert.Equal(["reels"], history.Load(10).Select(record => record.JobId).ToArray());
+    }
+
+    /// <summary>
     /// Очистка без файла журнала ничего не ломает
     /// </summary>
     [Fact]

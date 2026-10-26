@@ -250,6 +250,16 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
+    /// Удаляет один запуск из журнала и сообщает панелям
+    /// </summary>
+    /// <param name="record">Запись, которую убирают</param>
+    public void RemoveRecord(RunRecord record)
+    {
+        _runner.History.Remove(record);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
     /// Стирает запуски одной задачи и сообщает панелям
     /// </summary>
     /// <param name="jobId">Идентификатор задачи</param>

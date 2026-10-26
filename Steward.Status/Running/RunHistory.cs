@@ -112,6 +112,32 @@ public sealed class RunHistory
     }
 
     /// <summary>
+    /// Удаляет одну запись: задача и момент начала у неё совпадают с переданными
+    /// </summary>
+    /// <param name="target">Запись, которую нужно убрать</param>
+    public void Remove(RunRecord target)
+    {
+        lock (_gate)
+        {
+            try
+            {
+                if (!File.Exists(_path))
+                    return;
+
+                var kept = File.ReadLines(_path)
+                    .Where(line => Parse(line) is not { } record || record.StartedAt != target.StartedAt || !string.Equals(record.JobId, target.JobId, StringComparison.Ordinal))
+                    .ToArray();
+
+                File.WriteAllLines(_path, kept);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // ignore
+            }
+        }
+    }
+
+    /// <summary>
     /// Читает последние записи
     /// </summary>
     /// <param name="count">Сколько записей нужно</param>

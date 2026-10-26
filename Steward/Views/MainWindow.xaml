@@ -343,6 +343,7 @@
                                                                                         </Border>
                                                                                         <Button Content="Починить с Claude" Style="{StaticResource OutlineButton}" Margin="8,0,0,0" VerticalAlignment="Center"
                                                                                                 Command="{Binding FixCommand}" Visibility="{Binding CanFix, Converter={StaticResource BoolToVisibility}}"/>
+                                                                                        <Button Style="{StaticResource RemoveButton}" Command="{Binding RemoveCommand}"/>
                                                                                     </StackPanel>
                                                                                 </Grid>
                                                                                 <TextBlock Text="{Binding Summary}" Style="{StaticResource TextSecondary}" Margin="0,8,0,0" TextWrapping="Wrap"
@@ -393,9 +394,12 @@
                                                                                         <TextBlock Text="{Binding Repeats}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"
                                                                                                    Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVisibility}}"/>
                                                                                     </StackPanel>
-                                                                                    <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="14,6">
-                                                                                        <TextBlock Text="{Binding Outcome}" Style="{StaticResource ToneBadgeText}"/>
-                                                                                    </Border>
+                                                                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                                                        <Border Style="{StaticResource ToneBadge}" Padding="14,6" VerticalAlignment="Center">
+                                                                                            <TextBlock Text="{Binding Outcome}" Style="{StaticResource ToneBadgeText}"/>
+                                                                                        </Border>
+                                                                                        <Button Style="{StaticResource RemoveButton}" Command="{Binding RemoveCommand}"/>
+                                                                                    </StackPanel>
                                                                                 </Grid>
                                                                                 <ItemsControl ItemsSource="{Binding Lines}" Margin="0,8,0,0" Visibility="{Binding HasQuietDetail, Converter={StaticResource BoolToVisibility}}">
                                                                                     <ItemsControl.ItemTemplate>

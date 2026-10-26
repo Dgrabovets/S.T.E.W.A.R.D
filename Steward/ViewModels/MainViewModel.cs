@@ -92,6 +92,16 @@ public sealed class MainViewModel : PanelViewModel
     public event EventHandler? ClearJournalRequested;
 
     /// <summary>
+    /// Просит удалить один запуск из журнала: параметр — запись
+    /// </summary>
+    public event Action<RunRecord>? RecordRemoveRequested;
+
+    /// <summary>
+    /// Просит удалить одну сверку расписания из журнала: параметр — запись
+    /// </summary>
+    public event Action<LogEntry>? CheckRemoveRequested;
+
+    /// <summary>
     /// Просит стереть записи одного раздела журнала: параметр — идентификатор задачи или «schedule»
     /// </summary>
     public event Action<string>? ClearGroupRequested;
@@ -309,7 +319,7 @@ public sealed class MainViewModel : PanelViewModel
             var group = GroupOf(byJob.Key, runsOfJob[0].Title, runsOfJob[0].Outcome != RunOutcomeEnum.Ok);
             if (!group.IsCurrent(signature))
             {
-                var rows = runsOfJob.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();
+                var rows = runsOfJob.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed), removed => RecordRemoveRequested?.Invoke(removed))).ToArray();
                 group.Update(signature, $"{Entries(rows.Length)} · последняя {rows[0].When}", rows[0].Tone, rows[0].Kind, rows, []);
             }
 
@@ -322,7 +332,7 @@ public sealed class MainViewModel : PanelViewModel
             var group = GroupOf(SCHEDULE_GROUP, "Расписание", snapshot.Entries[0].Tone == LogToneEnum.Problem);
             if (!group.IsCurrent(signature))
             {
-                var checks = snapshot.Entries.Select(entry => new ScheduleCheckViewModel(entry)).ToArray();
+                var checks = snapshot.Entries.Select(entry => new ScheduleCheckViewModel(entry, removed => CheckRemoveRequested?.Invoke(removed))).ToArray();
                 var kind = checks[0].Tone switch
                 {
                     PanelToneEnum.Problem => ActivityKindEnum.Shattered,

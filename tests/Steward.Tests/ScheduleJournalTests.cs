@@ -152,18 +152,19 @@ public class ScheduleJournalTests
 
         group.Update("v1", "23 записи", PanelToneEnum.Running, ActivityKindEnum.Sealed, rows, []);
 
-        Assert.Equal((10, 3, "1 из 3", true), (group.Runs.Count, group.PageCount, group.PageLabel, group.HasPaging));
+        Assert.Equal((5, 5, "1 из 5", true), (group.Runs.Count, group.PageCount, group.PageLabel, group.HasPaging));
         Assert.False(group.PreviousCommand.CanExecute(null));
 
-        group.NextCommand.Execute(null);
-        group.NextCommand.Execute(null);
-        Assert.Equal(3, group.Runs.Count);
+        for (var step = 0; step < 4; step++)
+            group.NextCommand.Execute(null);
+
+        Assert.Equal((3, "5 из 5"), (group.Runs.Count, group.PageLabel));
         Assert.False(group.NextCommand.CanExecute(null));
         group.NextCommand.Execute(null);
-        Assert.Equal("3 из 3", group.PageLabel);
+        Assert.Equal("5 из 5", group.PageLabel);
 
-        group.PageSize = 5;
-        Assert.Equal((3, 5, "5 из 5"), (group.Runs.Count, group.PageCount, group.PageLabel));
+        group.PageSize = 10;
+        Assert.Equal((3, 3, "3 из 3"), (group.Runs.Count, group.PageCount, group.PageLabel));
         Assert.Same(rows[20], group.Runs[0]);
 
         group.Update("v2", "5 записей", PanelToneEnum.Running, ActivityKindEnum.Sealed, rows[..5], []);

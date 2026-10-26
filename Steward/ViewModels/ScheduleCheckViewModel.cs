@@ -1,5 +1,6 @@
 using System.Globalization;
 using Steward.Models;
+using Steward.Mvvm;
 using Steward.Monitoring.Models;
 
 namespace Steward.ViewModels;
@@ -13,8 +14,10 @@ public sealed class ScheduleCheckViewModel
     /// Создаёт строку по записи истории сверок
     /// </summary>
     /// <param name="entry">Запись сверки</param>
-    public ScheduleCheckViewModel(LogEntry entry)
+    /// <param name="remove">Вызывается, когда человек удаляет запись из журнала</param>
+    public ScheduleCheckViewModel(LogEntry entry, Action<LogEntry>? remove = null)
     {
+        RemoveCommand = new RelayCommand(() => remove?.Invoke(entry));
         When = entry.Time.ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
         Outcome = entry.Tone switch
         {
@@ -34,6 +37,11 @@ public sealed class ScheduleCheckViewModel
         IsProblem = entry.Tone == LogToneEnum.Problem;
         Repeats = entry.Tone == LogToneEnum.Quiet && entry.Repeat > 1 ? $"Таких сверок подряд: {entry.Repeat}" : string.Empty;
     }
+
+    /// <summary>
+    /// Удаляет эту запись из журнала
+    /// </summary>
+    public RelayCommand RemoveCommand { get; }
 
     /// <summary>
     /// Когда закончилась сверка: день, часы и минуты

@@ -12,7 +12,7 @@ public sealed class JournalGroupViewModel : Bindable
     /// <summary>
     /// Размер страницы по умолчанию
     /// </summary>
-    public const int DEFAULT_PAGE_SIZE = 10;
+    public const int DEFAULT_PAGE_SIZE = 5;
 
     /// <summary>
     /// Какие размеры страницы можно выбрать

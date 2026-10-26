@@ -636,6 +636,17 @@
         <Setter Property="Margin" Value="0,0,8,0"/>
     </Style>
 
+
+    <!-- Крестик удаления записи: приглушённый значок без фона, при наведении светлеет и получает плашку -->
+    <Style x:Key="RemoveButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
+        <Setter Property="Content" Value="&#xE711;"/>
+        <Setter Property="Padding" Value="10,9"/>
+        <Setter Property="Margin" Value="6,0,0,0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="ToolTip" Value="Удалить запись"/>
+    </Style>
     <!-- Серая кнопка с видимой обводкой: для действий, которые должны быть заметны, но не кричать цветом -->
     <Style x:Key="OutlineButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
         <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>

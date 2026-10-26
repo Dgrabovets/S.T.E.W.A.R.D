@@ -16,9 +16,11 @@ public sealed class RunRowViewModel
     /// </summary>
     /// <param name="record">Запись о запуске</param>
     /// <param name="fix">Вызывается, когда человек просит починить запуск</param>
-    public RunRowViewModel(RunRecord record, Action<RunRecord> fix)
+    /// <param name="remove">Вызывается, когда человек удаляет запись из журнала</param>
+    public RunRowViewModel(RunRecord record, Action<RunRecord> fix, Action<RunRecord>? remove = null)
     {
         FixCommand = new RelayCommand(() => fix(record));
+        RemoveCommand = new RelayCommand(() => remove?.Invoke(record));
         CanFix = record.Outcome != RunOutcomeEnum.Ok;
         When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
         Title = record.Title;
@@ -98,6 +100,11 @@ public sealed class RunRowViewModel
     /// Просит Claude починить неудавшийся запуск
     /// </summary>
     public RelayCommand FixCommand { get; }
+
+    /// <summary>
+    /// Удаляет эту запись из журнала
+    /// </summary>
+    public RelayCommand RemoveCommand { get; }
 
     /// <summary>
     /// Запуск не удался, значит, его можно отдать на починку

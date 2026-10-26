@@ -32,6 +32,48 @@ public static class ScheduleHistory
     private static string ClearedFilePath() => Path.Combine(DataLocation.DataDirectory(), "schedule", "cleared.txt");
 
     /// <summary>
+    /// Файл с моментами записей, которые человек удалил по одной: из хвоста журнала контейнера они не возвращаются
+    /// </summary>
+    private static string RemovedFilePath() => Path.Combine(DataLocation.DataDirectory(), "schedule", "removed.txt");
+
+    /// <summary>
+    /// Удаляет одну запись из истории и запоминает её момент, чтобы она не вернулась из хвоста журнала контейнера
+    /// </summary>
+    /// <param name="entry">Запись, которую убирают</param>
+    public static void Remove(LogEntry entry)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(RemovedFilePath())!);
+            File.AppendAllText(RemovedFilePath(), entry.Time.UtcTicks + Environment.NewLine);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // ignore
+        }
+
+        Save([.. Load().Where(stored => stored.Time != entry.Time)]);
+    }
+
+    /// <summary>
+    /// Читает моменты удалённых записей
+    /// </summary>
+    /// <returns>Набор моментов в тиках UTC</returns>
+    private static HashSet<long> RemovedTicks()
+    {
+        try
+        {
+            return File.Exists(RemovedFilePath())
+                ? [.. File.ReadLines(RemovedFilePath()).Select(line => long.TryParse(line, out var ticks) ? ticks : 0).Where(ticks => ticks > 0)]
+                : [];
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
     /// Добавляет свежие записи к сохранённой истории, записывает результат и отдаёт его
     /// </summary>
     /// <param name="fresh">Записи из хвоста журнала контейнера от новых к старым</param>
@@ -40,7 +82,8 @@ public static class ScheduleHistory
     {
         var merged = Merge(Load(), fresh);
         var cleared = ClearedAt();
-        var kept = cleared is { } stamp ? merged.Where(entry => entry.Time > stamp).ToArray() : merged;
+        var removed = RemovedTicks();
+        var kept = merged.Where(entry => (cleared is not { } stamp || entry.Time > stamp) && !removed.Contains(entry.Time.UtcTicks)).ToArray();
         if (fresh.Count > 0)
             Save(kept);
 

@@ -403,6 +403,8 @@ public sealed class TrayHost : IDisposable
             _main.Model.FixRequested += OpenFix;
             _main.Model.ClearJournalRequested += (_, _) => ClearJournal();
             _main.Model.ClearGroupRequested += ClearGroup;
+            _main.Model.RecordRemoveRequested += record => _jobs.RemoveRecord(record);
+            _main.Model.CheckRemoveRequested += RemoveCheck;
             _main.Model.IdeaApproved += ApproveIdea;
             _main.Model.IdeaRejected += idea => _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Rejected);
             _main.Model.LinkRequested += OpenLink;
@@ -425,6 +427,17 @@ public sealed class TrayHost : IDisposable
         _jobs.ClearRecords();
         ScheduleHistory.Clear();
         _snapshot = _snapshot with { Entries = [] };
+        ApplyAll();
+    }
+
+    /// <summary>
+    /// Удаляет одну сверку расписания из журнала
+    /// </summary>
+    /// <param name="entry">Запись сверки</param>
+    private void RemoveCheck(LogEntry entry)
+    {
+        ScheduleHistory.Remove(entry);
+        _snapshot = _snapshot with { Entries = [.. _snapshot.Entries.Where(stored => stored.Time != entry.Time)] };
         ApplyAll();
     }
 
