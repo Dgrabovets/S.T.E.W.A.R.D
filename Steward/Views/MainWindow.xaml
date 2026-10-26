@@ -49,7 +49,7 @@
                 </StackPanel>
                 <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="10,4,16,4" VerticalAlignment="Center" Margin="0,0,12,0">
                     <StackPanel Orientation="Horizontal">
-                        <ctl:ActivityOrb Width="30" Height="30" Style="{StaticResource SummaryOrb}" Margin="0,0,6,0"/>
+                        <ctl:ActivityOrb Width="24" Height="24" Style="{StaticResource SummaryOrb}" Margin="0,0,6,0"/>
                         <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource ToneBadgeText}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
@@ -106,7 +106,7 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <ctl:ActivityOrb Width="28" Height="28" Style="{StaticResource ActivityOrb}" VerticalAlignment="Top" Margin="-6,-2,10,0"/>
+                                                    <ctl:ActivityOrb Width="24" Height="24" Style="{StaticResource ActivityOrb}" VerticalAlignment="Top" Margin="-4,0,12,0"/>
                                                     <StackPanel Grid.Column="1">
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock x:Name="Name" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
@@ -151,6 +151,12 @@
                             <StackPanel>
                                 <TextBlock Text="Идеи" Style="{StaticResource PageTitle}"/>
                                 <TextBlock Text="Разобранные идеи из сохранённых рилсов, которые ждут твоего решения." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
+                                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding IsReelsBusy, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ctl:ActivityOrb Width="26" Height="26" Kind="Composing" Foreground="{StaticResource WorkingBrush}" Margin="-4,-2,12,-2"/>
+                                        <TextBlock Text="Бот разбирает рилс. Идея появится здесь через пару минут" Style="{StaticResource PageHint}" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
                                 <Border Style="{StaticResource Card}" Visibility="{Binding IsIdeasEmpty, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel>
                                         <TextBlock Text="Идей пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
@@ -222,8 +228,11 @@
                                                     <TextBlock Text="{Binding Requirements}" Style="{StaticResource PageHint}" Foreground="{StaticResource TextBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
                                                                Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
                                                 </StackPanel>
-                                                <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="12,6" VerticalAlignment="Top" Margin="16,0,0,0">
-                                                    <TextBlock Text="{Binding Status}" Style="{StaticResource ToneBadgeText}"/>
+                                                <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="8,4,12,4" VerticalAlignment="Top" Margin="16,0,0,0">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ctl:ActivityOrb Width="22" Height="22" Style="{StaticResource StatusOrb}" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="{Binding Status}" Style="{StaticResource ToneBadgeText}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
                                                 </Border>
                                             </Grid>
                                         </Border>
@@ -274,7 +283,7 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <Control Width="16" Height="16" Style="{StaticResource ToneDot}" VerticalAlignment="Top" Margin="0,4,16,0"/>
+                                                    <ctl:ActivityOrb Width="24" Height="24" Style="{StaticResource StatusOrb}" VerticalAlignment="Top" Margin="-4,0,12,0"/>
                                                     <StackPanel Grid.Column="1">
                                                         <StackPanel Orientation="Horizontal">
                                                             <TextBlock Text="{Binding Title}" Style="{StaticResource TextBodyLarge}" FontWeight="SemiBold"/>

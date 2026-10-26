@@ -98,6 +98,24 @@ public sealed class ActivityOrb : FrameworkElement
         new FrameworkPropertyMetadata(DateTimeOffset.MinValue, FrameworkPropertyMetadataOptions.AffectsRender));
 
     /// <summary>
+    /// Рисуется каждая n-я точка: у мелких сфер, например в иконке, точек меньше, чтобы они не слипались
+    /// </summary>
+    public static readonly DependencyProperty StrideProperty = DependencyProperty.Register(
+        nameof(Stride),
+        typeof(int),
+        typeof(ActivityOrb),
+        new FrameworkPropertyMetadata(1, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    /// <summary>
+    /// Во сколько раз крупнее рисуются точки
+    /// </summary>
+    public static readonly DependencyProperty DotScaleProperty = DependencyProperty.Register(
+        nameof(DotScale),
+        typeof(double),
+        typeof(ActivityOrb),
+        new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    /// <summary>
     /// Цвет точек
     /// </summary>
     public static readonly DependencyProperty ForegroundProperty = DependencyProperty.Register(
@@ -156,6 +174,24 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
+    /// Рисуется каждая n-я точка
+    /// </summary>
+    public int Stride
+    {
+        get => (int)GetValue(StrideProperty);
+        set => SetValue(StrideProperty, value);
+    }
+
+    /// <summary>
+    /// Во сколько раз крупнее рисуются точки
+    /// </summary>
+    public double DotScale
+    {
+        get => (double)GetValue(DotScaleProperty);
+        set => SetValue(DotScaleProperty, value);
+    }
+
+    /// <summary>
     /// Как показывается завершение
     /// </summary>
     public ActivityDoneStyleEnum DoneStyle
@@ -209,7 +245,7 @@ public sealed class ActivityOrb : FrameworkElement
         if (State == ActivityStateEnum.Done && age is >= 0 and < DONE_SECONDS)
             DrawDone(drawingContext, center, radius, seconds, age);
         else
-            DrawSphere(drawingContext, center, radius, seconds, Kind, ColorOf(Foreground), 1);
+            DrawSphere(drawingContext, center, radius, seconds, Kind, ColorOf(Foreground), 1, Math.Max(1, Stride), DotScale);
     }
 
     /// <summary>
@@ -286,7 +322,9 @@ public sealed class ActivityOrb : FrameworkElement
     /// <param name="kind">Вид сферы</param>
     /// <param name="color">Цвет точек</param>
     /// <param name="strength">Общая плотность от 0 до 1</param>
-    private static void DrawSphere(DrawingContext context, Point center, double radius, double seconds, ActivityKindEnum kind, Color color, double strength)
+    /// <param name="stride">Рисуется каждая n-я точка</param>
+    /// <param name="dotScale">Во сколько раз крупнее рисуются точки</param>
+    private static void DrawSphere(DrawingContext context, Point center, double radius, double seconds, ActivityKindEnum kind, Color color, double strength, int stride = 1, double dotScale = 1)
     {
         var brushes = Enumerable.Range(0, DEPTH_LEVELS).Select(level => MakeBrush(level, color, strength)).ToArray();
         var (sinTilt, cosTilt) = Math.SinCos(TILT);
@@ -294,12 +332,12 @@ public sealed class ActivityOrb : FrameworkElement
         for (var index = 0; index < Points.Length; index++)
         {
             var motion = Motion(kind, seconds, Points[index].Y, Scatter[index], index);
-            if (!motion.Show)
+            if (!motion.Show || index % stride != 0)
                 continue;
 
             var (x, y, depth) = Rotate(index, seconds * motion.Turn, cosTilt, sinTilt);
             var level = Math.Min(DEPTH_LEVELS - 1, (int)(Math.Clamp(depth + motion.Glow, 0, 0.999) * DEPTH_LEVELS));
-            var dot = (0.45 + 0.75 * depth) * (1 + Math.Max(0, motion.Glow) * 0.8);
+            var dot = (0.45 + 0.75 * depth) * (1 + Math.Max(0, motion.Glow) * 0.8) * dotScale;
 
             context.DrawEllipse(brushes[level], null, new Point(center.X + x * radius * motion.Reach, center.Y + y * radius * motion.Reach), dot, dot);
         }

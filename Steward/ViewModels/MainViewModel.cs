@@ -45,6 +45,11 @@ public sealed class MainViewModel : PanelViewModel
     private IReadOnlyList<IdeaCardViewModel> _ideas = [];
 
     /// <summary>
+    /// Бот сейчас разбирает рилс
+    /// </summary>
+    private bool _reelsBusy;
+
+    /// <summary>
     /// Что не удалось прочитать в реестре задач
     /// </summary>
     private string _registryErrors = string.Empty;
@@ -232,6 +237,15 @@ public sealed class MainViewModel : PanelViewModel
     public bool IsIdeasEmpty => Ideas.Count == 0;
 
     /// <summary>
+    /// Бот сейчас разбирает рилс: на странице идей показывается сфера и пояснение
+    /// </summary>
+    public bool IsReelsBusy
+    {
+        get => _reelsBusy;
+        private set => Set(ref _reelsBusy, value);
+    }
+
+    /// <summary>
     /// В журнале есть записи, их можно стереть
     /// </summary>
     public bool HasRecords => Records.Count > 0;
@@ -271,6 +285,7 @@ public sealed class MainViewModel : PanelViewModel
     public void Apply(SyncSnapshot snapshot, IReadOnlyList<JobRow> jobs, IReadOnlyList<RunRecord> records, IReadOnlyList<string> registryErrors, IReadOnlyList<Idea> ideas)
     {
         var rows = TaskRows.Build(snapshot, jobs);
+        IsReelsBusy = rows.Any(row => row.Id == "reels" && row.Working);
         _activity.Track(rows, DateTimeOffset.UtcNow);
         Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), _activity.StateOf(row), _activity.FinishedAt(row.Id))).ToArray();
         Records = records.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();

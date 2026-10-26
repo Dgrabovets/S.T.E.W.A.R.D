@@ -127,6 +127,23 @@
             </DataTrigger>
         </Style.Triggers>
     </Style>
+    <!-- Сфера состояния записи: цвет по цвету записи, вид берётся из модели. Для журнала и плашек, где процесса уже нет -->
+    <Style x:Key="StatusOrb" TargetType="ctl:ActivityOrb">
+        <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
+        <Setter Property="Kind" Value="{Binding Kind}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
+                <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Сфера общего состояния рядом с заголовком: свой вид с поясом из быстрых точек, цвет по общему состоянию -->
     <Style x:Key="SummaryOrb" TargetType="ctl:ActivityOrb">
         <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>

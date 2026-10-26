@@ -70,6 +70,10 @@ public static class SnapshotRenderer
             popup.Apply(snapshot, scrollToProblem: false);
             window = popup;
         }
+        else if (string.Equals(parts[0], "icons", StringComparison.OrdinalIgnoreCase))
+        {
+            window = IconSheet();
+        }
         else if (string.Equals(parts[0], "orbs", StringComparison.OrdinalIgnoreCase))
         {
             window = OrbSheet();
@@ -131,6 +135,44 @@ public static class SnapshotRenderer
 
         window.Close();
         return true;
+    }
+
+    /// <summary>
+    /// Собирает лист с иконками трея для каждого состояния в натуральную величину и вдвое крупнее
+    /// </summary>
+    /// <returns>Окно с иконками</returns>
+    private static Window IconSheet()
+    {
+        var resources = System.Windows.Application.Current.Resources;
+        var states = new (ActivityKindEnum Kind, string Brush)[]
+        {
+            (ActivityKindEnum.Alive, "OkBrush"),
+            (ActivityKindEnum.Working, "WorkingBrush"),
+            (ActivityKindEnum.Attention, "AttentionBrush"),
+            (ActivityKindEnum.Failed, "DangerBrush"),
+            (ActivityKindEnum.Dormant, "IdleBrush"),
+        };
+        var panel = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(16) };
+
+        foreach (var (kind, key) in states)
+        {
+            using var icon = TrayOrbIcon.Render(kind, (System.Windows.Media.Brush)resources[key]);
+            using var bitmap = icon.ToBitmap();
+            using var stream = new MemoryStream();
+            bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+            stream.Position = 0;
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.EndInit();
+            foreach (var size in new[] { 16, 32, 64 })
+                panel.Children.Add(new System.Windows.Controls.Image { Source = image, Width = size, Height = size, Margin = new Thickness(6, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center });
+
+            panel.Children.Add(new System.Windows.Controls.Border { Width = 1, Height = 48, Background = (System.Windows.Media.Brush)resources["LineBrush"], Margin = new Thickness(10, 0, 10, 0) });
+        }
+
+        return new Window { Width = 1100, Height = 100, WindowStyle = WindowStyle.None, Background = (System.Windows.Media.Brush)resources["WindowBrush"], Content = panel };
     }
 
     /// <summary>

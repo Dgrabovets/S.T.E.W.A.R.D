@@ -45,7 +45,13 @@ public sealed class RunRowViewModel
         OutputLines = LogLines.Parse(Output);
         Facts = string.Join(" · ", new[] { When, Reason, Duration(record.FinishedAt - record.StartedAt), record.ExitCode is { } code and not 0 ? $"код выхода {code}" : null }.Where(part => part is not null));
         Tone = record.Outcome == RunOutcomeEnum.Ok ? PanelToneEnum.Running : PanelToneEnum.Problem;
+        Kind = record.Outcome == RunOutcomeEnum.Ok ? ActivityKindEnum.Calm : ActivityKindEnum.Failed;
     }
+
+    /// <summary>
+    /// Вид сферы: спокойная у удачного запуска, рассыпающаяся у неудачного
+    /// </summary>
+    public ActivityKindEnum Kind { get; }
 
     /// <summary>
     /// Когда запущена

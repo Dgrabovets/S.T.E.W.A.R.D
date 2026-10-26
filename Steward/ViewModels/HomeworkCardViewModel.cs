@@ -25,11 +25,11 @@ public sealed class HomeworkCardViewModel
         Due = row.Item.Due is { } due ? $"Срок: {due.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}" : "Срок не назван";
         Format = HomeworkFormats.Title(row.Format);
         Requirements = row.Item.Requirements.Length > PREVIEW_LENGTH ? row.Item.Requirements[..PREVIEW_LENGTH].TrimEnd() + "…" : row.Item.Requirements;
-        (Status, Tone) = row switch
+        (Status, Tone, Kind) = row switch
         {
-            { Created: true } => ("Задача создана", PanelToneEnum.Running),
-            { Format: HomeworkFormatEnum.Skip } => ("Не готовить", PanelToneEnum.Idle),
-            _ => ("Ждёт создания задачи", PanelToneEnum.Attention),
+            { Created: true } => ("Задача создана", PanelToneEnum.Running, ActivityKindEnum.Calm),
+            { Format: HomeworkFormatEnum.Skip } => ("Не готовить", PanelToneEnum.Idle, ActivityKindEnum.Dormant),
+            _ => ("Ждёт создания задачи", PanelToneEnum.Attention, ActivityKindEnum.Attention),
         };
     }
 
@@ -67,6 +67,11 @@ public sealed class HomeworkCardViewModel
     /// Что с задачей в SingularityApp
     /// </summary>
     public string Status { get; }
+
+    /// <summary>
+    /// Вид сферы на плашке: «ждёт» у задачи, которую ещё не создали
+    /// </summary>
+    public ActivityKindEnum Kind { get; }
 
     /// <summary>
     /// Цвет плашки статуса

@@ -73,19 +73,19 @@ public sealed class TrayHost : IDisposable
     private readonly DispatcherTimer _timer = new() { Interval = POLL_INTERVAL };
 
     /// <summary>
-    /// Значок работающего процесса
+    /// Текущая иконка: её нужно освободить, когда рисуется новая
     /// </summary>
-    private readonly Icon _runningIcon = CreateIcon(TrayPalette.Ok);
+    private Icon? _current;
 
     /// <summary>
-    /// Значок остановленного процесса
+    /// Перерисовывает иконку, пока что-то выполняется: сфера на ней вращается
     /// </summary>
-    private readonly Icon _stoppedIcon = CreateIcon(TrayPalette.Idle);
+    private readonly DispatcherTimer _iconTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
 
     /// <summary>
-    /// Значок ошибки
+    /// Вид и цвет сферы, которая сейчас на иконке
     /// </summary>
-    private readonly Icon _errorIcon = CreateIcon(TrayPalette.Danger);
+    private (ActivityKindEnum Kind, string Brush) _orb = (ActivityKindEnum.Dormant, "IdleBrush");
 
     /// <summary>
     /// Последний снимок
@@ -141,7 +141,6 @@ public sealed class TrayHost : IDisposable
     {
         _icon = new NotifyIcon
         {
-            Icon = _stoppedIcon,
             Visible = true,
             Text = "Расписание",
         };
@@ -164,6 +163,9 @@ public sealed class TrayHost : IDisposable
             new GooeyItem("\uE7E8", "Выход", Exit),
         ]);
 
+        _iconTimer.Tick += (_, _) => RenderIcon();
+        RenderIcon();
+
         _timer.Tick += async (_, _) => await RefreshAsync();
         _timer.Start();
         _ = RefreshAsync();
@@ -171,16 +173,6 @@ public sealed class TrayHost : IDisposable
         _jobs.Changed += (_, _) => ApplyAll();
         _jobs.Start();
     }
-
-    /// <summary>
-    /// Удаляет значок, созданный через <c>GetHicon</c>
-    /// </summary>
-    /// <param name="handle">Дескриптор значка</param>
-    /// <returns>
-    /// <see langword="true"/>, если значок удалён
-    /// </returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool DestroyIcon(IntPtr handle);
 
     /// <summary>
     /// Освобождает иконку
@@ -199,9 +191,8 @@ public sealed class TrayHost : IDisposable
         _menu.Close();
         _settings?.Close();
         _main?.CloseForExit();
-        _runningIcon.Dispose();
-        _stoppedIcon.Dispose();
-        _errorIcon.Dispose();
+        _iconTimer.Stop();
+        _current?.Dispose();
     }
 
     #endregion Lifetime
@@ -209,62 +200,45 @@ public sealed class TrayHost : IDisposable
     #region Icon
 
     /// <summary>
-    /// Рисует скруглённый значок календаря
+    /// Рисует на иконке сферу текущего вида и цвета. Старая иконка освобождается
     /// </summary>
-    /// <param name="color">Цвет фона значка</param>
-    /// <returns>Иконка 32 на 32</returns>
-    private static Icon CreateIcon(Color color)
+    private void RenderIcon()
     {
-        using var bitmap = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
-        using var graphics = Graphics.FromImage(bitmap);
-        graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        graphics.Clear(Color.Transparent);
+        if (_exiting)
+            return;
 
-        using (var shape = Rounded(new Rectangle(1, 1, 30, 30), 8))
-        using (var brush = new SolidBrush(color))
-            graphics.FillPath(brush, shape);
-
-        using var white = new SolidBrush(Color.White);
-        graphics.FillRectangle(white, 9, 12, 14, 12);
-        using var band = new SolidBrush(color);
-        graphics.FillRectangle(band, 9, 12, 14, 4);
-        graphics.FillRectangle(white, 12, 8, 2, 6);
-        graphics.FillRectangle(white, 18, 8, 2, 6);
-
-        var handle = bitmap.GetHicon();
-        try
-        {
-            using var temporary = Icon.FromHandle(handle);
-            return (Icon)temporary.Clone();
-        }
-        finally
-        {
-            DestroyIcon(handle);
-        }
+        var brush = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources[_orb.Brush];
+        var next = TrayOrbIcon.Render(_orb.Kind, brush);
+        _icon.Icon = next;
+        _current?.Dispose();
+        _current = next;
     }
 
     /// <summary>
-    /// Строит скруглённый контур значка
+    /// Выбирает вид и цвет сферы по состоянию: сбой, выполнение, ожидание решения, работа или остановка. Пока что-то выполняется, сфера движется
     /// </summary>
-    /// <param name="bounds">Прямоугольник контура</param>
-    /// <param name="radius">Радиус угла в пикселях</param>
-    /// <returns>Контур, который нужно освободить</returns>
-    private static GraphicsPath Rounded(Rectangle bounds, int radius)
+    /// <param name="snapshot">Текущее состояние контейнера</param>
+    private void ChooseOrb(SyncSnapshot snapshot)
     {
-        var path = new GraphicsPath();
-        var diameter = Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height));
-        var arc = new Rectangle(bounds.X, bounds.Y, diameter, diameter);
+        var enabled = _jobRows.Where(row => row.Enabled).ToList();
+        var next = snapshot.CurrentError is not null || enabled.Any(row => row.Tone == RowToneEnum.Problem)
+            ? (ActivityKindEnum.Failed, "DangerBrush")
+            : enabled.Any(row => row.Tone == RowToneEnum.Working)
+                ? (ActivityKindEnum.Working, "WorkingBrush")
+                : enabled.Any(row => row.Tone == RowToneEnum.Attention)
+                    ? (ActivityKindEnum.Attention, "AttentionBrush")
+                    : snapshot.ContainerRunning ? (ActivityKindEnum.Alive, "OkBrush") : (ActivityKindEnum.Dormant, "IdleBrush");
 
-        path.AddArc(arc, 180, 90);
-        arc.X = bounds.Right - diameter;
-        path.AddArc(arc, 270, 90);
-        arc.Y = bounds.Bottom - diameter;
-        path.AddArc(arc, 0, 90);
-        arc.X = bounds.Left;
-        path.AddArc(arc, 90, 90);
-        path.CloseFigure();
+        if (next != _orb)
+        {
+            _orb = next;
+            RenderIcon();
+        }
 
-        return path;
+        if (_orb.Kind == ActivityKindEnum.Working)
+            _iconTimer.Start();
+        else
+            _iconTimer.Stop();
     }
 
     #endregion Icon
@@ -381,9 +355,7 @@ public sealed class TrayHost : IDisposable
     private void ApplyIcon(SyncSnapshot snapshot)
     {
         var failed = _jobRows.FirstOrDefault(row => row.Enabled && row.Tone == RowToneEnum.Problem);
-        _icon.Icon = snapshot.CurrentError is not null || failed is not null
-            ? _errorIcon
-            : snapshot.ContainerRunning ? _runningIcon : _stoppedIcon;
+        ChooseOrb(snapshot);
 
         var text = snapshot.CurrentError is not null
                      ? "Расписание: не удалось обновить"
