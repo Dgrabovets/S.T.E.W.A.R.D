@@ -20,7 +20,7 @@ public sealed class RunRowViewModel
     {
         FixCommand = new RelayCommand(() => fix(record));
         CanFix = record.Outcome != RunOutcomeEnum.Ok;
-        When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm:ss", CultureInfo.InvariantCulture);
+        When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
         Title = record.Title;
         Reason = record.Reason switch
         {
@@ -43,7 +43,8 @@ public sealed class RunRowViewModel
         Summary = record.Summary ?? string.Empty;
         Output = record.Output ?? string.Empty;
         OutputLines = LogLines.Parse(Output);
-        Facts = string.Join(" · ", new[] { When, Reason, Duration(record.FinishedAt - record.StartedAt), record.ExitCode is { } code and not 0 ? $"код выхода {code}" : null }.Where(part => part is not null));
+        IsManual = record.Reason == "manual";
+        Facts = string.Join(" · ", new[] { Duration(record.FinishedAt - record.StartedAt), record.ExitCode is { } code and not 0 ? $"код выхода {code}" : null }.Where(part => part is not null));
         (Tone, Kind) = record.Outcome switch
         {
             RunOutcomeEnum.Ok => (PanelToneEnum.Running, ActivityKindEnum.Sealed),
@@ -124,7 +125,12 @@ public sealed class RunRowViewModel
     public IReadOnlyList<LogLine> OutputLines { get; }
 
     /// <summary>
-    /// Строка фактов: когда, почему, сколько шёл и каким кодом закончился
+    /// Запуск начал человек: такой запуск выделяется среди запусков по расписанию
+    /// </summary>
+    public bool IsManual { get; }
+
+    /// <summary>
+    /// Строка фактов: сколько шёл запуск и каким кодом закончился
     /// </summary>
     public string Facts { get; }
 

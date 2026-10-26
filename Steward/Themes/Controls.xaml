@@ -79,6 +79,33 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Причина или перечень правок внутри записи: рамка и фон по цвету записи, чтобы объяснение не терялось среди остального текста -->
+    <Style x:Key="ReasonBlock" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource AttentionBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Небольшая метка в записи: контур без заливки. Цвет рамки при необходимости меняет вызывающий -->
+    <Style x:Key="Chip" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusBadge}"/>
+        <Setter Property="Padding" Value="8,1"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
+    </Style>
+
     <!-- Точка состояния: заливка и тонкое кольцо вокруг неё того же цвета. Размер задаёт вызывающий, внутренняя точка на 6 меньше -->
     <Style x:Key="ToneDot" TargetType="Control">
         <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
@@ -184,7 +211,7 @@
         </Setter>
     </Style>
 
-    <!-- Сворачиваемое содержимое: открывается и закрывается плавно, высота и прозрачность меняются вместе. Раскрыто, пока IsOpen равно True: по умолчанию содержимое видно, а при False плавно сворачивается -->
+    <!-- Сворачиваемое содержимое: шаблон с частями Clip и Scale, анимацию ведёт сам элемент. Раскрыто, пока IsOpen равно True -->
     <Style x:Key="CollapsibleBody" TargetType="ctl:CollapsibleBody">
         <Setter Property="IsTabStop" Value="False"/>
         <Setter Property="Template">
@@ -196,34 +223,6 @@
                         </Border.LayoutTransform>
                         <ContentPresenter/>
                     </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsOpen" Value="False">
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="Scale" Storyboard.TargetProperty="ScaleY" To="0" Duration="0:0:0.28">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseInOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="Clip" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.18"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
-                            <Trigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="Scale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.35">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="Clip" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.3" BeginTime="0:0:0.08"/>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.ExitActions>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

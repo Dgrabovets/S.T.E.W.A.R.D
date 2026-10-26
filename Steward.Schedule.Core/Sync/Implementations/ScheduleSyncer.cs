@@ -278,6 +278,10 @@ public sealed class ScheduleSyncer
         if (run.TargetTaskIds.Contains(existing.Id) && !SingularityClient.NeedsUpdate(existing, target))
             return;
 
+        var changes = SingularityClient.Differences(existing, target);
+        if (changes.Count > 0)
+            _logger.LogInformation(SyncLogMessages.CHANGES + "{ExternalId}: {Changes}", slot.ExternalId, string.Join(" | ", changes));
+
         await _client.UpdateTaskAsync(existing.Id, run.ProjectId, target, cancellationToken);
         run.Updated++;
         _logger.LogInformation(SyncLogMessages.UPDATED + "{Kind}{ExternalId} {Title}", kind, slot.ExternalId, lesson.Title);

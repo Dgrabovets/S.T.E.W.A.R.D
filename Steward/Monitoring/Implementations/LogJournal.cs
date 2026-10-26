@@ -93,13 +93,19 @@ public static partial class LogJournal
                 continue;
             }
 
+            if (message.Text.StartsWith(SyncLogMessages.CHANGES, StringComparison.Ordinal))
+            {
+                RememberDifferences(cycle, message.Text);
+                continue;
+            }
+
             if (TryChange(message.Text, out var change, out var skippedOne))
             {
                 cycle.Time = message.Time;
                 if (skippedOne)
                     cycle.Skipped++;
                 else if (change is not null)
-                    cycle.Changes.Add(change);
+                    cycle.Changes.Add(WithDifferences(cycle, message.Text, change));
             }
         }
 
@@ -254,6 +260,90 @@ public static partial class LogJournal
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Запоминает перечень отличий, который сервис пишет перед строкой об обновлении задачи
+    /// </summary>
+    /// <param name="cycle">Текущий прогон</param>
+    /// <param name="text">Строка вида <c>Changes up:…: start=… | title=…</c></param>
+    private static void RememberDifferences(Cycle cycle, string text)
+    {
+        var match = ExternalIdPattern().Match(text);
+        var separator = match.Success ? text.IndexOf(": ", match.Index + match.Length, StringComparison.Ordinal) : -1;
+        if (separator < 0)
+            return;
+
+        cycle.Differences[match.Value] = Describe(text[(separator + 2)..]);
+    }
+
+    /// <summary>
+    /// Дописывает к строке об обновлении то, что именно изменилось
+    /// </summary>
+    /// <param name="cycle">Текущий прогон</param>
+    /// <param name="text">Строка журнала об обновлении</param>
+    /// <param name="change">Человеческая строка об обновлении</param>
+    /// <returns>Строка с перечнем отличий под ней, если он известен</returns>
+    private static string WithDifferences(Cycle cycle, string text, string change)
+    {
+        if (!text.StartsWith(SyncLogMessages.UPDATED, StringComparison.Ordinal))
+            return change;
+
+        var match = ExternalIdPattern().Match(text);
+        if (!match.Success || !cycle.Differences.Remove(match.Value, out var lines))
+            return change;
+
+        return change + "\n" + lines;
+    }
+
+    /// <summary>
+    /// Переводит пункты отличий на русский, по строке на пункт
+    /// </summary>
+    /// <param name="items">Пункты через « | », каждый вида ключ=старое&gt;новое или просто ключ</param>
+    /// <returns>Строки с точкой-маркером</returns>
+    private static string Describe(string items) => string.Join('\n', items.Split(" | ", StringSplitOptions.RemoveEmptyEntries).Select(DescribeItem));
+
+    /// <summary>
+    /// Переводит один пункт отличий
+    /// </summary>
+    /// <param name="item">Пункт: ключ, при необходимости «=старое&gt;новое»</param>
+    /// <returns>Строка для человека</returns>
+    private static string DescribeItem(string item)
+    {
+        var equals = item.IndexOf('=', StringComparison.Ordinal);
+        var key = equals < 0 ? item : item[..equals];
+        var values = equals < 0 ? string.Empty : item[(equals + 1)..];
+        var arrow = values.IndexOf('>', StringComparison.Ordinal);
+        var before = arrow < 0 ? values : values[..arrow];
+        var after = arrow < 0 ? string.Empty : values[(arrow + 1)..];
+
+        return key switch
+        {
+            "start" => $"• время: {Moment(before, after)}",
+            "title" => $"• название: «{before}» → «{after}»",
+            "length" => $"• длительность: {before} мин → {after} мин",
+            "note" => "• заметка к занятию",
+            "reminder" => "• напоминание",
+            "tags" => "• теги",
+            _ => $"• {item}",
+        };
+    }
+
+    /// <summary>
+    /// Пишет старое и новое время начала рядом
+    /// </summary>
+    /// <param name="before">Прежнее начало в формате ISO</param>
+    /// <param name="after">Новое начало в формате ISO</param>
+    /// <returns>Строка вроде <c>29.10 в 20:10 → 29.10 в 21:00</c></returns>
+    private static string Moment(string before, string after)
+    {
+        if (!DateTimeOffset.TryParse(before, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var old)
+            || !DateTimeOffset.TryParse(after, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var next))
+            return $"{before} → {after}";
+
+        old = old.ToOffset(next.Offset);
+
+        return $"{old:dd.MM} в {old:HH:mm} → {next:dd.MM} в {next:HH:mm}";
     }
 
     /// <summary>
@@ -450,6 +540,11 @@ public static partial class LogJournal
         /// В журнале есть строка <c>Sync finished</c>
         /// </summary>
         public bool HasFinish { get; set; }
+
+        /// <summary>
+        /// Перечни отличий по внешнему идентификатору занятия, пока не встретилась строка об обновлении
+        /// </summary>
+        public Dictionary<string, string> Differences { get; } = new(StringComparer.Ordinal);
     }
 
     #endregion Cycles

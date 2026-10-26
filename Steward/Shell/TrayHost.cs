@@ -48,11 +48,6 @@ public sealed class TrayHost : IDisposable
     private readonly DockerSyncProbe _probe = new(DataLocation.RepoRootOrStart());
 
     /// <summary>
-    /// Панель с подробностями
-    /// </summary>
-    private readonly StatusWindow _window = new();
-
-    /// <summary>
     /// Список занятий с выбором формата ДЗ: общий для окна и страницы, чтобы идущая подготовка заданий не сбрасывалась
     /// </summary>
     private HomeworkFormatsViewModel? _formats;
@@ -192,7 +187,6 @@ public sealed class TrayHost : IDisposable
         _jobs.Dispose();
         _icon.Visible = false;
         _icon.Dispose();
-        _window.Close();
         _menu.Close();
         _settings?.Close();
         _main?.CloseForExit();
@@ -262,7 +256,8 @@ public sealed class TrayHost : IDisposable
         _refreshing = true;
         try
         {
-            _snapshot = await _probe.ReadAsync(CancellationToken.None);
+            var probed = await _probe.ReadAsync(CancellationToken.None);
+            _snapshot = probed with { Entries = ScheduleHistory.Update(probed.Entries) };
             if (_exiting)
                 return;
 
@@ -300,8 +295,6 @@ public sealed class TrayHost : IDisposable
 
         _jobRows = _jobs.Rows();
         ApplyIcon(_snapshot);
-        if (_window.IsVisible)
-            _window.Apply(_snapshot, scrollToProblem: false);
         if (_menu.IsVisible)
             _menu.Apply(_snapshot, _jobRows);
         if (_main is { IsVisible: true })
@@ -382,17 +375,6 @@ public sealed class TrayHost : IDisposable
     #region Window
 
     /// <summary>
-    /// Открывает или прячет окно истории сверок расписания у курсора
-    /// </summary>
-    private void ShowScheduleHistory()
-    {
-        if (!_window.IsVisible)
-            _window.Apply(_snapshot, scrollToProblem: _snapshot.CurrentError is not null);
-
-        _window.ToggleFromIcon();
-    }
-
-    /// <summary>
     /// Открывает меню из капель у курсора или прячет его
     /// </summary>
     private void ShowMenu()
@@ -417,8 +399,7 @@ public sealed class TrayHost : IDisposable
             _main = new MainWindow();
             _main.Model.RunRequested += id => _jobs.RunNow(id);
             _main.Model.FixRequested += OpenFix;
-            _main.Model.ClearJournalRequested += (_, _) => _jobs.ClearRecords();
-            _main.Model.ScheduleHistoryRequested += (_, _) => ShowScheduleHistory();
+            _main.Model.ClearJournalRequested += (_, _) => ClearJournal();
             _main.Model.IdeaApproved += ApproveIdea;
             _main.Model.IdeaRejected += idea => _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Rejected);
             _main.Model.LinkRequested += OpenLink;
@@ -431,6 +412,17 @@ public sealed class TrayHost : IDisposable
             _main.Model.Page = selected;
 
         _main.ShowAndActivate();
+    }
+
+    /// <summary>
+    /// Стирает журнал запусков вместе с историей сверок расписания
+    /// </summary>
+    private void ClearJournal()
+    {
+        _jobs.ClearRecords();
+        ScheduleHistory.Clear();
+        _snapshot = _snapshot with { Entries = [] };
+        ApplyAll();
     }
 
     /// <summary>

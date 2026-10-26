@@ -16,7 +16,7 @@ namespace Steward.Shell;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>Steward.exe --snapshot файл.png [popup | appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal]]</c>
+/// Запуск: <c>Steward.exe --snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal]]</c>
 /// </summary>
 public static class SnapshotRenderer
 {
@@ -25,7 +25,7 @@ public static class SnapshotRenderer
     /// </summary>
     /// <param name="path">Куда сохранить PNG</param>
     /// <param name="which">
-    /// Какое окно: <c>main</c>, <c>popup</c> или <c>design</c> (страница-образец дизайн-системы)
+    /// Какое окно: <c>main</c>, <c>tray</c> или <c>design</c> (страница-образец дизайн-системы)
     /// </param>
     /// <returns>
     /// <see langword="true"/>, если картинка записана
@@ -81,12 +81,6 @@ public static class SnapshotRenderer
             window = menu;
             afterShow = () => menu.Expand(animate: false);
         }
-        else if (string.Equals(parts[0], "popup", StringComparison.OrdinalIgnoreCase))
-        {
-            var popup = new StatusWindow();
-            popup.Apply(snapshot, scrollToProblem: false);
-            window = popup;
-        }
         else if (string.Equals(parts[0], "slider", StringComparison.OrdinalIgnoreCase))
         {
             window = SliderSheet();
@@ -120,6 +114,15 @@ public static class SnapshotRenderer
             }
             if (parts.Length > 1 && Enum.TryParse<AppPageEnum>(parts[1], ignoreCase: true, out var page))
                 main.Model.Page = page;
+
+            // «main:journal:open»: все разделы журнала раскрыты
+            if (parts.Length > 2 && string.Equals(parts[2], "open", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var group in main.Model.Groups)
+                    group.IsOpen = true;
+
+                settleSeconds = 1.0;
+            }
 
             // «main:done»: задача «telegram» только что закончилась, на её карточке рисуется галочка
             if (parts.Length > 1 && string.Equals(parts[1], "done", StringComparison.OrdinalIgnoreCase))

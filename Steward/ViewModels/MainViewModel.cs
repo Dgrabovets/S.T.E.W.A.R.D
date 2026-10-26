@@ -24,9 +24,19 @@ public sealed class MainViewModel : PanelViewModel
     private IReadOnlyList<TaskCardViewModel> _tasks = [];
 
     /// <summary>
-    /// Строки журнала
+    /// Разделы журнала
     /// </summary>
-    private IReadOnlyList<RunRowViewModel> _records = [];
+    private IReadOnlyList<JournalGroupViewModel> _groups = [];
+
+    /// <summary>
+    /// Разделы журнала по идентификатору: объекты живут, пока раздел есть, чтобы свёрнутые не проигрывали анимацию при каждом обновлении
+    /// </summary>
+    private readonly Dictionary<string, JournalGroupViewModel> _groupById = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Что человек раскрыл или свернул в журнале
+    /// </summary>
+    private readonly Dictionary<string, bool> _groupOpen = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Карточки найденных домашних заданий
@@ -64,12 +74,16 @@ public sealed class MainViewModel : PanelViewModel
     private string _registryErrors = string.Empty;
 
     /// <summary>
+    /// Идентификатор раздела журнала со сверками расписания
+    /// </summary>
+    private const string SCHEDULE_GROUP = "schedule";
+
+    /// <summary>
     /// Создаёт модель
     /// </summary>
     public MainViewModel() : base("Проверка")
     {
         ClearJournalCommand = new RelayCommand(() => ClearJournalRequested?.Invoke(this, EventArgs.Empty));
-        OpenScheduleHistoryCommand = new RelayCommand(() => ScheduleHistoryRequested?.Invoke(this, EventArgs.Empty));
     }
 
     /// <summary>
@@ -86,11 +100,6 @@ public sealed class MainViewModel : PanelViewModel
     /// Просит стереть журнал запусков
     /// </summary>
     public event EventHandler? ClearJournalRequested;
-
-    /// <summary>
-    /// Просит открыть окно с историей сверок расписания
-    /// </summary>
-    public event EventHandler? ScheduleHistoryRequested;
 
     /// <summary>
     /// Решено делать идею: параметр — идея
@@ -111,11 +120,6 @@ public sealed class MainViewModel : PanelViewModel
     /// Стирает журнал запусков
     /// </summary>
     public RelayCommand ClearJournalCommand { get; }
-
-    /// <summary>
-    /// Открывает окно с историей сверок расписания
-    /// </summary>
-    public RelayCommand OpenScheduleHistoryCommand { get; }
 
     #region State
 
@@ -174,14 +178,14 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
-    /// Строки журнала запусков от новых к старым
+    /// Разделы журнала: у каждой задачи свой, плюс сверки расписания. Сверху тот, где запись свежее
     /// </summary>
-    public IReadOnlyList<RunRowViewModel> Records
+    public IReadOnlyList<JournalGroupViewModel> Groups
     {
-        get => _records;
+        get => _groups;
         private set
         {
-            if (!Set(ref _records, value))
+            if (!Set(ref _groups, value))
                 return;
 
             Raise(nameof(IsJournalEmpty));
@@ -192,7 +196,7 @@ public sealed class MainViewModel : PanelViewModel
     /// <summary>
     /// Журнал пуст
     /// </summary>
-    public bool IsJournalEmpty => Records.Count == 0;
+    public bool IsJournalEmpty => Groups.Count == 0;
 
     /// <summary>
     /// Карточки найденных домашних заданий
@@ -264,7 +268,7 @@ public sealed class MainViewModel : PanelViewModel
     /// <summary>
     /// В журнале есть записи, их можно стереть
     /// </summary>
-    public bool HasRecords => Records.Count > 0;
+    public bool HasRecords => Groups.Count > 0;
 
     /// <summary>
     /// Что не удалось прочитать в реестре задач
@@ -304,12 +308,80 @@ public sealed class MainViewModel : PanelViewModel
         IsReelsBusy = rows.Any(row => row.Id == "reels" && row.Working);
         _activity.Track(rows, DateTimeOffset.UtcNow);
         Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), _activity.StateOf(row), _activity.FinishedAt(row.Id))).ToArray();
-        Records = records.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();
+        Groups = BuildJournal(snapshot, records);
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
         Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();
 
         ApplySummary(rows);
     }
+
+    /// <summary>
+    /// Раскладывает запуски по задачам, добавляет сверки расписания и сортирует разделы так, чтобы сверху был тот, где запись свежее. Раздел с последней неудачей раскрыт сам, пока человек не решил иначе
+    /// </summary>
+    /// <param name="snapshot">Состояние расписания с историей сверок</param>
+    /// <param name="records">Запуски задач</param>
+    /// <returns>Разделы журнала</returns>
+    private IReadOnlyList<JournalGroupViewModel> BuildJournal(SyncSnapshot snapshot, IReadOnlyList<RunRecord> records)
+    {
+        var built = new List<(DateTimeOffset Last, JournalGroupViewModel Group)>();
+
+        foreach (var byJob in records.GroupBy(record => record.JobId, StringComparer.Ordinal))
+        {
+            var rows = byJob.OrderByDescending(record => record.StartedAt).Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed))).ToArray();
+            var group = GroupOf(byJob.Key, rows[0].Title, rows[0].Tone == PanelToneEnum.Problem);
+            group.Update($"{Entries(rows.Length)} · последняя {rows[0].When}", rows[0].Tone, rows[0].Kind, rows, []);
+            built.Add((byJob.Max(record => record.StartedAt), group));
+        }
+
+        if (snapshot.Entries.Count > 0)
+        {
+            var checks = snapshot.Entries.Select(entry => new ScheduleCheckViewModel(entry)).ToArray();
+            var group = GroupOf(SCHEDULE_GROUP, "Расписание", checks[0].Tone == PanelToneEnum.Problem);
+            var kind = checks[0].Tone switch
+            {
+                PanelToneEnum.Problem => ActivityKindEnum.Shattered,
+                PanelToneEnum.Attention => ActivityKindEnum.Sweep,
+                _ => ActivityKindEnum.Sealed,
+            };
+
+            group.Update($"{Entries(checks.Length)} · последняя {checks[0].When}", checks[0].Tone, kind, [], checks);
+            built.Add((snapshot.Entries[0].Time, group));
+        }
+
+        var ordered = built.OrderByDescending(item => item.Last).Select(item => item.Group).ToArray();
+
+        return ordered.SequenceEqual(_groups) ? _groups : ordered;
+    }
+
+    /// <summary>
+    /// Находит раздел журнала или создаёт его
+    /// </summary>
+    /// <param name="id">Идентификатор задачи или «schedule»</param>
+    /// <param name="title">Название раздела</param>
+    /// <param name="failed">Последняя запись неудачная: тогда новый раздел раскрыт</param>
+    /// <returns>Раздел, который переживает обновления</returns>
+    private JournalGroupViewModel GroupOf(string id, string title, bool failed)
+    {
+        if (_groupById.TryGetValue(id, out var existing))
+            return existing;
+
+        var created = new JournalGroupViewModel(id, title, _groupOpen.TryGetValue(id, out var open) ? open : failed, (key, value) => _groupOpen[key] = value);
+        _groupById[id] = created;
+
+        return created;
+    }
+
+    /// <summary>
+    /// Склоняет «запись» по числу
+    /// </summary>
+    /// <param name="count">Сколько записей</param>
+    /// <returns>Число и слово в нужной форме</returns>
+    private static string Entries(int count) => (count % 100 is >= 11 and <= 14 ? 0 : count % 10) switch
+    {
+        1 => $"{count} запись",
+        2 or 3 or 4 => $"{count} записи",
+        _ => $"{count} записей",
+    };
 
     /// <summary>
     /// Показывает найденные домашние задания

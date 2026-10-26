@@ -350,6 +350,36 @@ public sealed class SingularityClient : ISingularityClient
         || lesson.TagIds.Any(tagId => task.Tags is null || !task.Tags.Contains(tagId));
 
     /// <summary>
+    /// Перечисляет, чем сохранённая задача отличается от занятия. Приложение в трее показывает это человеку, когда расписание поменялось
+    /// </summary>
+    /// <param name="task">Задача, которая сейчас хранится в Singularity</param>
+    /// <param name="lesson">Занятие, разобранное из таблицы</param>
+    /// <returns>Пункты вида <c>start=старое&gt;новое</c>, <c>title=старое&gt;новое</c>, <c>length=старое&gt;новое</c>, а также <c>note</c>, <c>reminder</c>, <c>tags</c>. Пусто, если отличий в полях нет</returns>
+    public static IReadOnlyList<string> Differences(SingularityTask task, Lesson lesson)
+    {
+        var items = new List<string>();
+        if (!SameStart(task.Start, lesson.Start))
+            items.Add($"start={task.Start}>{FormatStart(lesson.Start)}");
+
+        if (!string.Equals(task.Title, lesson.Title, StringComparison.Ordinal))
+            items.Add($"title={task.Title}>{lesson.Title}");
+
+        if (task.TimeLength != lesson.TimeLengthMinutes)
+            items.Add($"length={task.TimeLength}>{lesson.TimeLengthMinutes}");
+
+        if (!NoteTextHelper.Same(task.Note, lesson.Note))
+            items.Add("note");
+
+        if (task.Notifies is null || !task.Notifies.Contains(ReminderMinutes))
+            items.Add("reminder");
+
+        if (lesson.TagIds.Any(tagId => task.Tags is null || !task.Tags.Contains(tagId)))
+            items.Add("tags");
+
+        return items;
+    }
+
+    /// <summary>
     /// Форматирует момент начала так, как в примерах API, с числовым смещением
     /// </summary>
     /// <param name="start">Местное начало занятия</param>
