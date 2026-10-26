@@ -504,6 +504,7 @@ public sealed class TrayHost : IDisposable
         if (_settings is null)
         {
             var window = new SettingsWindow();
+            window.Model.LinkRequested += OpenLink;
             window.Model.RestartRequested += async (_, _) => await RestartContainerAsync(window);
             window.Closed += (_, _) => _settings = null;
             _settings = window;

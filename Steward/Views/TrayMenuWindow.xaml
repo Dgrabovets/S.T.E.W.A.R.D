@@ -40,12 +40,13 @@
 
     <Border Style="{StaticResource WindowChrome}">
         <StackPanel Margin="20,18,20,10">
-            <StackPanel Orientation="Horizontal">
+            <Grid Margin="0,0,0,12">
                 <TextBlock Text="Быстрый статус" Style="{StaticResource TextTitle}" VerticalAlignment="Center"/>
-                <ctl:ActivityOrb Width="26" Height="26" Style="{StaticResource SummaryOrb}" Margin="10,-2,2,-2"/>
-                <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="2,0,0,0"/>
-            </StackPanel>
-            <TextBlock Text="{Binding Subtitle}" Style="{StaticResource TextCaption}" Margin="0,4,0,10"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <ctl:ActivityOrb Width="26" Height="26" Style="{StaticResource SummaryOrb}" Margin="0,-2,6,-2"/>
+                    <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
 
             <Border Background="{StaticResource SurfaceBrush}" CornerRadius="{StaticResource RadiusField}" Padding="14,10">
                 <ItemsControl ItemsSource="{Binding Tasks}" Grid.IsSharedSizeScope="True">
@@ -67,7 +68,7 @@
                 </ItemsControl>
             </Border>
 
-            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,12,0,0"/>
+            <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,10,0,0"/>
 
             <ctl:GooeyCluster x:Name="Cluster" Style="{StaticResource Cluster}"/>
         </StackPanel>

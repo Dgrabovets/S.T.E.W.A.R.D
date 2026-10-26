@@ -62,19 +62,119 @@ public sealed class SettingsViewModel : Bindable
     private string _token = string.Empty;
 
     /// <summary>
+    /// Ссылка на таблицу, из которой берётся идентификатор
+    /// </summary>
+    private string _spreadsheetLink = string.Empty;
+
+    /// <summary>
+    /// Ссылка на вкладку, из которой берётся номер листа
+    /// </summary>
+    private string _sheetLink = string.Empty;
+
+    /// <summary>
+    /// Итог определения идентификатора таблицы
+    /// </summary>
+    private string _spreadsheetNote = string.Empty;
+
+    /// <summary>
+    /// Итог определения номера листа
+    /// </summary>
+    private string _sheetNote = string.Empty;
+
+    /// <summary>
     /// Создаёт модель и сразу читает файл настроек
     /// </summary>
     public SettingsViewModel()
     {
         SaveAndRestartCommand = new RelayCommand(SaveAndRestart);
         RestartCommand = new RelayCommand(Restart);
+        DetectSpreadsheetCommand = new RelayCommand(DetectSpreadsheet);
+        DetectSheetCommand = new RelayCommand(DetectSheet);
+        OpenTokenPageCommand = new RelayCommand(() => LinkRequested?.Invoke(TOKEN_PAGE));
         LoadSettings();
+        TimeZones = TimeZoneChoices.All(TimeZone);
     }
+
+    /// <summary>
+    /// Страница с описанием API Singularity, где рассказано, как выпустить токен
+    /// </summary>
+    public const string TOKEN_PAGE = "https://api.singularity-app.com/";
 
     /// <summary>
     /// Просит пересоздать контейнер
     /// </summary>
     public event EventHandler? RestartRequested;
+
+    /// <summary>
+    /// Просит открыть адрес в браузере: параметр — адрес
+    /// </summary>
+    public event Action<string>? LinkRequested;
+
+    /// <summary>
+    /// Достаёт идентификатор таблицы из ссылки
+    /// </summary>
+    public RelayCommand DetectSpreadsheetCommand { get; }
+
+    /// <summary>
+    /// Достаёт номер листа из ссылки на вкладку
+    /// </summary>
+    public RelayCommand DetectSheetCommand { get; }
+
+    /// <summary>
+    /// Открывает страницу, где выпускают токен
+    /// </summary>
+    public RelayCommand OpenTokenPageCommand { get; }
+
+    /// <summary>
+    /// Пояса, из которых выбирается пояс таблицы
+    /// </summary>
+    public IReadOnlyList<TimeZoneChoice> TimeZones { get; }
+
+    /// <summary>
+    /// Ссылка на таблицу, в которую вставляют адрес из браузера
+    /// </summary>
+    public string SpreadsheetLink
+    {
+        get => _spreadsheetLink;
+        set => Set(ref _spreadsheetLink, value);
+    }
+
+    /// <summary>
+    /// Ссылка на вкладку, в которую вставляют адрес из браузера
+    /// </summary>
+    public string SheetLinkText
+    {
+        get => _sheetLink;
+        set => Set(ref _sheetLink, value);
+    }
+
+    /// <summary>
+    /// Итог определения идентификатора таблицы
+    /// </summary>
+    public string SpreadsheetNote
+    {
+        get => _spreadsheetNote;
+        private set => Set(ref _spreadsheetNote, value);
+    }
+
+    /// <summary>
+    /// Итог определения номера листа
+    /// </summary>
+    public string SheetNote
+    {
+        get => _sheetNote;
+        private set => Set(ref _sheetNote, value);
+    }
+
+    /// <summary>
+    /// Сколько сейчас времени в поясе таблицы и на этом компьютере
+    /// </summary>
+    public string TimeZoneNote => TimeZoneChoices.Compare(TimeZone, DateTimeOffset.UtcNow);
+
+    /// <summary>
+    /// Над полями есть сообщение
+    /// </summary>
+    public bool HasSettingsMessage => SettingsMessage.Length > 0;
 
     /// <summary>
     /// Записывает поля и просит перезапуск
@@ -92,7 +192,11 @@ public sealed class SettingsViewModel : Bindable
     public string SettingsMessage
     {
         get => _settingsMessage;
-        set => Set(ref _settingsMessage, value);
+        set
+        {
+            if (Set(ref _settingsMessage, value))
+                Raise(nameof(HasSettingsMessage));
+        }
     }
 
     /// <summary>
@@ -161,7 +265,11 @@ public sealed class SettingsViewModel : Bindable
     public string TimeZone
     {
         get => _timeZone;
-        set => Set(ref _timeZone, value);
+        set
+        {
+            if (Set(ref _timeZone, value))
+                Raise(nameof(TimeZoneNote));
+        }
     }
 
     /// <summary>
@@ -189,6 +297,34 @@ public sealed class SettingsViewModel : Bindable
     {
         get => _token;
         set => Set(ref _token, value);
+    }
+
+    /// <summary>
+    /// Находит идентификатор в ссылке на таблицу и вставляет его в поле
+    /// </summary>
+    private void DetectSpreadsheet()
+    {
+        if (SheetLink.TryId(SpreadsheetLink, out var id))
+        {
+            SpreadsheetId = id;
+            SpreadsheetNote = "Идентификатор найден и вставлен в поле выше";
+        }
+        else
+            SpreadsheetNote = "В ссылке нет идентификатора. Скопируйте адрес таблицы целиком из строки браузера";
+    }
+
+    /// <summary>
+    /// Находит номер листа в ссылке на вкладку и вставляет его в поле
+    /// </summary>
+    private void DetectSheet()
+    {
+        if (SheetLink.TryGid(SheetLinkText, out var gid))
+        {
+            SheetGid = gid;
+            SheetNote = "Номер листа найден и вставлен в поле выше";
+        }
+        else
+            SheetNote = "В ссылке нет номера листа. Откройте нужную вкладку и скопируйте адрес: в нём есть «gid=…»";
     }
 
     /// <summary>
