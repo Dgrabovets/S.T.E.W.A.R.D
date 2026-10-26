@@ -86,7 +86,7 @@ public sealed class ActivityOrb : FrameworkElement
         nameof(DoneStyle),
         typeof(ActivityDoneStyleEnum),
         typeof(ActivityOrb),
-        new FrameworkPropertyMetadata(ActivityDoneStyleEnum.DotTick, FrameworkPropertyMetadataOptions.AffectsRender));
+        new FrameworkPropertyMetadata(ActivityDoneStyleEnum.Burst, FrameworkPropertyMetadataOptions.AffectsRender));
 
     /// <summary>
     /// Когда процесс закончился: от этого момента идёт анимация. Так она не начинается заново, если карточку пересоздали
