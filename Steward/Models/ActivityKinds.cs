@@ -1,12 +1,12 @@
 namespace Steward.Models;
 
 /// <summary>
-/// Подбирает вид движения индикатора по задаче
+/// Подбирает вид сферы по задаче и её состоянию
 /// </summary>
 public static class ActivityKinds
 {
     /// <summary>
-    /// Вид движения для задачи из реестра
+    /// Вид движения для выполняющейся задачи из реестра
     /// </summary>
     /// <param name="jobId">Идентификатор задачи из config/jobs.json</param>
     /// <returns>Связь для почты и бота, сборка для домашних заданий, остальным ровное вращение</returns>
@@ -15,5 +15,21 @@ public static class ActivityKinds
         "mail" or "reels" or "telegram" => ActivityKindEnum.Connecting,
         "homework" => ActivityKindEnum.Composing,
         _ => ActivityKindEnum.Working,
+    };
+
+    /// <summary>
+    /// Вид сферы для задачи: пока выполняется, по её делу, иначе по состоянию
+    /// </summary>
+    /// <param name="row">Строка задачи</param>
+    /// <returns>Вид сферы</returns>
+    public static ActivityKindEnum Of(TaskStatusRow row) => row switch
+    {
+        { Working: true } => For(row.Id),
+        { Muted: true } => ActivityKindEnum.Dormant,
+        { Tone: PanelToneEnum.Problem } => ActivityKindEnum.Failed,
+        { Tone: PanelToneEnum.Attention } => ActivityKindEnum.Attention,
+        { Tone: PanelToneEnum.Running } when row.Headline.StartsWith("Выполнено", StringComparison.Ordinal) => ActivityKindEnum.Calm,
+        { Tone: PanelToneEnum.Running } => ActivityKindEnum.Alive,
+        _ => ActivityKindEnum.Dormant,
     };
 }

@@ -17,7 +17,7 @@ public sealed class TaskCardViewModel
     /// <param name="activitySince">Когда процесс закончился, если индикатор показывает галочку</param>
     public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default)
     {
-        Kind = ActivityKinds.For(row.Id);
+        Kind = ActivityKinds.Of(row);
         Activity = activity;
         ActivitySince = activitySince;
         Name = row.Name;
@@ -30,7 +30,7 @@ public sealed class TaskCardViewModel
     }
 
     /// <summary>
-    /// Как движутся точки индикатора, пока задача выполняется
+    /// Вид сферы: по делу задачи, пока она выполняется, иначе по её состоянию
     /// </summary>
     public ActivityKindEnum Kind { get; }
 

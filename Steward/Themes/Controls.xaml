@@ -127,6 +127,22 @@
             </DataTrigger>
         </Style.Triggers>
     </Style>
+    <!-- Сфера общего состояния рядом с заголовком: свой вид с поясом из быстрых точек, цвет по общему состоянию -->
+    <Style x:Key="SummaryOrb" TargetType="ctl:ActivityOrb">
+        <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
+        <Setter Property="Kind" Value="Beacon"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
+                <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
     <Style x:Key="NavButton" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
         <Setter Property="FontSize" Value="{StaticResource FontSizeBodyLarge}"/>

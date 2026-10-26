@@ -70,6 +70,10 @@ public static class SnapshotRenderer
             popup.Apply(snapshot, scrollToProblem: false);
             window = popup;
         }
+        else if (string.Equals(parts[0], "orbs", StringComparison.OrdinalIgnoreCase))
+        {
+            window = OrbSheet();
+        }
         else if (string.Equals(parts[0], "settings", StringComparison.OrdinalIgnoreCase))
         {
             window = new SettingsWindow();
@@ -127,6 +131,84 @@ public static class SnapshotRenderer
 
         window.Close();
         return true;
+    }
+
+    /// <summary>
+    /// Собирает лист с образцами сфер: виды состояния и три способа показать завершение в пяти моментах
+    /// </summary>
+    /// <returns>Окно с образцами</returns>
+    private static Window OrbSheet()
+    {
+        var resources = System.Windows.Application.Current.Resources;
+        System.Windows.Media.Brush Brush(string key) => (System.Windows.Media.Brush)resources[key];
+
+        var grid = new System.Windows.Controls.Grid { Margin = new Thickness(24) };
+        var kinds = new (ActivityKindEnum Kind, string Brush, string Label)[]
+        {
+            (ActivityKindEnum.Alive, "OkBrush", "Работает"),
+            (ActivityKindEnum.Calm, "OkBrush", "Выполнено"),
+            (ActivityKindEnum.Dormant, "IdleBrush", "Отключена"),
+            (ActivityKindEnum.Attention, "AttentionBrush", "Ждёт тебя"),
+            (ActivityKindEnum.Failed, "DangerBrush", "Не удалось"),
+            (ActivityKindEnum.Beacon, "OkBrush", "Общий статус"),
+            (ActivityKindEnum.Working, "WorkingBrush", "Выполняется"),
+        };
+        var ages = new[] { 0.12, 0.4, 0.8, 1.2, 1.7 };
+        var styles = new[] { (ActivityDoneStyleEnum.Ripple, "А. Волна"), (ActivityDoneStyleEnum.DotTick, "Б. Галочка из точек"), (ActivityDoneStyleEnum.Burst, "В. Вспышка") };
+
+        for (var row = 0; row < 1 + styles.Length; row++)
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+
+        for (var column = 0; column < 8; column++)
+            grid.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = GridLength.Auto });
+
+        System.Windows.Controls.StackPanel Cell(UIElement orb, string label)
+        {
+            var cell = new System.Windows.Controls.StackPanel { Margin = new Thickness(0, 0, 20, 14), HorizontalAlignment = System.Windows.HorizontalAlignment.Center };
+            cell.Children.Add(orb);
+            cell.Children.Add(new System.Windows.Controls.TextBlock { Text = label, Foreground = Brush("MutedBrush"), FontSize = 12, HorizontalAlignment = System.Windows.HorizontalAlignment.Center });
+
+            return cell;
+        }
+
+        for (var index = 0; index < kinds.Length; index++)
+        {
+            var orb = new Controls.ActivityOrb { Width = 72, Height = 72, Kind = kinds[index].Kind, Foreground = Brush(kinds[index].Brush) };
+            var cell = Cell(orb, kinds[index].Label);
+            System.Windows.Controls.Grid.SetColumn(cell, index);
+            grid.Children.Add(cell);
+        }
+
+        for (var row = 0; row < styles.Length; row++)
+        {
+            for (var column = 0; column < ages.Length; column++)
+            {
+                var orb = new Controls.ActivityOrb
+                {
+                    Width = 72,
+                    Height = 72,
+                    State = ActivityStateEnum.Done,
+                    Kind = ActivityKindEnum.Calm,
+                    DoneStyle = styles[row].Item1,
+                    Foreground = Brush("OkBrush"),
+                    DoneBrush = Brush("OkBrush"),
+                    Since = DateTimeOffset.UtcNow.AddSeconds(-ages[column]),
+                };
+                var cell = Cell(orb, column == 0 ? $"{styles[row].Item2}  {ages[column]:0.0} с" : $"{ages[column]:0.0} с");
+                System.Windows.Controls.Grid.SetRow(cell, row + 1);
+                System.Windows.Controls.Grid.SetColumn(cell, column);
+                grid.Children.Add(cell);
+            }
+        }
+
+        return new Window
+        {
+            Width = 760,
+            Height = 540,
+            WindowStyle = WindowStyle.None,
+            Background = Brush("WindowBrush"),
+            Content = grid,
+        };
     }
 
     /// <summary>

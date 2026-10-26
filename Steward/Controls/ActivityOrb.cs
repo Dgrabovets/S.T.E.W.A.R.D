@@ -1,18 +1,16 @@
 using System.Windows;
 using System.Windows.Media;
+using Steward.Models;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using Colors = System.Windows.Media.Colors;
-using Pen = System.Windows.Media.Pen;
 using Point = System.Windows.Point;
-using Size = System.Windows.Size;
-using Steward.Models;
 
 namespace Steward.Controls;
 
 /// <summary>
-/// Индикатор процесса. Пока процесс идёт, вращается сфера из точек, когда закончился, рисуется кольцо с галочкой, в покое показывает точку состояния с кольцом
+/// Индикатор из точек на сфере. Всегда показывает сферу, вид которой говорит о состоянии задачи или о процессе, а когда процесс закончился, один раз проигрывает завершение
 /// </summary>
 public sealed class ActivityOrb : FrameworkElement
 {
@@ -37,17 +35,12 @@ public sealed class ActivityOrb : FrameworkElement
     private const double TILT = 0.4;
 
     /// <summary>
-    /// Сколько секунд рисуется кольцо
+    /// Сколько секунд играет завершение
     /// </summary>
-    private const double RING_SECONDS = 0.45;
+    public const double DONE_SECONDS = 1.9;
 
     /// <summary>
-    /// Сколько секунд рисуется галочка после кольца
-    /// </summary>
-    private const double TICK_SECONDS = 0.35;
-
-    /// <summary>
-    /// Сколько секунд галочка остаётся на экране, потом снова точка
+    /// Сколько секунд после окончания процесса задача считается «только что завершённой»: в это время анимация играет, потом сфера спокойная
     /// </summary>
     public const double DONE_SHOW_SECONDS = 6;
 
@@ -64,12 +57,12 @@ public sealed class ActivityOrb : FrameworkElement
     })];
 
     /// <summary>
-    /// Постоянное случайное число для каждой точки: по нему точки разлетаются при сборке сферы
+    /// Постоянное случайное число для каждой точки: по нему точки разлетаются и запаздывают
     /// </summary>
-    private static readonly double[] Scatter = [.. Enumerable.Range(0, POINT_COUNT).Select(index => (Math.Sin(index * 12.9898) * 43758.5453) % 1 is var value ? Math.Abs(value) : 0)];
+    private static readonly double[] Scatter = [.. Enumerable.Range(0, POINT_COUNT).Select(index => Math.Abs(Math.Sin(index * 12.9898) * 43758.5453 % 1))];
 
     /// <summary>
-    /// Состояние индикатора
+    /// Состояние индикатора: идёт процесс, закончился или покой
     /// </summary>
     public static readonly DependencyProperty StateProperty = DependencyProperty.Register(
         nameof(State),
@@ -78,7 +71,7 @@ public sealed class ActivityOrb : FrameworkElement
         new FrameworkPropertyMetadata(ActivityStateEnum.None, FrameworkPropertyMetadataOptions.AffectsRender, (orb, _) => ((ActivityOrb)orb).UpdateLoop()));
 
     /// <summary>
-    /// Как движутся точки, пока процесс идёт
+    /// Вид сферы
     /// </summary>
     public static readonly DependencyProperty KindProperty = DependencyProperty.Register(
         nameof(Kind),
@@ -87,7 +80,16 @@ public sealed class ActivityOrb : FrameworkElement
         new FrameworkPropertyMetadata(ActivityKindEnum.Working, FrameworkPropertyMetadataOptions.AffectsRender));
 
     /// <summary>
-    /// Когда процесс закончился: от этого момента идёт анимация галочки. Так анимация не начинается заново, если карточку пересоздали
+    /// Как показывается завершение
+    /// </summary>
+    public static readonly DependencyProperty DoneStyleProperty = DependencyProperty.Register(
+        nameof(DoneStyle),
+        typeof(ActivityDoneStyleEnum),
+        typeof(ActivityOrb),
+        new FrameworkPropertyMetadata(ActivityDoneStyleEnum.Ripple, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    /// <summary>
+    /// Когда процесс закончился: от этого момента идёт анимация. Так она не начинается заново, если карточку пересоздали
     /// </summary>
     public static readonly DependencyProperty SinceProperty = DependencyProperty.Register(
         nameof(Since),
@@ -96,7 +98,7 @@ public sealed class ActivityOrb : FrameworkElement
         new FrameworkPropertyMetadata(DateTimeOffset.MinValue, FrameworkPropertyMetadataOptions.AffectsRender));
 
     /// <summary>
-    /// Цвет точек и кольца в покое и во время процесса
+    /// Цвет точек
     /// </summary>
     public static readonly DependencyProperty ForegroundProperty = DependencyProperty.Register(
         nameof(Foreground),
@@ -105,7 +107,7 @@ public sealed class ActivityOrb : FrameworkElement
         new FrameworkPropertyMetadata(Brushes.Gray, FrameworkPropertyMetadataOptions.AffectsRender));
 
     /// <summary>
-    /// Цвет галочки и её кольца
+    /// Цвет точек в момент завершения
     /// </summary>
     public static readonly DependencyProperty DoneBrushProperty = DependencyProperty.Register(
         nameof(DoneBrush),
@@ -117,6 +119,11 @@ public sealed class ActivityOrb : FrameworkElement
     /// Идёт ли покадровая отрисовка
     /// </summary>
     private bool _looping;
+
+    /// <summary>
+    /// Счётчик кадров: спокойные сферы обновляются через кадр
+    /// </summary>
+    private int _frame;
 
     /// <summary>
     /// Создаёт индикатор и подписывается на показ и скрытие, чтобы не рисовать кадры невидимому окну
@@ -140,12 +147,21 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
-    /// Как движутся точки, пока процесс идёт
+    /// Вид сферы
     /// </summary>
     public ActivityKindEnum Kind
     {
         get => (ActivityKindEnum)GetValue(KindProperty);
         set => SetValue(KindProperty, value);
+    }
+
+    /// <summary>
+    /// Как показывается завершение
+    /// </summary>
+    public ActivityDoneStyleEnum DoneStyle
+    {
+        get => (ActivityDoneStyleEnum)GetValue(DoneStyleProperty);
+        set => SetValue(DoneStyleProperty, value);
     }
 
     /// <summary>
@@ -158,7 +174,7 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
-    /// Цвет точек и кольца
+    /// Цвет точек
     /// </summary>
     public Brush Foreground
     {
@@ -167,7 +183,7 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
-    /// Цвет галочки
+    /// Цвет точек в момент завершения
     /// </summary>
     public Brush DoneBrush
     {
@@ -186,28 +202,27 @@ public sealed class ActivityOrb : FrameworkElement
             return;
 
         var center = new Point(ActualWidth / 2, ActualHeight / 2);
-        var doneAge = (DateTimeOffset.UtcNow - Since).TotalSeconds;
+        var radius = size / 2 - 1.5;
+        var seconds = DateTimeOffset.UtcNow.TimeOfDay.TotalSeconds;
+        var age = (DateTimeOffset.UtcNow - Since).TotalSeconds;
 
-        if (State == ActivityStateEnum.Working)
-            DrawSphere(drawingContext, center, size / 2 - 1);
-        else if (State == ActivityStateEnum.Done && doneAge is >= 0 and < DONE_SHOW_SECONDS)
-            DrawDone(drawingContext, center, size / 2 - 1.5, doneAge);
+        if (State == ActivityStateEnum.Done && age is >= 0 and < DONE_SECONDS)
+            DrawDone(drawingContext, center, radius, seconds, age);
         else
-            DrawDot(drawingContext, center, size);
+            DrawSphere(drawingContext, center, radius, seconds, Kind, ColorOf(Foreground), 1);
     }
 
     /// <summary>
-    /// Включает покадровую отрисовку, пока она нужна: идёт процесс или играет галочка
+    /// Включает покадровую отрисовку, пока индикатор виден
     /// </summary>
     private void UpdateLoop()
     {
-        var needed = IsLoaded && IsVisible && State != ActivityStateEnum.None;
-        if (needed && !_looping)
+        if (IsLoaded && IsVisible && !_looping)
         {
             CompositionTarget.Rendering += OnFrame;
             _looping = true;
         }
-        else if (!needed)
+        else if (!(IsLoaded && IsVisible))
             StopLoop();
 
         InvalidateVisual();
@@ -226,165 +241,309 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
-    /// Просит перерисовать кадр. Когда галочка отыграла своё, возвращает точку и останавливает отрисовку
+    /// Перерисовывает кадр. Сферы покоя обновляются через кадр: им плавности хватает, а процессор остаётся свободным
     /// </summary>
     /// <param name="sender">Источник события</param>
     /// <param name="e">Аргументы события</param>
     private void OnFrame(object? sender, EventArgs e)
     {
-        if (State == ActivityStateEnum.Done && (DateTimeOffset.UtcNow - Since).TotalSeconds >= DONE_SHOW_SECONDS)
-        {
-            StopLoop();
-            InvalidateVisual();
-
+        var busy = State != ActivityStateEnum.None || Kind is ActivityKindEnum.Working or ActivityKindEnum.Searching or ActivityKindEnum.Connecting or ActivityKindEnum.Composing or ActivityKindEnum.Breathing;
+        if (!busy && ++_frame % 2 == 0)
             return;
-        }
 
         InvalidateVisual();
     }
 
     /// <summary>
-    /// Рисует точку состояния: заливка и тонкое кольцо
+    /// Цвет кисти
     /// </summary>
-    /// <param name="context">Контекст рисования</param>
-    /// <param name="center">Центр</param>
-    /// <param name="size">Размер индикатора</param>
-    private void DrawDot(DrawingContext context, Point center, double size)
-    {
-        var ring = Math.Min(size, 16) / 2;
-        context.DrawEllipse(null, new Pen(Foreground, 1), center, ring - 0.5, ring - 0.5);
-        context.DrawEllipse(Foreground, null, center, ring - 3.5, ring - 3.5);
-    }
-
-    /// <summary>
-    /// Рисует сферу из точек. Движение зависит от вида: у каждого свои радиус точки, яркость и размер
-    /// </summary>
-    /// <param name="context">Контекст рисования</param>
-    /// <param name="center">Центр</param>
-    /// <param name="radius">Радиус сферы</param>
-    private void DrawSphere(DrawingContext context, Point center, double radius)
-    {
-        var seconds = DateTimeOffset.UtcNow.TimeOfDay.TotalSeconds;
-        var kind = Kind;
-        var turn = seconds % TURN_SECONDS / TURN_SECONDS * Math.PI * 2 * (kind == ActivityKindEnum.Breathing ? 0.5 : 1);
-        var (sinTurn, cosTurn) = Math.SinCos(turn);
-        var (sinTilt, cosTilt) = Math.SinCos(TILT);
-        var brushes = Enumerable.Range(0, DEPTH_LEVELS).Select(MakeBrush).ToArray();
-
-        for (var index = 0; index < Points.Length; index++)
-        {
-            var (x, y, z) = Points[index];
-            var turnedX = x * cosTurn + z * sinTurn;
-            var turnedZ = -x * sinTurn + z * cosTurn;
-            var tiltedY = y * cosTilt - turnedZ * sinTilt;
-            var depth = (y * sinTilt + turnedZ * cosTilt + 1) / 2;
-            var (reach, glow) = Motion(kind, seconds, y, Scatter[index]);
-            var level = Math.Min(DEPTH_LEVELS - 1, (int)(Math.Clamp(depth + glow, 0, 0.999) * DEPTH_LEVELS));
-            var dot = (0.45 + 0.75 * depth) * (1 + glow * 0.8);
-
-            context.DrawEllipse(brushes[level], null, new Point(center.X + turnedX * radius * reach, center.Y + tiltedY * radius * reach), dot, dot);
-        }
-    }
-
-    /// <summary>
-    /// Считает, как далеко от центра лежит точка и насколько она подсвечена в этот момент
-    /// </summary>
-    /// <param name="kind">Вид движения</param>
-    /// <param name="seconds">Время, секунд</param>
-    /// <param name="height">Высота точки на единичной сфере от -1 до 1</param>
-    /// <param name="scatter">Постоянное случайное число точки от 0 до 1</param>
-    /// <returns>Доля радиуса сферы и добавка яркости от 0 до 1</returns>
-    private static (double Reach, double Glow) Motion(ActivityKindEnum kind, double seconds, double height, double scatter)
-    {
-        switch (kind)
-        {
-            case ActivityKindEnum.Searching:
-                var band = (seconds * 0.7 % 1) * 2.6 - 1.3;
-
-                return (1, Math.Max(0, 1 - Math.Abs(height - band) * 3.2) * 0.6);
-
-            case ActivityKindEnum.Connecting:
-                return (0.62 + 0.38 * (0.5 + 0.5 * Math.Sin(seconds * 2.4 - height * 3)), 0);
-
-            case ActivityKindEnum.Composing:
-                var phase = seconds % 3.2 / 3.2;
-                var gather = phase < 0.7 ? 1 - Math.Pow(1 - phase / 0.7, 3) : phase < 0.9 ? 1 : 1 - (phase - 0.9) / 0.1;
-
-                return (1 + (1 - gather) * (0.5 + scatter), gather > 0.98 ? 0.15 : 0);
-
-            case ActivityKindEnum.Breathing:
-                return (0.82 + 0.18 * Math.Sin(seconds * 1.3), 0);
-
-            default:
-                return (1, 0);
-        }
-    }
+    /// <param name="brush">Кисть</param>
+    /// <returns>Цвет сплошной кисти или серый</returns>
+    private static Color ColorOf(Brush brush) => brush is SolidColorBrush solid ? solid.Color : Colors.Gray;
 
     /// <summary>
     /// Кисть для одного уровня глубины: чем ближе точка, тем она плотнее
     /// </summary>
     /// <param name="level">Уровень, 0 — самые дальние точки</param>
-    /// <returns>Замороженная кисть цвета индикатора с нужной прозрачностью</returns>
-    private Brush MakeBrush(int level)
+    /// <param name="color">Цвет точек</param>
+    /// <param name="strength">Общая плотность от 0 до 1</param>
+    /// <returns>Замороженная кисть нужной прозрачности</returns>
+    private static Brush MakeBrush(int level, Color color, double strength)
     {
-        var color = Foreground is SolidColorBrush solid ? solid.Color : Colors.Gray;
-        var brush = new SolidColorBrush(Color.FromArgb((byte)(70 + 185 * level / (DEPTH_LEVELS - 1)), color.R, color.G, color.B));
+        var brush = new SolidColorBrush(Color.FromArgb((byte)((70 + 185 * level / (DEPTH_LEVELS - 1)) * Math.Clamp(strength, 0, 1)), color.R, color.G, color.B));
         brush.Freeze();
 
         return brush;
     }
 
     /// <summary>
-    /// Рисует кольцо, которое замыкается, и галочку внутри него
+    /// Рисует сферу из точек. Движение зависит от вида: у каждого своя дальность точки, яркость, скорость и набор видимых точек
     /// </summary>
     /// <param name="context">Контекст рисования</param>
     /// <param name="center">Центр</param>
-    /// <param name="radius">Радиус кольца</param>
-    /// <param name="age">Сколько секунд прошло с окончания процесса</param>
-    private void DrawDone(DrawingContext context, Point center, double radius, double age)
+    /// <param name="radius">Радиус сферы</param>
+    /// <param name="seconds">Время, секунд</param>
+    /// <param name="kind">Вид сферы</param>
+    /// <param name="color">Цвет точек</param>
+    /// <param name="strength">Общая плотность от 0 до 1</param>
+    private static void DrawSphere(DrawingContext context, Point center, double radius, double seconds, ActivityKindEnum kind, Color color, double strength)
     {
-        var pen = new Pen(DoneBrush, 2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
-        var ring = Math.Clamp(age / RING_SECONDS, 0, 1);
-        var tick = Math.Clamp((age - RING_SECONDS) / TICK_SECONDS, 0, 1);
+        var brushes = Enumerable.Range(0, DEPTH_LEVELS).Select(level => MakeBrush(level, color, strength)).ToArray();
+        var (sinTilt, cosTilt) = Math.SinCos(TILT);
 
-        if (ring >= 1)
-            context.DrawEllipse(null, pen, center, radius, radius);
-        else
+        for (var index = 0; index < Points.Length; index++)
         {
-            var start = new Point(center.X, center.Y - radius);
-            var (sin, cos) = Math.SinCos(ring * Math.PI * 2);
-            var end = new Point(center.X + radius * sin, center.Y - radius * cos);
-            var geometry = new StreamGeometry();
-            using (var ctx = geometry.Open())
-            {
-                ctx.BeginFigure(start, false, false);
-                ctx.ArcTo(end, new Size(radius, radius), 0, ring > 0.5, SweepDirection.Clockwise, true, false);
-            }
+            var motion = Motion(kind, seconds, Points[index].Y, Scatter[index], index);
+            if (!motion.Show)
+                continue;
 
-            geometry.Freeze();
-            context.DrawGeometry(null, pen, geometry);
+            var (x, y, depth) = Rotate(index, seconds * motion.Turn, cosTilt, sinTilt);
+            var level = Math.Min(DEPTH_LEVELS - 1, (int)(Math.Clamp(depth + motion.Glow, 0, 0.999) * DEPTH_LEVELS));
+            var dot = (0.45 + 0.75 * depth) * (1 + Math.Max(0, motion.Glow) * 0.8);
+
+            context.DrawEllipse(brushes[level], null, new Point(center.X + x * radius * motion.Reach, center.Y + y * radius * motion.Reach), dot, dot);
         }
+    }
 
-        if (tick <= 0)
+    /// <summary>
+    /// Поворачивает точку сферы и проецирует её на плоскость
+    /// </summary>
+    /// <param name="index">Номер точки</param>
+    /// <param name="turns">Сколько оборотов в секундах нужно пройти: время, умноженное на скорость</param>
+    /// <param name="cosTilt">Косинус наклона оси</param>
+    /// <param name="sinTilt">Синус наклона оси</param>
+    /// <returns>Положение на плоскости от -1 до 1 и глубина от 0 до 1, где 1 ближе к зрителю</returns>
+    private static (double X, double Y, double Depth) Rotate(int index, double turns, double cosTilt, double sinTilt)
+    {
+        var (x, y, z) = Points[index];
+        var (sinTurn, cosTurn) = Math.SinCos(turns % TURN_SECONDS / TURN_SECONDS * Math.PI * 2);
+        var turnedX = x * cosTurn + z * sinTurn;
+        var turnedZ = -x * sinTurn + z * cosTurn;
+
+        return (turnedX, y * cosTilt - turnedZ * sinTilt, (y * sinTilt + turnedZ * cosTilt + 1) / 2);
+    }
+
+    /// <summary>
+    /// Считает, как ведёт себя точка выбранного вида в этот момент
+    /// </summary>
+    /// <param name="kind">Вид сферы</param>
+    /// <param name="seconds">Время, секунд</param>
+    /// <param name="height">Высота точки на единичной сфере от -1 до 1</param>
+    /// <param name="scatter">Постоянное случайное число точки от 0 до 1</param>
+    /// <param name="index">Номер точки</param>
+    /// <returns>Дальность от центра в долях радиуса, добавка яркости, скорость вращения и показывается ли точка</returns>
+    private static (double Reach, double Glow, double Turn, bool Show) Motion(ActivityKindEnum kind, double seconds, double height, double scatter, int index)
+    {
+        switch (kind)
+        {
+            case ActivityKindEnum.Searching:
+                return (1, Math.Max(0, 1 - Math.Abs(height - ((seconds * 0.7 % 1) * 2.6 - 1.3)) * 3.2) * 0.6, 1, true);
+
+            case ActivityKindEnum.Connecting:
+                return (0.62 + 0.38 * (0.5 + 0.5 * Math.Sin(seconds * 2.4 - height * 3)), 0, 1, true);
+
+            case ActivityKindEnum.Composing:
+                var phase = seconds % 3.2 / 3.2;
+                var gather = phase < 0.7 ? 1 - Math.Pow(1 - phase / 0.7, 3) : phase < 0.9 ? 1 : 1 - (phase - 0.9) / 0.1;
+
+                return (1 + (1 - gather) * (0.5 + scatter), gather > 0.98 ? 0.15 : 0, 1, true);
+
+            case ActivityKindEnum.Breathing:
+                return (0.82 + 0.18 * Math.Sin(seconds * 1.3), 0, 0.5, true);
+
+            case ActivityKindEnum.Alive:
+                return (1 + 0.03 * Math.Sin(seconds * 1.5 + height * 4), 0.12 * Math.Max(0, Math.Sin(seconds * 2 + index)), 0.6, true);
+
+            case ActivityKindEnum.Calm:
+                return (1, 0.15 * Math.Max(0, Math.Sin(seconds * 0.9 - height * 2)), 0.25, true);
+
+            case ActivityKindEnum.Dormant:
+                return (0.9, -0.35, 0.2, index % 4 == 0);
+
+            case ActivityKindEnum.Attention:
+                return (0.8 + 0.2 * Math.Sin(seconds * 3.2), 0.2 * Math.Max(0, Math.Sin(seconds * 3.2)), 0.7, true);
+
+            case ActivityKindEnum.Failed:
+                var wobble = 0.5 + 0.5 * Math.Sin(seconds * 5 + index);
+
+                return (1 + (scatter - 0.5) * 0.35 * wobble + (scatter > 0.85 ? 0.45 : 0), 0, 0.4, true);
+
+            case ActivityKindEnum.Beacon:
+                var belt = Math.Abs(height) < 0.14;
+
+                return (belt ? 1.3 : 0.78, belt ? 0.35 : 0, belt ? 2.4 : 0.8, true);
+
+            default:
+                return (1, 0, 1, true);
+        }
+    }
+
+    /// <summary>
+    /// Проигрывает завершение выбранным способом
+    /// </summary>
+    /// <param name="context">Контекст рисования</param>
+    /// <param name="center">Центр</param>
+    /// <param name="radius">Радиус сферы</param>
+    /// <param name="seconds">Время, секунд</param>
+    /// <param name="age">Сколько секунд прошло с окончания процесса</param>
+    private void DrawDone(DrawingContext context, Point center, double radius, double seconds, double age)
+    {
+        var done = ColorOf(DoneBrush);
+        switch (DoneStyle)
+        {
+            case ActivityDoneStyleEnum.DotTick:
+                DrawDotTick(context, center, radius, seconds, age, done);
+                break;
+            case ActivityDoneStyleEnum.Burst:
+                DrawBurst(context, center, radius, seconds, age, done);
+                break;
+            default:
+                DrawRipple(context, center, radius, seconds, age, done);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Сфера вспыхивает цветом завершения, от неё расходится кольцо из точек и тает
+    /// </summary>
+    /// <param name="context">Контекст рисования</param>
+    /// <param name="center">Центр</param>
+    /// <param name="radius">Радиус сферы</param>
+    /// <param name="seconds">Время, секунд</param>
+    /// <param name="age">Секунд с окончания</param>
+    /// <param name="done">Цвет завершения</param>
+    private void DrawRipple(DrawingContext context, Point center, double radius, double seconds, double age, Color done)
+    {
+        var share = age / DONE_SECONDS;
+        var wave = Math.Clamp(age / 1.2, 0, 1);
+        var calm = ColorOf(Foreground);
+        var mixed = Mix(done, calm, Math.Clamp((age - 0.9) / 1, 0, 1));
+
+        DrawSphere(context, center, radius * (1 + 0.1 * Math.Sin(Math.Min(share * 2, 1) * Math.PI)), seconds, ActivityKindEnum.Calm, mixed, 1);
+        if (wave >= 1)
             return;
 
+        var spread = radius * (1 + 0.9 * (1 - Math.Pow(1 - wave, 3)));
+        var fade = 1 - wave;
+        var brush = new SolidColorBrush(Color.FromArgb((byte)(255 * fade), done.R, done.G, done.B));
+        brush.Freeze();
+        for (var index = 0; index < 36; index++)
+        {
+            var (sin, cos) = Math.SinCos(index / 36.0 * Math.PI * 2);
+            context.DrawEllipse(brush, null, new Point(center.X + cos * spread, center.Y + sin * spread), 1.1 * fade + 0.4, 1.1 * fade + 0.4);
+        }
+    }
+
+    /// <summary>
+    /// Точки собираются в кольцо с галочкой, держатся и возвращаются в сферу
+    /// </summary>
+    /// <param name="context">Контекст рисования</param>
+    /// <param name="center">Центр</param>
+    /// <param name="radius">Радиус сферы</param>
+    /// <param name="seconds">Время, секунд</param>
+    /// <param name="age">Секунд с окончания</param>
+    /// <param name="done">Цвет завершения</param>
+    private void DrawDotTick(DrawingContext context, Point center, double radius, double seconds, double age, Color done)
+    {
+        var (sinTilt, cosTilt) = Math.SinCos(TILT);
+        var brush = new SolidColorBrush(done);
+        brush.Freeze();
+        var ringCount = POINT_COUNT * 6 / 10;
+
+        for (var index = 0; index < POINT_COUNT; index++)
+        {
+            var (x, y, depth) = Rotate(index, seconds * 0.25, cosTilt, sinTilt);
+            var from = new Point(center.X + x * radius, center.Y + y * radius);
+            var to = TickTarget(index, ringCount, center, radius);
+            var delay = Scatter[index] * 0.25;
+            var gather = Ease(Math.Clamp((age - delay) / 0.5, 0, 1));
+            var release = Ease(Math.Clamp((age - 1.2 - delay) / 0.5, 0, 1));
+            var at = gather * (1 - release);
+            var dot = (0.45 + 0.75 * depth) * (1 - at) + 1.25 * at;
+
+            context.DrawEllipse(at > 0.5 ? brush : MakeBrush(Math.Min(DEPTH_LEVELS - 1, (int)(depth * DEPTH_LEVELS)), done, 1), null, new Point(from.X + (to.X - from.X) * at, from.Y + (to.Y - from.Y) * at), dot, dot);
+        }
+    }
+
+    /// <summary>
+    /// Место точки в кольце с галочкой: первые точки идут по кольцу, остальные по двум отрезкам галочки
+    /// </summary>
+    /// <param name="index">Номер точки</param>
+    /// <param name="ringCount">Сколько точек отдано кольцу</param>
+    /// <param name="center">Центр</param>
+    /// <param name="radius">Радиус сферы</param>
+    /// <returns>Точка на плоскости</returns>
+    private static Point TickTarget(int index, int ringCount, Point center, double radius)
+    {
+        if (index < ringCount)
+        {
+            var (sin, cos) = Math.SinCos(index / (double)ringCount * Math.PI * 2 - Math.PI / 2);
+
+            return new Point(center.X + cos * radius, center.Y + sin * radius);
+        }
+
+        var share = (index - ringCount) / (double)(POINT_COUNT - ringCount - 1);
         var from = new Point(center.X - radius * 0.42, center.Y + radius * 0.02);
         var corner = new Point(center.X - radius * 0.1, center.Y + radius * 0.36);
         var to = new Point(center.X + radius * 0.46, center.Y - radius * 0.3);
-        var firstShare = Math.Clamp(tick / 0.4, 0, 1);
-        var secondShare = Math.Clamp((tick - 0.4) / 0.6, 0, 1);
 
-        context.DrawLine(pen, from, Lerp(from, corner, firstShare));
-        if (secondShare > 0)
-            context.DrawLine(pen, corner, Lerp(corner, to, secondShare));
+        return share < 0.4 ? Lerp(from, corner, share / 0.4) : Lerp(corner, to, (share - 0.4) / 0.6);
     }
+
+    /// <summary>
+    /// Сфера схлопывается в яркую точку, взрывается и точки возвращаются на места
+    /// </summary>
+    /// <param name="context">Контекст рисования</param>
+    /// <param name="center">Центр</param>
+    /// <param name="radius">Радиус сферы</param>
+    /// <param name="seconds">Время, секунд</param>
+    /// <param name="age">Секунд с окончания</param>
+    /// <param name="done">Цвет завершения</param>
+    private void DrawBurst(DrawingContext context, Point center, double radius, double seconds, double age, Color done)
+    {
+        var (sinTilt, cosTilt) = Math.SinCos(TILT);
+        var implode = Math.Clamp(age / 0.4, 0, 1);
+        var explode = Math.Clamp((age - 0.4) / 1.3, 0, 1);
+        var reach = age < 0.4 ? 1 - 0.85 * Ease(implode) : 0.15 + 1.25 * (1 - Math.Pow(1 - explode, 3));
+        var settle = Math.Clamp((age - 1.1) / 0.8, 0, 1);
+        reach = reach * (1 - settle) + settle;
+        var brushes = Enumerable.Range(0, DEPTH_LEVELS).Select(level => MakeBrush(level, Mix(done, ColorOf(Foreground), settle), 1)).ToArray();
+
+        for (var index = 0; index < POINT_COUNT; index++)
+        {
+            var (x, y, depth) = Rotate(index, seconds * 0.25, cosTilt, sinTilt);
+            var level = Math.Min(DEPTH_LEVELS - 1, (int)(Math.Clamp(depth + (1 - settle) * 0.4, 0, 0.999) * DEPTH_LEVELS));
+            var dot = (0.45 + 0.75 * depth) * (1 + (1 - settle) * 0.6);
+
+            context.DrawEllipse(brushes[level], null, new Point(center.X + x * radius * reach, center.Y + y * radius * reach), dot, dot);
+        }
+    }
+
+    /// <summary>
+    /// Плавное ускорение и замедление
+    /// </summary>
+    /// <param name="value">Доля пути от 0 до 1</param>
+    /// <returns>Сглаженная доля пути</returns>
+    private static double Ease(double value) => value * value * (3 - 2 * value);
+
+    /// <summary>
+    /// Смесь двух цветов
+    /// </summary>
+    /// <param name="first">Цвет при нуле</param>
+    /// <param name="second">Цвет при единице</param>
+    /// <param name="share">Доля второго цвета</param>
+    /// <returns>Промежуточный цвет</returns>
+    private static Color Mix(Color first, Color second, double share) => Color.FromRgb(
+        (byte)(first.R + (second.R - first.R) * share),
+        (byte)(first.G + (second.G - first.G) * share),
+        (byte)(first.B + (second.B - first.B) * share));
 
     /// <summary>
     /// Точка на отрезке между двумя
     /// </summary>
     /// <param name="from">Начало</param>
     /// <param name="to">Конец</param>
-    /// <param name="share">Доля пути от 0 до 1</param>
+    /// <param name="share">Доля пути</param>
     /// <returns>Точка на нужной доле отрезка</returns>
     private static Point Lerp(Point from, Point to, double share) => new(from.X + (to.X - from.X) * share, from.Y + (to.Y - from.Y) * share);
 }
