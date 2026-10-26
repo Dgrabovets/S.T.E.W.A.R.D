@@ -46,7 +46,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="Steward" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
+                    <TextBlock Text="S.T.E.W.A.R.D" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
                     <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,2,0,0"/>
                 </StackPanel>
                 <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="10,4,16,4" VerticalAlignment="Center" Margin="0,0,12,0">
@@ -90,7 +90,6 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
                                 <TextBlock Text="Задачи" Style="{StaticResource PageTitle}"/>
-                                <TextBlock Text="Всё, что приложение запускает или за чем следит. Статус обновляется сам." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
                                 <Border Style="{StaticResource Card}" Background="{StaticResource AttentionSurfaceBrush}"
                                         Visibility="{Binding HasRegistryErrors, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel>
@@ -114,7 +113,7 @@
                                                             <TextBlock x:Name="Name" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
                                                             <TextBlock Text="{Binding Headline}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBodyLarge}" Margin="12,2,0,0"/>
                                                         </StackPanel>
-                                                        <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                                        <TextBlock x:Name="Reason" Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                                     </StackPanel>
                                                     <Button x:Name="Run" Grid.Column="2" Content="Запустить" Style="{StaticResource ActionButton}" Margin="12,0,0,0"
                                                             VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"/>
@@ -129,6 +128,7 @@
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
                                                     <Setter TargetName="Card" Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
+                                                    <Setter TargetName="Reason" Property="Foreground" Value="{StaticResource DangerBrush}"/>
                                                 </DataTrigger>
                                             </DataTemplate.Triggers>
                                         </DataTemplate>
@@ -152,7 +152,6 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="Идеи" Style="{StaticResource PageTitle}"/>
-                                <TextBlock Text="Разобранные идеи из сохранённых рилсов, которые ждут твоего решения." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding IsReelsBusy, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel Orientation="Horizontal">
                                         <ctl:ActivityOrb Width="26" Height="26" Kind="Composing" Foreground="{StaticResource WorkingBrush}" Margin="-4,-2,12,-2"/>
@@ -203,11 +202,9 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                             <TextBlock Text="Домашние задания" Style="{StaticResource PageTitle}"/>
-                            <TextBlock Text="Задания, которые агент нашёл в расшифровках занятий. Работу сдаёшь всегда ты сам." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
                             <ToggleButton IsChecked="{Binding IsFormatsOpen, Mode=TwoWay}" Style="{StaticResource SectionToggle}">
                                 <StackPanel>
                                     <TextBlock Text="Форматы заданий" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                                    <TextBlock Text="В каком виде готовить ДЗ по каждому занятию" Style="{StaticResource PageHint}" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </ToggleButton>
                             <ctl:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsFormatsOpen}">
@@ -274,7 +271,6 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
                                         <TextBlock Text="Журнал запусков" Style="{StaticResource PageTitle}"/>
-                                        <TextBlock Text="Что приложение запускало и чем это закончилось. Последние сто записей." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="16,0,0,0">
                                         <Button Content="Сверки расписания" Style="{StaticResource ActionButton}" Command="{Binding OpenScheduleHistoryCommand}"/>
@@ -303,7 +299,7 @@
                                                         <TextBlock Text="{Binding Facts}" Style="{StaticResource TextCaption}" Margin="0,4,0,0"/>
                                                         <TextBlock Text="{Binding Summary}" Style="{StaticResource TextSecondary}" Margin="0,8,0,0"
                                                                    Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}"/>
-                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource TextBody}" Margin="0,8,0,0"
+                                                        <TextBlock x:Name="Reason" Text="{Binding Detail}" Style="{StaticResource TextBody}" Margin="0,8,0,0"
                                                                    Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}"/>
                                                         <ItemsControl ItemsSource="{Binding OutputLines}" Margin="0,8,0,0"
                                                                       Visibility="{Binding HasOutput, Converter={StaticResource BoolToVisibility}}">
@@ -330,6 +326,7 @@
                                             <DataTemplate.Triggers>
                                                 <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
                                                     <Setter TargetName="Row" Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
+                                                    <Setter TargetName="Reason" Property="Foreground" Value="{StaticResource DangerBrush}"/>
                                                 </DataTrigger>
                                             </DataTemplate.Triggers>                                        </DataTemplate>
                                     </ItemsControl.ItemTemplate>

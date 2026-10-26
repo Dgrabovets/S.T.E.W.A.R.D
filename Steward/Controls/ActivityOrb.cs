@@ -478,9 +478,9 @@ public sealed class ActivityOrb : FrameworkElement
         var share = age / DONE_SECONDS;
         var wave = Math.Clamp(age / 1.2, 0, 1);
         var calm = ColorOf(Foreground);
-        var mixed = Mix(done, calm, Math.Clamp((age - 0.9) / 1, 0, 1));
+        var mixed = Mix(done, calm, Ease(Math.Clamp((age - 0.4) / (DONE_SECONDS - 0.4), 0, 1)));
 
-        DrawSphere(context, center, radius * (1 + 0.1 * Math.Sin(Math.Min(share * 2, 1) * Math.PI)), seconds, ActivityKindEnum.Calm, mixed, 1);
+        DrawSphere(context, center, radius * (1 + 0.1 * Math.Sin(Math.Min(share * 2, 1) * Math.PI)), seconds, Kind, mixed, 1, Math.Max(1, Stride), DotScale);
         if (wave >= 1)
             return;
 

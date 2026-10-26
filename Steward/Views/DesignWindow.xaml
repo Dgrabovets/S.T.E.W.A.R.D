@@ -33,8 +33,7 @@
 
     <Border Style="{StaticResource WindowChrome}">
         <StackPanel Margin="24,16,24,24">
-            <TextBlock Text="Дизайн-система Steward" Style="{StaticResource TextHeadline}"/>
-            <TextBlock Text="Все цвета, размеры и состояния приложения. Цвета заданы в Themes/Colors.xaml, всё остальное берёт их по имени." Style="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+            <TextBlock Text="Дизайн-система S.T.E.W.A.R.D" Style="{StaticResource TextHeadline}"/>
 
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -59,7 +58,6 @@
             </StackPanel>
 
             <TextBlock Text="Сферы состояния" Style="{StaticResource Section}"/>
-            <TextBlock Text="Сфера из точек вместо точки-индикатора: вид говорит о состоянии, цвет берётся из палитры состояний. Окончание процесса проигрывает волну от сферы." Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,8"/>
             <WrapPanel>
                 <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Alive" Foreground="{StaticResource OkBrush}"/><TextBlock Text="Работает" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>
                 <StackPanel Width="88" Margin="0,0,8,12"><ctl:ActivityOrb Width="56" Height="56" Kind="Waiting" Foreground="{StaticResource OkBrush}"/><TextBlock Text="Выполнено, ждёт срока" Style="{StaticResource TextCaption}" TextAlignment="Center" TextWrapping="Wrap" HorizontalAlignment="Center"/></StackPanel>

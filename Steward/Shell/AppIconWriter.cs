@@ -138,7 +138,7 @@ public static class AppIconWriter
         grid.Children.Add(tile);
 
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 40, 0) };
-        text.Children.Add(new TextBlock { Text = "Steward", FontFamily = new System.Windows.Media.FontFamily("Segoe UI"), FontWeight = FontWeights.SemiBold, FontSize = 96, Foreground = (Brush)resources["TextBrush"] });
+        text.Children.Add(new TextBlock { Text = "S.T.E.W.A.R.D", FontFamily = new System.Windows.Media.FontFamily("Segoe UI"), FontWeight = FontWeights.SemiBold, FontSize = 96, Foreground = (Brush)resources["TextBrush"] });
         text.Children.Add(new TextBlock { Text = "Личные утилиты в трее: расписание, почта, рилсы и домашние задания в SingularityApp", FontFamily = new System.Windows.Media.FontFamily("Segoe UI"), FontSize = 32, Foreground = (Brush)resources["MutedBrush"], TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0) });
         Grid.SetColumn(text, 1);
         grid.Children.Add(text);

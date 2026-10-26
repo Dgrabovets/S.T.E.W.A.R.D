@@ -53,7 +53,7 @@ public sealed class GooeyCluster : FrameworkElement
     /// <summary>
     /// Высота полосы подписи над кнопками
     /// </summary>
-    private const double LABEL_BAND = 30;
+    private const double LABEL_BAND = 20;
 
     /// <summary>
     /// Жёсткость пружины: чем больше, тем быстрее кнопка выезжает

@@ -27,7 +27,6 @@
             <Grid Margin="24,20,20,12" MouseLeftButtonDown="Header_OnDrag" Background="Transparent">
                 <StackPanel>
                     <TextBlock Text="Настройки" Style="{StaticResource TextHeadline}"/>
-                    <TextBlock Text="Параметры расписания и перезапуск сервиса" Style="{StaticResource TextSecondary}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
                 <Button Content="Закрыть" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" VerticalAlignment="Top" Click="Close_OnClick"/>
             </Grid>
@@ -38,12 +37,10 @@
                             <TextBlock Text="{Binding SettingsMessage}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,4"/>
 
                             <TextBlock Text="Интервал сверки" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Сколько минут ждать между проверками таблицы. Ползунок и число — одно и то же значение, от 1 до 180. После сохранения контейнер перезапускается и начинает ходить с новым интервалом."/>
                             <Grid Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="72"/>
+                                    <ColumnDefinition Width="96"/>
                                 </Grid.ColumnDefinitions>
                                 <controls:IntervalBar VerticalAlignment="Center" Margin="0,0,12,0"
                                                    Value="{Binding IntervalMinutes, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
@@ -52,33 +49,21 @@
                             </Grid>
 
                             <TextBlock Text="Название проекта" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Имя проекта в Singularity, куда записываются занятия. Сервис ищет проект с этим названием и создаёт его, если такого нет."/>
                             <TextBox Style="{StaticResource Field}" Text="{Binding ProjectTitle, UpdateSourceTrigger=PropertyChanged}"/>
 
                             <TextBlock Text="Колонка группы" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Заголовок столбца на листе, из которого берутся ваши пары. Пишите его так же, как в таблице, например РКИ-2-26."/>
                             <TextBox Style="{StaticResource Field}" Text="{Binding GroupColumn, UpdateSourceTrigger=PropertyChanged}"/>
 
                             <TextBlock Text="Часовой пояс таблицы" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Пояс, в котором в таблице указано время начала пар. Для этой таблицы оставьте Europe/Moscow: время в ней московское, даже если на компьютере другой пояс."/>
                             <TextBox Style="{StaticResource Field}" Text="{Binding TimeZone, UpdateSourceTrigger=PropertyChanged}"/>
 
                             <TextBlock Text="Идентификатор таблицы" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Часть ссылки на Google Таблицу между /d/ и /edit. По ней сервис скачивает расписание."/>
                             <TextBox Style="{StaticResource Field}" Text="{Binding SpreadsheetId, UpdateSourceTrigger=PropertyChanged}"/>
 
                             <TextBlock Text="Номер листа" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Число gid из адреса вкладки. Это не название листа, а номер вкладки внутри файла."/>
                             <TextBox Style="{StaticResource Field}" Text="{Binding SheetGid, UpdateSourceTrigger=PropertyChanged}"/>
 
                             <TextBlock Text="Токен Singularity" Style="{StaticResource FieldTitle}"/>
-                            <TextBlock Style="{StaticResource Hint}"
-                                       Text="Ключ, по которому сервис входит в ваш аккаунт. Здесь уже лежит значение из файла настроек, на экране оно закрыто точками. Если выпустите новый ключ, вставьте его вместо текущего и сохраните."/>
                             <PasswordBox Style="{StaticResource SecretField}"
                                          behaviors:PasswordBinding.Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         </StackPanel>

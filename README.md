@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/logo.png" alt="Steward" width="128">
+  <img src="docs/logo.png" alt="S.T.E.W.A.R.D" width="128">
 </p>
 
-# Steward
+# S.T.E.W.A.R.D
 
 Личные утилиты, которые заводят задачи в SingularityApp, и приложение в трее Windows, которое запускает их и показывает статус каждой.
 
@@ -13,7 +13,7 @@
 | [`Steward.Schedule/`](Steward.Schedule/README.md) | Переносит расписание из Google Таблицы в задачи. Работает в Docker. Библиотеки: `Steward.Schedule.Core` и `Steward.Schedule.Shared` |
 | [`Steward.Mail/`](Steward.Mail/README.md) | Проверяет учебную почту и ставит задачи на письма, которые требуют ответа или содержат отзыв |
 | [`Steward.Homework.Tasks/`](Steward.Homework.Tasks/README.md) | Создаёт задачи SingularityApp по заданиям, которые агент нашёл в расшифровках |
-| [`Steward.Homework/`](Steward.Homework/README.md) | Занятия и выбранный для каждого формат ДЗ (Word, презентация, текст, код, не готовить). Выбор делается в окне «Форматы ДЗ» на странице «ДЗ» |
+| [`Steward.Homework/`](Steward.Homework/README.md) | Занятия и выбранный для каждого формат ДЗ (Word, презентация, текст, код, не готовить). Выбор делается в блоке «Форматы заданий» на странице «Домашние задания» |
 | [`Steward.Reels/`](Steward.Reels/README.md) | Бот в Telegram: рилсы превращаются в идеи на странице «Идеи». Идеи хранит библиотека `Steward.Ideas` |
 | [`Whisper/`](Whisper/README.md) | Локальная расшифровка речи из видео, пока для рилсов (Python) |
 | `tests/` | Тесты: `Steward.Tests`, `Steward.Status.Tests`, `Steward.Schedule.Tests`, `Steward.Mail.Tests`, `Steward.Reels.Tests` |

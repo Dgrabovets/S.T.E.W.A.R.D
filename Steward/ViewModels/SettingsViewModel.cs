@@ -29,7 +29,7 @@ public sealed class SettingsViewModel : Bindable
     /// <summary>
     /// Сообщение над полями настроек
     /// </summary>
-    private string _settingsMessage = "Здесь параметры из файла настроек. Они уже подставлены";
+    private string _settingsMessage = string.Empty;
 
     /// <summary>
     /// Название проекта

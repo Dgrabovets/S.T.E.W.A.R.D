@@ -1,4 +1,4 @@
-# Steward
+# S.T.E.W.A.R.D
 
 Приложение в трее Windows. Запускает задачи из [`config/jobs.json`](../config/jobs.json) и показывает статус каждой. Как задачи запускаются и в каком формате пишут статус, описано в [`Steward.Status`](../Steward.Status/README.md).
 
