@@ -15,6 +15,16 @@ public sealed class FakeTelegram(params TelegramMessage[] messages) : ITelegramC
     public List<string> Sent { get; } = [];
 
     /// <summary>
+    /// Данные кнопок, которые бот показал под вопросами
+    /// </summary>
+    public List<string> Buttons { get; } = [];
+
+    /// <summary>
+    /// Номера нажатий, которые бот подтвердил
+    /// </summary>
+    public List<string> Answered { get; } = [];
+
+    /// <summary>
     /// Номер, с которого бот запросил сообщения в последний раз
     /// </summary>
     public long LastOffset { get; private set; }
@@ -34,6 +44,35 @@ public sealed class FakeTelegram(params TelegramMessage[] messages) : ITelegramC
 
     /// <summary>
     /// Запоминает ответ
+    /// </summary>
+    /// <param name="chatId">Чат</param>
+    /// <param name="text">Текст</param>
+    /// <param name="buttons">Кнопки под вопросом</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Завершённая задача</returns>
+    public Task SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken)
+    {
+        Sent.Add(text);
+        Buttons.AddRange(buttons.Select(button => button.Data));
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Запоминает подтверждённые нажатия
+    /// </summary>
+    /// <param name="callbackId">Номер нажатия</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Завершённая задача</returns>
+    public Task AnswerCallbackAsync(string callbackId, CancellationToken cancellationToken)
+    {
+        Answered.Add(callbackId);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Запоминает ответ без кнопок
     /// </summary>
     /// <param name="chatId">Чат</param>
     /// <param name="text">Текст</param>

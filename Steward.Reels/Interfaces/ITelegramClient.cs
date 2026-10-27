@@ -23,4 +23,22 @@ public interface ITelegramClient
     /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Задача, которая завершается, когда Telegram принимает сообщение</returns>
     Task SendAsync(long chatId, string text, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Отправляет сообщение с кнопками под ним. Нажатие приходит как сообщение с <see cref="TelegramMessage.CallbackId"/>, а в тексте лежит данные кнопки
+    /// </summary>
+    /// <param name="chatId">Чат</param>
+    /// <param name="text">Текст вопроса</param>
+    /// <param name="buttons">Кнопки в одну строку: подпись и данные</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда Telegram принимает сообщение</returns>
+    Task SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Подтверждает нажатие кнопки, чтобы у неё перестали крутиться часики
+    /// </summary>
+    /// <param name="callbackId">Номер нажатия</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда Telegram принимает подтверждение</returns>
+    Task AnswerCallbackAsync(string callbackId, CancellationToken cancellationToken);
 }

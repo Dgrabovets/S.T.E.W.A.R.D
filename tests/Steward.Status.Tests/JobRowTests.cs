@@ -112,7 +112,7 @@ public class JobRowTests
 
         Assert.Equal(RowToneEnum.Attention, row.Tone);
         Assert.Equal(3, row.Awaiting);
-        Assert.Equal("Разобрано 3 рилса. Ждут решения: 3", row.Detail);
+        Assert.Equal("Разобрано 3 рилса. Без решения: 3", row.Detail);
     }
 
     /// <summary>

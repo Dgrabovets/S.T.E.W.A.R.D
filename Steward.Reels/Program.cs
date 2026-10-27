@@ -49,7 +49,9 @@ internal static class Program
                 new OffsetStore(Path.Combine(DataLocation.DataDirectory(), "reels", "offset.txt")),
                 settings,
                 TimeProvider.System,
-                Log);
+                Log,
+                new ClaudeIdeaAnalyzer(settings),
+                new SeenStore(Path.Combine(DataLocation.DataDirectory(), "reels", "seen.txt"), Path.Combine(DataLocation.DataDirectory(), "reels", "pending.json")));
 
             var result = await pipeline.RunAsync(CancellationToken.None);
 
@@ -88,7 +90,7 @@ internal static class Program
     /// Собирает строку статуса из итога проверки
     /// </summary>
     /// <param name="result">Итог проверки</param>
-    /// <returns>Например «Принято 2, ждут решения 3». Если ничего не пришло, «Новых рилсов нет»</returns>
+    /// <returns>Например «Принято 2, не получилось 1». Сколько идей ждёт решения, добавляет приложение само. Если ничего не пришло, «Новых рилсов нет»</returns>
     private static string Summary(ReelsResult result)
     {
         var parts = new List<string>();
@@ -97,9 +99,6 @@ internal static class Program
 
         if (result.Failed > 0)
             parts.Add($"не получилось {result.Failed}");
-
-        if (result.Awaiting > 0)
-            parts.Add($"ждут решения {result.Awaiting}");
 
         return parts.Count == 0 ? "Новых рилсов нет" : string.Join(", ", parts).Replace("принято", "Принято", StringComparison.Ordinal);
     }

@@ -303,7 +303,7 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
-    /// Раскладывает запуски по задачам, добавляет сверки расписания и сортирует разделы так, чтобы сверху был тот, где запись свежее. Раздел с последней неудачей раскрыт сам, пока человек не решил иначе
+    /// Раскладывает запуски по задачам, добавляет сверки расписания и держит разделы на постоянных местах, по идентификатору, чтобы они не прыгали после удаления записи. Раздел с последней неудачей раскрыт сам, пока человек не решил иначе
     /// </summary>
     /// <param name="snapshot">Состояние расписания с историей сверок</param>
     /// <param name="records">Запуски задач</param>
@@ -346,7 +346,7 @@ public sealed class MainViewModel : PanelViewModel
             built.Add((snapshot.Entries[0].Time, group));
         }
 
-        var ordered = built.OrderByDescending(item => item.Last).Select(item => item.Group).ToArray();
+        var ordered = built.OrderBy(item => item.Group.Id, StringComparer.Ordinal).Select(item => item.Group).ToArray();
 
         return ordered.SequenceEqual(_groups) ? _groups : ordered;
     }

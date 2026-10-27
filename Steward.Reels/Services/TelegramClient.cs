@@ -42,12 +42,20 @@ public sealed class TelegramClient : ITelegramClient, IDisposable
     /// <exception cref="HttpRequestException">Telegram ответил ошибкой</exception>
     public async Task<IReadOnlyList<TelegramMessage>> GetMessagesAsync(long offset, CancellationToken cancellationToken)
     {
-        using var response = await _http.GetAsync($"getUpdates?offset={offset}&timeout=0&allowed_updates=%5B%22message%22%5D", cancellationToken);
+        using var response = await _http.GetAsync($"getUpdates?offset={offset}&timeout=0&allowed_updates=%5B%22message%22%2C%22callback_query%22%5D", cancellationToken);
         using var document = JsonDocument.Parse(await ReadAsync(response, cancellationToken));
 
         var messages = new List<TelegramMessage>();
         foreach (var update in document.RootElement.GetProperty("result").EnumerateArray())
         {
+            if (update.TryGetProperty("callback_query", out var callback))
+            {
+                if (callback.TryGetProperty("message", out var source) && callback.TryGetProperty("from", out var presser) && callback.TryGetProperty("data", out var data))
+                    messages.Add(new TelegramMessage(update.GetProperty("update_id").GetInt64(), source.GetProperty("chat").GetProperty("id").GetInt64(), presser.GetProperty("id").GetInt64(), data.GetString() ?? string.Empty, callback.GetProperty("id").GetString()));
+
+                continue;
+            }
+
             if (!update.TryGetProperty("message", out var message) || !message.TryGetProperty("from", out var from))
                 continue;
 
@@ -72,6 +80,35 @@ public sealed class TelegramClient : ITelegramClient, IDisposable
     public async Task SendAsync(long chatId, string text, CancellationToken cancellationToken)
     {
         using var response = await _http.PostAsJsonAsync("sendMessage", new { chat_id = chatId, text, disable_web_page_preview = true }, cancellationToken);
+
+        await ReadAsync(response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Отправляет сообщение с кнопками в одну строку
+    /// </summary>
+    /// <param name="chatId">Чат</param>
+    /// <param name="text">Текст вопроса</param>
+    /// <param name="buttons">Подпись и данные каждой кнопки</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда Telegram принимает сообщение</returns>
+    public async Task SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken)
+    {
+        var keyboard = new { inline_keyboard = new[] { buttons.Select(button => new { text = button.Label, callback_data = button.Data }).ToArray() } };
+        using var response = await _http.PostAsJsonAsync("sendMessage", new { chat_id = chatId, text, disable_web_page_preview = true, reply_markup = keyboard }, cancellationToken);
+
+        await ReadAsync(response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Подтверждает нажатие кнопки
+    /// </summary>
+    /// <param name="callbackId">Номер нажатия</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда Telegram принимает подтверждение</returns>
+    public async Task AnswerCallbackAsync(string callbackId, CancellationToken cancellationToken)
+    {
+        using var response = await _http.PostAsJsonAsync("answerCallbackQuery", new { callback_query_id = callbackId }, cancellationToken);
 
         await ReadAsync(response, cancellationToken);
     }

@@ -19,13 +19,13 @@ public sealed class IdeaCardViewModel
     /// </summary>
     /// <param name="idea">Идея</param>
     /// <param name="approve">Вызывается по кнопке «Делаем»</param>
-    /// <param name="reject">Вызывается по кнопке «Отклонить»</param>
+    /// <param name="reject">Вызывается по кнопке «Удалить»</param>
     /// <param name="open">Вызывается по ссылке на рилс: параметр — адрес</param>
     public IdeaCardViewModel(Idea idea, Action<Idea> approve, Action<Idea> reject, Action<string> open)
     {
         Title = idea.Title;
-        Meta = string.Join(" · ", new[] { idea.Author, idea.CreatedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture) }.Where(part => part.Length > 0));
-        Preview = Shorten(idea.Transcript.Length > 0 ? idea.Transcript : idea.Caption);
+        Meta = string.Join(" · ", new[] { idea.Author, idea.CreatedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture), idea.State == IdeaStateEnum.Approved ? "в работе" : string.Empty }.Where(part => part.Length > 0));
+        Preview = idea.Summary.Length > 0 ? idea.Summary.Trim() : Shorten(idea.Transcript.Length > 0 ? idea.Transcript : idea.Caption);
         ApproveCommand = new RelayCommand(() => approve(idea));
         RejectCommand = new RelayCommand(() => reject(idea));
         OpenSourceCommand = new RelayCommand(() => open(idea.SourceUrl));
@@ -42,7 +42,7 @@ public sealed class IdeaCardViewModel
     public string Meta { get; }
 
     /// <summary>
-    /// Начало расшифровки или, если речи нет, подписи
+    /// Краткий разбор идеи, а если его нет, начало расшифровки или подписи
     /// </summary>
     public string Preview { get; }
 

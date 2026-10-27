@@ -28,9 +28,14 @@ public sealed record Idea
     public required string SourceUrl { get; init; }
 
     /// <summary>
-    /// Короткое название для списка: первая строка подписи или начало расшифровки
+    /// Название идеи для списка: понятное без рилса
     /// </summary>
     public required string Title { get; init; }
+
+    /// <summary>
+    /// Краткий разбор: о чём идея, для чего она, плюсы и минусы. Пустой, если разобрать не удалось
+    /// </summary>
+    public string Summary { get; init; } = string.Empty;
 
     /// <summary>
     /// Автор рилса или пустая строка, если он неизвестен

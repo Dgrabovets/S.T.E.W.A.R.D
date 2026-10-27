@@ -58,7 +58,7 @@ public static class JobRowBuilder
             return Row(RowToneEnum.Problem, "Давно не запускалась", $"Последний успех {TimeWording.Moment(lastSuccess, now)}");
 
         if (status.State == ProcessStateEnum.NeedsAttention || status.Awaiting > 0)
-            return Row(RowToneEnum.Attention, "Ждёт тебя", Join(status.Summary, status.Awaiting > 0 ? $"Ждут решения: {status.Awaiting}" : null));
+            return Row(RowToneEnum.Attention, "Ждёт тебя", Join(status.Summary, status.Awaiting > 0 ? $"Без решения: {status.Awaiting}" : null));
 
         return status.State switch
         {

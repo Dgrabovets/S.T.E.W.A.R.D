@@ -132,6 +132,23 @@ public sealed partial class IdeaStore
     }
 
     /// <summary>
+    /// Удаляет идею: файл стирается, в повторной обработке ссылки это не мешает, её помнит бот
+    /// </summary>
+    /// <param name="id">Идентификатор идеи</param>
+    /// <returns>
+    /// <see langword="true"/>, если файл был и удалён
+    /// </returns>
+    public bool Delete(string id)
+    {
+        if (!IsValidId(id) || !File.Exists(PathFor(id)))
+            return false;
+
+        File.Delete(PathFor(id));
+
+        return true;
+    }
+
+    /// <summary>
     /// Читает один файл, не мешая тому, кто его пишет
     /// </summary>
     /// <param name="path">Путь к файлу</param>

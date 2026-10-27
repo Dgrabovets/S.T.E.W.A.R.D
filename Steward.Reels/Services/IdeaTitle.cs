@@ -19,6 +19,8 @@ public static class IdeaTitle
     /// <returns>Название не длиннее лимита, оборванное по слову с многоточием</returns>
     public static string Build(string caption, string transcript, string author)
     {
+        caption = TextCleaner.Clean(caption);
+        transcript = TextCleaner.Clean(transcript);
         var line = caption.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
         if (line is null)
         {
@@ -26,7 +28,7 @@ public static class IdeaTitle
             line = sentence ?? (author.Length > 0 ? $"Рилс {author}" : "Рилс");
         }
 
-        return Cut(line);
+        return Cut(TextCleaner.CleanLine(line));
     }
 
     /// <summary>

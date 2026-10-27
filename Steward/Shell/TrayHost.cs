@@ -415,7 +415,7 @@ public sealed class TrayHost : IDisposable
             _main.Model.RecordRemoveRequested += record => _jobs.RemoveRecord(record);
             _main.Model.CheckRemoveRequested += RemoveCheck;
             _main.Model.IdeaApproved += ApproveIdea;
-            _main.Model.IdeaRejected += idea => _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Rejected);
+            _main.Model.IdeaRejected += idea => _jobs.DeleteIdea(idea.Id);
             _main.Model.LinkRequested += OpenLink;
             _main.Model.ExitRequested += (_, _) => Exit();
         }

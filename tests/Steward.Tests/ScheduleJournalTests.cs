@@ -96,10 +96,10 @@ public class ScheduleJournalTests
     }
 
     /// <summary>
-    /// Журнал делится на разделы по задачам, сверху тот, где запись свежее, а раздел с неудачей раскрыт
+    /// Журнал делится на разделы по задачам, они стоят по идентификатору, а не по свежести, и раздел с неудачей раскрыт
     /// </summary>
     [Fact]
-    public void The_journal_groups_runs_by_job_newest_first_and_opens_a_failure()
+    public void The_journal_groups_runs_by_job_in_a_fixed_order_and_opens_a_failure()
     {
         var now = DateTimeOffset.Now;
         var model = new MainViewModel();

@@ -209,10 +209,10 @@ public sealed class JobHost : IDisposable
     public void SetHomeworkFormat(string lessonId, HomeworkFormatEnum format) => _homework.SetFormat(lessonId, format);
 
     /// <summary>
-    /// Читает идеи, которые ждут решения
+    /// Читает идеи, которые остались в списке: новые и взятые в работу. Убирает их из списка только человек
     /// </summary>
-    /// <returns>Новые идеи от свежих к старым</returns>
-    public IReadOnlyList<Idea> Ideas() => [.. _ideas.LoadAll().Where(idea => idea.State == IdeaStateEnum.New)];
+    /// <returns>Идеи от свежих к старым</returns>
+    public IReadOnlyList<Idea> Ideas() => [.. _ideas.LoadAll().Where(idea => idea.State is IdeaStateEnum.New or IdeaStateEnum.Approved)];
 
     /// <summary>
     /// Путь к файлу идеи
@@ -222,21 +222,37 @@ public sealed class JobHost : IDisposable
     public string IdeaPath(string id) => _ideas.PathFor(id);
 
     /// <summary>
+    /// Удаляет идею по просьбе человека и обновляет число ожидающих в статусе так же, как после решения
+    /// </summary>
+    /// <param name="id">Идентификатор идеи</param>
+    public void DeleteIdea(string id)
+    {
+        _ideas.Delete(id);
+        RefreshAwaiting();
+    }
+
+    /// <summary>
     /// Записывает решение по идее и обновляет число ожидающих в статусе задачи «reels», не дожидаясь следующего запуска бота
     /// </summary>
     /// <param name="id">Идентификатор идеи</param>
     /// <param name="state">Решение</param>
     public void SetIdeaState(string id, IdeaStateEnum state)
     {
-        if (!_ideas.SetState(id, state) || _store.TryRead(REELS_ID) is not { State: ProcessStateEnum.Ok or ProcessStateEnum.NeedsAttention } status)
-        {
-            Changed?.Invoke(this, EventArgs.Empty);
+        _ideas.SetState(id, state);
+        RefreshAwaiting();
+    }
 
-            return;
+    /// <summary>
+    /// Пересчитывает идеи без решения, записывает число в статус задачи «reels» и сообщает панелям
+    /// </summary>
+    private void RefreshAwaiting()
+    {
+        if (_store.TryRead(REELS_ID) is { State: ProcessStateEnum.Ok or ProcessStateEnum.NeedsAttention } status)
+        {
+            var awaiting = _ideas.LoadAll().Count(idea => idea.State == IdeaStateEnum.New);
+            _store.Write(status with { Awaiting = awaiting, State = awaiting > 0 ? ProcessStateEnum.NeedsAttention : ProcessStateEnum.Ok });
         }
 
-        var awaiting = Ideas().Count;
-        _store.Write(status with { Awaiting = awaiting, State = awaiting > 0 ? ProcessStateEnum.NeedsAttention : ProcessStateEnum.Ok });
         Changed?.Invoke(this, EventArgs.Empty);
     }
 

@@ -1,6 +1,7 @@
 using Steward.Ideas.Models;
 using Steward.Ideas.Storage;
 using Steward.Reels.Common;
+using Steward.Reels.Interfaces;
 using Steward.Reels.Models;
 using Steward.Reels.Services;
 using Steward.Reels.Tests.Fakes;
@@ -132,6 +133,71 @@ public class ReelsPipelineTests
     }
 
     /// <summary>
+    /// Название и разбор берутся у Claude, а не из подписи
+    /// </summary>
+    [Fact]
+    public async Task The_analysis_gives_the_idea_its_title_and_summary()
+    {
+        using var directory = new TempDirectory();
+        var telegram = new FakeTelegram(Message(1, 7, "https://www.instagram.com/reel/Abc/"));
+
+        await Pipeline(directory, telegram, new FakeDownloader(), 7, out var ideas, new FakeAnalyzer(new IdeaAnalysis("Хук на звук", "Суть: звук после задачи"))).RunAsync(CancellationToken.None);
+
+        var idea = Assert.Single(ideas.LoadAll());
+        Assert.Equal(("Хук на звук", "Суть: звук после задачи"), (idea.Title, idea.Summary));
+        Assert.Equal("Готово: Хук на звук", telegram.Sent.Last());
+    }
+
+    /// <summary>
+    /// Уже обработанный рилс не разбирается заново: бот спрашивает, а ответ «Добавить ещё раз» создаёт вторую идею
+    /// </summary>
+    [Fact]
+    public async Task A_repeated_link_is_asked_about_and_added_only_after_a_yes()
+    {
+        using var directory = new TempDirectory();
+        var first = new FakeTelegram(Message(1, 7, "https://www.instagram.com/reel/Abc/"));
+        await Pipeline(directory, first, new FakeDownloader(), 7, out var ideas).RunAsync(CancellationToken.None);
+
+        var downloader = new FakeDownloader();
+        var second = new FakeTelegram(Message(2, 7, "https://www.instagram.com/reels/Abc/?igsh=x"));
+        var asked = await Pipeline(directory, second, downloader, 7, out _).RunAsync(CancellationToken.None);
+
+        Assert.Equal(0, downloader.Downloads);
+        Assert.Equal(1, asked.Ignored);
+        Assert.Contains("уже разбирали", second.Sent.Single(), StringComparison.Ordinal);
+        Assert.Equal(["again:d2-1", "skip:d2-1"], second.Buttons);
+        Assert.Single(ideas.LoadAll());
+
+        var answer = new FakeTelegram(new TelegramMessage(3, 100, 7, "again:d2-1", "cb1"));
+        var added = await Pipeline(directory, answer, downloader, 7, out _).RunAsync(CancellationToken.None);
+
+        Assert.Equal(1, added.Accepted);
+        Assert.Equal(["cb1"], answer.Answered);
+        Assert.Equal(2, ideas.LoadAll().Count);
+    }
+
+    /// <summary>
+    /// После удаления идеи ссылка всё равно считается обработанной, а ответ «Не надо» ничего не создаёт
+    /// </summary>
+    [Fact]
+    public async Task A_deleted_idea_is_still_remembered_and_a_no_adds_nothing()
+    {
+        using var directory = new TempDirectory();
+        await Pipeline(directory, new FakeTelegram(Message(1, 7, "https://www.instagram.com/reel/Abc/")), new FakeDownloader(), 7, out var ideas).RunAsync(CancellationToken.None);
+        ideas.Delete("r1-1");
+
+        var downloader = new FakeDownloader();
+        var again = new FakeTelegram(Message(2, 7, "https://www.instagram.com/reel/Abc/"));
+        await Pipeline(directory, again, downloader, 7, out _).RunAsync(CancellationToken.None);
+        var skipped = new FakeTelegram(new TelegramMessage(3, 100, 7, "skip:d2-1", "cb2"));
+        await Pipeline(directory, skipped, downloader, 7, out _).RunAsync(CancellationToken.None);
+
+        Assert.Equal(0, downloader.Downloads);
+        Assert.Empty(ideas.LoadAll());
+        Assert.Equal("Хорошо, повторно не добавляю.", skipped.Sent.Single());
+    }
+
+    /// <summary>
     /// Собирает проверку бота с подделками и фиксированным временем
     /// </summary>
     /// <param name="directory">Папка для идей и номера сообщения</param>
@@ -139,8 +205,9 @@ public class ReelsPipelineTests
     /// <param name="downloader">Подделка загрузчика и расшифровки</param>
     /// <param name="allowedUserId">Разрешённый пользователь</param>
     /// <param name="ideas">Папка идей, в которую пишет проверка</param>
+    /// <param name="analyzer">Разбор идеи или <see langword="null"/>, тогда разбора нет</param>
     /// <returns>Проверка бота</returns>
-    private static ReelsPipeline Pipeline(TempDirectory directory, FakeTelegram telegram, FakeDownloader downloader, long allowedUserId, out IdeaStore ideas)
+    private static ReelsPipeline Pipeline(TempDirectory directory, FakeTelegram telegram, FakeDownloader downloader, long allowedUserId, out IdeaStore ideas, IIdeaAnalyzer? analyzer = null)
     {
         ideas = new IdeaStore(Path.Combine(directory.Path, "ideas"));
 
@@ -152,7 +219,9 @@ public class ReelsPipelineTests
             new OffsetStore(Path.Combine(directory.Path, "offset.txt")),
             new ReelsSettings { AllowedUserId = allowedUserId },
             new FixedTime(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero)),
-            _ => { });
+            _ => { },
+            analyzer ?? new FakeAnalyzer(null),
+            new SeenStore(Path.Combine(directory.Path, "seen.txt"), Path.Combine(directory.Path, "pending.json")));
     }
 
     /// <summary>

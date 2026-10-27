@@ -26,6 +26,16 @@ public sealed class ReelsSettings
     public string CookiesFromBrowser { get; init; } = string.Empty;
 
     /// <summary>
+    /// Команда Claude Code, которая разбирает идею и придумывает ей название. Пусто: разбора нет, название берётся из подписи
+    /// </summary>
+    public string ClaudeCommand { get; init; } = "claude";
+
+    /// <summary>
+    /// Сколько минут даётся Claude на разбор одной идеи
+    /// </summary>
+    public int AnalyzeTimeoutMinutes { get; init; } = 3;
+
+    /// <summary>
     /// Сколько минут даётся на скачивание одного рилса
     /// </summary>
     public int DownloadTimeoutMinutes { get; init; } = 3;
