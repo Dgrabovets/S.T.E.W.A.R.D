@@ -3,6 +3,7 @@ using System.Text.Json;
 using Steward.Homework.Models;
 using Steward.Homework.Storage;
 using Steward.Lms.Common;
+using Steward.Lms.Models;
 using Steward.Lms.Services;
 using Steward.Status.Common;
 using Steward.Status.State;
@@ -44,6 +45,10 @@ internal static class Program
                     Log($"Ставлю браузер в {browser.BrowsersPath}");
 
                     return browser.Install();
+                case "tasks":
+                    Log(await TasksAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")), dryRun: args.Contains("--dry-run")));
+
+                    return 0;
                 case "probe":
                     foreach (var line in await browser.ProbeAsync(args[1], CancellationToken.None))
                         Log(line);
@@ -64,6 +69,7 @@ internal static class Program
                     var store = new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"));
                     var summary = await SyncAsync(settings, store);
                     summary += "\n" + await FetchAsync(browser, store, settings.MaxFetchPerRun);
+                    summary += "\n" + await TasksAsync(settings, store, dryRun: !settings.CreateTasks);
                     Log(summary);
                     Report(statusStore, ProcessStateEnum.Ok, summary, null);
 
@@ -102,6 +108,51 @@ internal static class Program
         store.SetStates(fresh.Select(lesson => new KeyValuePair<string, LessonStateEnum>(lesson.Id, LessonImporter.InitialState(lesson, settings.MinLessonMinutes))));
 
         return $"Занятий: {lessons.Count}\nНовых: {fresh.Length}";
+    }
+
+    /// <summary>
+    /// Читает из LMS задания и тесты со статусами и сверяет их с задачами SingularityApp: заводит задачу на несданную работу предмета с отметкой «расшифровывать» и закрывает задачу, когда работа сдана
+    /// </summary>
+    /// <param name="settings">Настройки входа и SingularityApp</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <param name="dryRun">Только показать, что было бы сделано, ничего не записывая в SingularityApp</param>
+    /// <returns>Строка итога для статуса</returns>
+    private static async Task<string> TasksAsync(LmsSettings settings, HomeworkStore store, bool dryRun)
+    {
+        using var lms = new LmsClient(settings);
+        await lms.LoginAsync(CancellationToken.None);
+
+        var activities = new List<LmsActivity>();
+        foreach (var course in await lms.CoursesAsync(CancellationToken.None))
+            activities.AddRange(await lms.ActivitiesAsync(course, CancellationToken.None));
+
+        ActivityStore.Save(store.Root, activities);
+        foreach (var subject in activities.Where(activity => !activity.Done).GroupBy(activity => activity.Subject).OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase))
+            Log($"Не сдано: {subject.Key}: {subject.Count()} ({store.SubjectStateFor(subject.Key)})");
+
+        if (settings.Singularity is not { Token.Length: > 0 } || settings.Singularity.Token.StartsWith('<'))
+            return $"Работ в LMS: {activities.Count}, не сдано: {activities.Count(activity => !activity.Done)}. Singularity не настроен, задачи не заводятся";
+
+        using var singularity = new Steward.Mail.Services.SingularityClient(settings.Singularity);
+        var tasks = await singularity.ListTasksAsync(DateTimeOffset.Now.AddYears(-1), "lms:", CancellationToken.None);
+        var plan = ActivityTaskSync.Build(activities, tasks, store.SubjectStateFor);
+
+        var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+        foreach (var activity in plan.ToCreate)
+        {
+            Log($"{(dryRun ? "Завёл бы" : "Завожу")} задачу: {activity.Name} ({activity.Subject}), срок {activity.Due:dd.MM.yyyy}");
+            if (!dryRun)
+                await singularity.CreateTaskAsync(ActivityTaskSync.Build(activity, settings.Singularity.ProjectId, DateOnly.FromDateTime(DateTime.Now), offset), CancellationToken.None);
+        }
+
+        foreach (var (task, activity) in plan.ToClose)
+        {
+            Log($"{(dryRun ? "Закрыл бы" : "Закрываю")} задачу: {activity.Name} ({activity.Subject}): сдано в LMS");
+            if (!dryRun)
+                await singularity.CompleteTaskAsync(task.Id, CancellationToken.None);
+        }
+
+        return $"Работ в LMS: {activities.Count}, не сдано: {activities.Count(activity => !activity.Done)}\nЗадач {(dryRun ? "завёл бы" : "заведено")}: {plan.ToCreate.Count}, {(dryRun ? "закрыл бы" : "закрыто")}: {plan.ToClose.Count}";
     }
 
     /// <summary>

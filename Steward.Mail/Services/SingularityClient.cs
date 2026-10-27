@@ -96,6 +96,68 @@ public sealed class SingularityClient : ISingularityClient, IDisposable
     }
 
     /// <summary>
+    /// Читает задачи с внешним ключом, которые начинаются позже заданного момента: номер задачи, ключ и отметка выполнения. Удалённые и архивные читаются тоже, с пометкой: если задачу удалили, заново её заводить не нужно
+    /// </summary>
+    /// <param name="startsAfter">Нижняя граница начала задач</param>
+    /// <param name="keyPrefix">Берутся только задачи, ключ которых начинается с этого текста</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задачи с ключом</returns>
+    /// <exception cref="HttpRequestException">
+    /// SingularityApp ответил ошибкой. В тексте код ответа и тело
+    /// </exception>
+    public async Task<IReadOnlyList<SingularityTaskInfo>> ListTasksAsync(DateTimeOffset startsAfter, string keyPrefix, CancellationToken cancellationToken)
+    {
+        var found = new List<SingularityTaskInfo>();
+        var after = Uri.EscapeDataString(startsAfter.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture));
+
+        for (var offset = 0; ; offset += PAGE_SIZE)
+        {
+            using var response = await _http.GetAsync($"v2/task?maxCount={PAGE_SIZE}&offset={offset}&includeRemoved=true&includeArchived=true&start.gt={after}", cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"SingularityApp ответил {(int)response.StatusCode}: {body}");
+
+            using var document = JsonDocument.Parse(body);
+            var tasks = document.RootElement.GetProperty("tasks");
+            foreach (var task in tasks.EnumerateArray())
+            {
+                if (task.TryGetProperty("externalId", out var key) && key.GetString() is { Length: > 0 } value && value.StartsWith(keyPrefix, StringComparison.Ordinal))
+                {
+                    found.Add(new SingularityTaskInfo(
+                        task.GetProperty("id").GetString() ?? string.Empty,
+                        value,
+                        task.TryGetProperty("checked", out var state) && state.ValueKind == JsonValueKind.Number ? state.GetInt32() : 0,
+                        task.TryGetProperty("removed", out var removed) && removed.ValueKind == JsonValueKind.True,
+                        task.TryGetProperty("archive", out var archived) && archived.ValueKind == JsonValueKind.True));
+                }
+            }
+
+            if (tasks.GetArrayLength() < PAGE_SIZE)
+                return found;
+        }
+    }
+
+    /// <summary>
+    /// Отмечает задачу выполненной запросом PATCH /v2/task/{id}
+    /// </summary>
+    /// <param name="taskId">Номер задачи в SingularityApp</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда SingularityApp принимает запрос</returns>
+    /// <exception cref="HttpRequestException">
+    /// SingularityApp ответил ошибкой. В тексте код ответа и тело
+    /// </exception>
+    public async Task CompleteTaskAsync(string taskId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"v2/task/{Uri.EscapeDataString(taskId)}") { Content = JsonContent.Create(new { @checked = 1 }) };
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new HttpRequestException($"SingularityApp ответил {(int)response.StatusCode}: {body}");
+        }
+    }
+
+    /// <summary>
     /// Освобождает HTTP-клиент
     /// </summary>
     public void Dispose() => _http.Dispose();

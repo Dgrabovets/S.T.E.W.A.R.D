@@ -36,6 +36,16 @@ public sealed class LmsSettings
     public int MaxFetchPerRun { get; init; } = 6;
 
     /// <summary>
+    /// Подключение к SingularityApp: токен и проект для задач по работам. Пусто: задачи не заводятся
+    /// </summary>
+    public Steward.Mail.Common.SingularitySettings? Singularity { get; init; }
+
+    /// <summary>
+    /// Заводить ли задачи в SingularityApp и закрывать ли их по сдаче. Пока выключено, программа только читает LMS и показывает, что сделала бы (команда <c>tasks</c>)
+    /// </summary>
+    public bool CreateTasks { get; init; }
+
+    /// <summary>
     /// Записи короче этого числа минут считаются пробными запусками и сразу получают отметку «не забирать»
     /// </summary>
     public int MinLessonMinutes { get; init; } = 10;

@@ -2,6 +2,7 @@ using Steward.Homework.Models;
 using Steward.Homework.Storage;
 using Steward.Lms.Models;
 using Steward.Lms.Services;
+using Steward.Mail.Models;
 
 namespace Steward.Lms.Tests;
 
@@ -148,5 +149,64 @@ public class LmsTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    /// <summary>
+    /// Страница заданий: сданные и несданные различаются, срок читается, у работы без срока он пустой
+    /// </summary>
+    [Fact]
+    public void Assignments_are_parsed_with_status_and_due_date()
+    {
+        const string html = """
+            <table class="generaltable"><tr><th>Секция</th><th>Задания</th></tr>
+            <tr><td>Дизайн</td><td><a href="https://lms.ranepa.ru/mod/assign/view.php?id=1001">Задание 1</a></td><td>пятница, 23 октября 2026, 00:00</td><td>Отправлено для оценивания</td><td>-</td></tr>
+            <tr><td>Баланс</td><td><a href="https://lms.ranepa.ru/mod/assign/view.php?id=1002">Задание 2</a></td><td>-</td><td>Нет ответа на задание</td><td>-</td></tr>
+            <tr><td>Звук</td><td><a href="https://lms.ranepa.ru/mod/assign/view.php?id=1003">Задание 3</a></td><td>суббота, 31 октября 2026, 20:34</td><td>Черновик (не отправлено)</td><td></td></tr>
+            </table>
+            """;
+
+        var items = ActivityParser.ParseAssignments(html, 5, "Гейм-дизайн");
+
+        Assert.Equal([true, false, false], items.Select(item => item.Done).ToArray());
+        Assert.Equal(new DateTime(2026, 10, 23), items[0].Due);
+        Assert.Null(items[1].Due);
+        Assert.Equal("lms:assign:1002", items[1].ExternalId);
+        Assert.Equal("Дизайн", items[0].Section);
+    }
+
+    /// <summary>
+    /// Тест считается сданным, когда у него есть оценка, а прочерк значит «не пройден»
+    /// </summary>
+    [Fact]
+    public void A_quiz_is_done_when_it_has_a_grade()
+    {
+        const string html = """
+            <table><tr><td>Тема 1</td><td><a href="https://lms.ranepa.ru/mod/quiz/view.php?id=2001">Тест 1</a></td><td>Нет даты закрытия</td><td>100,00/100,00</td></tr>
+            <tr><td>Тема 2</td><td><a href="https://lms.ranepa.ru/mod/quiz/view.php?id=2002">Тест 2</a></td><td>среда, 30 декабря 2026, 20:36</td><td>-</td></tr></table>
+            """;
+
+        var items = ActivityParser.ParseQuizzes(html, 5, "C#");
+
+        Assert.Equal([true, false], items.Select(item => item.Done).ToArray());
+        Assert.Equal("lms:quiz:2002", items[1].ExternalId);
+        Assert.Equal(new DateTime(2026, 12, 30, 20, 36, 0), items[1].Due);
+    }
+
+    /// <summary>
+    /// Задачи заводятся только по несданным работам предметов «расшифровывать», а открытая задача на сданную работу закрывается
+    /// </summary>
+    [Fact]
+    public void The_plan_creates_for_open_work_of_active_subjects_and_closes_for_submitted_work()
+    {
+        var open = new LmsActivity("1", ActivityKindEnum.Assignment, 5, "Гейм-дизайн", string.Empty, "З1", null, "Нет ответа", string.Empty, false, "u1");
+        var other = new LmsActivity("2", ActivityKindEnum.Assignment, 6, "Английский", string.Empty, "З2", null, "Нет ответа", string.Empty, false, "u2");
+        var submitted = new LmsActivity("3", ActivityKindEnum.Assignment, 5, "Гейм-дизайн", string.Empty, "З3", null, "Отправлено", string.Empty, true, "u3");
+        var already = new LmsActivity("4", ActivityKindEnum.Quiz, 5, "Гейм-дизайн", string.Empty, "Т4", null, "Не пройден", string.Empty, false, "u4");
+        var tasks = new[] { new SingularityTaskInfo("t3", "lms:assign:3", 0), new SingularityTaskInfo("t4", "lms:quiz:4", 0, Removed: true) };
+
+        var plan = ActivityTaskSync.Build([open, other, submitted, already], tasks, subject => subject == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided);
+
+        Assert.Equal(["lms:assign:1"], plan.ToCreate.Select(activity => activity.ExternalId).ToArray());
+        Assert.Equal(["t3"], plan.ToClose.Select(pair => pair.Task.Id).ToArray());
     }
 }

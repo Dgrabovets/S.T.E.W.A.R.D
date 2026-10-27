@@ -120,6 +120,20 @@ public sealed partial class LmsClient : IDisposable
     }
 
     /// <summary>
+    /// Читает задания и тесты курса с их состоянием: сданы они или нет
+    /// </summary>
+    /// <param name="course">Курс</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Работы курса. Пусто, если в курсе нет ни заданий, ни тестов</returns>
+    public async Task<IReadOnlyList<LmsActivity>> ActivitiesAsync(LmsCourse course, CancellationToken cancellationToken)
+    {
+        var assignments = await _http.GetStringAsync(Url($"/mod/assign/index.php?id={course.Id}"), cancellationToken);
+        var quizzes = await _http.GetStringAsync(Url($"/mod/quiz/index.php?id={course.Id}"), cancellationToken);
+
+        return [.. ActivityParser.ParseAssignments(assignments, course.Id, course.Subject), .. ActivityParser.ParseQuizzes(quizzes, course.Id, course.Subject)];
+    }
+
+    /// <summary>
     /// Освобождает HTTP-клиент
     /// </summary>
     public void Dispose() => _http.Dispose();
