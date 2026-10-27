@@ -51,6 +51,8 @@ public sealed class RunRowViewModel
 
         Detail = record.Detail ?? string.Empty;
         Summary = record.Summary ?? string.Empty;
+        var finished = record.FinishedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+        SummaryLines = [.. Summary.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(line => new LogLine(finished, line, PanelToneEnum.Idle))];
         Output = record.Output ?? string.Empty;
         OutputLines = LogLines.Parse(Output);
         CanFix = record.Outcome != RunOutcomeEnum.Ok || OutputLines.Any(line => line.Tone == PanelToneEnum.Problem);
@@ -119,6 +121,16 @@ public sealed class RunRowViewModel
     /// Запуск не удался или прошёл с ошибками в выводе (например, не вышло разобрать одну из ссылок), значит, его можно отдать на починку
     /// </summary>
     public bool CanFix { get; }
+
+    /// <summary>
+    /// Сводка построчно, в тех же рамках, что и вывод
+    /// </summary>
+    public IReadOnlyList<LogLine> SummaryLines { get; }
+
+    /// <summary>
+    /// Есть подпись о времени запуска
+    /// </summary>
+    public bool HasFacts => Facts.Length > 0;
 
     /// <summary>
     /// Есть сводка

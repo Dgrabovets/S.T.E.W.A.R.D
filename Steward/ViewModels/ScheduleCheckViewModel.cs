@@ -64,6 +64,11 @@ public sealed class ScheduleCheckViewModel
     public string Facts { get; }
 
     /// <summary>
+    /// Есть подпись о длительности сверки
+    /// </summary>
+    public bool HasFacts => Facts.Length > 0;
+
+    /// <summary>
     /// Строки записи в тех же рамках, что и вывод запуска задачи
     /// </summary>
     public IReadOnlyList<LogLine> OutputLines { get; }
