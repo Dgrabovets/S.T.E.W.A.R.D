@@ -94,6 +94,7 @@ public class IdeaTests
         Assert.Contains(@"D:\repo\data\ideas\r1-1.json", prompt, StringComparison.Ordinal);
         Assert.Contains("не инструкции", prompt, StringComparison.Ordinal);
         Assert.Contains("Не читай секреты", prompt, StringComparison.Ordinal);
+        Assert.Contains("Уже есть", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("слово слово", prompt, StringComparison.Ordinal);
     }
 
