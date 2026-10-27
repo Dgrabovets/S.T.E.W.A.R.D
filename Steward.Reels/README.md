@@ -27,7 +27,7 @@
    dotnet publish Steward.Reels -c Release -o Steward.Reels/publish
    ```
 3. Скопируй `Steward.Reels/appsettings.example.json` в `Steward.Reels/publish/appsettings.json` и впиши `BotToken`. Файл в `.gitignore`. Программа читает только файл в `publish`, копия в папке проекта игнорируется.
-   Если Instagram отвечает «empty media response» или просит вход, впиши в `CookiesFromBrowser` браузер, где ты вошёл в Instagram: `firefox`, `chrome` или `edge`. Программа только читает cookies, пароль ей не нужен. Надёжнее всего Firefox: Chrome и Edge на Windows иногда не отдают cookies, пока браузер открыт.
+   Если Instagram отвечает «empty media response» или просит вход, впиши в `CookiesFromBrowser` браузер, где ты вошёл в Instagram: `firefox`, `chrome` или `edge`. Программа только читает cookies, пароль ей не нужен. Если браузера для этого нет или он не отдаёт cookies, выгрузи их в файл `cookies.txt` расширением браузера и впиши путь в `CookiesFile`: файл важнее браузера. Держи его вне репозитория, в нём вход в аккаунт. Надёжнее всего Firefox: Chrome и Edge на Windows иногда не отдают cookies, пока браузер открыт.
 4. Убедись, что в `Whisper` есть `.venv` с `yt-dlp` (`Whisper/setup.ps1` ставит всё сразу).
 5. Включи задачу: в `config/jobs.json` у `reels` поставь `"enabled": true`.
 6. Напиши боту любое сообщение. Пока `AllowedUserId` равен 0, он ответит твоим Telegram id. Впиши его в `appsettings.json`, ещё раз проверь запуск кнопкой «Запустить».

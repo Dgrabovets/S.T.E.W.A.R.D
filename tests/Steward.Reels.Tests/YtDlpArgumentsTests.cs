@@ -32,4 +32,17 @@ public class YtDlpArgumentsTests
         Assert.Equal("firefox", arguments[index + 1]);
         Assert.Equal("https://instagram.com/p/x", arguments[^1]);
     }
+
+    /// <summary>
+    /// Файл cookies важнее браузера: в аргументах только он
+    /// </summary>
+    [Fact]
+    public void A_cookies_file_replaces_the_browser()
+    {
+        var arguments = YtDlpDownloader.Arguments("https://instagram.com/p/x", "r1", @"D:\work", "firefox", @"D:\secrets\cookies.txt");
+
+        Assert.Contains("--cookies", arguments);
+        Assert.DoesNotContain("--cookies-from-browser", arguments);
+        Assert.Equal(@"D:\secrets\cookies.txt", arguments[arguments.ToList().IndexOf("--cookies") + 1]);
+    }
 }

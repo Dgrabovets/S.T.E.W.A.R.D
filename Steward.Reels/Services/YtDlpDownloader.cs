@@ -27,7 +27,7 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
 
         var result = await CommandRunner.RunAsync(
             python,
-            Arguments(url, name, workDirectory, settings.CookiesFromBrowser),
+            Arguments(url, name, workDirectory, settings.CookiesFromBrowser, settings.CookiesFile),
             TimeSpan.FromMinutes(settings.DownloadTimeoutMinutes),
             cancellationToken);
 
@@ -41,14 +41,15 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
     }
 
     /// <summary>
-    /// Собирает аргументы yt-dlp: только звук, подпись в файл сведений и, если задан браузер, вход в Instagram из его cookies
+    /// Собирает аргументы yt-dlp: только звук, подпись в файл сведений и, если задан файл или браузер, вход в Instagram из cookies
     /// </summary>
     /// <param name="url">Ссылка на рилс</param>
     /// <param name="name">Имя файлов без расширения</param>
     /// <param name="workDirectory">Папка для скачанных файлов</param>
     /// <param name="cookiesFromBrowser">Название браузера или пусто</param>
+    /// <param name="cookiesFile">Путь к файлу cookies в формате Netscape или пусто. Если задан, браузер не читается</param>
     /// <returns>Аргументы запуска python</returns>
-    public static IReadOnlyList<string> Arguments(string url, string name, string workDirectory, string cookiesFromBrowser)
+    public static IReadOnlyList<string> Arguments(string url, string name, string workDirectory, string cookiesFromBrowser, string cookiesFile = "")
     {
         var arguments = new List<string>
         {
@@ -57,7 +58,12 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
             "-o", Path.Combine(workDirectory, name + ".%(ext)s"),
         };
 
-        if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
+        if (!string.IsNullOrWhiteSpace(cookiesFile))
+        {
+            arguments.Add("--cookies");
+            arguments.Add(cookiesFile.Trim());
+        }
+        else if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
         {
             arguments.Add("--cookies-from-browser");
             arguments.Add(cookiesFromBrowser.Trim());

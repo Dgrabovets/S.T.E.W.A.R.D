@@ -36,6 +36,11 @@ public sealed class ReelsSettings
     public int AnalyzeTimeoutMinutes { get; init; } = 3;
 
     /// <summary>
+    /// Путь к файлу cookies Instagram в формате Netscape (cookies.txt), выгруженному расширением браузера. Если задан, он важнее <see cref="CookiesFromBrowser"/>. Файл содержит вход в аккаунт, в репозиторий его класть нельзя
+    /// </summary>
+    public string CookiesFile { get; init; } = string.Empty;
+
+    /// <summary>
     /// Сколько минут даётся на скачивание одного рилса
     /// </summary>
     public int DownloadTimeoutMinutes { get; init; } = 3;
