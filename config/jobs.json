@@ -35,6 +35,22 @@
       "staleAfterMinutes": 30
     },
     {
+      "id": "lms",
+      "title": "Занятия LMS",
+      // Заходит в LMS по паролю из Steward.Lms/publish/lmssettings.json, собирает прошедшие занятия и забирает расшифровки тех, что отмечены «Забирать» в настройках.
+      // Вход в MTS Link сохраняется один раз командой: Steward.Lms.exe login (см. Steward.Lms/README.md).
+      //   dotnet publish Steward.Lms -c Release -o Steward.Lms/publish
+      "enabled": true,
+      "command": "{repo}\Steward.Lms\publish\Steward.Lms.exe",
+      "triggers": [
+        { "type": "start" },
+        { "type": "daily", "at": "08:00" },
+        { "type": "daily", "at": "22:30" }
+      ],
+      "timeoutMinutes": 30,
+      "staleAfterMinutes": 1500
+    },
+    {
       "id": "homework",
       "title": "Домашние задания",
       // Создаёт задачи SingularityApp по заданиям, которые агент записал в data/homework/items/<занятие>.json.

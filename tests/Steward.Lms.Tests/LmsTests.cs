@@ -1,0 +1,118 @@
+using Steward.Homework.Models;
+using Steward.Homework.Storage;
+using Steward.Lms.Models;
+using Steward.Lms.Services;
+
+namespace Steward.Lms.Tests;
+
+/// <summary>
+/// Проверяет разбор страницы занятий LMS, превращение вебинаров в занятия и текст файла расшифровки
+/// </summary>
+public class LmsTests
+{
+    /// <summary>
+    /// Кусок страницы: текущий вебинар без записи и два прошедших, у одного из них в названии есть подпись «Лекция 1»
+    /// </summary>
+    private const string Page = """
+        <h2>Текущие вебинары</h2>
+        <ul><li class="moodle__content"><h3 class="moodle__title-2">LMS_P_Гейм-дизайн [1 семестр] [Медов А.А.]_26.10.2026_8</h3><a href="https://my.mts-link.ru/j/Ranepa/1/join">Присоединиться</a></li></ul>
+        <h2>Прошедшие вебинары</h2>
+        <ul data-pagination-content>
+          <li class="moodle__content">
+            <div class="moodle__titles">
+              <h3 class="moodle__title-2">LMS_P_Гейм-дизайн [1 семестр] [Медов А.А., Чистова Е.В.] [ОМ-РКИ-26 (1 сем.)]_Лекция 1, 07.09.2026</h3>
+              <p class="moodle__subtitle">07 сентября 2026, 19:25 (длительность 01:59)</p>
+            </div><a class="moodle-button" href="https://my.mts-link.ru/j/Ranepa/24692920129/record-new/24116923549">Запись вебинара</a>
+          </li>
+          <li class="moodle__content">
+            <h3 class="moodle__title-2">LMS_P_Гейм-дизайн [1 семестр] [Медов А.А., Чистова Е.В.] [ОМ-РКИ-26 (1 сем.)]_21.09.2026_3</h3>
+            <p class="moodle__subtitle">22 сентября 2026, 17:25 (длительность 00:05)</p>
+            <a href="https://my.mts-link.ru/j/Ranepa/25428026479/record-new/24883158850">Запись вебинара</a>
+          </li>
+        </ul>
+        """;
+
+    /// <summary>
+    /// Со страницы берутся только вебинары с записью: дата, длительность, ссылка и номера читаются точно
+    /// </summary>
+    [Fact]
+    public void Only_webinars_with_a_record_are_parsed()
+    {
+        var webinars = WebinarParser.Parse(Page);
+
+        Assert.Equal(2, webinars.Count);
+        Assert.Equal(new DateTime(2026, 9, 7, 19, 25, 0), webinars[0].Start);
+        Assert.Equal(119, webinars[0].Minutes);
+        Assert.Equal("https://my.mts-link.ru/j/Ranepa/24692920129/record-new/24116923549", webinars[0].RecordUrl);
+        Assert.Equal(("24692920129", "24116923549"), (webinars[0].EventId, webinars[0].SessionId));
+        Assert.Equal(5, webinars[1].Minutes);
+    }
+
+    /// <summary>
+    /// Занятие получает ключ из номера записи, название предмета без служебных скобок и подпись без даты
+    /// </summary>
+    [Fact]
+    public void A_webinar_becomes_a_lesson_with_a_clean_title_and_label()
+    {
+        var webinars = WebinarParser.Parse(Page);
+
+        var lecture = LessonImporter.ToLesson(webinars[0]);
+        var plain = LessonImporter.ToLesson(webinars[1]);
+
+        Assert.Equal(("e24116923549", "Гейм-дизайн", "Лекция 1"), (lecture.Id, lecture.Title, lecture.Label));
+        Assert.Equal(new DateOnly(2026, 9, 7), lecture.Date);
+        Assert.Equal(string.Empty, plain.Label);
+    }
+
+    /// <summary>
+    /// Короткая запись сразу получает отметку «не забирать», обычная ждёт решения
+    /// </summary>
+    [Fact]
+    public void A_short_record_is_skipped_at_first()
+    {
+        var webinars = WebinarParser.Parse(Page);
+
+        Assert.Equal(LessonStateEnum.Undecided, LessonImporter.InitialState(LessonImporter.ToLesson(webinars[0]), 10));
+        Assert.Equal(LessonStateEnum.Skip, LessonImporter.InitialState(LessonImporter.ToLesson(webinars[1]), 10));
+    }
+
+    /// <summary>
+    /// В файле расшифровки есть заголовок занятия, резюме и реплики со временем от начала записи
+    /// </summary>
+    [Fact]
+    public void The_transcript_file_has_a_header_a_summary_and_timed_lines()
+    {
+        var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 9, 14), "Лекция 2");
+        var text = TranscriptFormatter.Format(lesson, new MtsTranscript("Тема встречи: игры", [new TranscriptLine(TimeSpan.FromSeconds(3725), "Алексей", "Добрый вечер.")]));
+
+        Assert.StartsWith("Занятие: Гейм-дизайн, Лекция 2", text, StringComparison.Ordinal);
+        Assert.Contains("Дата: 14.09.2026", text, StringComparison.Ordinal);
+        Assert.Contains("== Резюме ==", text, StringComparison.Ordinal);
+        Assert.Contains("[01:02:05] Алексей: Добрый вечер.", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Новый список занятий дополняет старый, а отметки сохраняются и читаются по ключу
+    /// </summary>
+    [Fact]
+    public void Lessons_are_merged_and_states_are_remembered()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "steward-lms-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new HomeworkStore(directory);
+            store.SaveLessons([new Lesson("e1", "А", new DateOnly(2026, 9, 1))]);
+            store.SaveLessons([new Lesson("e2", "Б", new DateOnly(2026, 9, 2))]);
+            store.SetState("e1", LessonStateEnum.Fetch);
+
+            Assert.Equal(["e2", "e1"], store.LoadLessons().Select(lesson => lesson.Id).ToArray());
+            Assert.Equal(LessonStateEnum.Fetch, store.StateFor("e1"));
+            Assert.Equal(LessonStateEnum.Undecided, store.StateFor("e2"));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+}

@@ -209,6 +209,20 @@ public sealed class JobHost : IDisposable
     public void SetHomeworkFormat(string lessonId, HomeworkFormatEnum format) => _homework.SetFormat(lessonId, format);
 
     /// <summary>
+    /// Читает отметку занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Что делать с занятием: забирать расшифровку или нет</returns>
+    public LessonStateEnum LessonState(string lessonId) => _homework.StateFor(lessonId);
+
+    /// <summary>
+    /// Запоминает отметку занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="state">Выбранная отметка</param>
+    public void SetLessonState(string lessonId, LessonStateEnum state) => _homework.SetState(lessonId, state);
+
+    /// <summary>
     /// Читает идеи, которые остались в списке: новые и взятые в работу. Убирает их из списка только человек
     /// </summary>
     /// <returns>Идеи от свежих к старым</returns>

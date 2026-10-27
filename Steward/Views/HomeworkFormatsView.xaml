@@ -19,7 +19,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock Text="{Binding Title}" Style="{StaticResource TextTitle}" TextWrapping="Wrap"/>
-                                    <TextBlock Text="{Binding Date}" Style="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding Meta}" Style="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="Подготовить задания" Command="{Binding PrepareCommand}" Style="{StaticResource PrimaryButton}" VerticalAlignment="Top" Margin="16,0,0,0"
                                         Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}"/>
@@ -37,6 +37,34 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0" Visibility="{Binding HasStates, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Расшифровка" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <ItemsControl ItemsSource="{Binding StateOptions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Title}" Command="{Binding SelectCommand}" Margin="0,0,8,0" BorderThickness="1">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                                                                <Setter Property="Background" Value="{StaticResource RaisedBrush}"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                 <TextBlock Text="Формат" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,12,0"/>

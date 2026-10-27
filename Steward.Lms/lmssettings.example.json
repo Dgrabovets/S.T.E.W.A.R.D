@@ -1,0 +1,5 @@
+{
+  "BaseUrl": "https://lms.ranepa.ru",
+  "Login": "<логин или почта для входа в LMS>",
+  "Password": "<пароль от LMS>"
+}

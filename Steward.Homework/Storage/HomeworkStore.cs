@@ -75,6 +75,76 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
+    /// Файл с отметками, что делать с занятиями
+    /// </summary>
+    private string StatesFile => Path.Combine(directory, "lesson-states.json");
+
+    /// <summary>
+    /// Читает отметки занятий
+    /// </summary>
+    /// <returns>Отметка по ключу занятия. У занятий без выбора ключа нет</returns>
+    public IReadOnlyDictionary<string, LessonStateEnum> LoadStates() =>
+        Read<Dictionary<string, LessonStateEnum>>(StatesFile) ?? [];
+
+    /// <summary>
+    /// Отметка занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Выбранная отметка или <see cref="LessonStateEnum.Undecided"/></returns>
+    public LessonStateEnum StateFor(string lessonId) =>
+        LoadStates().TryGetValue(lessonId, out var state) ? state : LessonStateEnum.Undecided;
+
+    /// <summary>
+    /// Запоминает отметку занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="state">Что делать с занятием</param>
+    public void SetState(string lessonId, LessonStateEnum state) => SetStates([new KeyValuePair<string, LessonStateEnum>(lessonId, state)]);
+
+    /// <summary>
+    /// Запоминает отметки нескольких занятий одной записью файла
+    /// </summary>
+    /// <param name="changes">Ключ занятия и новая отметка</param>
+    public void SetStates(IEnumerable<KeyValuePair<string, LessonStateEnum>> changes)
+    {
+        var states = LoadStates().ToDictionary(pair => pair.Key, pair => pair.Value);
+        foreach (var (id, state) in changes)
+            states[id] = state;
+
+        Directory.CreateDirectory(directory);
+
+        var temp = StatesFile + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(states, Json));
+        File.Move(temp, StatesFile, overwrite: true);
+    }
+
+    /// <summary>
+    /// Записывает список занятий. Занятия, которых нет в новом списке, остаются: расшифровка и задания по ним уже могут быть
+    /// </summary>
+    /// <param name="lessons">Занятия, найденные при последней выгрузке</param>
+    public void SaveLessons(IEnumerable<Lesson> lessons)
+    {
+        var merged = LoadLessons().ToDictionary(lesson => lesson.Id, StringComparer.Ordinal);
+        foreach (var lesson in lessons)
+            merged[lesson.Id] = lesson;
+
+        Directory.CreateDirectory(directory);
+
+        var temp = LessonsFile + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(merged.Values.OrderByDescending(lesson => lesson.Date).ThenBy(lesson => lesson.Id, StringComparer.Ordinal), Json));
+        File.Move(temp, LessonsFile, overwrite: true);
+    }
+
+    /// <summary>
+    /// Проверяет, лежит ли уже расшифровка занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>
+    /// <see langword="true"/>, если файл расшифровки есть и не пуст
+    /// </returns>
+    public bool HasTranscript(string lessonId) => File.Exists(TranscriptPath(lessonId)) && new FileInfo(TranscriptPath(lessonId)).Length > 0;
+
+    /// <summary>
     /// Файл с ключами задач, которые уже созданы в SingularityApp
     /// </summary>
     private string CreatedFile => Path.Combine(directory, "created.json");

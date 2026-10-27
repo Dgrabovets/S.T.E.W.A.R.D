@@ -19,6 +19,16 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private readonly Func<Lesson, bool> _hasTranscript;
 
     /// <summary>
+    /// Запоминает отметку занятия. Пусто: выбор отметок не показывается
+    /// </summary>
+    private readonly Action<string, LessonStateEnum>? _stateChosen;
+
+    /// <summary>
+    /// Читает текущую отметку занятия по ключу
+    /// </summary>
+    private readonly Func<string, LessonStateEnum>? _stateOf;
+
+    /// <summary>
     /// Ищет задания в расшифровке занятия
     /// </summary>
     private readonly Func<Lesson, Task<(int Count, string Error)>> _prepare;
@@ -34,11 +44,17 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="chosen">Вызывается при выборе формата: параметры — ключ занятия и формат</param>
     /// <param name="hasTranscript">Проверяет, есть ли у занятия расшифровка</param>
     /// <param name="prepare">Ищет задания в расшифровке занятия: возвращает их число и текст ошибки</param>
+    /// <param name="stateChosen">Запоминает отметку занятия. Пусто: выбор отметок не показывается</param>
+    /// <param name="stateOf">Читает отметку занятия по ключу</param>
     public HomeworkFormatsViewModel(
         Action<string, HomeworkFormatEnum> chosen,
         Func<Lesson, bool> hasTranscript,
-        Func<Lesson, Task<(int Count, string Error)>> prepare)
+        Func<Lesson, Task<(int Count, string Error)>> prepare,
+        Action<string, LessonStateEnum>? stateChosen = null,
+        Func<string, LessonStateEnum>? stateOf = null)
     {
+        _stateChosen = stateChosen;
+        _stateOf = stateOf;
         _chosen = chosen;
         _hasTranscript = hasTranscript;
         _prepare = prepare;
@@ -51,12 +67,16 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="chosen">Вызывается при выборе формата: параметры — ключ занятия и формат</param>
     /// <param name="hasTranscript">Проверяет, есть ли у занятия расшифровка</param>
     /// <param name="prepare">Ищет задания в расшифровке занятия: возвращает их число и текст ошибки</param>
+    /// <param name="stateChosen">Запоминает отметку занятия. Пусто: выбор отметок не показывается</param>
+    /// <param name="stateOf">Читает отметку занятия по ключу</param>
     public HomeworkFormatsViewModel(
         IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> lessons,
         Action<string, HomeworkFormatEnum> chosen,
         Func<Lesson, bool> hasTranscript,
-        Func<Lesson, Task<(int Count, string Error)>> prepare)
-        : this(chosen, hasTranscript, prepare) => Update(lessons);
+        Func<Lesson, Task<(int Count, string Error)>> prepare,
+        Action<string, LessonStateEnum>? stateChosen = null,
+        Func<string, LessonStateEnum>? stateOf = null)
+        : this(chosen, hasTranscript, prepare, stateChosen, stateOf) => Update(lessons);
 
     /// <summary>
     /// Строки занятий
@@ -89,7 +109,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             .Select(item =>
             {
                 if (!known.TryGetValue(item.Lesson.Id, out var row))
-                    return new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare);
+                    return new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _stateChosen, _stateOf?.Invoke(item.Lesson.Id) ?? LessonStateEnum.Undecided);
 
                 row.HasTranscript = _hasTranscript(item.Lesson);
 
