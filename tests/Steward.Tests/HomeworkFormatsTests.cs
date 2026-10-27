@@ -162,4 +162,28 @@ public class HomeworkFormatsTests
         Assert.Equal(@"D:\data\homework", arguments[arguments.ToList().IndexOf("--add-dir") + 1]);
         Assert.Equal("просьба", arguments[arguments.ToList().IndexOf("-p") + 1]);
     }
+
+    /// <summary>
+    /// Занятия с одним названием собираются в одну карточку предмета, а выбор отметки сообщает название предмета
+    /// </summary>
+    [Fact]
+    public void Lessons_of_one_subject_share_a_card_and_report_the_subject()
+    {
+        var chosen = new List<(string, LessonStateEnum)>();
+        var lessons = new[]
+        {
+            (new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word),
+            (new Lesson("b", "Гейм-дизайн", new DateOnly(2026, 10, 18)), HomeworkFormatEnum.Word),
+            (new Lesson("c", "Английский", new DateOnly(2026, 10, 20)), HomeworkFormatEnum.Word),
+        };
+        var model = new HomeworkFormatsViewModel(lessons, (_, _) => { }, _ => true, _ => Task.FromResult((0, string.Empty)), (title, state) => chosen.Add((title, state)), _ => LessonStateEnum.Undecided);
+
+        Assert.Equal(["Английский", "Гейм-дизайн"], model.Subjects.Select(subject => subject.Title).ToArray());
+        Assert.Equal(2, model.Subjects[1].Lessons.Count);
+
+        model.Subjects[1].StateOptions.Single(option => option.State == LessonStateEnum.Fetch).SelectCommand.Execute(null);
+
+        Assert.Equal([("Гейм-дизайн", LessonStateEnum.Fetch)], chosen);
+        Assert.Equal([LessonStateEnum.Fetch], model.Subjects[1].StateOptions.Where(option => option.IsSelected).Select(option => option.State).ToArray());
+    }
 }

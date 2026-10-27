@@ -4,7 +4,7 @@ using Steward.Mvvm;
 namespace Steward.ViewModels;
 
 /// <summary>
-/// Одна кнопка выбора отметки занятия: «Ждёт решения», «Забирать», «Не забирать» или «Завершено»
+/// Одна кнопка выбора отметки предмета: «Ждёт решения», «Расшифровывать», «Не нужно» или «Завершён»
 /// </summary>
 public sealed class LessonStateOptionViewModel : Bindable
 {
@@ -58,9 +58,9 @@ public sealed class LessonStateOptionViewModel : Bindable
     /// <returns>Короткая подпись на русском</returns>
     public static string TitleOf(LessonStateEnum state) => state switch
     {
-        LessonStateEnum.Fetch => "Забирать",
-        LessonStateEnum.Skip => "Не забирать",
-        LessonStateEnum.Done => "Завершено",
+        LessonStateEnum.Fetch => "Расшифровывать",
+        LessonStateEnum.Skip => "Не нужно",
+        LessonStateEnum.Done => "Завершён",
         _ => "Ждёт решения",
     };
 }

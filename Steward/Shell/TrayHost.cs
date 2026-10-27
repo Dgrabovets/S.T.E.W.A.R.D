@@ -521,7 +521,7 @@ public sealed class TrayHost : IDisposable
     /// <returns>Модель списка</returns>
     private HomeworkFormatsViewModel Formats()
     {
-        _formats ??= new HomeworkFormatsViewModel(_jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None), _jobs.SetLessonState, _jobs.LessonState);
+        _formats ??= new HomeworkFormatsViewModel(_jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None), _jobs.SetSubjectState, _jobs.SubjectState);
         _formats.Update(_jobs.Lessons());
 
         return _formats;

@@ -63,7 +63,7 @@ internal static class Program
                 default:
                     var store = new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"));
                     var summary = await SyncAsync(settings, store);
-                    summary += "\n" + await FetchAsync(browser, store);
+                    summary += "\n" + await FetchAsync(browser, store, settings.MaxFetchPerRun);
                     Log(summary);
                     Report(statusStore, ProcessStateEnum.Ok, summary, null);
 
@@ -105,16 +105,17 @@ internal static class Program
     }
 
     /// <summary>
-    /// Забирает расшифровки занятий с отметкой «забирать», у которых текста ещё нет, и кладёт их в <c>transcripts</c>
+    /// Забирает расшифровки занятий предметов с отметкой «расшифровывать», у которых текста ещё нет, от свежих к старым, и кладёт их в <c>transcripts</c>
     /// </summary>
     /// <param name="browser">Браузер MTS Link</param>
     /// <param name="store">Папка домашних заданий</param>
+    /// <param name="maxPerRun">Сколько расшифровок забирать за один запуск: остальные подтянутся постепенно в следующих</param>
     /// <returns>Строка итога для статуса</returns>
-    private static async Task<string> FetchAsync(MtsBrowser browser, HomeworkStore store)
+    private static async Task<string> FetchAsync(MtsBrowser browser, HomeworkStore store, int maxPerRun)
     {
-        var states = store.LoadStates();
         var wanted = store.LoadLessons()
-            .Where(lesson => lesson.RecordUrl.Length > 0 && states.TryGetValue(lesson.Id, out var state) && state == LessonStateEnum.Fetch && !store.HasTranscript(lesson.Id))
+            .Where(store.ShouldFetch)
+            .Take(maxPerRun)
             .ToDictionary(lesson => lesson.Id, StringComparer.Ordinal);
         if (wanted.Count == 0)
             return "Расшифровки: новых к выгрузке нет";

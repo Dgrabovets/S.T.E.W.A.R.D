@@ -136,6 +136,49 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
+    /// Файл с отметками предметов: что делать с занятиями предмета
+    /// </summary>
+    private string SubjectStatesFile => Path.Combine(directory, "subject-states.json");
+
+    /// <summary>
+    /// Отметка предмета
+    /// </summary>
+    /// <param name="subject">Название предмета, как оно записано в занятиях</param>
+    /// <returns>Выбранная отметка или <see cref="LessonStateEnum.Undecided"/></returns>
+    public LessonStateEnum SubjectStateFor(string subject) =>
+        (Read<Dictionary<string, LessonStateEnum>>(SubjectStatesFile) ?? []).TryGetValue(subject, out var state) ? state : LessonStateEnum.Undecided;
+
+    /// <summary>
+    /// Запоминает отметку предмета
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="state">Что делать с занятиями предмета</param>
+    public void SetSubjectState(string subject, LessonStateEnum state)
+    {
+        var states = (Read<Dictionary<string, LessonStateEnum>>(SubjectStatesFile) ?? []).ToDictionary(pair => pair.Key, pair => pair.Value);
+        states[subject] = state;
+
+        Directory.CreateDirectory(directory);
+
+        var temp = SubjectStatesFile + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(states, Json));
+        File.Move(temp, SubjectStatesFile, overwrite: true);
+    }
+
+    /// <summary>
+    /// Решает, нужно ли забирать расшифровку занятия: предмет отмечен «расшифровывать», у занятия нет своей отметки «не нужно» или «завершено» и текста ещё нет
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>
+    /// <see langword="true"/>, если расшифровку пора забирать
+    /// </returns>
+    public bool ShouldFetch(Lesson lesson) =>
+        lesson.RecordUrl.Length > 0
+        && SubjectStateFor(lesson.Title) == LessonStateEnum.Fetch
+        && StateFor(lesson.Id) is not (LessonStateEnum.Skip or LessonStateEnum.Done)
+        && !HasTranscript(lesson.Id);
+
+    /// <summary>
     /// Проверяет, лежит ли уже расшифровка занятия
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>

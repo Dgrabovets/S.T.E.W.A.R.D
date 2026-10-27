@@ -98,12 +98,14 @@ public static class SnapshotRenderer
         else if (string.Equals(parts[0], "settings", StringComparison.OrdinalIgnoreCase))
         {
             var settings = new SettingsWindow();
-            settings.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, id => id == "en-1020" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided);
+            settings.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided);
 
             // «settings:formats»: раскрыт блок «Форматы заданий»
             if (parts.Length > 1 && string.Equals(parts[1], "formats", StringComparison.OrdinalIgnoreCase))
             {
                 settings.FormatsToggle.IsChecked = true;
+                settings.ScheduleToggle.IsChecked = false;
+                settings.Model.Formats.Subjects[0].IsOpen = true;
                 settleSeconds = 1.0;
             }
 
@@ -383,9 +385,10 @@ public static class SnapshotRenderer
     /// <returns>Занятия от свежих к старым</returns>
     private static IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> SampleLessons() =>
     [
-        (new Lesson("ux-1025", "Гейм-дизайн: игровые механики", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Presentation),
-        (new Lesson("db-1022", "Базы данных: нормализация", new DateOnly(2026, 10, 22)), HomeworkFormatEnum.Word),
-        (new Lesson("en-1020", "Английский: эссе", new DateOnly(2026, 10, 20)), HomeworkFormatEnum.Skip),
+        (new Lesson("ux-1025", "Гейм-дизайн", new DateOnly(2026, 10, 25), "Лекция 3", string.Empty, 163), HomeworkFormatEnum.Presentation),
+        (new Lesson("ux-1018", "Гейм-дизайн", new DateOnly(2026, 10, 18), "Лекция 2", string.Empty, 118), HomeworkFormatEnum.Word),
+        (new Lesson("db-1022", "Базы данных", new DateOnly(2026, 10, 22), "Нормализация", string.Empty, 90), HomeworkFormatEnum.Word),
+        (new Lesson("en-1020", "Английский язык", new DateOnly(2026, 10, 20), "Эссе", string.Empty, 87), HomeworkFormatEnum.Skip),
     ];
 
     /// <summary>

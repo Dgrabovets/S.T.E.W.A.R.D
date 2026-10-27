@@ -44,7 +44,7 @@ public sealed class LessonFormatViewModel : Bindable
     /// <param name="chosen">Вызывается, когда выбран другой формат: параметры — ключ занятия и формат</param>
     /// <param name="hasTranscript">Есть ли у занятия расшифровка, с которой можно начинать</param>
     /// <param name="prepare">Ищет задания в расшифровке: возвращает их число и текст ошибки, если не получилось</param>
-    public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen, bool hasTranscript, Func<Lesson, Task<(int Count, string Error)>> prepare, Action<string, LessonStateEnum>? stateChosen = null, LessonStateEnum state = LessonStateEnum.Undecided)
+    public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen, bool hasTranscript, Func<Lesson, Task<(int Count, string Error)>> prepare)
     {
         Id = lesson.Id;
         _hasTranscript = hasTranscript;
@@ -52,22 +52,6 @@ public sealed class LessonFormatViewModel : Bindable
         Title = lesson.Title;
         Date = lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
         Meta = string.Join("  ·  ", new[] { Date, lesson.Label, lesson.Minutes > 0 ? $"{lesson.Minutes / 60} ч {lesson.Minutes % 60:00} мин" : string.Empty }.Where(part => part.Length > 0));
-        var states = new List<LessonStateOptionViewModel>();
-        if (stateChosen is not null)
-        {
-            foreach (var option in Enum.GetValues<LessonStateEnum>())
-            {
-                states.Add(new LessonStateOptionViewModel(option, option == state, picked =>
-                {
-                    foreach (var other in states)
-                        other.IsSelected = other.State == picked;
-
-                    stateChosen(lesson.Id, picked);
-                }));
-            }
-        }
-
-        StateOptions = states;
         var options = new List<FormatOptionViewModel>();
         foreach (var option in HomeworkFormats.All)
         {
@@ -180,16 +164,6 @@ public sealed class LessonFormatViewModel : Bindable
     /// Дата, подпись занятия и длительность записи одной строкой
     /// </summary>
     public string Meta { get; }
-
-    /// <summary>
-    /// Кнопки выбора отметки занятия. Пусто, если выбор отметок приложению не передан
-    /// </summary>
-    public IReadOnlyList<LessonStateOptionViewModel> StateOptions { get; }
-
-    /// <summary>
-    /// Есть кнопки отметок
-    /// </summary>
-    public bool HasStates => StateOptions.Count > 0;
 
     /// <summary>
     /// Форматы на выбор

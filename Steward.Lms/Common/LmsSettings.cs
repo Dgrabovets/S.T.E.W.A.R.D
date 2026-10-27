@@ -31,6 +31,11 @@ public sealed class LmsSettings
     public string MtsStatePath { get; init; } = string.Empty;
 
     /// <summary>
+    /// Сколько расшифровок забирать за один запуск. Остальные подтягиваются в следующих запусках, чтобы не грузить сервис и лимиты разом
+    /// </summary>
+    public int MaxFetchPerRun { get; init; } = 6;
+
+    /// <summary>
     /// Записи короче этого числа минут считаются пробными запусками и сразу получают отметку «не забирать»
     /// </summary>
     public int MinLessonMinutes { get; init; } = 10;

@@ -19,12 +19,12 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private readonly Func<Lesson, bool> _hasTranscript;
 
     /// <summary>
-    /// Запоминает отметку занятия. Пусто: выбор отметок не показывается
+    /// Запоминает отметку предмета. Пусто: выбор отметок не показывается
     /// </summary>
     private readonly Action<string, LessonStateEnum>? _stateChosen;
 
     /// <summary>
-    /// Читает текущую отметку занятия по ключу
+    /// Читает текущую отметку предмета по названию
     /// </summary>
     private readonly Func<string, LessonStateEnum>? _stateOf;
 
@@ -39,13 +39,18 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private IReadOnlyList<LessonFormatViewModel> _lessons = [];
 
     /// <summary>
+    /// Карточки предметов
+    /// </summary>
+    private IReadOnlyList<SubjectViewModel> _subjects = [];
+
+    /// <summary>
     /// Создаёт модель без занятий
     /// </summary>
     /// <param name="chosen">Вызывается при выборе формата: параметры — ключ занятия и формат</param>
     /// <param name="hasTranscript">Проверяет, есть ли у занятия расшифровка</param>
     /// <param name="prepare">Ищет задания в расшифровке занятия: возвращает их число и текст ошибки</param>
-    /// <param name="stateChosen">Запоминает отметку занятия. Пусто: выбор отметок не показывается</param>
-    /// <param name="stateOf">Читает отметку занятия по ключу</param>
+    /// <param name="stateChosen">Запоминает отметку предмета: ключ — название предмета. Пусто: выбор отметок не показывается</param>
+    /// <param name="stateOf">Читает отметку предмета по названию</param>
     public HomeworkFormatsViewModel(
         Action<string, HomeworkFormatEnum> chosen,
         Func<Lesson, bool> hasTranscript,
@@ -67,8 +72,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="chosen">Вызывается при выборе формата: параметры — ключ занятия и формат</param>
     /// <param name="hasTranscript">Проверяет, есть ли у занятия расшифровка</param>
     /// <param name="prepare">Ищет задания в расшифровке занятия: возвращает их число и текст ошибки</param>
-    /// <param name="stateChosen">Запоминает отметку занятия. Пусто: выбор отметок не показывается</param>
-    /// <param name="stateOf">Читает отметку занятия по ключу</param>
+    /// <param name="stateChosen">Запоминает отметку предмета: ключ — название предмета. Пусто: выбор отметок не показывается</param>
+    /// <param name="stateOf">Читает отметку предмета по названию</param>
     public HomeworkFormatsViewModel(
         IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> lessons,
         Action<string, HomeworkFormatEnum> chosen,
@@ -96,6 +101,15 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <summary>
     /// Занятий пока нет
     /// </summary>
+    /// <summary>
+    /// Карточки предметов: в них те же занятия, но по одной отметке на предмет
+    /// </summary>
+    public IReadOnlyList<SubjectViewModel> Subjects
+    {
+        get => _subjects;
+        private set => Set(ref _subjects, value);
+    }
+
     public bool IsEmpty => Lessons.Count == 0;
 
     /// <summary>
@@ -109,7 +123,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             .Select(item =>
             {
                 if (!known.TryGetValue(item.Lesson.Id, out var row))
-                    return new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _stateChosen, _stateOf?.Invoke(item.Lesson.Id) ?? LessonStateEnum.Undecided);
+                    return new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare);
 
                 row.HasTranscript = _hasTranscript(item.Lesson);
 
@@ -119,5 +133,33 @@ public sealed class HomeworkFormatsViewModel : Bindable
 
         if (!rows.SequenceEqual(Lessons))
             Lessons = rows;
+
+        UpdateSubjects();
+    }
+
+    /// <summary>
+    /// Собирает карточки предметов из строк занятий: занятия с одним названием идут в одну карточку, порядок предметов по названию
+    /// </summary>
+    private void UpdateSubjects()
+    {
+        var known = Subjects.ToDictionary(subject => subject.Title, StringComparer.Ordinal);
+        var subjects = Lessons
+            .GroupBy(row => row.Title, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase)
+            .Select(group =>
+            {
+                if (known.TryGetValue(group.Key, out var subject))
+                {
+                    subject.Update([.. group]);
+
+                    return subject;
+                }
+
+                return new SubjectViewModel(group.Key, [.. group], _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen);
+            })
+            .ToList();
+
+        if (!subjects.SequenceEqual(Subjects))
+            Subjects = subjects;
     }
 }

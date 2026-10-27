@@ -209,18 +209,18 @@ public sealed class JobHost : IDisposable
     public void SetHomeworkFormat(string lessonId, HomeworkFormatEnum format) => _homework.SetFormat(lessonId, format);
 
     /// <summary>
-    /// Читает отметку занятия
+    /// Читает отметку предмета
     /// </summary>
-    /// <param name="lessonId">Ключ занятия</param>
-    /// <returns>Что делать с занятием: забирать расшифровку или нет</returns>
-    public LessonStateEnum LessonState(string lessonId) => _homework.StateFor(lessonId);
+    /// <param name="subject">Название предмета</param>
+    /// <returns>Что делать с занятиями предмета: расшифровывать или нет</returns>
+    public LessonStateEnum SubjectState(string subject) => _homework.SubjectStateFor(subject);
 
     /// <summary>
-    /// Запоминает отметку занятия
+    /// Запоминает отметку предмета
     /// </summary>
-    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="subject">Название предмета</param>
     /// <param name="state">Выбранная отметка</param>
-    public void SetLessonState(string lessonId, LessonStateEnum state) => _homework.SetState(lessonId, state);
+    public void SetSubjectState(string subject, LessonStateEnum state) => _homework.SetSubjectState(subject, state);
 
     /// <summary>
     /// Читает идеи, которые остались в списке: новые и взятые в работу. Убирает их из списка только человек

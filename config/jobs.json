@@ -41,7 +41,7 @@
       // Вход в MTS Link сохраняется один раз командой: Steward.Lms.exe login (см. Steward.Lms/README.md).
       //   dotnet publish Steward.Lms -c Release -o Steward.Lms/publish
       "enabled": true,
-      "command": "{repo}\Steward.Lms\publish\Steward.Lms.exe",
+      "command": "{repo}\\Steward.Lms\\publish\\Steward.Lms.exe",
       "triggers": [
         { "type": "start" },
         { "type": "daily", "at": "08:00" },

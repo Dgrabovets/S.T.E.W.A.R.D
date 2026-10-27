@@ -115,4 +115,38 @@ public class LmsTests
                 Directory.Delete(directory, recursive: true);
         }
     }
+
+    /// <summary>
+    /// Расшифровка забирается, только когда предмет отмечен «расшифровывать», у занятия нет своей отметки «не нужно» и текста ещё нет
+    /// </summary>
+    [Fact]
+    public void A_transcript_is_fetched_only_for_subjects_marked_for_it()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "steward-lms-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new HomeworkStore(directory);
+            var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 9, 1), RecordUrl: "https://my.mts-link.ru/j/Ranepa/1/record-new/2");
+            var other = new Lesson("e2", "Английский", new DateOnly(2026, 9, 2), RecordUrl: "https://my.mts-link.ru/j/Ranepa/3/record-new/4");
+
+            Assert.False(store.ShouldFetch(lesson));
+
+            store.SetSubjectState("Гейм-дизайн", LessonStateEnum.Fetch);
+            Assert.True(store.ShouldFetch(lesson));
+            Assert.False(store.ShouldFetch(other));
+
+            store.SetState("e1", LessonStateEnum.Skip);
+            Assert.False(store.ShouldFetch(lesson));
+
+            store.SetState("e1", LessonStateEnum.Undecided);
+            Directory.CreateDirectory(Path.GetDirectoryName(store.TranscriptPath("e1"))!);
+            File.WriteAllText(store.TranscriptPath("e1"), "текст");
+            Assert.False(store.ShouldFetch(lesson));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
 }
