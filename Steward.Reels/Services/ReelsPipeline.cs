@@ -257,7 +257,7 @@ public sealed class ReelsPipeline(
         }
         catch (ReelException exception)
         {
-            log($"Не получилось: {url}: {exception.Message}");
+            log($"Не получилось: {url}: {exception.Message}{(exception.Detail is null ? string.Empty : $" ({exception.Detail})")}");
             await ReplyAsync(message.ChatId, $"Не получилось: {exception.Message}", cancellationToken);
 
             return false;

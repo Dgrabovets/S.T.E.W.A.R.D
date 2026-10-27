@@ -32,7 +32,11 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
             cancellationToken);
 
         if (result.ExitCode != 0)
-            throw new ReelException("yt-dlp: " + LastLine(result.Error, "скачать не удалось"));
+        {
+            var line = LastLine(result.Error, "скачать не удалось");
+
+            throw new ReelException(Explain(line), "yt-dlp: " + line);
+        }
 
         var media = Directory.GetFiles(workDirectory, name + ".*").FirstOrDefault(file => !file.EndsWith(".info.json", StringComparison.OrdinalIgnoreCase))
             ?? throw new ReelException("yt-dlp ничего не скачал");
@@ -72,6 +76,23 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
         arguments.Add(url);
 
         return arguments;
+    }
+
+    /// <summary>
+    /// Переводит ошибки входа в Instagram в подсказку, что сделать, а остальные оставляет как есть
+    /// </summary>
+    /// <param name="line">Последняя строка ошибки yt-dlp</param>
+    /// <returns>Короткий текст для Telegram без путей к файлам</returns>
+    public static string Explain(string line)
+    {
+        if (line.Contains("cookies database", StringComparison.OrdinalIgnoreCase) || line.Contains("cookies-from-browser", StringComparison.OrdinalIgnoreCase) && line.Contains("could not", StringComparison.OrdinalIgnoreCase))
+            return "Бот не нашёл cookies браузера. Открой Firefox, зайди в аккаунт Instagram и пришли ссылку ещё раз.";
+
+        string[] loginMarks = ["empty media response", "login required", "login_required", "log in", "sign in", "checkpoint", "rate-limit", "rate limit", "requested content is not available"];
+
+        return loginMarks.Any(mark => line.Contains(mark, StringComparison.OrdinalIgnoreCase))
+            ? "Instagram не пустил без входа. Открой Firefox, зайди в аккаунт Instagram и пришли ссылку ещё раз."
+            : "yt-dlp: " + line;
     }
 
     /// <summary>

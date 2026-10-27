@@ -45,4 +45,15 @@ public class YtDlpArgumentsTests
         Assert.DoesNotContain("--cookies-from-browser", arguments);
         Assert.Equal(@"D:\secrets\cookies.txt", arguments[arguments.ToList().IndexOf("--cookies") + 1]);
     }
+
+    /// <summary>
+    /// Ошибки входа превращаются в подсказку без путей, остальные остаются с пометкой yt-dlp
+    /// </summary>
+    [Fact]
+    public void Login_errors_become_a_hint_and_others_stay_as_they_are()
+    {
+        Assert.StartsWith("Instagram не пустил", YtDlpDownloader.Explain("ERROR: [Instagram] X: Instagram sent an empty media response."), StringComparison.Ordinal);
+        Assert.StartsWith("Бот не нашёл cookies", YtDlpDownloader.Explain(@"ERROR: could not find firefox cookies database in 'C:\Users\admin'"), StringComparison.Ordinal);
+        Assert.Equal("yt-dlp: ERROR: Video unavailable", YtDlpDownloader.Explain("ERROR: Video unavailable"));
+    }
 }
