@@ -25,7 +25,9 @@ public sealed class SubjectViewModel : Bindable
     /// <param name="lessons">Занятия предмета</param>
     /// <param name="state">Текущая отметка предмета</param>
     /// <param name="stateChosen">Вызывается при выборе отметки: ключ (название предмета) и отметка. Пусто: выбор не показывается</param>
-    public SubjectViewModel(string title, IReadOnlyList<LessonFormatViewModel> lessons, LessonStateEnum state, Action<string, LessonStateEnum>? stateChosen)
+    /// <param name="format">Формат заданий по умолчанию для предмета</param>
+    /// <param name="formatChosen">Вызывается при выборе формата по умолчанию: название предмета и формат. Пусто: выбор формата не показывается</param>
+    public SubjectViewModel(string title, IReadOnlyList<LessonFormatViewModel> lessons, LessonStateEnum state, Action<string, LessonStateEnum>? stateChosen, HomeworkFormatEnum format = HomeworkFormats.DEFAULT, Action<string, HomeworkFormatEnum>? formatChosen = null)
     {
         Title = title;
         _lessons = lessons;
@@ -45,6 +47,26 @@ public sealed class SubjectViewModel : Bindable
         }
 
         StateOptions = options;
+
+        var formats = new List<FormatOptionViewModel>();
+        if (formatChosen is not null)
+        {
+            foreach (var option in HomeworkFormats.All.Where(item => item != HomeworkFormatEnum.Skip))
+            {
+                formats.Add(new FormatOptionViewModel(option, option == format, picked =>
+                {
+                    foreach (var other in formats)
+                        other.IsSelected = other.Format == picked;
+
+                    foreach (var lesson in Lessons)
+                        lesson.SetDefaultFormat(picked);
+
+                    formatChosen(title, picked);
+                }));
+            }
+        }
+
+        FormatOptions = formats;
     }
 
     /// <summary>
@@ -61,6 +83,16 @@ public sealed class SubjectViewModel : Bindable
     /// Есть кнопки отметок
     /// </summary>
     public bool HasStates => StateOptions.Count > 0;
+
+    /// <summary>
+    /// Кнопки выбора формата заданий по умолчанию для предмета. Формат «Не готовить» здесь не предлагается
+    /// </summary>
+    public IReadOnlyList<FormatOptionViewModel> FormatOptions { get; }
+
+    /// <summary>
+    /// Есть кнопки формата
+    /// </summary>
+    public bool HasFormats => FormatOptions.Count > 0;
 
     /// <summary>
     /// Занятия предмета от свежих к старым

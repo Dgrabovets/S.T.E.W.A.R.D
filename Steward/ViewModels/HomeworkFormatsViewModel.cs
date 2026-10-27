@@ -24,6 +24,16 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private readonly Action<string, LessonStateEnum>? _stateChosen;
 
     /// <summary>
+    /// Просит забрать расшифровку занятия независимо от отметки предмета. Пусто: кнопки «Расшифровать» нет
+    /// </summary>
+    private readonly Action<Lesson>? _fetchRequested;
+
+    /// <summary>
+    /// Запоминает формат заданий по умолчанию для предмета. Пусто: выбор формата в карточке не показывается
+    /// </summary>
+    private readonly Action<string, HomeworkFormatEnum>? _subjectFormatChosen;
+
+    /// <summary>
     /// Читает текущую отметку предмета по названию
     /// </summary>
     private readonly Func<string, LessonStateEnum>? _stateOf;
@@ -44,6 +54,11 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private IReadOnlyList<SubjectViewModel> _subjects = [];
 
     /// <summary>
+    /// Формат заданий по умолчанию для каждого предмета, по названию
+    /// </summary>
+    private IReadOnlyDictionary<string, HomeworkFormatEnum> _formatByTitle = new Dictionary<string, HomeworkFormatEnum>();
+
+    /// <summary>
     /// Создаёт модель без занятий
     /// </summary>
     /// <param name="chosen">Вызывается при выборе формата: параметры — ключ занятия и формат</param>
@@ -56,8 +71,12 @@ public sealed class HomeworkFormatsViewModel : Bindable
         Func<Lesson, bool> hasTranscript,
         Func<Lesson, Task<(int Count, string Error)>> prepare,
         Action<string, LessonStateEnum>? stateChosen = null,
-        Func<string, LessonStateEnum>? stateOf = null)
+        Func<string, LessonStateEnum>? stateOf = null,
+        Action<Lesson>? fetchRequested = null,
+        Action<string, HomeworkFormatEnum>? subjectFormatChosen = null)
     {
+        _fetchRequested = fetchRequested;
+        _subjectFormatChosen = subjectFormatChosen;
         _stateChosen = stateChosen;
         _stateOf = stateOf;
         _chosen = chosen;
@@ -80,8 +99,10 @@ public sealed class HomeworkFormatsViewModel : Bindable
         Func<Lesson, bool> hasTranscript,
         Func<Lesson, Task<(int Count, string Error)>> prepare,
         Action<string, LessonStateEnum>? stateChosen = null,
-        Func<string, LessonStateEnum>? stateOf = null)
-        : this(chosen, hasTranscript, prepare, stateChosen, stateOf) => Update(lessons);
+        Func<string, LessonStateEnum>? stateOf = null,
+        Action<Lesson>? fetchRequested = null,
+        Action<string, HomeworkFormatEnum>? subjectFormatChosen = null)
+        : this(chosen, hasTranscript, prepare, stateChosen, stateOf, fetchRequested, subjectFormatChosen) => Update(lessons);
 
     /// <summary>
     /// Строки занятий
@@ -118,12 +139,13 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="lessons">Занятия с выбранными форматами от свежих к старым</param>
     public void Update(IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> lessons)
     {
+        _formatByTitle = lessons.GroupBy(item => item.Lesson.Title, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First().Format, StringComparer.Ordinal);
         var known = Lessons.ToDictionary(row => row.Id, StringComparer.Ordinal);
         var rows = lessons
             .Select(item =>
             {
                 if (!known.TryGetValue(item.Lesson.Id, out var row))
-                    return new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare);
+                    return new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested);
 
                 row.HasTranscript = _hasTranscript(item.Lesson);
 
@@ -143,6 +165,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private void UpdateSubjects()
     {
         var known = Subjects.ToDictionary(subject => subject.Title, StringComparer.Ordinal);
+        var lessonsByTitle = _formatByTitle;
         var subjects = Lessons
             .GroupBy(row => row.Title, StringComparer.Ordinal)
             .OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase)
@@ -155,7 +178,10 @@ public sealed class HomeworkFormatsViewModel : Bindable
                     return subject;
                 }
 
-                return new SubjectViewModel(group.Key, [.. group], _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen);
+                var rows = group.ToArray();
+                var format = lessonsByTitle.TryGetValue(group.Key, out var found) ? found : HomeworkFormats.DEFAULT;
+
+                return new SubjectViewModel(group.Key, rows, _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen, format, _subjectFormatChosen);
             })
             .ToList();
 

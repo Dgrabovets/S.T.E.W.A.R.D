@@ -59,45 +59,67 @@ public class HomeworkFormatsTests
     }
 
     /// <summary>
-    /// Выбор формата в строке переключает отметку и сообщает о выборе
+    /// Выбор формата в меню запоминает его для занятия и сразу запускает поиск заданий, а формат по умолчанию остаётся отмеченным
     /// </summary>
     [Fact]
-    public void Picking_a_format_moves_the_selection_and_reports_it()
+    public void Picking_a_format_in_the_menu_reports_it_and_starts_the_search()
     {
         var picked = new List<(string, HomeworkFormatEnum)>();
-        var model = new HomeworkFormatsViewModel([(new Lesson("a", "А", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word)], (id, format) => picked.Add((id, format)), _ => true, _ => Task.FromResult((0, string.Empty)));
+        var prepared = new List<string>();
+        var model = new HomeworkFormatsViewModel([(new Lesson("a", "А", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word)], (id, format) => picked.Add((id, format)), _ => true, lesson =>
+        {
+            prepared.Add(lesson.Id);
+
+            return Task.FromResult((1, string.Empty));
+        });
         var options = model.Lessons.Single().Options;
 
         options.Single(option => option.Format == HomeworkFormatEnum.Code).SelectCommand.Execute(null);
 
         Assert.Equal([("a", HomeworkFormatEnum.Code)], picked);
-        Assert.Equal([HomeworkFormatEnum.Code], options.Where(option => option.IsSelected).Select(option => option.Format).ToArray());
+        Assert.Equal(["a"], prepared);
+        Assert.Equal([HomeworkFormatEnum.Word], options.Where(option => option.IsSelected).Select(option => option.Format).ToArray());
         Assert.False(model.IsEmpty);
     }
 
     /// <summary>
-    /// Кнопка «Подготовить» видна только у занятий с расшифровкой и передаёт нужное занятие
+    /// Кнопка «Подготовить» раскрывает меню форматов у занятий с расшифровкой, а кнопка «Расшифровать» нужна тем, у кого текста нет
     /// </summary>
     [Fact]
-    public void Prepare_is_offered_only_with_a_transcript_and_passes_the_lesson()
+    public void Prepare_opens_the_format_menu_and_fetch_is_offered_without_a_transcript()
     {
-        var prepared = new List<string>();
+        var requested = new List<string>();
         var withText = new Lesson("a", "А", new DateOnly(2026, 10, 25));
         var without = new Lesson("b", "Б", new DateOnly(2026, 10, 24));
-        var model = new HomeworkFormatsViewModel([(withText, HomeworkFormatEnum.Word), (without, HomeworkFormatEnum.Word)], (_, _) => { }, lesson => lesson.Id == "a", lesson =>
-        {
-            prepared.Add(lesson.Id);
-
-            return Task.FromResult((2, string.Empty));
-        });
+        var model = new HomeworkFormatsViewModel([(withText, HomeworkFormatEnum.Word), (without, HomeworkFormatEnum.Word)], (_, _) => { }, lesson => lesson.Id == "a", _ => Task.FromResult((2, string.Empty)), fetchRequested: lesson => requested.Add(lesson.Id));
 
         model.Lessons[0].PrepareCommand.Execute(null);
+        model.Lessons[1].FetchCommand.Execute(null);
 
         Assert.True(model.Lessons[0].HasTranscript);
         Assert.False(model.Lessons[1].HasTranscript);
-        Assert.Equal(["a"], prepared);
-        Assert.Equal(ActivityStateEnum.Done, model.Lessons[0].Activity);
-        Assert.Equal("Найдено заданий: 2", model.Lessons[0].Status);
+        Assert.True(model.Lessons[0].IsMenuOpen);
+        Assert.False(model.Lessons[0].CanFetch);
+        Assert.False(model.Lessons[1].CanFetch);
+        Assert.Equal(["b"], requested);
+        Assert.True(model.Lessons[1].FetchRequested);
+    }
+
+    /// <summary>
+    /// После выбора формата показывается число найденных заданий и меню закрывается
+    /// </summary>
+    [Fact]
+    public void After_the_format_is_picked_the_count_is_shown_and_the_menu_closes()
+    {
+        var model = new HomeworkFormatsViewModel([(new Lesson("a", "А", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, _ => Task.FromResult((2, string.Empty)));
+        var row = model.Lessons[0];
+        row.PrepareCommand.Execute(null);
+
+        row.Options.First().SelectCommand.Execute(null);
+
+        Assert.False(row.IsMenuOpen);
+        Assert.Equal(ActivityStateEnum.Done, row.Activity);
+        Assert.Equal("Найдено заданий: 2", row.Status);
     }
 
     /// <summary>
@@ -108,7 +130,7 @@ public class HomeworkFormatsTests
     {
         var model = new HomeworkFormatsViewModel([(new Lesson("a", "А", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, _ => Task.FromResult((0, "Claude не ответил")));
 
-        model.Lessons[0].PrepareCommand.Execute(null);
+        model.Lessons[0].Options.First().SelectCommand.Execute(null);
 
         Assert.True(model.Lessons[0].Failed);
         Assert.Equal(ActivityStateEnum.None, model.Lessons[0].Activity);

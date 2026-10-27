@@ -7,7 +7,7 @@ using Steward.Mvvm;
 namespace Steward.ViewModels;
 
 /// <summary>
-/// Строка окна форматов: занятие, выбор формата ДЗ и подготовка заданий по расшифровке
+/// Строка занятия внутри карточки предмета: дата, подпись, кнопка «Расшифровать» для занятий без текста и кнопка «Подготовить задания» с выбором формата для занятий с текстом
 /// </summary>
 public sealed class LessonFormatViewModel : Bindable
 {
@@ -17,12 +17,12 @@ public sealed class LessonFormatViewModel : Bindable
     private ActivityStateEnum _activity;
 
     /// <summary>
-    /// Когда подготовка закончилась
+    /// Когда подготовка закончилась: от этого момента рисуется галочка
     /// </summary>
     private DateTimeOffset _activitySince;
 
     /// <summary>
-    /// Текст рядом с индикатором: что происходит или что получилось
+    /// Текст статуса: идёт поиск, найдено столько-то, ошибка
     /// </summary>
     private string _status = string.Empty;
 
@@ -32,35 +32,54 @@ public sealed class LessonFormatViewModel : Bindable
     private bool _failed;
 
     /// <summary>
-    /// Есть ли у занятия расшифровка
+    /// У занятия уже есть расшифровка
     /// </summary>
     private bool _hasTranscript;
 
     /// <summary>
-    /// Создаёт строку
+    /// Меню выбора формата раскрыто
+    /// </summary>
+    private bool _isMenuOpen;
+
+    /// <summary>
+    /// Расшифровку этого занятия уже попросили забрать
+    /// </summary>
+    private bool _fetchRequested;
+
+    /// <summary>
+    /// Создаёт строку занятия
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    /// <param name="format">Выбранный сейчас формат</param>
-    /// <param name="chosen">Вызывается, когда выбран другой формат: параметры — ключ занятия и формат</param>
-    /// <param name="hasTranscript">Есть ли у занятия расшифровка, с которой можно начинать</param>
-    /// <param name="prepare">Ищет задания в расшифровке: возвращает их число и текст ошибки, если не получилось</param>
-    public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen, bool hasTranscript, Func<Lesson, Task<(int Count, string Error)>> prepare)
+    /// <param name="format">Формат заданий по умолчанию: его отмечает меню, но выбрать можно любой</param>
+    /// <param name="chosen">Запоминает формат, в котором подготовлено занятие: ключ занятия и формат</param>
+    /// <param name="hasTranscript">Расшифровка уже лежит на диске</param>
+    /// <param name="prepare">Ищет задания в расшифровке занятия: возвращает их число и текст ошибки</param>
+    /// <param name="fetchRequested">Вызывается по кнопке «Расшифровать»: просит забрать расшифровку занятия, даже если предмет не отмечен. Пусто: кнопки нет</param>
+    public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen, bool hasTranscript, Func<Lesson, Task<(int Count, string Error)>> prepare, Action<Lesson>? fetchRequested = null)
     {
         Id = lesson.Id;
         _hasTranscript = hasTranscript;
-        PrepareCommand = new RelayCommand(async () => await PrepareAsync(lesson, prepare), () => Activity != ActivityStateEnum.Working);
+        PrepareCommand = new RelayCommand(() => IsMenuOpen = !IsMenuOpen, () => Activity != ActivityStateEnum.Working);
+        FetchCommand = new RelayCommand(
+            () =>
+            {
+                FetchRequested = true;
+                Failed = false;
+                Status = "Расшифровка заказана: она появится после ближайшей выгрузки, это несколько минут";
+                fetchRequested?.Invoke(lesson);
+            },
+            () => fetchRequested is not null && !FetchRequested);
         Title = lesson.Title;
         Date = lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
         Meta = string.Join("  ·  ", new[] { Date, lesson.Label, lesson.Minutes > 0 ? $"{lesson.Minutes / 60} ч {lesson.Minutes % 60:00} мин" : string.Empty }.Where(part => part.Length > 0));
         var options = new List<FormatOptionViewModel>();
         foreach (var option in HomeworkFormats.All)
         {
-            options.Add(new FormatOptionViewModel(option, option == format, picked =>
+            options.Add(new FormatOptionViewModel(option, option == format, async picked =>
             {
-                foreach (var other in options)
-                    other.IsSelected = other.Format == picked;
-
+                IsMenuOpen = false;
                 chosen(lesson.Id, picked);
+                await PrepareAsync(lesson, prepare);
             }));
         }
 
@@ -73,16 +92,53 @@ public sealed class LessonFormatViewModel : Bindable
     public string Id { get; }
 
     /// <summary>
-    /// Есть ли у занятия расшифровка: без неё готовить задания не из чего
+    /// У занятия уже есть расшифровка: тогда можно подготовить задания
     /// </summary>
     public bool HasTranscript
     {
         get => _hasTranscript;
-        set => Set(ref _hasTranscript, value);
+        set
+        {
+            if (!Set(ref _hasTranscript, value))
+                return;
+
+            Raise(nameof(CanFetch));
+            CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     /// <summary>
-    /// Как движутся точки индикатора: идёт поиск по тексту расшифровки
+    /// Расшифровки ещё нет: можно заказать
+    /// </summary>
+    public bool CanFetch => !HasTranscript && FetchCommand.CanExecute(null);
+
+    /// <summary>
+    /// Расшифровку уже заказали
+    /// </summary>
+    public bool FetchRequested
+    {
+        get => _fetchRequested;
+        private set
+        {
+            if (!Set(ref _fetchRequested, value))
+                return;
+
+            Raise(nameof(CanFetch));
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    /// <summary>
+    /// Меню выбора формата раскрыто
+    /// </summary>
+    public bool IsMenuOpen
+    {
+        get => _isMenuOpen;
+        set => Set(ref _isMenuOpen, value);
+    }
+
+    /// <summary>
+    /// Вид сферы в индикаторе подготовки
     /// </summary>
     public ActivityKindEnum Kind => ActivityKindEnum.Searching;
 
@@ -103,7 +159,7 @@ public sealed class LessonFormatViewModel : Bindable
     }
 
     /// <summary>
-    /// Когда подготовка закончилась: от этого момента рисуется галочка
+    /// Когда подготовка закончилась
     /// </summary>
     public DateTimeOffset ActivitySince
     {
@@ -112,7 +168,7 @@ public sealed class LessonFormatViewModel : Bindable
     }
 
     /// <summary>
-    /// Текст рядом с индикатором
+    /// Текст статуса
     /// </summary>
     public string Status
     {
@@ -127,7 +183,7 @@ public sealed class LessonFormatViewModel : Bindable
     }
 
     /// <summary>
-    /// Подготовка закончилась ошибкой: текст показывается красным
+    /// Подготовка закончилась ошибкой
     /// </summary>
     public bool Failed
     {
@@ -136,27 +192,32 @@ public sealed class LessonFormatViewModel : Bindable
     }
 
     /// <summary>
-    /// Есть что показать рядом с индикатором
+    /// Есть что сказать о ходе подготовки
     /// </summary>
     public bool HasStatus => Status.Length > 0;
 
     /// <summary>
-    /// Цвет точки для стиля индикатора: в покое серый
+    /// Цвет сферы: нейтральный
     /// </summary>
     public PanelToneEnum Tone => PanelToneEnum.Idle;
 
     /// <summary>
-    /// Запускает поиск заданий в фоне, пока Claude работает, показывает вращение, потом галочку или ошибку
+    /// Раскрывает меню выбора формата. Сами задания ищутся после выбора формата в меню
     /// </summary>
     public RelayCommand PrepareCommand { get; }
 
     /// <summary>
-    /// Название предмета и темы
+    /// Заказывает расшифровку занятия
+    /// </summary>
+    public RelayCommand FetchCommand { get; }
+
+    /// <summary>
+    /// Название предмета
     /// </summary>
     public string Title { get; }
 
     /// <summary>
-    /// День занятия
+    /// Дата занятия
     /// </summary>
     public string Date { get; }
 
@@ -166,16 +227,26 @@ public sealed class LessonFormatViewModel : Bindable
     public string Meta { get; }
 
     /// <summary>
-    /// Форматы на выбор
+    /// Форматы в меню подготовки. Нажатие выбирает формат и сразу запускает поиск заданий. Формат по умолчанию отмечен
     /// </summary>
     public IReadOnlyList<FormatOptionViewModel> Options { get; }
 
     /// <summary>
-    /// Выполняет подготовку и меняет состояние индикатора по её итогу
+    /// Отмечает в меню формат по умолчанию, когда его сменили в карточке предмета
+    /// </summary>
+    /// <param name="format">Новый формат по умолчанию</param>
+    public void SetDefaultFormat(HomeworkFormatEnum format)
+    {
+        foreach (var option in Options)
+            option.IsSelected = option.Format == format;
+    }
+
+    /// <summary>
+    /// Ищет задания в расшифровке и показывает ход поиска
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    /// <param name="prepare">Поиск заданий</param>
-    /// <returns>Задача, которая завершается, когда подготовка закончилась</returns>
+    /// <param name="prepare">Ищет задания: возвращает их число и текст ошибки</param>
+    /// <returns>Задача, которая завершается, когда поиск закончен</returns>
     private async Task PrepareAsync(Lesson lesson, Func<Lesson, Task<(int Count, string Error)>> prepare)
     {
         Failed = false;

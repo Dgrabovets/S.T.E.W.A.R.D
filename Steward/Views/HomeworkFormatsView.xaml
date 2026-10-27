@@ -39,6 +39,34 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0" Visibility="{Binding HasFormats, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Формат заданий" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <ItemsControl ItemsSource="{Binding FormatOptions}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Title}" Command="{Binding SelectCommand}" Margin="0,0,8,0" BorderThickness="1">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                                                                <Setter Property="Background" Value="{StaticResource RaisedBrush}"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                             <ToggleButton IsChecked="{Binding IsOpen, Mode=TwoWay}" Style="{StaticResource InlineLink}" Content="Занятия и форматы заданий" Margin="0,12,0,0" HorizontalAlignment="Left"/>
                             <ctl:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsOpen}">
                                 <ItemsControl ItemsSource="{Binding Lessons}" Margin="0,8,0,0">
@@ -54,8 +82,46 @@
                                                         <StackPanel>
                                                             <TextBlock Text="{Binding Meta}" Style="{StaticResource TextBody}" TextWrapping="Wrap"/>
                                                         </StackPanel>
-                                                        <Button Grid.Column="1" Content="Подготовить задания" Command="{Binding PrepareCommand}" Style="{StaticResource PrimaryButton}" VerticalAlignment="Top" Margin="16,0,0,0"
-                                                                Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}"/>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="16,0,0,0">
+                                                            <Button Content="Расшифровать" Command="{Binding FetchCommand}" Style="{StaticResource ActionButton}"
+                                                                    Visibility="{Binding CanFetch, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <Grid Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}">
+                                                                <Button x:Name="PrepareButton" Content="Подготовить задания  ▾" Command="{Binding PrepareCommand}" Style="{StaticResource PrimaryButton}"/>
+                                                                <Popup IsOpen="{Binding IsMenuOpen, Mode=TwoWay}" PlacementTarget="{Binding ElementName=PrepareButton}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True" VerticalOffset="4">
+                                                                    <Border Style="{StaticResource Card}" Background="{StaticResource SurfaceBrush}" Padding="8" MinWidth="200">
+                                                                        <StackPanel>
+                                                                            <TextBlock Text="В каком формате готовить" Style="{StaticResource TextCaption}" Margin="8,4,8,6"/>
+                                                                            <ItemsControl ItemsSource="{Binding Options}">
+                                                                                <ItemsControl.ItemTemplate>
+                                                                                    <DataTemplate>
+                                                                                        <Button Command="{Binding SelectCommand}" HorizontalContentAlignment="Left" Margin="0,0,0,2">
+                                                                                            <Button.Style>
+                                                                                                <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                                                                                    <Style.Triggers>
+                                                                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                                            <Setter Property="Background" Value="{StaticResource RaisedBrush}"/>
+                                                                                                            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                                                                                        </DataTrigger>
+                                                                                                    </Style.Triggers>
+                                                                                                </Style>
+                                                                                            </Button.Style>
+                                                                                            <StackPanel Orientation="Horizontal">
+                                                                                                <TextBlock Text="{Binding Title}"/>
+                                                                                                <TextBlock Text="  по умолчанию" Style="{StaticResource TextCaption}" VerticalAlignment="Center">
+                                                                                                    <TextBlock.Visibility>
+                                                                                                        <Binding Path="IsSelected" Converter="{StaticResource BoolToVisibility}"/>
+                                                                                                    </TextBlock.Visibility>
+                                                                                                </TextBlock>
+                                                                                            </StackPanel>
+                                                                                        </Button>
+                                                                                    </DataTemplate>
+                                                                                </ItemsControl.ItemTemplate>
+                                                                            </ItemsControl>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </Popup>
+                                                            </Grid>
+                                                        </StackPanel>
                                                     </Grid>
                                                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0" Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
                                                         <ctl:ActivityOrb Width="28" Height="28" Style="{StaticResource ActivityOrb}" Margin="-6,-4,8,-4"/>
@@ -70,34 +136,6 @@
                                                                 </Style>
                                                             </TextBlock.Style>
                                                         </TextBlock>
-                                                    </StackPanel>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                                        <TextBlock Text="Формат" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                                        <ItemsControl ItemsSource="{Binding Options}">
-                                                            <ItemsControl.ItemsPanel>
-                                                                <ItemsPanelTemplate>
-                                                                    <WrapPanel/>
-                                                                </ItemsPanelTemplate>
-                                                            </ItemsControl.ItemsPanel>
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate>
-                                                                    <Button Content="{Binding Title}" Command="{Binding SelectCommand}" Margin="0,0,8,0" BorderThickness="1">
-                                                                        <Button.Style>
-                                                                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
-                                                                                <Setter Property="BorderBrush" Value="Transparent"/>
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                                                        <Setter Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
-                                                                                        <Setter Property="Background" Value="{StaticResource RaisedBrush}"/>
-                                                                                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </Button.Style>
-                                                                    </Button>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
                                                     </StackPanel>
                                                 </StackPanel>
                                             </Border>

@@ -50,12 +50,47 @@ public sealed class HomeworkStore(string directory)
         Read<Dictionary<string, HomeworkFormatEnum>>(FormatsFile) ?? [];
 
     /// <summary>
-    /// Формат для занятия
+    /// Формат для занятия: тот, в котором занятие готовили, а если не готовили, формат по умолчанию для его предмета
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Формат занятия, формат предмета или <see cref="HomeworkFormats.DEFAULT"/></returns>
+    public HomeworkFormatEnum FormatFor(string lessonId)
+    {
+        if (LoadFormats().TryGetValue(lessonId, out var format))
+            return format;
+
+        return LoadLessons().FirstOrDefault(lesson => lesson.Id == lessonId) is { } found ? SubjectFormatFor(found.Title) : HomeworkFormats.DEFAULT;
+    }
+
+    /// <summary>
+    /// Файл с форматами по умолчанию для предметов
+    /// </summary>
+    private string SubjectFormatsFile => Path.Combine(directory, "subject-formats.json");
+
+    /// <summary>
+    /// Формат заданий по умолчанию для предмета
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
     /// <returns>Выбранный формат или <see cref="HomeworkFormats.DEFAULT"/></returns>
-    public HomeworkFormatEnum FormatFor(string lessonId) =>
-        LoadFormats().TryGetValue(lessonId, out var format) ? format : HomeworkFormats.DEFAULT;
+    public HomeworkFormatEnum SubjectFormatFor(string subject) =>
+        (Read<Dictionary<string, HomeworkFormatEnum>>(SubjectFormatsFile) ?? []).TryGetValue(subject, out var format) ? format : HomeworkFormats.DEFAULT;
+
+    /// <summary>
+    /// Запоминает формат заданий по умолчанию для предмета
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="format">Выбранный формат</param>
+    public void SetSubjectFormat(string subject, HomeworkFormatEnum format)
+    {
+        var formats = (Read<Dictionary<string, HomeworkFormatEnum>>(SubjectFormatsFile) ?? []).ToDictionary(pair => pair.Key, pair => pair.Value);
+        formats[subject] = format;
+
+        Directory.CreateDirectory(directory);
+
+        var temp = SubjectFormatsFile + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(formats, Json));
+        File.Move(temp, SubjectFormatsFile, overwrite: true);
+    }
 
     /// <summary>
     /// Запоминает формат для занятия
@@ -166,7 +201,7 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
-    /// Решает, нужно ли забирать расшифровку занятия: предмет отмечен «расшифровывать», у занятия нет своей отметки «не нужно» или «завершено» и текста ещё нет
+    /// Решает, нужно ли забирать расшифровку занятия: текста ещё нет и либо занятие заказано отдельно (его отметка «забирать» сильнее отметки предмета), либо предмет отмечен «расшифровывать» и у занятия нет отметки «не нужно» или «завершено»
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <returns>
@@ -174,9 +209,8 @@ public sealed class HomeworkStore(string directory)
     /// </returns>
     public bool ShouldFetch(Lesson lesson) =>
         lesson.RecordUrl.Length > 0
-        && SubjectStateFor(lesson.Title) == LessonStateEnum.Fetch
-        && StateFor(lesson.Id) is not (LessonStateEnum.Skip or LessonStateEnum.Done)
-        && !HasTranscript(lesson.Id);
+        && !HasTranscript(lesson.Id)
+        && (StateFor(lesson.Id) == LessonStateEnum.Fetch || (SubjectStateFor(lesson.Title) == LessonStateEnum.Fetch && StateFor(lesson.Id) is not (LessonStateEnum.Skip or LessonStateEnum.Done)));
 
     /// <summary>
     /// Проверяет, лежит ли уже расшифровка занятия

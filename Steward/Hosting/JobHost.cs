@@ -36,6 +36,11 @@ public sealed class JobHost : IDisposable
     private const int RECORD_COUNT = 100;
 
     /// <summary>
+    /// Идентификатор задачи выгрузки занятий и расшифровок из LMS в config/jobs.json
+    /// </summary>
+    private const string LMS_ID = "lms";
+
+    /// <summary>
     /// Идентификатор задачи бота для рилсов в config/jobs.json
     /// </summary>
     private const string REELS_ID = "reels";
@@ -166,7 +171,7 @@ public sealed class JobHost : IDisposable
     /// </summary>
     /// <returns>Занятия от свежих к старым с их форматами</returns>
     public IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> Lessons() =>
-        [.. _homework.LoadLessons().Select(lesson => (lesson, _homework.FormatFor(lesson.Id)))];
+        [.. _homework.LoadLessons().Where(lesson => _homework.StateFor(lesson.Id) != LessonStateEnum.Skip).Select(lesson => (lesson, _homework.SubjectFormatFor(lesson.Title)))];
 
     /// <summary>
     /// Читает найденные домашние задания
@@ -207,6 +212,23 @@ public sealed class JobHost : IDisposable
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="format">Выбранный формат</param>
     public void SetHomeworkFormat(string lessonId, HomeworkFormatEnum format) => _homework.SetFormat(lessonId, format);
+
+    /// <summary>
+    /// Запоминает формат заданий по умолчанию для предмета
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="format">Выбранный формат</param>
+    public void SetSubjectFormat(string subject, HomeworkFormatEnum format) => _homework.SetSubjectFormat(subject, format);
+
+    /// <summary>
+    /// Заказывает расшифровку занятия независимо от отметки предмета и сразу запускает выгрузку
+    /// </summary>
+    /// <param name="lesson">Занятие, расшифровку которого нужно забрать</param>
+    public void RequestTranscript(Lesson lesson)
+    {
+        _homework.SetState(lesson.Id, LessonStateEnum.Fetch);
+        RunNow(LMS_ID);
+    }
 
     /// <summary>
     /// Читает отметку предмета

@@ -68,7 +68,7 @@ internal static class Program
                 default:
                     var store = new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"));
                     var summary = await SyncAsync(settings, store);
-                    summary += "\n" + await FetchAsync(browser, store, settings.MaxFetchPerRun);
+                    summary += "\n" + await FetchAsync(browser, settings, store, settings.MaxFetchPerRun);
                     summary += "\n" + await TasksAsync(settings, store, dryRun: !settings.CreateTasks);
                     Log(summary);
                     Report(statusStore, ProcessStateEnum.Ok, summary, null);
@@ -156,35 +156,56 @@ internal static class Program
     }
 
     /// <summary>
-    /// Забирает расшифровки занятий предметов с отметкой «расшифровывать», у которых текста ещё нет, от свежих к старым, и кладёт их в <c>transcripts</c>
+    /// Забирает расшифровки занятий: сначала заказанные по кнопке «Расшифровать», потом занятия предметов с отметкой «расшифровывать», от свежих к старым. Кладёт их в <c>transcripts</c> и записывает заметку с резюме в SingularityApp
     /// </summary>
     /// <param name="browser">Браузер MTS Link</param>
+    /// <param name="settings">Настройки: подключение к SingularityApp и разрешение на запись</param>
     /// <param name="store">Папка домашних заданий</param>
     /// <param name="maxPerRun">Сколько расшифровок забирать за один запуск: остальные подтянутся постепенно в следующих</param>
     /// <returns>Строка итога для статуса</returns>
-    private static async Task<string> FetchAsync(MtsBrowser browser, HomeworkStore store, int maxPerRun)
+    private static async Task<string> FetchAsync(MtsBrowser browser, LmsSettings settings, HomeworkStore store, int maxPerRun)
     {
         var wanted = store.LoadLessons()
             .Where(store.ShouldFetch)
+            .OrderByDescending(lesson => store.StateFor(lesson.Id) == LessonStateEnum.Fetch)
             .Take(maxPerRun)
             .ToDictionary(lesson => lesson.Id, StringComparer.Ordinal);
         if (wanted.Count == 0)
             return "Расшифровки: новых к выгрузке нет";
 
-        var received = await browser.FetchAsync(
-            wanted.ToDictionary(pair => pair.Key, pair => pair.Value.RecordUrl, StringComparer.Ordinal),
-            (lessonId, transcript) =>
-            {
-                var path = store.TranscriptPath(lessonId);
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllText(path, TranscriptFormatter.Format(wanted[lessonId], transcript));
-                Log($"Расшифровка: {wanted[lessonId].Title}, {wanted[lessonId].Date:dd.MM.yyyy}");
+        var singularity = settings.Singularity is { Token.Length: > 0 } configured && !configured.Token.StartsWith('<') ? new Steward.Mail.Services.SingularityClient(configured) : null;
+        try
+        {
+            var noted = singularity is null
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : (await singularity.ListTasksAsync(DateTimeOffset.Now.AddYears(-2), TranscriptNote.KEY_PREFIX, CancellationToken.None)).Select(task => task.ExternalId).ToHashSet(StringComparer.Ordinal);
+            var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
 
-                return Task.CompletedTask;
-            },
-            CancellationToken.None);
+            var received = await browser.FetchAsync(
+                wanted.ToDictionary(pair => pair.Key, pair => pair.Value.RecordUrl, StringComparer.Ordinal),
+                async (lessonId, transcript) =>
+                {
+                    var lesson = wanted[lessonId];
+                    var path = store.TranscriptPath(lessonId);
+                    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                    File.WriteAllText(path, TranscriptFormatter.Format(lesson, transcript));
+                    Log($"Расшифровка: {lesson.Title}, {lesson.Date:dd.MM.yyyy}");
 
-        return $"Расшифровки: получено {received} из {wanted.Count}";
+                    if (singularity is null || noted.Contains(TranscriptNote.KEY_PREFIX + lessonId))
+                        return;
+
+                    Log($"{(settings.CreateTasks ? "Записываю" : "Записал бы")} заметку с расшифровкой в Singularity");
+                    if (settings.CreateTasks)
+                        await singularity.CreateTaskAsync(TranscriptNote.Build(lesson, transcript, path, settings.Singularity!.ProjectId, offset), CancellationToken.None);
+                },
+                CancellationToken.None);
+
+            return $"Расшифровки: получено {received} из {wanted.Count}";
+        }
+        finally
+        {
+            singularity?.Dispose();
+        }
     }
 
     /// <summary>

@@ -98,7 +98,7 @@ public static class SnapshotRenderer
         else if (string.Equals(parts[0], "settings", StringComparison.OrdinalIgnoreCase))
         {
             var settings = new SettingsWindow();
-            settings.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided);
+            settings.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
 
             // «settings:formats»: раскрыт блок «Форматы заданий»
             if (parts.Length > 1 && string.Equals(parts[1], "formats", StringComparison.OrdinalIgnoreCase))

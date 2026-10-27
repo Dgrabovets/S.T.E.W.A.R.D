@@ -209,4 +209,35 @@ public class LmsTests
         Assert.Equal(["lms:assign:1"], plan.ToCreate.Select(activity => activity.ExternalId).ToArray());
         Assert.Equal(["t3"], plan.ToClose.Select(pair => pair.Task.Id).ToArray());
     }
+
+    /// <summary>
+    /// Занятие, заказанное кнопкой «Расшифровать», забирается даже у предмета с отметкой «не нужно», а формат занятия по умолчанию берётся у предмета
+    /// </summary>
+    [Fact]
+    public void A_lesson_ordered_by_hand_is_fetched_even_if_the_subject_is_not_needed()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "steward-lms-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new HomeworkStore(directory);
+            var lesson = new Lesson("e1", "Английский", new DateOnly(2026, 9, 1), RecordUrl: "https://my.mts-link.ru/j/Ranepa/1/record-new/2");
+            store.SaveLessons([lesson]);
+            store.SetSubjectState("Английский", LessonStateEnum.Skip);
+            Assert.False(store.ShouldFetch(lesson));
+
+            store.SetState("e1", LessonStateEnum.Fetch);
+            Assert.True(store.ShouldFetch(lesson));
+
+            Assert.Equal(HomeworkFormatEnum.Word, store.FormatFor("e1"));
+            store.SetSubjectFormat("Английский", HomeworkFormatEnum.Text);
+            Assert.Equal(HomeworkFormatEnum.Text, store.FormatFor("e1"));
+            store.SetFormat("e1", HomeworkFormatEnum.Code);
+            Assert.Equal(HomeworkFormatEnum.Code, store.FormatFor("e1"));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
 }
