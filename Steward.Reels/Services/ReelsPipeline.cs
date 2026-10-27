@@ -64,6 +64,10 @@ public sealed class ReelsPipeline(
             }
         }
 
+        // Всё, что есть в папке идей, запоминается: если идею потом удалят, бот всё равно спросит о повторе
+        foreach (var idea in ideas.LoadAll())
+            seen.Add(ReelLinks.Key(idea.SourceUrl));
+
         var incoming = await telegram.GetMessagesAsync(offsets.Read(), 0, cancellationToken);
         await ForgetOldMessagesAsync(everything: incoming.Count > 0, cancellationToken);
         await HandleAllAsync(incoming);
@@ -144,7 +148,7 @@ public sealed class ReelsPipeline(
         var links = ReelLinks.Find(message.Text);
         if (links.Count == 0)
         {
-            await ReplyAsync(message.ChatId, "Пришлите ссылку на рилс Instagram, например https://www.instagram.com/reel/…", cancellationToken);
+            await ReplyAsync(message.ChatId, "Пришли ссылку на рилс Instagram, например https://www.instagram.com/reel/…", cancellationToken);
 
             return (0, 0, 1);
         }
@@ -163,10 +167,18 @@ public sealed class ReelsPipeline(
                 continue;
             }
 
-            if (await ProcessAsync(message, url, $"r{message.UpdateId}-{index + 1}", cancellationToken))
-                accepted++;
-            else
-                failed++;
+            switch (await ProcessAsync(message, url, $"r{message.UpdateId}-{index + 1}", cancellationToken))
+            {
+                case true:
+                    accepted++;
+                    break;
+                case false:
+                    failed++;
+                    break;
+                default:
+                    asked++;
+                    break;
+            }
         }
 
         return (accepted, failed, asked);
@@ -198,12 +210,17 @@ public sealed class ReelsPipeline(
 
         if (parts[0] != "again")
         {
-            await ReplyAsync(message.ChatId, "Хорошо, повторно не добавляю.", cancellationToken);
+            await ReplyAsync(message.ChatId, "Пропустил, повторно не добавляю.", cancellationToken);
 
             return (0, 0, 1);
         }
 
-        return await ProcessAsync(message, url, $"r{message.UpdateId}-1", cancellationToken) ? (1, 0, 0) : (0, 1, 0);
+        return await ProcessAsync(message, url, $"r{message.UpdateId}-1", cancellationToken) switch
+        {
+            true => (1, 0, 0),
+            false => (0, 1, 0),
+            null => (0, 0, 1),
+        };
     }
 
     /// <summary>
@@ -233,7 +250,7 @@ public sealed class ReelsPipeline(
         seen.AddPending(token, url);
         _openQuestions++;
         log($"Повтор: {url}");
-        chat.Add(message.ChatId, await telegram.SendWithButtonsAsync(message.ChatId, $"Этот рилс уже разбирали: {url}\nДобавить ещё раз?", [("Добавить ещё раз", $"again:{token}"), ("Не надо", $"skip:{token}")], cancellationToken), timeProvider.GetUtcNow());
+        chat.Add(message.ChatId, await telegram.SendWithButtonsAsync(message.ChatId, $"Этот рилс уже есть в Steward: {ReelLinks.Key(url)}\nДобавить второй раз?", [("Добавить", $"again:{token}"), ("Пропустить", $"skip:{token}")], cancellationToken), timeProvider.GetUtcNow());
     }
 
     /// <summary>
@@ -244,14 +261,14 @@ public sealed class ReelsPipeline(
     /// <param name="id">Идентификатор идеи</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>
-    /// <see langword="true"/>, если идея создана или уже была, <see langword="false"/>, если рилс не удалось обработать
+    /// <see langword="true"/>, если идея создана или уже была, <see langword="false"/>, если рилс не удалось обработать, и <see langword="null"/>, если пост пропущен по понятной причине
     /// </returns>
-    private async Task<bool> ProcessAsync(TelegramMessage message, string url, string id, CancellationToken cancellationToken)
+    private async Task<bool?> ProcessAsync(TelegramMessage message, string url, string id, CancellationToken cancellationToken)
     {
         if (ideas.Exists(id))
             return true;
 
-        await ReplyAsync(message.ChatId, "Принял, разбираю. Это займёт пару минут.", cancellationToken);
+        await ReplyAsync(message.ChatId, $"Принял: {ReelLinks.Key(url)}. Разбираю, это займёт пару минут.", cancellationToken);
         try
         {
             var reel = await downloader.DownloadAsync(url, id, cancellationToken);
@@ -275,16 +292,16 @@ public sealed class ReelsPipeline(
             ideas.Save(idea);
             seen.Add(ReelLinks.Key(url));
             log($"Идея: {idea.Title} ← {url}");
-            await ReplyAsync(message.ChatId, $"Готово: {idea.Title}", cancellationToken);
+            await ReplyAsync(message.ChatId, $"Готово, идея в Steward: {idea.Title}", cancellationToken);
 
             return true;
         }
         catch (ReelException exception)
         {
-            log($"Не получилось: {url}: {exception.Message}{(exception.Detail is null ? string.Empty : $" ({exception.Detail})")}");
-            await ReplyAsync(message.ChatId, $"Не получилось: {exception.Message}", cancellationToken);
+            log($"{(exception.IsSkip ? "Пропущено" : "Не получилось")}: {url}: {exception.Message}{(exception.Detail is null ? string.Empty : $" ({exception.Detail})")}");
+            await ReplyAsync(message.ChatId, exception.IsSkip ? exception.Message : $"Не получилось: {exception.Message}", cancellationToken);
 
-            return false;
+            return exception.IsSkip ? null : false;
         }
         finally
         {

@@ -35,7 +35,7 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
         {
             var line = LastLine(result.Error, "скачать не удалось");
 
-            throw new ReelException(Explain(line), "yt-dlp: " + line);
+            throw new ReelException(Explain(line), "yt-dlp: " + line, IsSkip(line));
         }
 
         var media = Directory.GetFiles(workDirectory, name + ".*").FirstOrDefault(file => !file.EndsWith(".info.json", StringComparison.OrdinalIgnoreCase))
@@ -89,7 +89,7 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
             return "Бот не нашёл cookies браузера. Открой Firefox, зайди в аккаунт Instagram и пришли ссылку ещё раз.";
 
         if (line.Contains("No video formats found", StringComparison.OrdinalIgnoreCase))
-            return "В этом посте нет видео (похоже на фото или карусель), расшифровывать нечего.";
+            return "Пропустил этот пост: в нём нет видео, только фото. Бот разбирает рилсы с речью, а в картинках расшифровывать нечего.";
 
         string[] loginMarks = ["empty media response", "login required", "login_required", "log in", "sign in", "checkpoint", "rate-limit", "rate limit", "requested content is not available"];
 
@@ -97,6 +97,15 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
             ? "Instagram не пустил без входа. Открой Firefox, зайди в аккаунт Instagram и пришли ссылку ещё раз."
             : "yt-dlp: " + line;
     }
+
+    /// <summary>
+    /// Пост без видео пропускается как обычный случай, а не как сбой
+    /// </summary>
+    /// <param name="line">Последняя строка ошибки yt-dlp</param>
+    /// <returns>
+    /// <see langword="true"/>, если причина не сбой
+    /// </returns>
+    public static bool IsSkip(string line) => line.Contains("No video formats found", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Удаляет скачанный файл, сведения и расшифровки рилса

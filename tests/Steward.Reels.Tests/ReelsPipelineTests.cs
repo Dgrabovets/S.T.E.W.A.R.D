@@ -29,7 +29,7 @@ public class ReelsPipelineTests
         Assert.Equal(("r1-1", "Подпись рилса", IdeaStateEnum.New), (idea.Id, idea.Title, idea.State));
         Assert.Equal("Первая мысль. Вторая мысль.", idea.Transcript);
         Assert.Equal(new ReelsResult(1, 0, 0, 1), result);
-        Assert.Equal("Готово: Подпись рилса", telegram.Sent.Last());
+        Assert.Equal("Готово, идея в Steward: Подпись рилса", telegram.Sent.Last());
         Assert.Equal(["r1-1"], downloader.Cleaned);
     }
 
@@ -145,7 +145,7 @@ public class ReelsPipelineTests
 
         var idea = Assert.Single(ideas.LoadAll());
         Assert.Equal(("Хук на звук", "Суть: звук после задачи"), (idea.Title, idea.Summary));
-        Assert.Equal("Готово: Хук на звук", telegram.Sent.Last());
+        Assert.Equal("Готово, идея в Steward: Хук на звук", telegram.Sent.Last());
     }
 
     /// <summary>
@@ -164,7 +164,7 @@ public class ReelsPipelineTests
 
         Assert.Equal(0, downloader.Downloads);
         Assert.Equal(1, asked.Ignored);
-        Assert.Contains("уже разбирали", second.Sent.Single(), StringComparison.Ordinal);
+        Assert.Contains("уже есть в Steward", second.Sent.Single(), StringComparison.Ordinal);
         Assert.Equal(["again:d2-1", "skip:d2-1"], second.Buttons);
         Assert.Single(ideas.LoadAll());
 
@@ -194,7 +194,7 @@ public class ReelsPipelineTests
 
         Assert.Equal(0, downloader.Downloads);
         Assert.Empty(ideas.LoadAll());
-        Assert.Equal("Хорошо, повторно не добавляю.", skipped.Sent.Single());
+        Assert.Equal("Пропустил, повторно не добавляю.", skipped.Sent.Single());
     }
 
     /// <summary>
