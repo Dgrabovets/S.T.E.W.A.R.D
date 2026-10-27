@@ -41,6 +41,11 @@ public sealed class ReelsSettings
     public string CookiesFile { get; init; } = string.Empty;
 
     /// <summary>
+    /// Сколько секунд бот после вопроса «добавить ещё раз?» ждёт нажатия кнопки, прежде чем завершить проверку. Если не нажать за это время, ответ обработается при следующей проверке
+    /// </summary>
+    public int AnswerWaitSeconds { get; init; } = 45;
+
+    /// <summary>
     /// Сколько минут даётся на скачивание одного рилса
     /// </summary>
     public int DownloadTimeoutMinutes { get; init; } = 3;

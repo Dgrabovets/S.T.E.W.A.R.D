@@ -24,12 +24,13 @@ public class TelegramClientTests
             """);
         using var client = new TelegramClient(new HttpClient(handler) { BaseAddress = new Uri("https://example.test/bot/") });
 
-        var messages = await client.GetMessagesAsync(10, CancellationToken.None);
+        var messages = await client.GetMessagesAsync(10, 0, CancellationToken.None);
 
         Assert.Equal([10L, 12L], messages.Select(message => message.UpdateId).ToArray());
         Assert.Equal(["привет", "подпись"], messages.Select(message => message.Text).ToArray());
         Assert.All(messages, message => Assert.Equal((5L, 7L), (message.ChatId, message.UserId)));
         Assert.Contains("offset=10", handler.RequestUrl, StringComparison.Ordinal);
+        Assert.Contains("timeout=0", handler.RequestUrl, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -57,7 +58,7 @@ public class TelegramClientTests
         var handler = new StubHandler(HttpStatusCode.Unauthorized, """{"ok":false,"description":"Unauthorized"}""");
         using var client = new TelegramClient(new HttpClient(handler) { BaseAddress = new Uri("https://example.test/botSECRET/") });
 
-        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetMessagesAsync(0, CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetMessagesAsync(0, 0, CancellationToken.None));
 
         Assert.DoesNotContain("SECRET", exception.Message, StringComparison.Ordinal);
     }

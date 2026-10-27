@@ -49,23 +49,37 @@ public sealed class ReelsPipeline(
         var failed = 0;
         var ignored = 0;
 
-        var incoming = (await telegram.GetMessagesAsync(offsets.Read(), cancellationToken)).OrderBy(item => item.UpdateId).ToArray();
-        await ForgetOldMessagesAsync(everything: incoming.Length > 0, cancellationToken);
-
-        foreach (var message in incoming)
+        async Task HandleAllAsync(IEnumerable<TelegramMessage> batch)
         {
-            chat.Add(message.ChatId, message.MessageId, timeProvider.GetUtcNow());
-            var (ok, bad, skipped) = await HandleAsync(message, cancellationToken);
-            accepted += ok;
-            failed += bad;
-            ignored += skipped;
+            foreach (var message in batch.OrderBy(item => item.UpdateId))
+            {
+                chat.Add(message.ChatId, message.MessageId, timeProvider.GetUtcNow());
+                var (ok, bad, skipped) = await HandleAsync(message, cancellationToken);
+                accepted += ok;
+                failed += bad;
+                ignored += skipped;
 
-            // Сохраняем после каждого сообщения: если следующее упадёт, это не прочитается второй раз
-            offsets.Write(message.UpdateId + 1);
+                // Сохраняем после каждого сообщения: если следующее упадёт, это не прочитается второй раз
+                offsets.Write(message.UpdateId + 1);
+            }
         }
+
+        var incoming = await telegram.GetMessagesAsync(offsets.Read(), 0, cancellationToken);
+        await ForgetOldMessagesAsync(everything: incoming.Count > 0, cancellationToken);
+        await HandleAllAsync(incoming);
+
+        // Пока человек не ответил на вопрос о повторе, держим проверку открытой: нажатие кнопки обрабатывается сразу, а не при следующей проверке
+        var deadline = Environment.TickCount64 + (settings.AnswerWaitSeconds * 1000L);
+        while (_openQuestions > 0 && Environment.TickCount64 < deadline)
+            await HandleAllAsync(await telegram.GetMessagesAsync(offsets.Read(), Math.Min(10, Math.Max(1, settings.AnswerWaitSeconds)), cancellationToken));
 
         return new ReelsResult(accepted, failed, ignored, ideas.LoadAll().Count(idea => idea.State == IdeaStateEnum.New));
     }
+
+    /// <summary>
+    /// Сколько вопросов «добавить ещё раз?» отправлено в этой проверке и ещё без ответа
+    /// </summary>
+    private int _openQuestions;
 
     /// <summary>
     /// Удаляет из чата сообщения прошлых проходов: ответы бота и ссылки владельца. Когда пришло что-то новое, удаляются все, а когда нет, только те, которым скоро выйдет срок, после которого Telegram удалить их не даст. Что удалить не удалось, пропускается
@@ -166,7 +180,16 @@ public sealed class ReelsPipeline(
     /// <returns>Сколько идей создано, сколько рилсов не удалось и сколько раз нажатие пропущено</returns>
     private async Task<(int Accepted, int Failed, int Ignored)> HandleAnswerAsync(TelegramMessage message, CancellationToken cancellationToken)
     {
-        await telegram.AnswerCallbackAsync(message.CallbackId!, cancellationToken);
+        try
+        {
+            await telegram.AnswerCallbackAsync(message.CallbackId!, cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            // Telegram не принимает ответ на старое нажатие: кнопка уже отработала, и это не повод ронять проверку
+        }
+
+        _openQuestions = Math.Max(0, _openQuestions - 1);
 
         var parts = message.Text.Split(':', 2);
         var url = parts.Length == 2 ? seen.TakePending(parts[1]) : null;
@@ -208,6 +231,7 @@ public sealed class ReelsPipeline(
     private async Task AskAboutRepeatAsync(TelegramMessage message, string url, string token, CancellationToken cancellationToken)
     {
         seen.AddPending(token, url);
+        _openQuestions++;
         log($"Повтор: {url}");
         chat.Add(message.ChatId, await telegram.SendWithButtonsAsync(message.ChatId, $"Этот рилс уже разбирали: {url}\nДобавить ещё раз?", [("Добавить ещё раз", $"again:{token}"), ("Не надо", $"skip:{token}")], cancellationToken), timeProvider.GetUtcNow());
     }

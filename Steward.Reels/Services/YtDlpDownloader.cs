@@ -88,6 +88,9 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
         if (line.Contains("cookies database", StringComparison.OrdinalIgnoreCase) || line.Contains("cookies-from-browser", StringComparison.OrdinalIgnoreCase) && line.Contains("could not", StringComparison.OrdinalIgnoreCase))
             return "Бот не нашёл cookies браузера. Открой Firefox, зайди в аккаунт Instagram и пришли ссылку ещё раз.";
 
+        if (line.Contains("No video formats found", StringComparison.OrdinalIgnoreCase))
+            return "В этом посте нет видео (похоже на фото или карусель), расшифровывать нечего.";
+
         string[] loginMarks = ["empty media response", "login required", "login_required", "log in", "sign in", "checkpoint", "rate-limit", "rate limit", "requested content is not available"];
 
         return loginMarks.Any(mark => line.Contains(mark, StringComparison.OrdinalIgnoreCase))

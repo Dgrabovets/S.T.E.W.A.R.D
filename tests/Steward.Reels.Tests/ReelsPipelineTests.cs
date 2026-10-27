@@ -237,6 +237,23 @@ public class ReelsPipelineTests
     }
 
     /// <summary>
+    /// Нажатие кнопки, пришедшее во время ожидания, обрабатывается в той же проверке, а ошибка подтверждения нажатия её не роняет
+    /// </summary>
+    [Fact]
+    public async Task A_button_pressed_while_waiting_is_handled_in_the_same_pass()
+    {
+        using var directory = new TempDirectory();
+        await Pipeline(directory, new FakeTelegram(Message(1, 7, "https://www.instagram.com/reel/Abc/")), new FakeDownloader(), 7, out var ideas).RunAsync(CancellationToken.None);
+
+        var telegram = new FakeTelegram(Message(2, 7, "https://www.instagram.com/reel/Abc/"));
+        telegram.Late.Add(new TelegramMessage(3, 100, 7, "again:d2-1", "cb9"));
+        var result = await Pipeline(directory, telegram, new FakeDownloader(), 7, out _, answerWait: 5).RunAsync(CancellationToken.None);
+
+        Assert.Equal(1, result.Accepted);
+        Assert.Equal(2, ideas.LoadAll().Count);
+    }
+
+    /// <summary>
     /// Собирает проверку бота с подделками и фиксированным временем
     /// </summary>
     /// <param name="directory">Папка для идей и номера сообщения</param>
@@ -245,9 +262,10 @@ public class ReelsPipelineTests
     /// <param name="allowedUserId">Разрешённый пользователь</param>
     /// <param name="ideas">Папка идей, в которую пишет проверка</param>
     /// <param name="analyzer">Разбор идеи или <see langword="null"/>, тогда разбора нет</param>
+    /// <param name="answerWait">Сколько секунд ждать ответа на вопрос о повторе, по умолчанию не ждать</param>
     /// <param name="later">На сколько позже начала суток часы проверки, по умолчанию не позже</param>
     /// <returns>Проверка бота</returns>
-    private static ReelsPipeline Pipeline(TempDirectory directory, FakeTelegram telegram, FakeDownloader downloader, long allowedUserId, out IdeaStore ideas, IIdeaAnalyzer? analyzer = null, TimeSpan? later = null)
+    private static ReelsPipeline Pipeline(TempDirectory directory, FakeTelegram telegram, FakeDownloader downloader, long allowedUserId, out IdeaStore ideas, IIdeaAnalyzer? analyzer = null, TimeSpan? later = null, int answerWait = 0)
     {
         ideas = new IdeaStore(Path.Combine(directory.Path, "ideas"));
 
@@ -257,7 +275,7 @@ public class ReelsPipelineTests
             downloader,
             ideas,
             new OffsetStore(Path.Combine(directory.Path, "offset.txt")),
-            new ReelsSettings { AllowedUserId = allowedUserId },
+            new ReelsSettings { AllowedUserId = allowedUserId, AnswerWaitSeconds = answerWait },
             new FixedTime(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero) + (later ?? TimeSpan.Zero)),
             _ => { },
             analyzer ?? new FakeAnalyzer(null),

@@ -45,12 +45,23 @@ public sealed class FakeTelegram(params TelegramMessage[] messages) : ITelegramC
     /// <param name="offset">Номер первого нужного обновления</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Подходящие сообщения</returns>
-    public Task<IReadOnlyList<TelegramMessage>> GetMessagesAsync(long offset, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<TelegramMessage>> GetMessagesAsync(long offset, int waitSeconds, CancellationToken cancellationToken)
     {
         LastOffset = offset;
+        var result = messages.Where(message => message.UpdateId >= offset).Concat(_calls++ > 0 ? Late.Where(message => message.UpdateId >= offset) : []).ToArray();
 
-        return Task.FromResult<IReadOnlyList<TelegramMessage>>([.. messages.Where(message => message.UpdateId >= offset)]);
+        return Task.FromResult<IReadOnlyList<TelegramMessage>>(result);
     }
+
+    /// <summary>
+    /// Сообщения, которые появляются только после первого запроса, как нажатие кнопки, пришедшее позже
+    /// </summary>
+    public List<TelegramMessage> Late { get; } = [];
+
+    /// <summary>
+    /// Сколько раз бот запрашивал сообщения
+    /// </summary>
+    private int _calls;
 
     /// <summary>
     /// Запоминает ответ

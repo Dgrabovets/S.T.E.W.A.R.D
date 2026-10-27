@@ -40,9 +40,9 @@ public sealed class TelegramClient : ITelegramClient, IDisposable
     /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Сообщения в порядке появления. Обновления без сообщения пропускаются</returns>
     /// <exception cref="HttpRequestException">Telegram ответил ошибкой</exception>
-    public async Task<IReadOnlyList<TelegramMessage>> GetMessagesAsync(long offset, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<TelegramMessage>> GetMessagesAsync(long offset, int waitSeconds, CancellationToken cancellationToken)
     {
-        using var response = await _http.GetAsync($"getUpdates?offset={offset}&timeout=0&allowed_updates=%5B%22message%22%2C%22callback_query%22%5D", cancellationToken);
+        using var response = await _http.GetAsync($"getUpdates?offset={offset}&timeout={waitSeconds}&allowed_updates=%5B%22message%22%2C%22callback_query%22%5D", cancellationToken);
         using var document = JsonDocument.Parse(await ReadAsync(response, cancellationToken));
 
         var messages = new List<TelegramMessage>();

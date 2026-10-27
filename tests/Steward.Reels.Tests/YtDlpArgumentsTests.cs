@@ -54,6 +54,7 @@ public class YtDlpArgumentsTests
     {
         Assert.StartsWith("Instagram не пустил", YtDlpDownloader.Explain("ERROR: [Instagram] X: Instagram sent an empty media response."), StringComparison.Ordinal);
         Assert.StartsWith("Бот не нашёл cookies", YtDlpDownloader.Explain(@"ERROR: could not find firefox cookies database in 'C:\Users\admin'"), StringComparison.Ordinal);
+        Assert.StartsWith("В этом посте нет видео", YtDlpDownloader.Explain("ERROR: [Instagram] X: No video formats found!; please report"), StringComparison.Ordinal);
         Assert.Equal("yt-dlp: ERROR: Video unavailable", YtDlpDownloader.Explain("ERROR: Video unavailable"));
     }
 }
