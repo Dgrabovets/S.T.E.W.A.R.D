@@ -38,7 +38,7 @@ public static class JobRowBuilder
         JobRow Row(RowToneEnum tone, string headline, string detail) => new(job.Id, job.DisplayTitle, headline, detail, tone, status?.Awaiting ?? 0, job.Enabled);
 
         if (!job.Enabled)
-            return Row(RowToneEnum.Idle, "Отключена", "Включается полем enabled в config/jobs.json");
+            return Row(RowToneEnum.Idle, "Отключена", "Чтобы включить, поставь enabled: true в config/jobs.json");
 
         if (status is null)
             return Row(RowToneEnum.Idle, "Ещё не запускалась", next);
@@ -48,7 +48,7 @@ public static class JobRowBuilder
             case ProcessStateEnum.Failed:
                 return Row(RowToneEnum.Problem, "Не удалось", $"{Short(status.Error)} ({TimeWording.Moment(status.UpdatedAt, now)})");
             case ProcessStateEnum.Running when now - status.UpdatedAt > job.Timeout + HangGrace:
-                return Row(RowToneEnum.Problem, "Завис?", $"Запущена {TimeWording.Moment(status.UpdatedAt, now)} и не отвечает");
+                return Row(RowToneEnum.Problem, "Не отвечает", $"Запущена {TimeWording.Moment(status.UpdatedAt, now)}, ответа нет");
             case ProcessStateEnum.Running:
                 return Row(RowToneEnum.Working, "Выполняется", $"Запущена {TimeWording.Moment(status.UpdatedAt, now)}");
         }

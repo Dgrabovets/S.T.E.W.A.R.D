@@ -51,7 +51,8 @@ internal static class Program
                 TimeProvider.System,
                 Log,
                 new ClaudeIdeaAnalyzer(settings),
-                new SeenStore(Path.Combine(DataLocation.DataDirectory(), "reels", "seen.txt"), Path.Combine(DataLocation.DataDirectory(), "reels", "pending.json")));
+                new SeenStore(Path.Combine(DataLocation.DataDirectory(), "reels", "seen.txt"), Path.Combine(DataLocation.DataDirectory(), "reels", "pending.json")),
+                new ChatLog(Path.Combine(DataLocation.DataDirectory(), "reels", "chat.json")));
 
             var result = await pipeline.RunAsync(CancellationToken.None);
 

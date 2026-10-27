@@ -82,7 +82,7 @@ public class JobRowTests
         var hung = JobRowBuilder.Build(job, Samples.Status("mail", ProcessStateEnum.Running, Now.AddMinutes(-30)), null, Now);
 
         Assert.Equal((RowToneEnum.Working, "Выполняется"), (fresh.Tone, fresh.Headline));
-        Assert.Equal((RowToneEnum.Problem, "Завис?"), (hung.Tone, hung.Headline));
+        Assert.Equal((RowToneEnum.Problem, "Не отвечает"), (hung.Tone, hung.Headline));
     }
 
     /// <summary>

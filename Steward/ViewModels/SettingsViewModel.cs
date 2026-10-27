@@ -324,7 +324,7 @@ public sealed class SettingsViewModel : Bindable
             SpreadsheetNote = "Идентификатор найден и вставлен в поле выше";
         }
         else
-            SpreadsheetNote = "В ссылке нет идентификатора. Скопируйте адрес таблицы целиком из строки браузера";
+            SpreadsheetNote = "В ссылке нет идентификатора. Скопируй адрес таблицы целиком из адресной строки браузера";
     }
 
     /// <summary>

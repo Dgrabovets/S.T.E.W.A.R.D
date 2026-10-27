@@ -21,8 +21,8 @@ public interface ITelegramClient
     /// <param name="chatId">Чат</param>
     /// <param name="text">Текст ответа</param>
     /// <param name="cancellationToken">Токен отмены запроса</param>
-    /// <returns>Задача, которая завершается, когда Telegram принимает сообщение</returns>
-    Task SendAsync(long chatId, string text, CancellationToken cancellationToken);
+    /// <returns>Номер отправленного сообщения в чате</returns>
+    Task<long> SendAsync(long chatId, string text, CancellationToken cancellationToken);
 
     /// <summary>
     /// Отправляет сообщение с кнопками под ним. Нажатие приходит как сообщение с <see cref="TelegramMessage.CallbackId"/>, а в тексте лежит данные кнопки
@@ -31,8 +31,18 @@ public interface ITelegramClient
     /// <param name="text">Текст вопроса</param>
     /// <param name="buttons">Кнопки в одну строку: подпись и данные</param>
     /// <param name="cancellationToken">Токен отмены запроса</param>
-    /// <returns>Задача, которая завершается, когда Telegram принимает сообщение</returns>
-    Task SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken);
+    /// <returns>Номер отправленного сообщения в чате</returns>
+    Task<long> SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Удаляет сообщение из чата. Telegram разрешает это в течение двух суток: ответы бота и сообщения владельца в личном чате
+    /// </summary>
+    /// <param name="chatId">Чат</param>
+    /// <param name="messageId">Номер сообщения в чате</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда Telegram отвечает</returns>
+    /// <exception cref="HttpRequestException">Telegram отказал, например сообщение уже удалено или старше двух суток</exception>
+    Task DeleteAsync(long chatId, long messageId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Подтверждает нажатие кнопки, чтобы у неё перестали крутиться часики

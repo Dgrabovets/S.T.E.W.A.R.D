@@ -374,7 +374,7 @@ public static class SnapshotRenderer
         new JobRow("reels", "Рилсы", "Ждёт тебя", "Разобрано 3 рилса. Без решения: 3", RowToneEnum.Attention, 3, true),
         new JobRow("mts", "MTS Link", "Не удалось", "Нет доступа к LMS: войдите заново (вчера в 19:00)", RowToneEnum.Problem, 0, true),
         new JobRow("telegram", "Telegram-бот", "Выполняется", "Запущена сегодня в 12:00", RowToneEnum.Working, 0, true),
-        new JobRow("homework", "Домашние задания", "Отключена", "Включается полем enabled в config/jobs.json", RowToneEnum.Idle, 0, false),
+        new JobRow("homework", "Домашние задания", "Отключена", "Чтобы включить, поставь enabled: true в config/jobs.json", RowToneEnum.Idle, 0, false),
     ];
 
     /// <summary>

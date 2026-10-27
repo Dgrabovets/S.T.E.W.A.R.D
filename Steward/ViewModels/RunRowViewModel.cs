@@ -17,10 +17,19 @@ public sealed class RunRowViewModel
     /// <param name="record">Запись о запуске</param>
     /// <param name="fix">Вызывается, когда человек просит починить запуск</param>
     /// <param name="remove">Вызывается, когда человек удаляет запись из журнала</param>
-    public RunRowViewModel(RunRecord record, Action<RunRecord> fix, Action<RunRecord>? remove = null)
+    /// <param name="same">
+    /// Все подряд идущие запуски с тем же итогом и тем же выводом от новых к старым, считая саму запись, или <see langword="null"/>, если запуск один. Показываются одной строкой, удаляются вместе
+    /// </param>
+    public RunRowViewModel(RunRecord record, Action<RunRecord> fix, Action<RunRecord>? remove = null, IReadOnlyList<RunRecord>? same = null)
     {
+        var all = same is { Count: > 0 } ? same : [record];
         FixCommand = new RelayCommand(() => fix(record));
-        RemoveCommand = new RelayCommand(() => remove?.Invoke(record));
+        RemoveCommand = new RelayCommand(() =>
+        {
+            foreach (var item in all)
+                remove?.Invoke(item);
+        });
+        Repeats = all.Count > 1 ? $"Таких запусков подряд: {all.Count}, с {all[^1].StartedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture)}" : string.Empty;
         When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
         Title = record.Title;
         Reason = record.Reason switch
@@ -140,6 +149,23 @@ public sealed class RunRowViewModel
     /// Сколько шёл запуск
     /// </summary>
     public string Facts { get; }
+
+    /// <summary>
+    /// Сколько таких же запусков шло подряд и с какого времени. Пусто, если запуск один
+    /// </summary>
+    public string Repeats { get; }
+
+    /// <summary>
+    /// Запусков подряд было несколько
+    /// </summary>
+    public bool HasRepeats => Repeats.Length > 0;
+
+    /// <summary>
+    /// Ключ, по которому подряд идущие запуски считаются одинаковыми: итог, сводка, причина и вывод без отметок времени
+    /// </summary>
+    /// <param name="record">Запись о запуске</param>
+    /// <returns>Строка для сравнения</returns>
+    public static string SameKey(RunRecord record) => string.Join('\u001F', record.Outcome, record.Summary, record.Detail, string.Join('\n', LogLines.Parse(record.Output ?? string.Empty).Select(line => line.Text)));
 
     /// <summary>
     /// Цвет точки

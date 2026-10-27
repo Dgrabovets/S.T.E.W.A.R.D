@@ -26,6 +26,6 @@ public sealed record TaskSummary(PanelToneEnum Tone, string Label, string Subtit
 
         return active.All(row => row.Tone == PanelToneEnum.Running)
             ? new TaskSummary(PanelToneEnum.Running, "Работает", "Все задачи работают")
-            : new TaskSummary(PanelToneEnum.Idle, "Не всё запущено", "Не все задачи запущены");
+            : new TaskSummary(PanelToneEnum.Idle, "Не всё запущено", "Часть задач сейчас не работает");
     }
 }

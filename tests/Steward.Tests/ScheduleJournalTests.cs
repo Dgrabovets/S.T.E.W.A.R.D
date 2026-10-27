@@ -114,7 +114,9 @@ public class ScheduleJournalTests
         model.Apply(snapshot, [], records, [], []);
 
         Assert.Equal(["mail", "mts", "schedule"], model.Groups.Select(group => group.Id).ToArray());
-        Assert.Equal(2, model.Groups[0].Runs.Count);
+        Assert.Single(model.Groups[0].Runs);
+        Assert.True(model.Groups[0].Runs[0].HasRepeats);
+        Assert.StartsWith("Таких запусков подряд: 2", model.Groups[0].Runs[0].Repeats, StringComparison.Ordinal);
         Assert.False(model.Groups[0].IsOpen);
         Assert.True(model.Groups[1].IsOpen);
         Assert.Single(model.Groups[2].Checks);

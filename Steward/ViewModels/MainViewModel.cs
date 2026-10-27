@@ -319,7 +319,7 @@ public sealed class MainViewModel : PanelViewModel
             var group = GroupOf(byJob.Key, runsOfJob[0].Title, runsOfJob[0].Outcome != RunOutcomeEnum.Ok);
             if (!group.IsCurrent(signature))
             {
-                var rows = runsOfJob.Select(record => new RunRowViewModel(record, failed => FixRequested?.Invoke(failed), removed => RecordRemoveRequested?.Invoke(removed))).ToArray();
+                var rows = CollapseRepeats(runsOfJob).Select(same => new RunRowViewModel(same[0], failed => FixRequested?.Invoke(failed), removed => RecordRemoveRequested?.Invoke(removed), same)).ToArray();
                 group.Update(signature, $"{Entries(rows.Length)} · последняя {rows[0].When}", rows[0].Tone, rows[0].Kind, rows, []);
             }
 
@@ -349,6 +349,25 @@ public sealed class MainViewModel : PanelViewModel
         var ordered = built.OrderBy(item => item.Group.Id, StringComparer.Ordinal).Select(item => item.Group).ToArray();
 
         return ordered.SequenceEqual(_groups) ? _groups : ordered;
+    }
+
+    /// <summary>
+    /// Склеивает подряд идущие запуски с тем же итогом и тем же выводом, чтобы журнал не заполнялся одинаковыми записями
+    /// </summary>
+    /// <param name="runs">Запуски одной задачи от новых к старым</param>
+    /// <returns>Серии запусков: в каждой запуски от новых к старым, одиночный запуск даёт серию из одного</returns>
+    private static IReadOnlyList<IReadOnlyList<RunRecord>> CollapseRepeats(IReadOnlyList<RunRecord> runs)
+    {
+        var series = new List<List<RunRecord>>();
+        foreach (var run in runs)
+        {
+            if (series.Count > 0 && RunRowViewModel.SameKey(series[^1][0]) == RunRowViewModel.SameKey(run))
+                series[^1].Add(run);
+            else
+                series.Add([run]);
+        }
+
+        return series;
     }
 
     /// <summary>

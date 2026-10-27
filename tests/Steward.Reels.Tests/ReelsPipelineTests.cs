@@ -198,6 +198,27 @@ public class ReelsPipelineTests
     }
 
     /// <summary>
+    /// Следующий проход, в котором есть новые сообщения, удаляет ссылки и ответы прошлого, а без новых сообщений ничего не трогает
+    /// </summary>
+    [Fact]
+    public async Task The_next_pass_removes_the_previous_messages_only_when_there_is_something_new()
+    {
+        using var directory = new TempDirectory();
+        var first = new FakeTelegram(Message(1, 7, "https://www.instagram.com/reel/Abc/") with { MessageId = 501 });
+        await Pipeline(directory, first, new FakeDownloader(), 7, out _).RunAsync(CancellationToken.None);
+        Assert.Empty(first.Deleted);
+
+        var quiet = new FakeTelegram();
+        await Pipeline(directory, quiet, new FakeDownloader(), 7, out _).RunAsync(CancellationToken.None);
+        Assert.Empty(quiet.Deleted);
+
+        var second = new FakeTelegram(Message(2, 7, "https://www.instagram.com/reel/Zzz/") with { MessageId = 502 });
+        await Pipeline(directory, second, new FakeDownloader(), 7, out _).RunAsync(CancellationToken.None);
+
+        Assert.Equal([501L, 1001L, 1002L], second.Deleted.Order().ToArray());
+    }
+
+    /// <summary>
     /// Собирает проверку бота с подделками и фиксированным временем
     /// </summary>
     /// <param name="directory">Папка для идей и номера сообщения</param>
@@ -221,7 +242,8 @@ public class ReelsPipelineTests
             new FixedTime(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero)),
             _ => { },
             analyzer ?? new FakeAnalyzer(null),
-            new SeenStore(Path.Combine(directory.Path, "seen.txt"), Path.Combine(directory.Path, "pending.json")));
+            new SeenStore(Path.Combine(directory.Path, "seen.txt"), Path.Combine(directory.Path, "pending.json")),
+            new ChatLog(Path.Combine(directory.Path, "chat.json")));
     }
 
     /// <summary>

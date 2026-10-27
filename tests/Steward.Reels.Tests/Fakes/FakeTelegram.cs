@@ -20,6 +20,16 @@ public sealed class FakeTelegram(params TelegramMessage[] messages) : ITelegramC
     public List<string> Buttons { get; } = [];
 
     /// <summary>
+    /// Номера сообщений, которые бот удалил
+    /// </summary>
+    public List<long> Deleted { get; } = [];
+
+    /// <summary>
+    /// Последний выданный номер ответа бота
+    /// </summary>
+    private long _lastId = 1000;
+
+    /// <summary>
     /// Номера нажатий, которые бот подтвердил
     /// </summary>
     public List<string> Answered { get; } = [];
@@ -50,12 +60,12 @@ public sealed class FakeTelegram(params TelegramMessage[] messages) : ITelegramC
     /// <param name="buttons">Кнопки под вопросом</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Завершённая задача</returns>
-    public Task SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken)
+    public Task<long> SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken)
     {
         Sent.Add(text);
         Buttons.AddRange(buttons.Select(button => button.Data));
 
-        return Task.CompletedTask;
+        return Task.FromResult(NextId());
     }
 
     /// <summary>
@@ -78,10 +88,30 @@ public sealed class FakeTelegram(params TelegramMessage[] messages) : ITelegramC
     /// <param name="text">Текст</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Завершённая задача</returns>
-    public Task SendAsync(long chatId, string text, CancellationToken cancellationToken)
+    public Task<long> SendAsync(long chatId, string text, CancellationToken cancellationToken)
     {
         Sent.Add(text);
 
+        return Task.FromResult(NextId());
+    }
+
+    /// <summary>
+    /// Запоминает удаление
+    /// </summary>
+    /// <param name="chatId">Чат</param>
+    /// <param name="messageId">Номер сообщения</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Завершённая задача</returns>
+    public Task DeleteAsync(long chatId, long messageId, CancellationToken cancellationToken)
+    {
+        Deleted.Add(messageId);
+
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Выдаёт следующий номер ответа, начиная с 1000, чтобы он не пересекался с номерами сообщений владельца
+    /// </summary>
+    /// <returns>Номер сообщения</returns>
+    private long NextId() => ++_lastId;
 }

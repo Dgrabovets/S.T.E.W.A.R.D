@@ -43,7 +43,7 @@
                         <StackPanel>
                         <TextBlock Text="Интервал сверки" Style="{StaticResource FieldTitle}" Margin="0,8,0,4"/>
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                   Text="Как часто сервис заглядывает в таблицу, в минутах. Ползунок и число задают одно значение, от 1 до 180. После сохранения контейнер перезапускается и начинает ходить с новым интервалом."/>
+                                   Text="Как часто сервис проверяет таблицу, в минутах: от 1 до 180. Ползунок и число меняют одно значение. После сохранения контейнер перезапускается с новым интервалом."/>
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -57,17 +57,17 @@
 
                         <TextBlock Text="Название проекта" Style="{StaticResource FieldTitle}"/>
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                   Text="Проект в Singularity, куда сервис кладёт занятия. Он ищет проект с таким названием и создаёт его, если такого нет."/>
+                                   Text="Проект в Singularity, куда сервис кладёт занятия. Если проекта с таким названием нет, сервис его создаст."/>
                         <TextBox Style="{StaticResource Field}" Text="{Binding ProjectTitle, UpdateSourceTrigger=PropertyChanged}"/>
 
                         <TextBlock Text="Колонка группы" Style="{StaticResource FieldTitle}"/>
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                   Text="Заголовок столбца на листе, из которого берутся ваши пары. Пишите его так же, как в таблице, например РКИ-2-26."/>
+                                   Text="Заголовок столбца на листе, из которого берутся твои пары. Пиши его так же, как в таблице, например РКИ-2-26."/>
                         <TextBox Style="{StaticResource Field}" Text="{Binding GroupColumn, UpdateSourceTrigger=PropertyChanged}"/>
 
                         <TextBlock Text="Часовой пояс таблицы" Style="{StaticResource FieldTitle}"/>
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                   Text="В каком поясе в таблице записано время начала пар. Сервис переводит его в ваше время сам, поэтому пояс компьютера указывать не нужно: ниже видно, чем они отличаются."/>
+                                   Text="В каком часовом поясе в таблице записано время начала пар. Сервис сам переводит его в твоё время, так что пояс компьютера указывать не нужно. Ниже видно, чем они отличаются."/>
                         <ComboBox Style="{StaticResource FieldChoice}" ItemsSource="{Binding TimeZones}" SelectedValuePath="Id" SelectedValue="{Binding TimeZone, Mode=TwoWay}">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
@@ -81,10 +81,10 @@
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
                                    Text="Часть ссылки на Google Таблицу между /d/ и /edit. По ней сервис скачивает расписание."/>
                         <TextBox Style="{StaticResource Field}" Text="{Binding SpreadsheetId, UpdateSourceTrigger=PropertyChanged}"/>
-                        <ToggleButton x:Name="IdHelp" Style="{StaticResource InlineLink}" Content="Не знаете, как определить?"/>
+                        <ToggleButton x:Name="IdHelp" Style="{StaticResource InlineLink}" Content="Как определить?"/>
                         <controls:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsChecked, ElementName=IdHelp}">
                             <StackPanel Margin="0,4,0,4">
-                                <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Откройте таблицу в браузере, скопируйте адрес из строки браузера и вставьте сюда."/>
+                                <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Открой таблицу в браузере, скопируй адрес из адресной строки и вставь сюда."/>
                                 <TextBox Style="{StaticResource Field}" Text="{Binding SpreadsheetLink, UpdateSourceTrigger=PropertyChanged}"/>
                                 <Button Content="Определить идентификатор таблицы" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,4,0,0"
                                         Command="{Binding DetectSpreadsheetCommand}"/>
@@ -96,10 +96,10 @@
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
                                    Text="Число gid из адреса вкладки. Это не название листа, а номер вкладки внутри файла."/>
                         <TextBox Style="{StaticResource Field}" Text="{Binding SheetGid, UpdateSourceTrigger=PropertyChanged}"/>
-                        <ToggleButton x:Name="SheetHelp" Style="{StaticResource InlineLink}" Content="Не знаете, как определить?"/>
+                        <ToggleButton x:Name="SheetHelp" Style="{StaticResource InlineLink}" Content="Как определить?"/>
                         <controls:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsChecked, ElementName=SheetHelp}">
                             <StackPanel Margin="0,4,0,4">
-                                <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Откройте нужную вкладку таблицы, скопируйте адрес из строки браузера (в нём есть «gid=…») и вставьте сюда."/>
+                                <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Открой нужную вкладку таблицы, скопируй адрес из адресной строки (в нём есть «gid=…») и вставь сюда."/>
                                 <TextBox Style="{StaticResource Field}" Text="{Binding SheetLinkText, UpdateSourceTrigger=PropertyChanged}"/>
                                 <Button Content="Определить номер листа" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,4,0,0"
                                         Command="{Binding DetectSheetCommand}"/>
@@ -109,13 +109,13 @@
 
                         <TextBlock Text="Токен Singularity" Style="{StaticResource FieldTitle}"/>
                         <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap"
-                                   Text="Ключ, по которому сервис входит в ваш аккаунт. Он уже лежит в файле настроек и на экране закрыт точками. Если выпустите новый, вставьте его вместо текущего и сохраните."/>
+                                   Text="Ключ, по которому сервис входит в твой аккаунт. Он уже лежит в файле настроек, а на экране закрыт точками. Если выпустишь новый, вставь его вместо текущего и сохрани."/>
                         <PasswordBox Style="{StaticResource SecretField}"
                                      behaviors:PasswordBinding.Password="{Binding Token, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         <ToggleButton x:Name="TokenHelp" Style="{StaticResource InlineLink}" Content="Где выпустить токен?"/>
                         <controls:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsChecked, ElementName=TokenHelp}">
                             <StackPanel Margin="0,4,0,4">
-                                <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Откройте страницу токенов Singularity, создайте токен с доступом к проектам и задачам на чтение и запись и вставьте его в поле выше."/>
+                                <TextBlock Style="{StaticResource Hint}" TextWrapping="Wrap" Text="Открой страницу токенов Singularity, создай токен с доступом к проектам и задачам на чтение и запись и вставь его в поле выше."/>
                                 <Button Content="Открыть страницу токенов" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,4,0,0"
                                         Command="{Binding OpenTokenPageCommand}"/>
                             </StackPanel>

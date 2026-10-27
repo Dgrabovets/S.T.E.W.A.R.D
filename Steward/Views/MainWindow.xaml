@@ -167,14 +167,14 @@
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding IsReelsBusy, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel Orientation="Horizontal">
                                         <ctl:ActivityOrb Width="26" Height="26" Kind="Composing" Foreground="{StaticResource WorkingBrush}" Margin="-4,-2,12,-2"/>
-                                        <TextBlock Text="Бот разбирает рилс. Идея появится здесь через пару минут" Style="{StaticResource PageHint}" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Бот разбирает рилс, идея появится здесь через пару минут" Style="{StaticResource PageHint}" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Style="{StaticResource Card}" Visibility="{Binding IsIdeasEmpty, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel>
                                         <TextBlock Text="Идей пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
                                         <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
-                                                   Text="Пришли ссылку на рилс боту в Telegram: через несколько минут идея появится здесь с кнопками «Делаем» и «Удалить». «Делаем» открывает Claude Code с готовой просьбой, и ты отправляешь её сам. Идея остаётся в списке, пока ты её не удалишь."/>
+                                                   Text="Пришли боту в Telegram ссылку на рилс. Через пару минут здесь появится идея с названием и разбором. «Делаем» открывает Claude Code с готовой просьбой, которую ты отправляешь сам. Идея остаётся в списке, пока ты её не удалишь."/>
                                     </StackPanel>
                                 </Border>
                                 <ItemsControl ItemsSource="{Binding Ideas}">
@@ -217,7 +217,7 @@
                                 <StackPanel>
                                     <TextBlock Text="Заданий пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
                                     <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
-                                               Text="Задания появятся здесь, когда по занятию с расшифровкой нажмёшь «Подготовить задания» в настройках, в блоке «Форматы заданий». Для каждого будет видно срок, формат и создана ли задача в SingularityApp."/>
+                                               Text="Они появятся здесь после кнопки «Подготовить задания» в настройках, в блоке «Форматы заданий». Для каждого видно срок, формат и создана ли задача в SingularityApp."/>
                                 </StackPanel>
                             </Border>
                             <ItemsControl ItemsSource="{Binding Homework}">
@@ -308,6 +308,8 @@
                                                                                             <TextBlock x:Name="ReasonText" Text="{Binding Reason}" Style="{StaticResource TextCaption}"/>
                                                                                         </Border>
                                                                                         <TextBlock Text="{Binding Facts}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                                                        <TextBlock Text="{Binding Repeats}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                                                                   Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVisibility}}"/>
                                                                                     </StackPanel>
                                                                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                                                                                         <Border Style="{StaticResource ToneBadge}" Padding="14,8" VerticalAlignment="Center">

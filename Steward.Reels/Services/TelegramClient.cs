@@ -63,7 +63,9 @@ public sealed class TelegramClient : ITelegramClient, IDisposable
                 update.GetProperty("update_id").GetInt64(),
                 message.GetProperty("chat").GetProperty("id").GetInt64(),
                 from.GetProperty("id").GetInt64(),
-                (message.TryGetProperty("text", out var text) ? text.GetString() : message.TryGetProperty("caption", out var caption) ? caption.GetString() : null) ?? string.Empty));
+                (message.TryGetProperty("text", out var text) ? text.GetString() : message.TryGetProperty("caption", out var caption) ? caption.GetString() : null) ?? string.Empty,
+                null,
+                message.TryGetProperty("message_id", out var messageId) ? messageId.GetInt64() : 0));
         }
 
         return messages;
@@ -75,13 +77,13 @@ public sealed class TelegramClient : ITelegramClient, IDisposable
     /// <param name="chatId">Чат</param>
     /// <param name="text">Текст</param>
     /// <param name="cancellationToken">Токен отмены запроса</param>
-    /// <returns>Задача, которая завершается, когда Telegram принял сообщение</returns>
+    /// <returns>Номер отправленного сообщения в чате</returns>
     /// <exception cref="HttpRequestException">Telegram ответил ошибкой</exception>
-    public async Task SendAsync(long chatId, string text, CancellationToken cancellationToken)
+    public async Task<long> SendAsync(long chatId, string text, CancellationToken cancellationToken)
     {
         using var response = await _http.PostAsJsonAsync("sendMessage", new { chat_id = chatId, text, disable_web_page_preview = true }, cancellationToken);
 
-        await ReadAsync(response, cancellationToken);
+        return MessageIdOf(await ReadAsync(response, cancellationToken));
     }
 
     /// <summary>
@@ -91,13 +93,40 @@ public sealed class TelegramClient : ITelegramClient, IDisposable
     /// <param name="text">Текст вопроса</param>
     /// <param name="buttons">Подпись и данные каждой кнопки</param>
     /// <param name="cancellationToken">Токен отмены запроса</param>
-    /// <returns>Задача, которая завершается, когда Telegram принимает сообщение</returns>
-    public async Task SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken)
+    /// <returns>Номер отправленного сообщения в чате</returns>
+    public async Task<long> SendWithButtonsAsync(long chatId, string text, IReadOnlyList<(string Label, string Data)> buttons, CancellationToken cancellationToken)
     {
         var keyboard = new { inline_keyboard = new[] { buttons.Select(button => new { text = button.Label, callback_data = button.Data }).ToArray() } };
         using var response = await _http.PostAsJsonAsync("sendMessage", new { chat_id = chatId, text, disable_web_page_preview = true, reply_markup = keyboard }, cancellationToken);
 
+        return MessageIdOf(await ReadAsync(response, cancellationToken));
+    }
+
+    /// <summary>
+    /// Удаляет сообщение из чата
+    /// </summary>
+    /// <param name="chatId">Чат</param>
+    /// <param name="messageId">Номер сообщения в чате</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда Telegram отвечает</returns>
+    /// <exception cref="HttpRequestException">Telegram отказал</exception>
+    public async Task DeleteAsync(long chatId, long messageId, CancellationToken cancellationToken)
+    {
+        using var response = await _http.PostAsJsonAsync("deleteMessage", new { chat_id = chatId, message_id = messageId }, cancellationToken);
+
         await ReadAsync(response, cancellationToken);
+    }
+
+    /// <summary>
+    /// Достаёт номер сообщения из ответа на sendMessage
+    /// </summary>
+    /// <param name="body">Тело ответа Bot API</param>
+    /// <returns>Номер сообщения или ноль, если ответ без номера</returns>
+    private static long MessageIdOf(string body)
+    {
+        using var document = JsonDocument.Parse(body);
+
+        return document.RootElement.TryGetProperty("result", out var result) && result.TryGetProperty("message_id", out var id) ? id.GetInt64() : 0;
     }
 
     /// <summary>

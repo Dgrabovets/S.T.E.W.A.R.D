@@ -19,6 +19,7 @@ namespace Steward.Reels.Services;
 /// <param name="log">Принимает строки лога</param>
 /// <param name="analyzer">Придумывает название идеи и пишет разбор</param>
 /// <param name="seen">Помнит обработанные ссылки и вопросы о повторе</param>
+/// <param name="chat">Помнит сообщения прошлого прохода, чтобы удалить их при следующем</param>
 public sealed class ReelsPipeline(
     ITelegramClient telegram,
     IReelDownloader downloader,
@@ -29,7 +30,8 @@ public sealed class ReelsPipeline(
     TimeProvider timeProvider,
     Action<string> log,
     IIdeaAnalyzer analyzer,
-    SeenStore seen)
+    SeenStore seen,
+    ChatLog chat)
 {
     /// <summary>
     /// Читает сообщения и обрабатывает их по порядку. Номер прочитанного сохраняется после каждого сообщения
@@ -42,8 +44,13 @@ public sealed class ReelsPipeline(
         var failed = 0;
         var ignored = 0;
 
-        foreach (var message in (await telegram.GetMessagesAsync(offsets.Read(), cancellationToken)).OrderBy(item => item.UpdateId))
+        var incoming = (await telegram.GetMessagesAsync(offsets.Read(), cancellationToken)).OrderBy(item => item.UpdateId).ToArray();
+        if (incoming.Length > 0)
+            await ForgetPreviousPassAsync(cancellationToken);
+
+        foreach (var message in incoming)
         {
+            chat.Add(message.ChatId, message.MessageId);
             var (ok, bad, skipped) = await HandleAsync(message, cancellationToken);
             accepted += ok;
             failed += bad;
@@ -57,6 +64,37 @@ public sealed class ReelsPipeline(
     }
 
     /// <summary>
+    /// Удаляет из чата сообщения прошлого прохода: ответы бота и ссылки владельца. Что Telegram удалить не дал, например слишком старое, пропускается
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Задача, которая завершается, когда все попытки сделаны</returns>
+    private async Task ForgetPreviousPassAsync(CancellationToken cancellationToken)
+    {
+        foreach (var (chatId, messageId) in chat.Read())
+        {
+            try
+            {
+                await telegram.DeleteAsync(chatId, messageId, cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                // Сообщение уже удалено или старше двух суток: убрать его нельзя, и это не ошибка прохода
+            }
+        }
+
+        chat.Clear();
+    }
+
+    /// <summary>
+    /// Отправляет ответ и запоминает его, чтобы следующий проход его удалил
+    /// </summary>
+    /// <param name="chatId">Чат</param>
+    /// <param name="text">Текст ответа</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Задача, которая завершается, когда ответ отправлен</returns>
+    private async Task ReplyAsync(long chatId, string text, CancellationToken cancellationToken) => chat.Add(chatId, await telegram.SendAsync(chatId, text, cancellationToken));
+
+    /// <summary>
     /// Разбирает одно сообщение
     /// </summary>
     /// <param name="message">Сообщение</param>
@@ -67,7 +105,7 @@ public sealed class ReelsPipeline(
         if (settings.AllowedUserId == 0)
         {
             log($"Сообщение от пользователя {message.UserId}: идентификатор в настройках не задан");
-            await telegram.SendAsync(message.ChatId, $"Ваш Telegram id {message.UserId}. Впишите его в AllowedUserId в настройках бота, дальше бот будет принимать рилсы только от вас.", cancellationToken);
+            await ReplyAsync(message.ChatId, $"Ваш Telegram id {message.UserId}. Впишите его в AllowedUserId в настройках бота, дальше бот будет принимать рилсы только от вас.", cancellationToken);
 
             return (0, 0, 1);
         }
@@ -85,7 +123,7 @@ public sealed class ReelsPipeline(
         var links = ReelLinks.Find(message.Text);
         if (links.Count == 0)
         {
-            await telegram.SendAsync(message.ChatId, "Пришлите ссылку на рилс Instagram, например https://www.instagram.com/reel/…", cancellationToken);
+            await ReplyAsync(message.ChatId, "Пришлите ссылку на рилс Instagram, например https://www.instagram.com/reel/…", cancellationToken);
 
             return (0, 0, 1);
         }
@@ -130,7 +168,7 @@ public sealed class ReelsPipeline(
 
         if (parts[0] != "again")
         {
-            await telegram.SendAsync(message.ChatId, "Хорошо, повторно не добавляю.", cancellationToken);
+            await ReplyAsync(message.ChatId, "Хорошо, повторно не добавляю.", cancellationToken);
 
             return (0, 0, 1);
         }
@@ -164,7 +202,7 @@ public sealed class ReelsPipeline(
     {
         seen.AddPending(token, url);
         log($"Повтор: {url}");
-        await telegram.SendWithButtonsAsync(message.ChatId, $"Этот рилс уже разбирали: {url}\nДобавить ещё раз?", [("Добавить ещё раз", $"again:{token}"), ("Не надо", $"skip:{token}")], cancellationToken);
+        chat.Add(message.ChatId, await telegram.SendWithButtonsAsync(message.ChatId, $"Этот рилс уже разбирали: {url}\nДобавить ещё раз?", [("Добавить ещё раз", $"again:{token}"), ("Не надо", $"skip:{token}")], cancellationToken));
     }
 
     /// <summary>
@@ -182,7 +220,7 @@ public sealed class ReelsPipeline(
         if (ideas.Exists(id))
             return true;
 
-        await telegram.SendAsync(message.ChatId, "Принял, разбираю. Это займёт пару минут.", cancellationToken);
+        await ReplyAsync(message.ChatId, "Принял, разбираю. Это займёт пару минут.", cancellationToken);
         try
         {
             var reel = await downloader.DownloadAsync(url, id, cancellationToken);
@@ -206,14 +244,14 @@ public sealed class ReelsPipeline(
             ideas.Save(idea);
             seen.Add(ReelLinks.Key(url));
             log($"Идея: {idea.Title} ← {url}");
-            await telegram.SendAsync(message.ChatId, $"Готово: {idea.Title}", cancellationToken);
+            await ReplyAsync(message.ChatId, $"Готово: {idea.Title}", cancellationToken);
 
             return true;
         }
         catch (ReelException exception)
         {
             log($"Не получилось: {url}: {exception.Message}");
-            await telegram.SendAsync(message.ChatId, $"Не получилось: {exception.Message}", cancellationToken);
+            await ReplyAsync(message.ChatId, $"Не получилось: {exception.Message}", cancellationToken);
 
             return false;
         }
