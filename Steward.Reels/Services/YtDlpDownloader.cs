@@ -27,12 +27,7 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
 
         var result = await CommandRunner.RunAsync(
             python,
-            [
-                "-m", "yt_dlp", "--no-playlist", "--no-progress", "--no-warnings", "--write-info-json", "--restrict-filenames",
-                "-f", "bestaudio[ext=m4a]/bestaudio/best",
-                "-o", Path.Combine(workDirectory, name + ".%(ext)s"),
-                url,
-            ],
+            Arguments(url, name, workDirectory, settings.CookiesFromBrowser),
             TimeSpan.FromMinutes(settings.DownloadTimeoutMinutes),
             cancellationToken);
 
@@ -43,6 +38,34 @@ public sealed class YtDlpDownloader(string python, string workDirectory, ReelsSe
             ?? throw new ReelException("yt-dlp ничего не скачал");
 
         return ReadInfo(media, Path.Combine(workDirectory, name + ".info.json"));
+    }
+
+    /// <summary>
+    /// Собирает аргументы yt-dlp: только звук, подпись в файл сведений и, если задан браузер, вход в Instagram из его cookies
+    /// </summary>
+    /// <param name="url">Ссылка на рилс</param>
+    /// <param name="name">Имя файлов без расширения</param>
+    /// <param name="workDirectory">Папка для скачанных файлов</param>
+    /// <param name="cookiesFromBrowser">Название браузера или пусто</param>
+    /// <returns>Аргументы запуска python</returns>
+    public static IReadOnlyList<string> Arguments(string url, string name, string workDirectory, string cookiesFromBrowser)
+    {
+        var arguments = new List<string>
+        {
+            "-m", "yt_dlp", "--no-playlist", "--no-progress", "--no-warnings", "--write-info-json", "--restrict-filenames",
+            "-f", "bestaudio[ext=m4a]/bestaudio/best",
+            "-o", Path.Combine(workDirectory, name + ".%(ext)s"),
+        };
+
+        if (!string.IsNullOrWhiteSpace(cookiesFromBrowser))
+        {
+            arguments.Add("--cookies-from-browser");
+            arguments.Add(cookiesFromBrowser.Trim());
+        }
+
+        arguments.Add(url);
+
+        return arguments;
     }
 
     /// <summary>

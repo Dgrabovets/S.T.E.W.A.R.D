@@ -21,6 +21,11 @@ public sealed class ReelsSettings
     public string Language { get; init; } = "ru";
 
     /// <summary>
+    /// Браузер, из которого yt-dlp берёт вход в Instagram, например <c>firefox</c>, <c>chrome</c> или <c>edge</c>. Пусто: рилсы скачиваются без входа, и Instagram часто отказывает. Программа только читает cookies браузера, пароль ей не нужен
+    /// </summary>
+    public string CookiesFromBrowser { get; init; } = string.Empty;
+
+    /// <summary>
     /// Сколько минут даётся на скачивание одного рилса
     /// </summary>
     public int DownloadTimeoutMinutes { get; init; } = 3;
