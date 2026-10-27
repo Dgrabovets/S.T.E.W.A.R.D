@@ -370,8 +370,8 @@ public static class SnapshotRenderer
     /// <returns>Строки задач</returns>
     private static IReadOnlyList<JobRow> SampleJobs() =>
     [
-        new JobRow("mail", "Почта", "Выполнено сегодня в 09:00", "Новых важных писем нет. Следующий запуск сегодня в 19:00", RowToneEnum.Ok, 0, true),
-        new JobRow("reels", "Рилсы", "Ждёт тебя", "Разобрано 3 рилса. Без решения: 3", RowToneEnum.Attention, 3, true),
+        new JobRow("mail", "Почта", "Выполнено сегодня в 09:00", "Новых важных писем нет\nСледующий запуск сегодня в 19:00", RowToneEnum.Ok, 0, true),
+        new JobRow("reels", "Рилсы", "Ждёт тебя", "Разобрано 3 рилса\nБез решения: 3", RowToneEnum.Attention, 3, true),
         new JobRow("mts", "MTS Link", "Не удалось", "Нет доступа к LMS: войдите заново (вчера в 19:00)", RowToneEnum.Problem, 0, true),
         new JobRow("telegram", "Telegram-бот", "Выполняется", "Запущена сегодня в 12:00", RowToneEnum.Working, 0, true),
         new JobRow("homework", "Домашние задания", "Отключена", "Чтобы включить, поставь enabled: true в config/jobs.json", RowToneEnum.Idle, 0, false),
@@ -413,7 +413,7 @@ public static class SnapshotRenderer
     /// <returns>Идеи от свежих к старым</returns>
     private static IReadOnlyList<Idea> SampleIdeas(DateTimeOffset now) =>
     [
-        new Idea { Id = "r1-1", CreatedAt = now.AddMinutes(-12), SourceUrl = "https://www.instagram.com/reel/sample/", Title = "Хранить конспекты лекций в одном поиске", Author = "@study.tools", Transcript = "Собери все конспекты в одну папку, прогони через расшифровку и ищи по ключевым словам вместо того, чтобы листать файлы. Я так готовлюсь к экзаменам уже второй семестр и экономлю кучу времени перед сессией." },
+        new Idea { Id = "r1-1", CreatedAt = now.AddMinutes(-12), SourceUrl = "https://www.instagram.com/reel/sample/", Title = "Хранить конспекты лекций в одном поиске", Author = "@study.tools", Summary = "Суть: все конспекты лекций складываются в одну папку и прогоняются через расшифровку, поиск идёт по ключевым словам.\nДля чего: быстро находить нужное место перед экзаменом, не листая файлы.\nПлюсы: бесплатно; работает с тем, что уже есть.\nМинусы и риски: длинные расшифровки занимают место; поиск по ключевым словам пропускает смысл без слов.\nВывод: стоит попробовать на одном предмете.", Transcript = "Собери все конспекты в одну папку, прогони через расшифровку и ищи по ключевым словам вместо того, чтобы листать файлы. Я так готовлюсь к экзаменам уже второй семестр и экономлю кучу времени перед сессией." },
         new Idea { Id = "r1-2", CreatedAt = now.AddHours(-5), SourceUrl = "https://www.instagram.com/reel/sample2/", Title = "Напоминание о дедлайне за день", Author = "@productivity", Caption = "Настрой напоминание за сутки до сдачи" },
     ];
 

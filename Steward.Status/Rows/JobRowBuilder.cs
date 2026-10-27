@@ -71,12 +71,12 @@ public static class JobRowBuilder
     #region Wording
 
     /// <summary>
-    /// Склеивает непустые части через точку
+    /// Складывает непустые части в строки: каждая часть с новой строки
     /// </summary>
     /// <param name="parts">Фразы, часть из которых может быть пустой</param>
     /// <returns>Одна строка</returns>
     private static string Join(params string?[] parts) =>
-        string.Join(". ", parts.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim().TrimEnd('.')));
+        string.Join('\n', parts.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim().TrimEnd('.')));
 
     /// <summary>
     /// Обрезает текст ошибки до читаемой длины

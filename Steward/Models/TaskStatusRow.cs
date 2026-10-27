@@ -15,4 +15,10 @@ namespace Steward.Models;
 /// <param name="CanRun">
 /// <see langword="true"/>, если задачу можно запустить кнопкой
 /// </param>
-public sealed record TaskStatusRow(string Id, string Name, string Headline, string Detail, PanelToneEnum Tone, bool Muted = false, bool CanRun = false, bool Working = false);
+public sealed record TaskStatusRow(string Id, string Name, string Headline, string Detail, PanelToneEnum Tone, bool Muted = false, bool CanRun = false, bool Working = false)
+{
+    /// <summary>
+    /// Подробности по пунктам: каждая строка отдельно
+    /// </summary>
+    public IReadOnlyList<string> DetailLines => [.. Detail.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+}

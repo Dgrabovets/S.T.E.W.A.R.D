@@ -23,6 +23,7 @@ public sealed class TaskCardViewModel
         Name = row.Name;
         Headline = row.Headline;
         Detail = row.Detail;
+        DetailLines = row.DetailLines;
         Tone = row.Tone;
         Muted = row.Muted;
         CanRun = row.CanRun;
@@ -58,6 +59,11 @@ public sealed class TaskCardViewModel
     /// Подробности
     /// </summary>
     public string Detail { get; }
+
+    /// <summary>
+    /// Подробности по пунктам: каждая строка отдельно
+    /// </summary>
+    public IReadOnlyList<string> DetailLines { get; }
 
     /// <summary>
     /// Цвет точки

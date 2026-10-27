@@ -10,6 +10,11 @@ namespace Steward.ViewModels;
 public sealed class IdeaCardViewModel
 {
     /// <summary>
+    /// Самая длинная метка абзаца, например «Минусы и риски»
+    /// </summary>
+    private const int LABEL_LIMIT = 24;
+
+    /// <summary>
     /// Длина превью расшифровки в символах
     /// </summary>
     private const int PREVIEW_LENGTH = 320;
@@ -25,7 +30,8 @@ public sealed class IdeaCardViewModel
     {
         Title = idea.Title;
         Meta = string.Join(" · ", new[] { idea.Author, idea.CreatedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture), idea.State == IdeaStateEnum.Approved ? "в работе" : string.Empty }.Where(part => part.Length > 0));
-        Preview = idea.Summary.Length > 0 ? idea.Summary.Trim() : Shorten(idea.Transcript.Length > 0 ? idea.Transcript : idea.Caption);
+        Sections = Split(idea.Summary);
+        Preview = Sections.Count > 0 ? string.Empty : Shorten(idea.Transcript.Length > 0 ? idea.Transcript : idea.Caption);
         ApproveCommand = new RelayCommand(() => approve(idea));
         RejectCommand = new RelayCommand(() => reject(idea));
         OpenSourceCommand = new RelayCommand(() => open(idea.SourceUrl));
@@ -47,9 +53,41 @@ public sealed class IdeaCardViewModel
     public string Preview { get; }
 
     /// <summary>
+    /// Разбор идеи по абзацам: метка («Суть», «Плюсы») и текст. Пусто, если разбора нет
+    /// </summary>
+    public IReadOnlyList<IdeaSection> Sections { get; }
+
+    /// <summary>
+    /// Есть разбор по абзацам
+    /// </summary>
+    public bool HasSections => Sections.Count > 0;
+
+    /// <summary>
     /// Есть что показать под названием
     /// </summary>
     public bool HasPreview => Preview.Length > 0;
+
+    /// <summary>
+    /// Делает первую букву заглавной, чтобы абзац после метки читался как предложение
+    /// </summary>
+    /// <param name="text">Текст абзаца</param>
+    /// <returns>Тот же текст с заглавной первой буквой</returns>
+    private static string Capitalize(string text) => text.Length == 0 ? text : char.ToUpper(text[0], CultureInfo.CurrentCulture) + text[1..];
+
+    /// <summary>
+    /// Делит разбор на абзацы: каждая строка вида «Метка: текст» становится отдельным абзацем, строка без метки остаётся абзацем без метки
+    /// </summary>
+    /// <param name="summary">Разбор из файла идеи</param>
+    /// <returns>Абзацы в порядке записи</returns>
+    private static IReadOnlyList<IdeaSection> Split(string summary) =>
+        [.. summary.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(line =>
+        {
+            var colon = line.IndexOf(':', StringComparison.Ordinal);
+
+            return colon is > 0 and <= LABEL_LIMIT && line[..colon].Split(' ').Length <= 3
+                ? new IdeaSection(line[..colon], Capitalize(line[(colon + 1)..].Trim()))
+                : new IdeaSection(string.Empty, line);
+        })];
 
     /// <summary>
     /// Решено делать: открывает Claude с просьбой разобрать идею

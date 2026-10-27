@@ -116,7 +116,7 @@ public class ScheduleJournalTests
         Assert.Equal(["mail", "mts", "schedule"], model.Groups.Select(group => group.Id).ToArray());
         Assert.Single(model.Groups[0].Runs);
         Assert.True(model.Groups[0].Runs[0].HasRepeats);
-        Assert.StartsWith("Таких запусков подряд: 2", model.Groups[0].Runs[0].Repeats, StringComparison.Ordinal);
+        Assert.Equal("Одинаковых подряд: 2", model.Groups[0].Runs[0].Repeats);
         Assert.False(model.Groups[0].IsOpen);
         Assert.True(model.Groups[1].IsOpen);
         Assert.Single(model.Groups[2].Checks);
@@ -185,6 +185,6 @@ public class ScheduleJournalTests
         Assert.True(changed.HasBlock);
         Assert.False(quiet.HasBlock);
         Assert.True(quiet.HasQuietDetail);
-        Assert.Equal("Таких сверок подряд: 3", quiet.Repeats);
+        Assert.Equal("Одинаковых подряд: 3", quiet.Repeats);
     }
 }

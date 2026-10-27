@@ -3,20 +3,25 @@ using System.Text.Json;
 namespace Steward.Reels.Services;
 
 /// <summary>
-/// Помнит сообщения последнего прохода бота: свои ответы и сообщения владельца. Следующий проход их удаляет, чтобы чат оставался чистым
+/// Помнит сообщения бота и владельца с временем отправки. Следующий проход с новыми сообщениями их удаляет, а если новых нет, их удаляют, когда подходит срок, который Telegram позволяет
 /// </summary>
 /// <param name="path">Файл со списком сообщений</param>
 public sealed class ChatLog(string path)
 {
     /// <summary>
-    /// Читает запомненные сообщения
+    /// Читает запомненные сообщения. В старом формате без времени берётся время записи файла
     /// </summary>
-    /// <returns>Чат и номер сообщения в нём</returns>
-    public IReadOnlyList<(long ChatId, long MessageId)> Read()
+    /// <returns>Чат, номер сообщения в нём и когда оно отправлено</returns>
+    public IReadOnlyList<(long ChatId, long MessageId, DateTimeOffset SentAt)> Read()
     {
         try
         {
-            return File.Exists(path) ? [.. (JsonSerializer.Deserialize<long[][]>(File.ReadAllText(path)) ?? []).Where(pair => pair.Length == 2).Select(pair => (pair[0], pair[1]))] : [];
+            if (!File.Exists(path))
+                return [];
+
+            var fallback = new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);
+
+            return [.. (JsonSerializer.Deserialize<long[][]>(File.ReadAllText(path)) ?? []).Where(item => item.Length >= 2).Select(item => (item[0], item[1], item.Length >= 3 ? DateTimeOffset.FromUnixTimeSeconds(item[2]) : fallback))];
         }
         catch (JsonException)
         {
@@ -29,27 +34,29 @@ public sealed class ChatLog(string path)
     /// </summary>
     /// <param name="chatId">Чат</param>
     /// <param name="messageId">Номер сообщения в чате. Ноль не запоминается</param>
-    public void Add(long chatId, long messageId)
+    /// <param name="sentAt">Когда сообщение отправлено</param>
+    public void Add(long chatId, long messageId, DateTimeOffset sentAt)
     {
         if (messageId != 0)
-            Write([.. Read(), (chatId, messageId)]);
+            Write([.. Read(), (chatId, messageId, sentAt)]);
     }
 
     /// <summary>
-    /// Забывает все сообщения
+    /// Забывает сообщения, которые уже удалены или удалить нельзя
     /// </summary>
-    public void Clear() => Write([]);
+    /// <param name="forgotten">Сообщения, которые нужно убрать из списка</param>
+    public void Forget(IEnumerable<(long ChatId, long MessageId, DateTimeOffset SentAt)> forgotten) => Write(Read().Except(forgotten));
 
     /// <summary>
     /// Записывает список через временный файл
     /// </summary>
-    /// <param name="items">Чат и номер сообщения</param>
-    private void Write(IEnumerable<(long ChatId, long MessageId)> items)
+    /// <param name="items">Чат, номер сообщения и время отправки</param>
+    private void Write(IEnumerable<(long ChatId, long MessageId, DateTimeOffset SentAt)> items)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
         var temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(items.Select(item => new[] { item.ChatId, item.MessageId })));
+        File.WriteAllText(temp, JsonSerializer.Serialize(items.Select(item => new[] { item.ChatId, item.MessageId, item.SentAt.ToUnixTimeSeconds() })));
         File.Move(temp, path, overwrite: true);
     }
 }

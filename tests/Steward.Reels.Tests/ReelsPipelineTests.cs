@@ -219,6 +219,24 @@ public class ReelsPipelineTests
     }
 
     /// <summary>
+    /// Если новых сообщений нет, но с отправки прошло почти двое суток, бот сам удаляет прошлые, пока Telegram это позволяет
+    /// </summary>
+    [Fact]
+    public async Task Old_messages_are_removed_even_when_nothing_new_arrives()
+    {
+        using var directory = new TempDirectory();
+        await Pipeline(directory, new FakeTelegram(Message(1, 7, "https://www.instagram.com/reel/Abc/") with { MessageId = 501 }), new FakeDownloader(), 7, out _).RunAsync(CancellationToken.None);
+
+        var early = new FakeTelegram();
+        await Pipeline(directory, early, new FakeDownloader(), 7, out _, later: TimeSpan.FromHours(40)).RunAsync(CancellationToken.None);
+        Assert.Empty(early.Deleted);
+
+        var late = new FakeTelegram();
+        await Pipeline(directory, late, new FakeDownloader(), 7, out _, later: TimeSpan.FromHours(47)).RunAsync(CancellationToken.None);
+        Assert.Equal([501L, 1001L, 1002L], late.Deleted.Order().ToArray());
+    }
+
+    /// <summary>
     /// Собирает проверку бота с подделками и фиксированным временем
     /// </summary>
     /// <param name="directory">Папка для идей и номера сообщения</param>
@@ -227,8 +245,9 @@ public class ReelsPipelineTests
     /// <param name="allowedUserId">Разрешённый пользователь</param>
     /// <param name="ideas">Папка идей, в которую пишет проверка</param>
     /// <param name="analyzer">Разбор идеи или <see langword="null"/>, тогда разбора нет</param>
+    /// <param name="later">На сколько позже начала суток часы проверки, по умолчанию не позже</param>
     /// <returns>Проверка бота</returns>
-    private static ReelsPipeline Pipeline(TempDirectory directory, FakeTelegram telegram, FakeDownloader downloader, long allowedUserId, out IdeaStore ideas, IIdeaAnalyzer? analyzer = null)
+    private static ReelsPipeline Pipeline(TempDirectory directory, FakeTelegram telegram, FakeDownloader downloader, long allowedUserId, out IdeaStore ideas, IIdeaAnalyzer? analyzer = null, TimeSpan? later = null)
     {
         ideas = new IdeaStore(Path.Combine(directory.Path, "ideas"));
 
@@ -239,7 +258,7 @@ public class ReelsPipelineTests
             ideas,
             new OffsetStore(Path.Combine(directory.Path, "offset.txt")),
             new ReelsSettings { AllowedUserId = allowedUserId },
-            new FixedTime(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero)),
+            new FixedTime(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero) + (later ?? TimeSpan.Zero)),
             _ => { },
             analyzer ?? new FakeAnalyzer(null),
             new SeenStore(Path.Combine(directory.Path, "seen.txt"), Path.Combine(directory.Path, "pending.json")),

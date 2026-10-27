@@ -126,7 +126,20 @@
                                                             <TextBlock x:Name="Name" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
                                                             <TextBlock Text="{Binding Headline}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBodyLarge}" Margin="12,2,0,0"/>
                                                         </StackPanel>
-                                                        <TextBlock x:Name="Reason" Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                                        <ItemsControl x:Name="Reason" ItemsSource="{Binding DetailLines}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,8,0,0">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Grid Margin="0,0,0,3">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="16"/>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Text="•"/>
+                                                                        <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap"/>
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
                                                     </StackPanel>
                                                     <Button x:Name="Run" Grid.Column="2" Content="Запустить" Style="{StaticResource ActionButton}" Margin="12,0,0,0"
                                                             VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"/>
@@ -184,6 +197,20 @@
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                                     <TextBlock Text="{Binding Meta}" Style="{StaticResource PageHint}" Margin="0,4,0,0"/>
+                                                    <ItemsControl ItemsSource="{Binding Sections}" Margin="0,10,0,0" Visibility="{Binding HasSections, Converter={StaticResource BoolToVisibility}}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid Margin="0,0,0,10">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="132"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource TextCaption}" Foreground="{StaticResource AccentTextBrush}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,2,12,0"/>
+                                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource TextBody}" TextWrapping="Wrap"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
                                                     <TextBlock Text="{Binding Preview}" Style="{StaticResource PageHint}" Margin="0,8,0,0" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"
                                                                Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}"/>
                                                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
@@ -304,12 +331,12 @@
                                                                                     </Grid.ColumnDefinitions>
                                                                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                                                         <TextBlock Text="{Binding When}" Style="{StaticResource TextBodyLarge}" FontWeight="SemiBold"/>
+                                                                                        <TextBlock Text="{Binding Repeats}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                                                                                   Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVisibility}}"/>
                                                                                         <Border x:Name="ReasonChip" Style="{StaticResource Chip}" Margin="12,0,0,0" VerticalAlignment="Center">
                                                                                             <TextBlock x:Name="ReasonText" Text="{Binding Reason}" Style="{StaticResource TextCaption}"/>
                                                                                         </Border>
                                                                                         <TextBlock Text="{Binding Facts}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"/>
-                                                                                        <TextBlock Text="{Binding Repeats}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                                                                                   Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVisibility}}"/>
                                                                                     </StackPanel>
                                                                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                                                                                         <Border Style="{StaticResource ToneBadge}" Padding="14,8" VerticalAlignment="Center">

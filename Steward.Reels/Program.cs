@@ -91,17 +91,17 @@ internal static class Program
     /// Собирает строку статуса из итога проверки
     /// </summary>
     /// <param name="result">Итог проверки</param>
-    /// <returns>Например «Принято 2, не получилось 1». Сколько идей ждёт решения, добавляет приложение само. Если ничего не пришло, «Новых рилсов нет»</returns>
+    /// <returns>Строки «Принято: 2» и «Не получилось: 1», каждая с новой строки. Сколько идей ждёт решения, добавляет приложение само. Если ничего не пришло, «Новых рилсов нет»</returns>
     private static string Summary(ReelsResult result)
     {
         var parts = new List<string>();
         if (result.Accepted > 0)
-            parts.Add($"принято {result.Accepted}");
+            parts.Add($"Принято: {result.Accepted}");
 
         if (result.Failed > 0)
-            parts.Add($"не получилось {result.Failed}");
+            parts.Add($"Не получилось: {result.Failed}");
 
-        return parts.Count == 0 ? "Новых рилсов нет" : string.Join(", ", parts).Replace("принято", "Принято", StringComparison.Ordinal);
+        return parts.Count == 0 ? "Новых рилсов нет" : string.Join('\n', parts);
     }
 
     /// <summary>

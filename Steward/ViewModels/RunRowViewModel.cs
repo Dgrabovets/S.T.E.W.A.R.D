@@ -29,7 +29,7 @@ public sealed class RunRowViewModel
             foreach (var item in all)
                 remove?.Invoke(item);
         });
-        Repeats = all.Count > 1 ? $"Таких запусков подряд: {all.Count}, с {all[^1].StartedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture)}" : string.Empty;
+        Repeats = JournalWording.Repeats(all.Count);
         When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
         Title = record.Title;
         Reason = record.Reason switch
@@ -151,7 +151,7 @@ public sealed class RunRowViewModel
     public string Facts { get; }
 
     /// <summary>
-    /// Сколько таких же запусков шло подряд и с какого времени. Пусто, если запуск один
+    /// Сколько таких же запусков шло подряд. Пусто, если запуск один
     /// </summary>
     public string Repeats { get; }
 

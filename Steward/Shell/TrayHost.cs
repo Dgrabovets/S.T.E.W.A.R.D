@@ -330,7 +330,7 @@ public sealed class TrayHost : IDisposable
             if (!_notifiedProblems.Add(key))
                 continue;
 
-            var tip = $"{row.Headline}. {row.Detail}";
+            var tip = $"{row.Headline}. {row.Detail.Replace('\n', ' ')}";
             if (tip.Length > BALLOON_TEXT_LIMIT)
                 tip = tip[..BALLOON_TEXT_LIMIT];
             _icon.ShowBalloonTip(BALLOON_MS, row.Title, tip, ToolTipIcon.None);

@@ -34,6 +34,11 @@ public sealed class ReelsPipeline(
     ChatLog chat)
 {
     /// <summary>
+    /// Через сколько после отправки сообщения удаляются, если новых нет: чуть раньше двух суток, после которых Telegram не даёт удалить
+    /// </summary>
+    private static readonly TimeSpan DELETE_AFTER = TimeSpan.FromHours(46);
+
+    /// <summary>
     /// Читает сообщения и обрабатывает их по порядку. Номер прочитанного сохраняется после каждого сообщения
     /// </summary>
     /// <param name="cancellationToken">Отменяет проверку</param>
@@ -45,12 +50,11 @@ public sealed class ReelsPipeline(
         var ignored = 0;
 
         var incoming = (await telegram.GetMessagesAsync(offsets.Read(), cancellationToken)).OrderBy(item => item.UpdateId).ToArray();
-        if (incoming.Length > 0)
-            await ForgetPreviousPassAsync(cancellationToken);
+        await ForgetOldMessagesAsync(everything: incoming.Length > 0, cancellationToken);
 
         foreach (var message in incoming)
         {
-            chat.Add(message.ChatId, message.MessageId);
+            chat.Add(message.ChatId, message.MessageId, timeProvider.GetUtcNow());
             var (ok, bad, skipped) = await HandleAsync(message, cancellationToken);
             accepted += ok;
             failed += bad;
@@ -64,13 +68,16 @@ public sealed class ReelsPipeline(
     }
 
     /// <summary>
-    /// Удаляет из чата сообщения прошлого прохода: ответы бота и ссылки владельца. Что Telegram удалить не дал, например слишком старое, пропускается
+    /// Удаляет из чата сообщения прошлых проходов: ответы бота и ссылки владельца. Когда пришло что-то новое, удаляются все, а когда нет, только те, которым скоро выйдет срок, после которого Telegram удалить их не даст. Что удалить не удалось, пропускается
     /// </summary>
+    /// <param name="everything">Пришли новые сообщения: убрать всё прошлое, а не только старое</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Задача, которая завершается, когда все попытки сделаны</returns>
-    private async Task ForgetPreviousPassAsync(CancellationToken cancellationToken)
+    private async Task ForgetOldMessagesAsync(bool everything, CancellationToken cancellationToken)
     {
-        foreach (var (chatId, messageId) in chat.Read())
+        var limit = timeProvider.GetUtcNow() - DELETE_AFTER;
+        var due = chat.Read().Where(item => everything || item.SentAt <= limit).ToArray();
+        foreach (var (chatId, messageId, _) in due)
         {
             try
             {
@@ -82,7 +89,7 @@ public sealed class ReelsPipeline(
             }
         }
 
-        chat.Clear();
+        chat.Forget(due);
     }
 
     /// <summary>
@@ -92,7 +99,7 @@ public sealed class ReelsPipeline(
     /// <param name="text">Текст ответа</param>
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Задача, которая завершается, когда ответ отправлен</returns>
-    private async Task ReplyAsync(long chatId, string text, CancellationToken cancellationToken) => chat.Add(chatId, await telegram.SendAsync(chatId, text, cancellationToken));
+    private async Task ReplyAsync(long chatId, string text, CancellationToken cancellationToken) => chat.Add(chatId, await telegram.SendAsync(chatId, text, cancellationToken), timeProvider.GetUtcNow());
 
     /// <summary>
     /// Разбирает одно сообщение
@@ -202,7 +209,7 @@ public sealed class ReelsPipeline(
     {
         seen.AddPending(token, url);
         log($"Повтор: {url}");
-        chat.Add(message.ChatId, await telegram.SendWithButtonsAsync(message.ChatId, $"Этот рилс уже разбирали: {url}\nДобавить ещё раз?", [("Добавить ещё раз", $"again:{token}"), ("Не надо", $"skip:{token}")], cancellationToken));
+        chat.Add(message.ChatId, await telegram.SendWithButtonsAsync(message.ChatId, $"Этот рилс уже разбирали: {url}\nДобавить ещё раз?", [("Добавить ещё раз", $"again:{token}"), ("Не надо", $"skip:{token}")], cancellationToken), timeProvider.GetUtcNow());
     }
 
     /// <summary>

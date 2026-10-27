@@ -35,7 +35,7 @@ public sealed class ScheduleCheckViewModel
 
         Lines = Split(entry);
         IsProblem = entry.Tone == LogToneEnum.Problem;
-        Repeats = entry.Tone == LogToneEnum.Quiet && entry.Repeat > 1 ? $"Таких сверок подряд: {entry.Repeat}" : string.Empty;
+        Repeats = entry.Tone == LogToneEnum.Quiet && entry.Repeat > 1 ? JournalWording.Repeats(entry.Repeat) : string.Empty;
     }
 
     /// <summary>
