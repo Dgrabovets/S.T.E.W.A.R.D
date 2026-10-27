@@ -21,7 +21,6 @@ public sealed class RunRowViewModel
     {
         FixCommand = new RelayCommand(() => fix(record));
         RemoveCommand = new RelayCommand(() => remove?.Invoke(record));
-        CanFix = record.Outcome != RunOutcomeEnum.Ok;
         When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
         Title = record.Title;
         Reason = record.Reason switch
@@ -45,6 +44,7 @@ public sealed class RunRowViewModel
         Summary = record.Summary ?? string.Empty;
         Output = record.Output ?? string.Empty;
         OutputLines = LogLines.Parse(Output);
+        CanFix = record.Outcome != RunOutcomeEnum.Ok || OutputLines.Any(line => line.Tone == PanelToneEnum.Problem);
         IsManual = record.Reason == "manual";
         Facts = Duration(record.FinishedAt - record.StartedAt);
         (Tone, Kind) = record.Outcome switch
@@ -107,7 +107,7 @@ public sealed class RunRowViewModel
     public RelayCommand RemoveCommand { get; }
 
     /// <summary>
-    /// Запуск не удался, значит, его можно отдать на починку
+    /// Запуск не удался или прошёл с ошибками в выводе (например, не вышло разобрать одну из ссылок), значит, его можно отдать на починку
     /// </summary>
     public bool CanFix { get; }
 

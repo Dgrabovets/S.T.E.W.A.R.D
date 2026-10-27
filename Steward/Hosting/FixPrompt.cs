@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Steward.Models;
 using Steward.Status.Running;
 
 namespace Steward.Hosting;
@@ -10,6 +11,16 @@ namespace Steward.Hosting;
 public static class FixPrompt
 {
     /// <summary>
+    /// Сколько знаков строк ошибок кладётся в просьбу: полный вывод лежит в файле отчёта
+    /// </summary>
+    private const int PROBLEM_LIMIT = 600;
+
+    /// <summary>
+    /// Фраза, когда текста ошибки нет
+    /// </summary>
+    private const string NO_ERROR_TEXT = "текст ошибки не записан";
+
+    /// <summary>
     /// Собирает короткую просьбу починить задачу
     /// </summary>
     /// <param name="record">Неудавшийся запуск из журнала</param>
@@ -19,7 +30,7 @@ public static class FixPrompt
     public static string Build(RunRecord record, string repoRoot, string reportPath)
     {
         var branch = $"fix/{record.JobId}-{record.StartedAt.ToLocalTime():yyyyMMdd}";
-        var error = string.IsNullOrWhiteSpace(record.Detail) ? "текст ошибки не записан" : record.Detail;
+        var error = string.IsNullOrWhiteSpace(record.Detail) ? ProblemLines(record) : record.Detail;
 
         return $"""
             Не работает задача «{record.Title}» (id {record.JobId}) в приложении Steward. Найди причину и почини.
@@ -67,13 +78,27 @@ public static class FixPrompt
     }
 
     /// <summary>
+    /// Достаёт из вывода строки с ошибками: запуск мог завершиться удачно, а часть работы, например одна ссылка, не получилась
+    /// </summary>
+    /// <param name="record">Запуск из журнала</param>
+    /// <returns>Строки ошибок, не длиннее нескольких сотен знаков. Если их нет, фраза о том, что текст ошибки не записан</returns>
+    private static string ProblemLines(RunRecord record)
+    {
+        var lines = string.Join(" ", LogLines.Parse(record.Output ?? string.Empty).Where(line => line.Tone == PanelToneEnum.Problem).Select(line => line.Text.ReplaceLineEndings(" ")));
+        if (lines.Length == 0)
+            return NO_ERROR_TEXT;
+
+        return lines.Length > PROBLEM_LIMIT ? string.Concat(lines.AsSpan(0, PROBLEM_LIMIT), "…") : lines;
+    }
+
+    /// <summary>
     /// Называет исход запуска словами
     /// </summary>
     /// <param name="record">Запуск из журнала</param>
     /// <returns>Короткая фраза: ошибка, не уложилась во время или не запустилась</returns>
     private static string Outcome(RunRecord record) => record.Outcome switch
     {
-        RunOutcomeEnum.Ok => "запуск удался",
+        RunOutcomeEnum.Ok => ProblemLines(record) == NO_ERROR_TEXT ? "запуск удался" : "запуск прошёл, но часть работы не получилась",
         RunOutcomeEnum.Failed => "запуск закончился ошибкой",
         RunOutcomeEnum.TimedOut => "запуск не уложился во время",
         _ => "программа не запустилась",
