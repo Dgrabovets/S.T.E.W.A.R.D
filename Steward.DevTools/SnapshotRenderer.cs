@@ -105,7 +105,6 @@ public static class SnapshotRenderer
             {
                 settings.FormatsToggle.IsChecked = true;
                 settings.ScheduleToggle.IsChecked = false;
-                settings.Model.Formats.Subjects[0].IsOpen = true;
                 settleSeconds = 1.0;
             }
 

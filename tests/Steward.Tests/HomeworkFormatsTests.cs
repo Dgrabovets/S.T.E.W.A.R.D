@@ -208,4 +208,32 @@ public class HomeworkFormatsTests
         Assert.Equal([("Гейм-дизайн", LessonStateEnum.Fetch)], chosen);
         Assert.Equal([LessonStateEnum.Fetch], model.Subjects[1].StateOptions.Where(option => option.IsSelected).Select(option => option.State).ToArray());
     }
+
+    /// <summary>
+    /// Плитка показывает, сколько занятий расшифровано, нажатие выбирает предмет, а выбранный остаётся выбранным после обновления
+    /// </summary>
+    [Fact]
+    public void A_tile_counts_transcripts_and_selection_survives_an_update()
+    {
+        var lessons = new[]
+        {
+            (new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 25)), HomeworkFormatEnum.Word),
+            (new Lesson("b", "Гейм-дизайн", new DateOnly(2026, 10, 18)), HomeworkFormatEnum.Word),
+            (new Lesson("c", "Английский", new DateOnly(2026, 10, 20)), HomeworkFormatEnum.Word),
+        };
+        var model = new HomeworkFormatsViewModel(lessons, (_, _) => { }, lesson => lesson.Id == "a", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, _ => LessonStateEnum.Fetch);
+
+        Assert.Equal("Английский", model.SelectedSubject?.Title);
+
+        var game = model.Subjects.Single(subject => subject.Title == "Гейм-дизайн");
+        game.SelectCommand.Execute(null);
+        model.Update(lessons);
+
+        Assert.Same(game, model.SelectedSubject);
+        Assert.True(game.IsSelected);
+        Assert.False(model.Subjects.Single(subject => subject.Title == "Английский").IsSelected);
+        Assert.Equal((1, 2, 0.5), (game.Transcribed, game.Total, game.Progress));
+        Assert.Equal("из 2 расшифровано", game.Note);
+        Assert.Equal("Расшифровывать · Word", game.Caption);
+    }
 }

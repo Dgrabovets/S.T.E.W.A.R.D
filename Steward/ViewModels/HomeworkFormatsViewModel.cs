@@ -54,6 +54,11 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private IReadOnlyList<SubjectViewModel> _subjects = [];
 
     /// <summary>
+    /// Предмет, панель которого открыта
+    /// </summary>
+    private SubjectViewModel? _selectedSubject;
+
+    /// <summary>
     /// Формат заданий по умолчанию для каждого предмета, по названию
     /// </summary>
     private IReadOnlyDictionary<string, HomeworkFormatEnum> _formatByTitle = new Dictionary<string, HomeworkFormatEnum>();
@@ -131,6 +136,15 @@ public sealed class HomeworkFormatsViewModel : Bindable
         private set => Set(ref _subjects, value);
     }
 
+    /// <summary>
+    /// Предмет, панель которого открыта под плитками
+    /// </summary>
+    public SubjectViewModel? SelectedSubject
+    {
+        get => _selectedSubject;
+        private set => Set(ref _selectedSubject, value);
+    }
+
     public bool IsEmpty => Lessons.Count == 0;
 
     /// <summary>
@@ -181,11 +195,26 @@ public sealed class HomeworkFormatsViewModel : Bindable
                 var rows = group.ToArray();
                 var format = lessonsByTitle.TryGetValue(group.Key, out var found) ? found : HomeworkFormats.DEFAULT;
 
-                return new SubjectViewModel(group.Key, rows, _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen, format, _subjectFormatChosen);
+                return new SubjectViewModel(group.Key, rows, _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen, format, _subjectFormatChosen, Select);
             })
             .ToList();
 
         if (!subjects.SequenceEqual(Subjects))
             Subjects = subjects;
+
+        // Выбранный предмет остаётся выбранным после обновления, а если выбора ещё не было, открывается первый
+        Select(subjects.FirstOrDefault(subject => subject.Title == SelectedSubject?.Title) ?? subjects.FirstOrDefault());
+    }
+
+    /// <summary>
+    /// Делает предмет выбранным: его плитка подсвечивается, а панель с занятиями открывается под плитками
+    /// </summary>
+    /// <param name="subject">Предмет или <see langword="null"/>, если предметов нет</param>
+    private void Select(SubjectViewModel? subject)
+    {
+        foreach (var other in Subjects)
+            other.IsSelected = other == subject;
+
+        SelectedSubject = subject;
     }
 }
