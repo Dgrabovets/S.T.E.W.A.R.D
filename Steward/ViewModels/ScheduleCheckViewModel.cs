@@ -34,6 +34,11 @@ public sealed class ScheduleCheckViewModel
         };
 
         Lines = Split(entry);
+        Reason = "по интервалу";
+        Facts = entry.Duration is { } duration ? JournalWording.Duration(duration) : string.Empty;
+        var stamp = entry.Time.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+        var lineTone = Tone == PanelToneEnum.Running ? PanelToneEnum.Idle : Tone;
+        OutputLines = [.. Lines.Select(line => new LogLine(stamp, line, lineTone))];
         IsProblem = entry.Tone == LogToneEnum.Problem;
         Repeats = entry.Tone == LogToneEnum.Quiet && entry.Repeat > 1 ? JournalWording.Repeats(entry.Repeat) : string.Empty;
     }
@@ -47,6 +52,21 @@ public sealed class ScheduleCheckViewModel
     /// Когда закончилась сверка: день, часы и минуты
     /// </summary>
     public string When { get; }
+
+    /// <summary>
+    /// Чем запущена сверка: сервис расписания всегда проверяет таблицу по интервалу
+    /// </summary>
+    public string Reason { get; }
+
+    /// <summary>
+    /// Сколько шла сверка. Пусто у записей без этих данных
+    /// </summary>
+    public string Facts { get; }
+
+    /// <summary>
+    /// Строки записи в тех же рамках, что и вывод запуска задачи
+    /// </summary>
+    public IReadOnlyList<LogLine> OutputLines { get; }
 
     /// <summary>
     /// Чем закончилась

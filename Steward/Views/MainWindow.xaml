@@ -394,6 +394,10 @@
                                                                                         <TextBlock Text="{Binding When}" Style="{StaticResource TextBodyLarge}" FontWeight="SemiBold"/>
                                                                                         <TextBlock Text="{Binding Repeats}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"
                                                                                                    Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVisibility}}"/>
+                                                                                        <Border Style="{StaticResource Chip}" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                                                            <TextBlock Text="{Binding Reason}" Style="{StaticResource TextCaption}"/>
+                                                                                        </Border>
+                                                                                        <TextBlock Text="{Binding Facts}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"/>
                                                                                     </StackPanel>
                                                                                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                                                                                         <Border Style="{StaticResource ToneBadge}" Padding="14,6" VerticalAlignment="Center">
@@ -402,22 +406,22 @@
                                                                                         <Button Style="{StaticResource RemoveButton}" Command="{Binding RemoveCommand}"/>
                                                                                     </StackPanel>
                                                                                 </Grid>
-                                                                                <ItemsControl ItemsSource="{Binding Lines}" Margin="0,8,0,0" Visibility="{Binding HasQuietDetail, Converter={StaticResource BoolToVisibility}}">
+                                                                                <ItemsControl ItemsSource="{Binding OutputLines}" Margin="0,10,0,0">
                                                                                     <ItemsControl.ItemTemplate>
                                                                                         <DataTemplate>
-                                                                                            <TextBlock Text="{Binding}" Style="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                                                                            <Border Style="{StaticResource LogLine}">
+                                                                                                <Grid>
+                                                                                                    <Grid.ColumnDefinitions>
+                                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                                        <ColumnDefinition Width="*"/>
+                                                                                                    </Grid.ColumnDefinitions>
+                                                                                                    <TextBlock Text="{Binding Time}" Style="{StaticResource TextMono}" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0"/>
+                                                                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource TextMono}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                                                                                                </Grid>
+                                                                                            </Border>
                                                                                         </DataTemplate>
                                                                                     </ItemsControl.ItemTemplate>
                                                                                 </ItemsControl>
-                                                                                <Border Style="{StaticResource ReasonBlock}" Margin="0,10,0,0" Visibility="{Binding HasBlock, Converter={StaticResource BoolToVisibility}}">
-                                                                                    <ItemsControl ItemsSource="{Binding Lines}">
-                                                                                        <ItemsControl.ItemTemplate>
-                                                                                            <DataTemplate>
-                                                                                                <TextBlock Text="{Binding}" Style="{StaticResource TextBody}" TextWrapping="Wrap" Margin="0,1"/>
-                                                                                            </DataTemplate>
-                                                                                        </ItemsControl.ItemTemplate>
-                                                                                    </ItemsControl>
-                                                                                </Border>
                                                                             </StackPanel>
                                                                         </Border>
                                                                     </DataTemplate>

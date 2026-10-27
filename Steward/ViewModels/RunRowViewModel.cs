@@ -55,7 +55,7 @@ public sealed class RunRowViewModel
         OutputLines = LogLines.Parse(Output);
         CanFix = record.Outcome != RunOutcomeEnum.Ok || OutputLines.Any(line => line.Tone == PanelToneEnum.Problem);
         IsManual = record.Reason == "manual";
-        Facts = Duration(record.FinishedAt - record.StartedAt);
+        Facts = JournalWording.Duration(record.FinishedAt - record.StartedAt);
         (Tone, Kind) = record.Outcome switch
         {
             RunOutcomeEnum.Ok => (PanelToneEnum.Running, ActivityKindEnum.Sealed),
@@ -192,11 +192,4 @@ public sealed class RunRowViewModel
     /// </summary>
     /// <param name="span">Сколько шёл запуск</param>
     /// <returns>Текст длительности</returns>
-    private static string Duration(TimeSpan span) => span.TotalSeconds switch
-    {
-        < 1 => "меньше секунды",
-        < 60 => $"{(int)span.TotalSeconds} с.",
-        < 3600 => $"{(int)span.TotalMinutes} мин. {span.Seconds} с.",
-        _ => $"{(int)span.TotalHours} ч. {span.Minutes} мин.",
-    };
 }

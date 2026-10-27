@@ -359,7 +359,7 @@ public static class SnapshotRenderer
         LastSuccess = now.AddMinutes(-3),
         Entries =
         [
-            new LogEntry(now.AddMinutes(-3), LogToneEnum.Quiet, "Всё совпало", "Новых правок в таблице нет", 4),
+            new LogEntry(now.AddMinutes(-3), LogToneEnum.Quiet, "Всё совпало", "Новых правок в таблице нет", 4, TimeSpan.FromSeconds(2)),
             new LogEntry(now.AddMinutes(-40), LogToneEnum.Update, "Появились правки", "Убрано из таблицы 30.10 в 20:10\nОбновлено «Гейм-дизайн»", 1),
         ],
     };
