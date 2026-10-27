@@ -1,5 +1,6 @@
 using Steward.Hosting;
 using Steward.Ideas.Models;
+using Steward.Models;
 using Steward.ViewModels;
 
 namespace Steward.Tests;
@@ -46,6 +47,19 @@ public class IdeaTests
 
         Assert.Equal("Подпись", withCaption.Preview);
         Assert.False(empty.HasPreview);
+    }
+
+    /// <summary>
+    /// Новая идея ждёт решения, а взятая в работу показывает «В работе» зелёным
+    /// </summary>
+    [Fact]
+    public void The_status_follows_the_state_of_the_idea()
+    {
+        var waiting = new IdeaCardViewModel(Sample, _ => { }, _ => { }, _ => { });
+        var approved = new IdeaCardViewModel(Sample with { State = IdeaStateEnum.Approved }, _ => { }, _ => { }, _ => { });
+
+        Assert.Equal(("Ждёт тебя", PanelToneEnum.Attention), (waiting.Status, waiting.Tone));
+        Assert.Equal(("В работе", PanelToneEnum.Running), (approved.Status, approved.Tone));
     }
 
     /// <summary>

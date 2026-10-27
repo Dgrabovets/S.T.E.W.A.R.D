@@ -1,4 +1,5 @@
 using System.Globalization;
+using Steward.Models;
 using Steward.Ideas.Models;
 using Steward.Mvvm;
 
@@ -29,7 +30,12 @@ public sealed class IdeaCardViewModel
     public IdeaCardViewModel(Idea idea, Action<Idea> approve, Action<Idea> reject, Action<string> open)
     {
         Title = idea.Title;
-        Meta = string.Join(" · ", new[] { idea.Author, idea.CreatedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture), idea.State == IdeaStateEnum.Approved ? "в работе" : string.Empty }.Where(part => part.Length > 0));
+        Author = idea.Author;
+        When = idea.CreatedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
+        Meta = string.Join(" · ", new[] { Author, When }.Where(part => part.Length > 0));
+        (Status, Tone, Kind) = idea.State == IdeaStateEnum.Approved
+            ? ("В работе", PanelToneEnum.Running, ActivityKindEnum.Alive)
+            : ("Ждёт тебя", PanelToneEnum.Attention, ActivityKindEnum.Attention);
         Sections = Split(idea.Summary);
         Preview = Sections.Count > 0 ? string.Empty : Shorten(idea.Transcript.Length > 0 ? idea.Transcript : idea.Caption);
         ApproveCommand = new RelayCommand(() => approve(idea));
@@ -43,9 +49,49 @@ public sealed class IdeaCardViewModel
     public string Title { get; }
 
     /// <summary>
-    /// Автор рилса и время получения
+    /// Автор рилса и время получения одной строкой
     /// </summary>
     public string Meta { get; }
+
+    /// <summary>
+    /// Автор рилса или пустая строка
+    /// </summary>
+    public string Author { get; }
+
+    /// <summary>
+    /// Есть автор
+    /// </summary>
+    public bool HasAuthor => Author.Length > 0;
+
+    /// <summary>
+    /// Когда идея получена
+    /// </summary>
+    public string When { get; }
+
+    /// <summary>
+    /// Что решено с идеей словами: «Ждёт тебя» или «В работе»
+    /// </summary>
+    public string Status { get; }
+
+    /// <summary>
+    /// Цвет статуса: жёлтый ждёт решения, зелёный в работе
+    /// </summary>
+    public PanelToneEnum Tone { get; }
+
+    /// <summary>
+    /// Вид сферы в чипе статуса
+    /// </summary>
+    public ActivityKindEnum Kind { get; }
+
+    /// <summary>
+    /// Сфера в чипе статуса не показывает ход процесса
+    /// </summary>
+    public ActivityStateEnum Activity => ActivityStateEnum.None;
+
+    /// <summary>
+    /// Момент окончания процесса: у идеи его нет
+    /// </summary>
+    public DateTimeOffset ActivitySince => default;
 
     /// <summary>
     /// Краткий разбор идеи, а если его нет, начало расшифровки или подписи
