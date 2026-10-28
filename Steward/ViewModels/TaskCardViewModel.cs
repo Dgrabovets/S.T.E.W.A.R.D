@@ -15,7 +15,8 @@ public sealed class TaskCardViewModel
     /// <param name="run">Действие кнопки «Запустить»</param>
     /// <param name="activity">Что показывает индикатор процесса</param>
     /// <param name="activitySince">Когда процесс закончился, если индикатор показывает галочку</param>
-    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default)
+    /// <param name="openSettings">Действие шестерёнки: открыть страницу процесса с настройками. Пусто, если у процесса нет страницы</param>
+    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default, Action<string>? openSettings = null)
     {
         Id = row.Id;
         Kind = ActivityKinds.Of(row);
@@ -29,6 +30,8 @@ public sealed class TaskCardViewModel
         Muted = row.Muted;
         CanRun = row.CanRun;
         RunCommand = new RelayCommand(() => run(row.Id), () => row.CanRun);
+        HasSettings = openSettings is not null;
+        SettingsCommand = new RelayCommand(() => openSettings?.Invoke(row.Id));
     }
 
     /// <summary>
@@ -90,4 +93,14 @@ public sealed class TaskCardViewModel
     /// Запускает задачу сейчас
     /// </summary>
     public RelayCommand RunCommand { get; }
+
+    /// <summary>
+    /// У процесса есть страница с настройками
+    /// </summary>
+    public bool HasSettings { get; }
+
+    /// <summary>
+    /// Открывает страницу процесса сразу с настройками
+    /// </summary>
+    public RelayCommand SettingsCommand { get; }
 }

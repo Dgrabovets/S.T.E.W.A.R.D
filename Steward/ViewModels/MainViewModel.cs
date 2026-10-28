@@ -286,6 +286,19 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
+    /// Открывает страницу процесса сразу с настройками
+    /// </summary>
+    /// <param name="id">Идентификатор процесса</param>
+    private void OpenProcessSettings(string id)
+    {
+        if (NavItems.FirstOrDefault(item => item.RowId == id) is not { } target)
+            return;
+
+        Select(true, target.Page);
+        IsSettingsOpen = true;
+    }
+
+    /// <summary>
     /// Собирает плитки состояния всех процессов для страницы «Статус»
     /// </summary>
     private void RebuildServices()
@@ -596,7 +609,7 @@ public sealed class MainViewModel : PanelViewModel
         var rows = TaskRows.Build(snapshot, jobs);
         IsReelsBusy = rows.Any(row => row.Id == "reels" && row.Working);
         _activity.Track(rows, DateTimeOffset.UtcNow);
-        Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), _activity.StateOf(row), _activity.FinishedAt(row.Id))).ToArray();
+        Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), _activity.StateOf(row), _activity.FinishedAt(row.Id), NavItems.Any(item => item.RowId == row.Id) ? OpenProcessSettings : null)).ToArray();
         Groups = BuildJournal(snapshot, records);
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
         Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();

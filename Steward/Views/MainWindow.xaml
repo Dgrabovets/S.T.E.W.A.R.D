@@ -39,6 +39,7 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <ctl:ActivityOrb Width="24" Height="24" Style="{StaticResource ActivityOrb}" VerticalAlignment="Top" Margin="-4,0,12,0"/>
                             <StackPanel Grid.Column="1">
@@ -63,6 +64,8 @@
                             </StackPanel>
                             <Button x:Name="Run" Grid.Column="2" Content="Запустить" Style="{StaticResource ActionButton}" Margin="12,0,0,0"
                                     VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"/>
+                            <Button Grid.Column="3" Content="⚙" Style="{StaticResource GhostButton}" Margin="4,0,0,0" VerticalAlignment="Top" ToolTip="Настройки"
+                                    Command="{Binding SettingsCommand}" Visibility="{Binding HasSettings, Converter={StaticResource BoolToVisibility}}"/>
                         </Grid>
                     </Border>
                     <DataTemplate.Triggers>
