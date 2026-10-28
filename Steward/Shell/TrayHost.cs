@@ -53,6 +53,11 @@ public sealed class TrayHost : IDisposable
     private HomeworkFormatsViewModel? _formats;
 
     /// <summary>
+    /// Меню иконки, пока оно открыто
+    /// </summary>
+    private TrayMenuPopup? _trayMenu;
+
+    /// <summary>
     /// Иконка трея
     /// </summary>
     private readonly NotifyIcon _icon;
@@ -135,18 +140,16 @@ public sealed class TrayHost : IDisposable
             Text = "Расписание",
         };
 
-        // Щелчок по иконке открывает единственное окно приложения, правая кнопка даёт короткое меню
+        // Левая кнопка открывает единственное окно приложения, правая даёт короткое меню в стилистике приложения
         _icon.MouseClick += (_, args) =>
         {
             if (args.Button == MouseButtons.Left)
                 ShowMain();
+            else if (args.Button == MouseButtons.Right)
+                ShowTrayMenu();
         };
 
         _icon.BalloonTipClicked += (_, _) => ShowMain();
-        var trayMenu = new ContextMenuStrip();
-        trayMenu.Items.Add("Открыть Steward", null, (_, _) => ShowMain());
-        trayMenu.Items.Add("Выход", null, (_, _) => Exit());
-        _icon.ContextMenuStrip = trayMenu;
 
         _iconTimer.Tick += (_, _) => RenderIcon();
         RenderIcon();
@@ -356,6 +359,39 @@ public sealed class TrayHost : IDisposable
     #region Window
 
     /// <summary>
+    /// Открывает файл настроек процесса в программе по умолчанию
+    /// </summary>
+    /// <param name="kind">Какой файл: «mail», «reels» или «lms»</param>
+    private void OpenSettingsFile(string kind)
+    {
+        var root = DataLocation.RepoRootOrStart();
+        var path = kind switch
+        {
+            "mail" => SettingsProbe.MailFile(root),
+            "reels" => SettingsProbe.ReelsFile(root),
+            _ => SettingsProbe.LmsFile(root),
+        };
+
+        if (System.IO.File.Exists(path))
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        else
+            _icon.ShowBalloonTip(BALLOON_MS, "Настройки", "Файл настроек не найден: " + path, ToolTipIcon.None);
+    }
+
+    /// <summary>
+    /// Показывает меню иконки у курсора. Если оно уже открыто, второе не появляется
+    /// </summary>
+    private void ShowTrayMenu()
+    {
+        if (_exiting || _trayMenu is { IsVisible: true })
+            return;
+
+        _trayMenu = new TrayMenuPopup(() => ShowMain(), Exit);
+        _trayMenu.Closed += (_, _) => _trayMenu = null;
+        _trayMenu.ShowAtCursor();
+    }
+
+    /// <summary>
     /// Открывает главное окно приложения с самыми свежими данными
     /// </summary>
     /// <param name="page">Раздел, который нужно открыть, или <see langword="null"/>, чтобы оставить прежний</param>
@@ -376,6 +412,7 @@ public sealed class TrayHost : IDisposable
             _main.Model.IdeaApproved += ApproveIdea;
             _main.Model.IdeaRejected += idea => _jobs.DeleteIdea(idea.Id);
             _main.Model.LinkRequested += OpenLink;
+            _main.Model.FileRequested += OpenSettingsFile;
             _main.Model.Settings.LinkRequested += OpenLink;
             _main.Model.Settings.RestartRequested += async (_, _) => await RestartContainerAsync();
             _main.Model.ExitRequested += (_, _) => Exit();
@@ -474,6 +511,8 @@ public sealed class TrayHost : IDisposable
     {
         _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
         _main.ApplyHomework(_jobs.HomeworkRows());
+        var root = DataLocation.RepoRootOrStart();
+        _main.Model.ApplyChips(SettingsProbe.Mail(root), SettingsProbe.Reels(root), SettingsProbe.Transcripts(root));
         _main.Model.Formats = Formats();
     }
 

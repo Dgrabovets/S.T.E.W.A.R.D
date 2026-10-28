@@ -18,6 +18,11 @@ public partial class MainWindow : Window
     /// <summary>
     /// Приложение завершается, окно можно закрыть по-настоящему
     /// </summary>
+    /// <summary>
+    /// Какую долю рабочей области экрана занимает окно по умолчанию
+    /// </summary>
+    private const double WINDOW_SHARE = 0.9;
+
     private bool _closing;
 
     /// <summary>
@@ -30,6 +35,8 @@ public partial class MainWindow : Window
         Steward.Shell.WindowDragging.Attach(this, TitleBar);
         Model = new MainViewModel();
         DataContext = Model;
+        StateChanged += (_, _) => UpdateMaximizeButton();
+        Fit();
     }
 
     /// <summary>
@@ -62,9 +69,40 @@ public partial class MainWindow : Window
         if (WindowState == WindowState.Minimized)
             WindowState = WindowState.Normal;
 
+        if (!IsVisible && WindowState == WindowState.Normal)
+            Fit();
+
         Show();
         Activate();
     }
+
+    /// <summary>
+    /// Делает окно размером с 90% рабочей области экрана и ставит его по центру. Для развёрнутого окна ничего не меняет
+    /// </summary>
+    private void Fit()
+    {
+        var area = SystemParameters.WorkArea;
+        Width = Math.Max(MinWidth, area.Width * WINDOW_SHARE);
+        Height = Math.Max(MinHeight, area.Height * WINDOW_SHARE);
+        Left = area.Left + ((area.Width - Width) / 2);
+        Top = area.Top + ((area.Height - Height) / 2);
+    }
+
+    /// <summary>
+    /// Меняет значок кнопки: квадрат у обычного окна и два квадрата у развёрнутого
+    /// </summary>
+    private void UpdateMaximizeButton()
+    {
+        MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "☐";
+        MaximizeButton.ToolTip = WindowState == WindowState.Maximized ? "Вернуть размер" : "Развернуть";
+    }
+
+    /// <summary>
+    /// Разворачивает окно на всю рабочую область или возвращает прежний размер
+    /// </summary>
+    /// <param name="sender">Кнопка</param>
+    /// <param name="e">Данные события</param>
+    private void Maximize_OnClick(object sender, RoutedEventArgs e) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
     /// <summary>
     /// Разрешает окну закрыться по-настоящему

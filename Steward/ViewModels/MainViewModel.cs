@@ -74,6 +74,11 @@ public sealed class MainViewModel : PanelViewModel
     private const string SCHEDULE_GROUP = "schedule";
 
     /// <summary>
+    /// С чего начинаются строки вывода почты про разобранные письма
+    /// </summary>
+    private static readonly string[] MailPrefixes = ["Отзыв:", "Ответить:", "Инфо:", "[тест] Отзыв:", "[тест] Ответить:", "[тест] Инфо:"];
+
+    /// <summary>
     /// Создаёт модель
     /// </summary>
     public MainViewModel() : base("Проверка")
@@ -117,6 +122,72 @@ public sealed class MainViewModel : PanelViewModel
     {
         get => _formats;
         set => Set(ref _formats, value);
+    }
+
+    /// <summary>
+    /// Плашки состояния настроек почты
+    /// </summary>
+    public IReadOnlyList<StatusChipViewModel> MailChips { get; private set; } = [];
+
+    /// <summary>
+    /// Плашки состояния бота рилсов и входа в Instagram
+    /// </summary>
+    public IReadOnlyList<StatusChipViewModel> ReelsChips { get; private set; } = [];
+
+    /// <summary>
+    /// Плашки состояния выгрузки занятий: вход в LMS и MTS Link, запись в SingularityApp
+    /// </summary>
+    public IReadOnlyList<StatusChipViewModel> TranscriptChips { get; private set; } = [];
+
+    /// <summary>
+    /// Плашки состояния расписания: Docker и контейнер
+    /// </summary>
+    public IReadOnlyList<StatusChipViewModel> ScheduleChips { get; private set; } = [];
+
+    /// <summary>
+    /// Письма, разобранные при последних проверках почты: «Отзыв», «Ответить», «Инфо» со временем проверки
+    /// </summary>
+    public IReadOnlyList<LogLine> MailLetters { get; private set; } = [];
+
+    /// <summary>
+    /// Последние сверки расписания короткими строками
+    /// </summary>
+    public IReadOnlyList<string> RecentChecks { get; private set; } = [];
+
+    /// <summary>
+    /// Просит открыть файл настроек процесса: «mail», «reels» или «lms»
+    /// </summary>
+    public event Action<string>? FileRequested;
+
+    /// <summary>
+    /// Открывает файл настроек почты
+    /// </summary>
+    public RelayCommand OpenMailSettingsCommand => new(() => FileRequested?.Invoke("mail"));
+
+    /// <summary>
+    /// Открывает файл настроек бота рилсов
+    /// </summary>
+    public RelayCommand OpenReelsSettingsCommand => new(() => FileRequested?.Invoke("reels"));
+
+    /// <summary>
+    /// Открывает файл настроек выгрузки занятий
+    /// </summary>
+    public RelayCommand OpenLmsSettingsCommand => new(() => FileRequested?.Invoke("lms"));
+
+    /// <summary>
+    /// Запоминает плашки состояния настроек процессов и сообщает окну
+    /// </summary>
+    /// <param name="mail">Плашки почты</param>
+    /// <param name="reels">Плашки бота рилсов</param>
+    /// <param name="transcripts">Плашки выгрузки занятий</param>
+    public void ApplyChips(IReadOnlyList<StatusChipViewModel> mail, IReadOnlyList<StatusChipViewModel> reels, IReadOnlyList<StatusChipViewModel> transcripts)
+    {
+        MailChips = mail;
+        ReelsChips = reels;
+        TranscriptChips = transcripts;
+        Raise(nameof(MailChips));
+        Raise(nameof(ReelsChips));
+        Raise(nameof(TranscriptChips));
     }
 
     /// <summary>
@@ -375,6 +446,18 @@ public sealed class MainViewModel : PanelViewModel
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
         Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();
 
+        ScheduleChips =
+        [
+            new StatusChipViewModel(snapshot.DockerAvailable ? "Docker запущен" : "Docker не запущен", snapshot.DockerAvailable ? PanelToneEnum.Running : PanelToneEnum.Problem),
+            new StatusChipViewModel(snapshot.ContainerRunning ? "Контейнер расписания работает" : "Контейнер расписания остановлен", snapshot.ContainerRunning ? PanelToneEnum.Running : PanelToneEnum.Attention),
+        ];
+        RecentChecks = [.. snapshot.Entries.Take(5).Select(entry => $"{entry.Time.ToString("dd.MM HH:mm", System.Globalization.CultureInfo.InvariantCulture)}  {entry.Title}: {entry.Detail.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault()}")];
+        MailLetters = [.. records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).Take(5)
+            .SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal))))
+            .Take(12)];
+        Raise(nameof(ScheduleChips));
+        Raise(nameof(RecentChecks));
+        Raise(nameof(MailLetters));
         Raise(nameof(MailCard));
         Raise(nameof(ScheduleCard));
         Raise(nameof(LmsCard));

@@ -15,7 +15,7 @@
         AllowsTransparency="False"
         Background="{StaticResource WindowBrush}"
         ResizeMode="CanResize"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="Manual"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
@@ -79,6 +79,24 @@
                     </DataTemplate.Triggers>
                 </DataTemplate>
 
+        <DataTemplate x:Key="ChipTemplate">
+            <Border Style="{StaticResource ToneBadge}" Padding="12,5" Margin="0,0,8,8">
+                <TextBlock Text="{Binding Text}" Style="{StaticResource ToneBadgeText}"/>
+            </Border>
+        </DataTemplate>
+
+        <Style x:Key="ChipsRow" TargetType="ItemsControl">
+            <Setter Property="ItemTemplate" Value="{StaticResource ChipTemplate}"/>
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+
         <Style x:Key="CardHost" TargetType="ContentControl">
             <Setter Property="ContentTemplate" Value="{StaticResource TaskCardTemplate}"/>
             <Style.Triggers>
@@ -106,9 +124,10 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal">
-                    <Image Source="pack://application:,,,/Steward;component/Assets/steward.ico" Width="52" Height="52" Margin="0,0,16,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <ctl:ActivityOrb Width="52" Height="52" Kind="Alive" Foreground="{StaticResource AccentTextBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
                     <TextBlock Text="S.T.E.W.A.R.D" Style="{StaticResource TextDisplay}" VerticalAlignment="Center">
                         <TextBlock.Foreground>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
@@ -125,12 +144,13 @@
                     </StackPanel>
                 </Border>
                 <Button Grid.Column="2" Content="—" Style="{StaticResource GhostButton}" Click="Minimize_OnClick" ToolTip="Свернуть"/>
-                <Button Grid.Column="3" Content="✕" Style="{StaticResource GhostButton}" Click="Close_OnClick" ToolTip="Скрыть в трей"/>
+                <Button x:Name="MaximizeButton" Grid.Column="3" Content="☐" Style="{StaticResource GhostButton}" Click="Maximize_OnClick" ToolTip="Развернуть"/>
+                <Button Grid.Column="4" Content="✕" Style="{StaticResource GhostButton}" Click="Close_OnClick" ToolTip="Скрыть в трей"/>
             </Grid>
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="250"/>
+                    <ColumnDefinition Width="276"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
@@ -216,6 +236,8 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="Рилсы" Style="{StaticResource PageTitle}"/>
+                                <ItemsControl ItemsSource="{Binding ReelsChips}" Style="{StaticResource ChipsRow}"/>
+                                <Button Content="Открыть файл настроек" Command="{Binding OpenReelsSettingsCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding IsReelsBusy, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel Orientation="Horizontal">
                                         <ctl:ActivityOrb Width="26" Height="26" Kind="Composing" Foreground="{StaticResource WorkingBrush}" Margin="-4,-2,12,-2"/>
@@ -352,10 +374,27 @@
                             <StackPanel Margin="0,0,12,0">
                                 <TextBlock Text="Почта" Style="{StaticResource PageTitle}"/>
                                 <ContentControl Content="{Binding MailCard}" Style="{StaticResource CardHost}"/>
-                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
-                                    <TextBlock Style="{StaticResource PageHint}" TextWrapping="Wrap"
-                                               Text="Почта проверяется утром, вечером и при запуске приложения. Разобранные письма превращаются в задачи в Singularity. Здесь появятся настройки и список разобранных писем."/>
-                                </Border>
+                                <ItemsControl ItemsSource="{Binding MailChips}" Style="{StaticResource ChipsRow}"/>
+                                <Button Content="Открыть файл настроек" Command="{Binding OpenMailSettingsCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Разобранные письма" Style="{StaticResource TextTitle}" Margin="4,24,0,8"/>
+                                <TextBlock Style="{StaticResource PageHint}" TextWrapping="Wrap" Margin="4,0,0,8"
+                                           Text="Почта проверяется утром, вечером и при запуске приложения. Каждое письмо от человека или с отзывом превращается в задачу в Singularity, а здесь видно, что разобрано в последних проверках."/>
+                                <ItemsControl ItemsSource="{Binding MailLetters}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource LogLine}">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Time}" Style="{StaticResource TextMono}" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource TextMono}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -375,6 +414,16 @@
                             <StackPanel Margin="0,0,12,0">
                                 <TextBlock Text="Расписание" Style="{StaticResource PageTitle}"/>
                                 <ContentControl Content="{Binding ScheduleCard}" Style="{StaticResource CardHost}"/>
+                                <ItemsControl ItemsSource="{Binding ScheduleChips}" Style="{StaticResource ChipsRow}"/>
+                                <Button Content="Перезапустить сверку" Command="{Binding Settings.RestartCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Последние сверки" Style="{StaticResource TextTitle}" Margin="4,24,0,8"/>
+                                <ItemsControl ItemsSource="{Binding RecentChecks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Style="{StaticResource TextSecondary}" Margin="4,0,0,6" TextWrapping="Wrap"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                                 <views:ScheduleSettingsView DataContext="{Binding Settings}" Margin="0,12,0,0"/>
                             </StackPanel>
                         </ScrollViewer>
@@ -395,7 +444,9 @@
                             <StackPanel Margin="0,0,12,0">
                                 <TextBlock Text="Расшифровки" Style="{StaticResource PageTitle}"/>
                                 <ContentControl Content="{Binding LmsCard}" Style="{StaticResource CardHost}"/>
-                                <views:HomeworkFormatsView DataContext="{Binding Formats}" Margin="0,12,0,0"/>
+                                <ItemsControl ItemsSource="{Binding TranscriptChips}" Style="{StaticResource ChipsRow}"/>
+                                <Button Content="Открыть файл настроек" Command="{Binding OpenLmsSettingsCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+                                <views:HomeworkFormatsView DataContext="{Binding Formats}"/>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
