@@ -301,6 +301,7 @@ public sealed class MainViewModel : PanelViewModel
                 new SettingsSectionViewModel("Учётные данные LMS", [
                     new SettingFieldViewModel("Login", "Логин", ""),
                     new SettingFieldViewModel("Password", "Пароль", "", secret: true),
+                    new SettingFieldViewModel("StudentName", "Ваше имя в расшифровках", "Как вас называют на занятиях. По нему в разбор попадают ваши задачи, а не поручения другим студентам."),
                 ]),
                 new SettingsSectionViewModel("Вход в MTS Link", [], "Войти в MTS Link", "Откроется окно браузера: войди один раз, вход сохранится.", () => MtsLoginRequested?.Invoke()),
                 new SettingsSectionViewModel("Выгрузка", [

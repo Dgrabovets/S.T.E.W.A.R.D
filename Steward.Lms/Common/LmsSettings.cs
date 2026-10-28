@@ -46,6 +46,11 @@ public sealed class LmsSettings
     public bool CreateTasks { get; init; }
 
     /// <summary>
+    /// Как вас называют в расшифровках, например «Иванов Иван Иванович». По имени в разбор занятия попадают ваши задачи, а не поручения другим студентам. Пусто: берутся задачи для всех
+    /// </summary>
+    public string StudentName { get; init; } = string.Empty;
+
+    /// <summary>
     /// Сколько занятий разбирать через Claude за один запуск. Разбор расходует лимит подписки, поэтому остальные подтягиваются в следующих запусках
     /// </summary>
     public int MaxAnalyzePerRun { get; init; } = 3;

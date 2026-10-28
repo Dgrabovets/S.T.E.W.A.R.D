@@ -119,8 +119,9 @@ public class EducationTests
 
         Assert.Equal([MarkdownBlocks.BlockKind.Heading, MarkdownBlocks.BlockKind.Paragraph, MarkdownBlocks.BlockKind.Bullet, MarkdownBlocks.BlockKind.Bullet, MarkdownBlocks.BlockKind.Paragraph], blocks.Select(block => block.Kind).ToArray());
         Assert.Equal(1, blocks[0].Level);
-        Assert.Equal([("Абзац с ", false), ("важным", true), (" словом.", false)], MarkdownBlocks.Runs(blocks[1].Text).ToArray());
+        Assert.Equal([("Абзац с ", false, false), ("важным", true, false), (" словом.", false, false)], MarkdownBlocks.Runs(blocks[1].Text).ToArray());
         Assert.Equal("важным", MarkdownBlocks.Plain("**важным**"));
+        Assert.Equal([("Допущение", false, true), (" и 2*3", false, false)], MarkdownBlocks.Runs("*Допущение* и 2*3").ToArray());
     }
 
     /// <summary>
@@ -257,6 +258,7 @@ public class EducationTests
         Assert.Equal("Что делать", DraftBuilder.SafeName("Что: делать?"));
         Assert.Equal("работа", DraftBuilder.SafeName("???"));
         Assert.True(DraftBuilder.SafeName(new string('а', 100)).Length <= 60);
+        Assert.Equal("Выбрать одну любую игру и написать по ней аналитический", DraftBuilder.SafeName("Выбрать одну любую игру и написать по ней аналитический отчёт"));
     }
 
     /// <summary>

@@ -3,7 +3,7 @@ namespace Steward.Homework.Services;
 /// <summary>
 /// Разбирает простой Markdown на блоки, из которых собираются Word и презентация: заголовки, пункты списка и абзацы
 /// </summary>
-public static class MarkdownBlocks
+public static partial class MarkdownBlocks
 {
     /// <summary>
     /// Вид блока
@@ -75,27 +75,35 @@ public static class MarkdownBlocks
     }
 
     /// <summary>
-    /// Делит строку на куски с жирным шрифтом и без него по знакам <c>**</c>
+    /// Делит строку на куски: обычный текст, жирный (<c>**…**</c>) и курсив (<c>*…*</c>)
     /// </summary>
     /// <param name="text">Строка с разметкой</param>
-    /// <returns>Куски текста и признак «жирный»</returns>
-    public static IReadOnlyList<(string Text, bool Bold)> Runs(string text)
+    /// <returns>Куски текста с признаками «жирный» и «курсив»</returns>
+    public static IReadOnlyList<(string Text, bool Bold, bool Italic)> Runs(string text)
     {
-        var parts = text.Split("**");
-        var runs = new List<(string, bool)>();
-        for (var i = 0; i < parts.Length; i++)
+        var runs = new List<(string, bool, bool)>();
+        foreach (System.Text.RegularExpressions.Match match in Emphasis().Matches(text))
         {
-            if (parts[i].Length > 0)
-                runs.Add((parts[i], i % 2 == 1));
+            if (match.Groups[1].Success)
+                runs.Add((match.Groups[1].Value, true, false));
+            else if (match.Groups[2].Success)
+                runs.Add((match.Groups[2].Value, false, true));
+            else if (runs.Count > 0 && runs[^1] is { Item2: false, Item3: false } previous)
+                runs[^1] = (previous.Item1 + match.Value, false, false);
+            else
+                runs.Add((match.Value, false, false));
         }
 
         return runs;
     }
 
     /// <summary>
-    /// Убирает знаки жирного шрифта из строки
+    /// Убирает знаки выделения из строки
     /// </summary>
     /// <param name="text">Строка с разметкой</param>
     /// <returns>Чистый текст</returns>
-    public static string Plain(string text) => text.Replace("**", string.Empty, StringComparison.Ordinal);
+    public static string Plain(string text) => string.Concat(Runs(text).Select(run => run.Text));
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"\*\*(.+?)\*\*|\*([^*\s][^*]*?)\*|[^*]+|\*+")]
+    private static partial System.Text.RegularExpressions.Regex Emphasis();
 }

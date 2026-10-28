@@ -51,8 +51,8 @@ public static class OfficeWriter
             }
 
             paragraph.PrependChild(properties);
-            foreach (var (text, isBold) in MarkdownBlocks.Runs(block.Text))
-                paragraph.AppendChild(Run(text, size, bold || isBold));
+            foreach (var (text, isBold, isItalic) in MarkdownBlocks.Runs(block.Text))
+                paragraph.AppendChild(Run(text, size, bold || isBold, isItalic));
 
             body.AppendChild(paragraph);
         }
@@ -108,10 +108,14 @@ public static class OfficeWriter
     /// <param name="text">Текст</param>
     /// <param name="size">Размер шрифта в пунктах</param>
     /// <param name="bold">Жирный шрифт</param>
+    /// <param name="italic">Курсив</param>
     /// <returns>Фрагмент</returns>
-    private static DocumentFormat.OpenXml.Wordprocessing.Run Run(string text, double size, bool bold)
+    private static DocumentFormat.OpenXml.Wordprocessing.Run Run(string text, double size, bool bold, bool italic = false)
     {
         var properties = new RunProperties(new FontSize { Val = ((int)(size * 2)).ToString(System.Globalization.CultureInfo.InvariantCulture) });
+        if (italic)
+            properties.PrependChild(new Italic());
+
         if (bold)
             properties.PrependChild(new Bold());
 

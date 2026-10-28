@@ -153,7 +153,17 @@ public static partial class DraftBuilder
     {
         var clean = Spaces().Replace(string.Concat(title.Where(symbol => !Path.GetInvalidFileNameChars().Contains(symbol))), " ").Trim().TrimEnd('.');
 
-        return clean.Length > 60 ? clean[..60].TrimEnd() : clean.Length == 0 ? "работа" : clean;
+        if (clean.Length == 0)
+            return "работа";
+
+        if (clean.Length <= 60)
+            return clean;
+
+        // Обрезаем по границе слова, чтобы имя не заканчивалось на полслове
+        var cut = clean[..60];
+        var space = cut.LastIndexOf(' ');
+
+        return (space > 20 ? cut[..space] : cut).TrimEnd(' ', ',', ';', ':', '-');
     }
 
     [GeneratedRegex(@"\s+")]

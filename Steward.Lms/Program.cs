@@ -237,7 +237,7 @@ internal static class Program
             var path = store.AnalysisPath(lesson.Id);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-            var error = await ClaudeAgent.RunAsync(LessonAnalysisPrompt.Build(lesson, store.TranscriptPath(lesson.Id), path), store.Root, CancellationToken.None);
+            var error = await ClaudeAgent.RunAsync(LessonAnalysisPrompt.Build(lesson, store.TranscriptPath(lesson.Id), path, settings.StudentName), store.Root, CancellationToken.None);
             if (error.Length == 0 && store.ReadAnalysis(lesson.Id) is null)
                 error = "Claude записал разбор в неверном формате";
 
