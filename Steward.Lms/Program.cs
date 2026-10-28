@@ -304,6 +304,7 @@ internal static class Program
 
             if (error.Length > 0)
             {
+                File.Delete(path);
                 Log($"Поиск заданий не удался: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}: {error}");
 
                 continue;

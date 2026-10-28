@@ -168,7 +168,7 @@ public sealed partial class GuideStore(string directory)
             return;
 
         Write([.. all.Where(item => item.Id != id)]);
-        if (entry.Path.Length > 0 && File.Exists(entry.Path) && Path.GetFullPath(entry.Path).StartsWith(Path.GetFullPath(Folder), StringComparison.OrdinalIgnoreCase))
+        if (entry.Path.Length > 0 && File.Exists(entry.Path) && Path.GetFullPath(entry.Path).StartsWith(Path.GetFullPath(Folder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             File.Delete(entry.Path);
     }
 

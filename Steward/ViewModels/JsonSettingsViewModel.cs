@@ -132,6 +132,9 @@ public sealed class JsonSettingsViewModel : Bindable
             foreach (var field in Fields)
             {
                 var value = field.Value.Trim();
+                if (value.Length == 0 && Find(root, field.Path) is null)
+                    continue;
+
                 if (field.IsNumber && !long.TryParse(value, out _))
                 {
                     Message = $"«{field.Title}» — целое число";
