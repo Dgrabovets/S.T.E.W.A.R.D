@@ -111,6 +111,14 @@ public static class SnapshotRenderer
                 var drafts = SampleDrafts();
                 education.TranscriptReader = _ => "Занятие: Гейм-дизайн, Лекция 1\nДата: 07.09.2026\n\n== Резюме ==\nТема встречи: Обсуждение курса по геймдизайну\n\nКраткое содержание:\nУчастники познакомились и обсудили содержание курса.\n\nКлючевые моменты:\n• Знакомство участников\n• Системность и реализация идей\n\n== Расшифровка ==\n[00:00] Преподаватель: Добрый день, начинаем.\n[00:12] Студент: Слышно хорошо.\n[00:30] Преподаватель: Сегодня разберём игровые циклы и баланс.";
                 education.DraftLister = _ => drafts;
+                education.GuideFolder = @"D:\data\homework\guides";
+                education.GuideLister = _ =>
+                [
+                    new GuideEntry("g1", "Гейм-дизайн", GuideKindEnum.Guide, "Методические указания по курсовой.docx", @"D:\data\homework\guides\Гейм-дизайн\Методические указания по курсовой.docx", string.Empty, string.Empty),
+                    new GuideEntry("g2", "Гейм-дизайн", GuideKindEnum.Guide, "Требования к оформлению", @"E:\Учёба\Гейм-дизайн\Требования", string.Empty, string.Empty),
+                    new GuideEntry("g3", "Гейм-дизайн", GuideKindEnum.Example, "Мой образец отчёта.docx", @"D:\data\homework\guides\Гейм-дизайн\Мой образец отчёта.docx", string.Empty, string.Empty),
+                    new GuideEntry("g4", "Гейм-дизайн", GuideKindEnum.Example, "drive.google.com/file/d/abc", string.Empty, "https://drive.google.com/file/d/abc/view", "Ссылка ведёт на страницу, а не на файл. Скачай файл и добавь его кнопкой «Файлы»"),
+                ];
                 education.Update(SampleLessons());
                 var chosen = education.Subjects.First(item => item.Title == "Гейм-дизайн");
                 chosen.SelectCommand.Execute(null);

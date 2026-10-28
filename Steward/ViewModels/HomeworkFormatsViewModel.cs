@@ -102,6 +102,31 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private IReadOnlyList<HomeworkCardViewModel> _homeworkCards = [];
 
     /// <summary>
+    /// Методические указания выбранного предмета
+    /// </summary>
+    private IReadOnlyList<GuideViewModel> _guides = [];
+
+    /// <summary>
+    /// Образцы работ выбранного предмета
+    /// </summary>
+    private IReadOnlyList<GuideViewModel> _examples = [];
+
+    /// <summary>
+    /// Что введено в поле ссылки на указания
+    /// </summary>
+    private string _guideLinkText = string.Empty;
+
+    /// <summary>
+    /// Что введено в поле ссылки на образец
+    /// </summary>
+    private string _exampleLinkText = string.Empty;
+
+    /// <summary>
+    /// Сообщение о добавлении материала
+    /// </summary>
+    private string _guideMessage = string.Empty;
+
+    /// <summary>
     /// Создаёт модель без занятий
     /// </summary>
     /// <param name="chosen">Вызывается при выборе формата: параметры — ключ занятия и формат</param>
@@ -118,6 +143,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
         Action<Lesson>? fetchRequested = null,
         Action<string, HomeworkFormatEnum>? subjectFormatChosen = null)
     {
+        AddGuideLinkCommand = new RelayCommand(async () => await AddLinkAsync(GuideKindEnum.Guide));
+        AddExampleLinkCommand = new RelayCommand(async () => await AddLinkAsync(GuideKindEnum.Example));
         ShowTranscriptsCommand = new RelayCommand(() => HomeworkTab = false);
         ShowHomeworkCommand = new RelayCommand(() => HomeworkTab = true);
         CloseLessonCommand = new RelayCommand(CloseLesson);
@@ -200,6 +227,140 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Func<string, LessonAnalysis?>? AnalysisReader { get; set; }
 
     /// <summary>
+    /// Папка материалов приложения: по ней список понимает, что файл скопирован
+    /// </summary>
+    public string GuideFolder { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Читает материалы предмета
+    /// </summary>
+    public Func<string, IReadOnlyList<GuideEntry>>? GuideLister { get; set; }
+
+    /// <summary>
+    /// Копирует выбранные файлы в материалы предмета и возвращает текст ошибки или пустую строку
+    /// </summary>
+    public Func<string, GuideKindEnum, IReadOnlyList<string>, string>? GuideFilesAdded { get; set; }
+
+    /// <summary>
+    /// Запоминает ссылку или путь, скачивает файл и возвращает пояснение или пустую строку
+    /// </summary>
+    public Func<string, GuideKindEnum, string, Task<string>>? GuideLinkAdded { get; set; }
+
+    /// <summary>
+    /// Убирает материал по ключу
+    /// </summary>
+    public Action<string>? GuideRemoved { get; set; }
+
+    /// <summary>
+    /// Открывает файл, папку или ссылку в программе по умолчанию
+    /// </summary>
+    public Action<string>? PathOpened { get; set; }
+
+    /// <summary>
+    /// Методические указания выбранного предмета
+    /// </summary>
+    public IReadOnlyList<GuideViewModel> Guides
+    {
+        get => _guides;
+        private set => Set(ref _guides, value);
+    }
+
+    /// <summary>
+    /// Образцы работ выбранного предмета
+    /// </summary>
+    public IReadOnlyList<GuideViewModel> Examples
+    {
+        get => _examples;
+        private set => Set(ref _examples, value);
+    }
+
+    /// <summary>
+    /// Путь или ссылка на методические указания, которые вводит пользователь
+    /// </summary>
+    public string GuideLinkText
+    {
+        get => _guideLinkText;
+        set => Set(ref _guideLinkText, value);
+    }
+
+    /// <summary>
+    /// Путь или ссылка на образец, которые вводит пользователь
+    /// </summary>
+    public string ExampleLinkText
+    {
+        get => _exampleLinkText;
+        set => Set(ref _exampleLinkText, value);
+    }
+
+    /// <summary>
+    /// Что случилось при добавлении материала
+    /// </summary>
+    public string GuideMessage
+    {
+        get => _guideMessage;
+        private set
+        {
+            if (Set(ref _guideMessage, value))
+                Raise(nameof(HasGuideMessage));
+        }
+    }
+
+    /// <summary>
+    /// Есть сообщение о добавлении материала
+    /// </summary>
+    public bool HasGuideMessage => GuideMessage.Length > 0;
+
+    /// <summary>
+    /// Добавляет файлы, которые выбрал пользователь
+    /// </summary>
+    /// <param name="kind">Указания или образцы</param>
+    /// <param name="paths">Выбранные файлы</param>
+    public void AddFiles(GuideKindEnum kind, IReadOnlyList<string> paths)
+    {
+        if (SelectedSubject is null || paths.Count == 0)
+            return;
+
+        GuideMessage = GuideFilesAdded?.Invoke(SelectedSubject.Title, kind, paths) ?? string.Empty;
+        RefreshGuides();
+    }
+
+    /// <summary>
+    /// Добавляет ссылку или путь, который ввёл пользователь
+    /// </summary>
+    /// <param name="kind">Указания или образцы</param>
+    private async Task AddLinkAsync(GuideKindEnum kind)
+    {
+        var text = kind == GuideKindEnum.Guide ? GuideLinkText : ExampleLinkText;
+        if (SelectedSubject is null || text.Trim().Length == 0 || GuideLinkAdded is null)
+            return;
+
+        GuideMessage = "Добавляю…";
+        GuideMessage = await GuideLinkAdded(SelectedSubject.Title, kind, text);
+        if (kind == GuideKindEnum.Guide)
+            GuideLinkText = string.Empty;
+        else
+            ExampleLinkText = string.Empty;
+
+        RefreshGuides();
+    }
+
+    /// <summary>
+    /// Перечитывает материалы выбранного предмета
+    /// </summary>
+    public void RefreshGuides()
+    {
+        var entries = SelectedSubject is { } subject ? GuideLister?.Invoke(subject.Title) ?? [] : [];
+        GuideViewModel Row(GuideEntry entry) => new(entry, GuideFolder, path => PathOpened?.Invoke(path), row =>
+        {
+            GuideRemoved?.Invoke(row.Id);
+            RefreshGuides();
+        });
+
+        Guides = [.. entries.Where(entry => entry.Kind == GuideKindEnum.Guide).Select(Row)];
+        Examples = [.. entries.Where(entry => entry.Kind == GuideKindEnum.Example).Select(Row)];
+    }
+
+    /// <summary>
     /// Находит готовые файлы заданий по ключу занятия
     /// </summary>
     public Func<string, IReadOnlyList<string>>? DraftLister { get; set; }
@@ -229,6 +390,16 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// Открыта вкладка «Домашние задания»
     /// </summary>
     public bool IsHomeworkTab => _homeworkTab;
+
+    /// <summary>
+    /// Добавляет ссылку или путь к методическим указаниям
+    /// </summary>
+    public RelayCommand AddGuideLinkCommand { get; }
+
+    /// <summary>
+    /// Добавляет ссылку или путь к образцу
+    /// </summary>
+    public RelayCommand AddExampleLinkCommand { get; }
 
     /// <summary>
     /// Переключает на вкладку «Расшифровки»
@@ -601,5 +772,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             other.IsSelected = other == subject;
 
         SelectedSubject = subject;
+        GuideMessage = string.Empty;
+        RefreshGuides();
     }
 }

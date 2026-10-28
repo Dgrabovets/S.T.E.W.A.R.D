@@ -24,6 +24,16 @@ public static partial class MarkdownBlocks
         /// Абзац
         /// </summary>
         Paragraph,
+
+        /// <summary>
+        /// Абзац по центру: строка вида «&lt;center&gt;текст&lt;/center&gt;», например для титульного листа
+        /// </summary>
+        Center,
+
+        /// <summary>
+        /// Разрыв страницы: строка «&lt;pagebreak&gt;»
+        /// </summary>
+        PageBreak,
     }
 
     /// <summary>
@@ -47,6 +57,18 @@ public static partial class MarkdownBlocks
             var line = raw.Trim();
             if (line.Length == 0 || line.StartsWith("```", StringComparison.Ordinal))
                 continue;
+
+            if (line.Equals("<pagebreak>", StringComparison.OrdinalIgnoreCase))
+            {
+                blocks.Add(new Block(BlockKind.PageBreak, 0, string.Empty));
+                continue;
+            }
+
+            if (line.StartsWith("<center>", StringComparison.OrdinalIgnoreCase))
+            {
+                blocks.Add(new Block(BlockKind.Center, 0, line["<center>".Length..].Replace("</center>", string.Empty, StringComparison.OrdinalIgnoreCase).Trim()));
+                continue;
+            }
 
             var level = line.TakeWhile(symbol => symbol == '#').Count();
             if (level is > 0 and <= 6 && line.Length > level && line[level] == ' ')

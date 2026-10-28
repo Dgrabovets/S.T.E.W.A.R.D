@@ -177,6 +177,125 @@ public class EducationTests
     }
 
     /// <summary>
+    /// Блок оформления в начале текста отделяется от работы и применяется в Word: шрифт, размер, интервал, поля, красная строка, титульный лист, разрывы страниц и нумерация
+    /// </summary>
+    [Fact]
+    public void A_word_style_block_is_applied_to_the_document()
+    {
+        var style = WordStyle.Extract("---\nfont: Times New Roman\nsize: 14\nspacing: 1,5\nmargins: 30,20,15,20\nalign: justify\nindent: 12.5 мм\nnumbers: center\nlost: 1\n---\n# Текст", out var body);
+
+        Assert.Equal("# Текст", body);
+        Assert.Equal("Times New Roman", style.Font);
+        Assert.Equal(14, style.SizePt);
+        Assert.Equal(1.5, style.Spacing);
+        Assert.Equal((30, 20, 15, 20), style.Margins);
+        Assert.True(style.Justify);
+        Assert.Equal(12.5, style.IndentMm);
+        Assert.Equal("center", style.PageNumbers);
+        Assert.Equal(WordStyle.None, WordStyle.Extract("# Просто текст", out var plain));
+        Assert.Equal("# Просто текст", plain);
+
+        var path = Path.Combine(Path.GetTempPath(), $"steward-{Guid.NewGuid():N}.docx");
+        try
+        {
+            OfficeWriter.WriteWord(path, "---\nfont: Times New Roman\nsize: 14\nspacing: 1.5\nmargins: 30,20,15,20\nalign: justify\nindent: 12.5\nnumbers: center\n---\n<center>Титульный лист</center>\n<pagebreak>\n# Введение\n\nТекст работы.");
+
+            using var archive = ZipFile.OpenRead(path);
+            var document = archive.GetEntry("word/document.xml")!.Open();
+            var xml = XDocument.Load(document).ToString();
+
+            Assert.Contains("Times New Roman", xml, StringComparison.Ordinal);
+            Assert.Contains("w:sz w:val=\"28\"", xml, StringComparison.Ordinal);
+            Assert.Contains("w:left=\"1701\"", xml, StringComparison.Ordinal);
+            Assert.Contains("w:line=\"360\"", xml, StringComparison.Ordinal);
+            Assert.Contains("w:firstLine=\"708\"", xml, StringComparison.Ordinal);
+            Assert.Contains("w:type=\"page\"", xml, StringComparison.Ordinal);
+            Assert.Contains("footerReference", xml, StringComparison.Ordinal);
+            Assert.Contains(archive.Entries, entry => entry.FullName.StartsWith("word/footer", StringComparison.Ordinal));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Файл, папка и ссылка добавляются как материалы предмета: файл копируется, путь остаётся на месте, Word превращается в читаемый текст с оформлением, ссылки Google становятся прямыми
+    /// </summary>
+    [Fact]
+    public void Guides_are_stored_per_subject_and_made_readable()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-guides-");
+        var outside = Directory.CreateTempSubdirectory("steward-outside-");
+        try
+        {
+            var store = new GuideStore(directory.FullName);
+            var docx = Path.Combine(outside.FullName, "Указания.docx");
+            OfficeWriter.WriteWord(docx, "---\nfont: Arial\nsize: 12\nspacing: 1.5\nmargins: 20,20,20,20\n---\n# Требования\n\nОбъём три страницы.\n\nРазделы начинаются с новой страницы.\n\nСписок источников обязателен.");
+            File.WriteAllText(Path.Combine(outside.FullName, "образец.md"), "# Образец");
+
+            var copied = store.AddFile("Гейм-дизайн", GuideKindEnum.Guide, docx);
+            var folder = store.AddReference("Гейм-дизайн", GuideKindEnum.Example, outside.FullName);
+            var web = store.AddReference("Гейм-дизайн", GuideKindEnum.Guide, "https://drive.google.com/file/d/abc123/view");
+            store.AddFile("Базы данных", GuideKindEnum.Guide, docx);
+
+            Assert.True(File.Exists(copied.Path));
+            Assert.StartsWith(store.Folder, copied.Path, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(outside.FullName, folder.Path);
+            Assert.Equal(string.Empty, web.Path);
+            Assert.Equal(3, store.ForSubject("гейм-дизайн").Count);
+            Assert.Single(store.ForSubject("Базы данных"));
+            Assert.Throws<ArgumentException>(() => store.AddReference("Гейм-дизайн", GuideKindEnum.Guide, "не путь и не ссылка"));
+            Assert.Equal("https://drive.google.com/uc?export=download&id=abc123", GuideStore.Direct(web.Url));
+            Assert.Equal("https://docs.google.com/document/d/XYZ/export?format=docx", GuideStore.Direct("https://docs.google.com/document/d/XYZ/edit"));
+
+            var materials = store.Materials("Гейм-дизайн");
+
+            Assert.Single(materials.Guides);
+            Assert.EndsWith(".txt", materials.Guides[0], StringComparison.Ordinal);
+            var text = File.ReadAllText(materials.Guides[0]);
+            Assert.Contains("шрифт Arial", text, StringComparison.Ordinal);
+            Assert.Contains("размер 12 pt", text, StringComparison.Ordinal);
+            Assert.Contains("поля 20/20/20/20 мм", text, StringComparison.Ordinal);
+            Assert.Contains("Объём три страницы.", text, StringComparison.Ordinal);
+            Assert.Contains(materials.Examples, path => path.EndsWith("образец.md", StringComparison.Ordinal));
+            Assert.Contains(outside.FullName, materials.Directories);
+
+            store.Remove(copied.Id);
+            Assert.False(File.Exists(copied.Path));
+            Assert.True(File.Exists(docx));
+            store.Remove(folder.Id);
+            Assert.True(Directory.Exists(outside.FullName));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+            outside.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Просьба на подготовку задания перечисляет указания и образцы и просит оформить работу блоком оформления
+    /// </summary>
+    [Fact]
+    public void The_draft_prompt_lists_the_guides_and_examples()
+    {
+        var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 25));
+        var item = new HomeworkItem("Отчёт", null, string.Empty, string.Empty);
+        var materials = new GuideMaterials([@"D:\g\guide.txt"], [@"D:\g\example.md"], [@"D:\g"]);
+
+        var withGuides = DraftBuilder.Prompt(lesson, item, 1, HomeworkFormatEnum.Word, "t.txt", "r.md", materials);
+        var without = DraftBuilder.Prompt(lesson, item, 1, HomeworkFormatEnum.Word, "t.txt", "r.md");
+
+        Assert.Contains(@"D:\g\guide.txt", withGuides, StringComparison.Ordinal);
+        Assert.Contains(@"D:\g\example.md", withGuides, StringComparison.Ordinal);
+        Assert.Contains("numbers", withGuides, StringComparison.Ordinal);
+        Assert.DoesNotContain("Методические указания по предмету", without, StringComparison.Ordinal);
+        Assert.Contains("--add-dir", ClaudeAgent.Arguments("п", "w", [@"D:\g"]));
+        Assert.Equal(2, ClaudeAgent.Arguments("п", "w", [@"D:\g"]).Count(argument => argument == "--add-dir"));
+    }
+
+    /// <summary>
     /// Готовые файлы делаются для каждого задания: агент пишет Markdown, Steward собирает Word, уже готовые не переделываются
     /// </summary>
     [Fact]
@@ -189,7 +308,7 @@ public class EducationTests
             var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 25));
             var items = new[] { new HomeworkItem("Описать цикл", null, "одна страница", string.Empty), new HomeworkItem("Баланс", null, string.Empty, string.Empty) };
             var runs = 0;
-            DraftBuilder.AgentRun agent = (prompt, _, _) =>
+            DraftBuilder.AgentRun agent = (prompt, _, _, _) =>
             {
                 runs++;
                 var path = ResultPath(prompt);
@@ -228,7 +347,7 @@ public class EducationTests
             var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 25));
             var items = new[] { new HomeworkItem("Один", null, string.Empty, string.Empty), new HomeworkItem("Два", null, string.Empty, string.Empty) };
             var call = 0;
-            DraftBuilder.AgentRun agent = (prompt, _, _) =>
+            DraftBuilder.AgentRun agent = (prompt, _, _, _) =>
             {
                 if (call++ == 0)
                     return Task.FromResult("лимит исчерпан");

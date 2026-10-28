@@ -392,6 +392,92 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
+                <Border Style="{StaticResource Card}" Margin="0,0,0,8" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Методические указания" Style="{StaticResource TextTitle}"/>
+                            <TextBlock Text="Требования к структуре, объёму и оформлению работ. Файлы копируются в папку приложения, пути и ссылки остаются на месте." Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                            <ItemsControl ItemsSource="{Binding Guides}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource WindowBrush}" CornerRadius="{StaticResource RadiusField}" Padding="10,6" Margin="0,0,0,4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+                                                    <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Meta}"/>
+                                                    <TextBlock Text="{Binding Note}" Foreground="{StaticResource AttentionBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"
+                                                               Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Открыть" Command="{Binding OpenCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                                <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}" Style="{StaticResource GhostButton}" ToolTip="Убрать из списка"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Файлы…" Click="AddGuideFiles_Click" Style="{StaticResource OutlineButton}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding GuideLinkText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource Field}" Margin="0" ToolTip="Путь к файлу или папке на диске либо ссылка на файл"/>
+                                <Button Grid.Column="2" Content="Добавить ссылку" Command="{Binding AddGuideLinkCommand}" Style="{StaticResource ActionButton}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                            <TextBlock Text="Мои образцы" Style="{StaticResource TextTitle}"/>
+                            <TextBlock Text="Работы, оформленные по указаниям правильно: по ним Claude берёт стиль и структуру, а содержание не копирует." Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,2,0,8"/>
+                            <ItemsControl ItemsSource="{Binding Examples}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource WindowBrush}" CornerRadius="{StaticResource RadiusField}" Padding="10,6" Margin="0,0,0,4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+                                                    <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Meta}"/>
+                                                    <TextBlock Text="{Binding Note}" Foreground="{StaticResource AttentionBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"
+                                                               Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Открыть" Command="{Binding OpenCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                                <Button Grid.Column="2" Content="✕" Command="{Binding RemoveCommand}" Style="{StaticResource GhostButton}" ToolTip="Убрать из списка"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Файлы…" Click="AddExampleFiles_Click" Style="{StaticResource OutlineButton}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ExampleLinkText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource Field}" Margin="0" ToolTip="Путь к файлу или папке на диске либо ссылка на файл"/>
+                                <Button Grid.Column="2" Content="Добавить ссылку" Command="{Binding AddExampleLinkCommand}" Style="{StaticResource ActionButton}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{Binding GuideMessage}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Visibility="{Binding HasGuideMessage, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                </Border>
                 <Grid Margin="0,8,0,0" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="340"/>

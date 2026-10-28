@@ -359,6 +359,25 @@ public sealed class TrayHost : IDisposable
     #region Window
 
     /// <summary>
+    /// Открывает файл, папку или ссылку в программе по умолчанию
+    /// </summary>
+    /// <param name="path">Путь или адрес</param>
+    private void OpenPath(string path)
+    {
+        if (path.Length == 0)
+            return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            _icon.ShowBalloonTip(BALLOON_MS, "Материалы", "Не удалось открыть: " + exception.Message, ToolTipIcon.None);
+        }
+    }
+
+    /// <summary>
     /// Запускает вход в MTS Link: окно браузера, в котором нужно войти один раз
     /// </summary>
     private void LoginToMts()
@@ -547,6 +566,12 @@ public sealed class TrayHost : IDisposable
         _formats.TranscriptReader = _jobs.ReadTranscript;
         _formats.DraftLister = _jobs.DraftFiles;
         _formats.AnalysisReader = _jobs.ReadAnalysis;
+        _formats.GuideLister = _jobs.Guides;
+        _formats.GuideFilesAdded = _jobs.AddGuideFiles;
+        _formats.GuideLinkAdded = _jobs.AddGuideLinkAsync;
+        _formats.GuideRemoved = _jobs.RemoveGuide;
+        _formats.PathOpened = OpenPath;
+        _formats.GuideFolder = System.IO.Path.Combine(DataLocation.DataDirectory(), "homework", "guides");
         _formats.Update(_jobs.Lessons());
         _formats.ApplyActivities(_jobs.Activities());
         _formats.ApplyHomework(_jobs.HomeworkRows());
