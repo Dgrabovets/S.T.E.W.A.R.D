@@ -9,7 +9,7 @@
                 <DataTemplate>
                     <StackPanel>
                         <TextBlock Text="{Binding Title}" Style="{StaticResource FieldTitle}"/>
-                        <TextBlock Text="{Binding Hint}" Style="{StaticResource Hint}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Hint}" Style="{StaticResource Hint}" TextWrapping="Wrap" Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}"/>
                         <TextBox Style="{StaticResource Field}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                                  Visibility="{Binding IsPlain, Converter={StaticResource BoolToVisibility}}"/>
                         <PasswordBox Style="{StaticResource SecretField}"

@@ -13,22 +13,8 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <DockPanel Margin="4,0,0,8" LastChildFill="True">
+    <DockPanel Margin="4,0,0,8" LastChildFill="False">
         <Button DockPanel.Dock="Right" Style="{StaticResource SettingsToggle}" VerticalAlignment="Center"/>
         <TextBlock DockPanel.Dock="Left" Text="{Binding Title, ElementName=Root}" Style="{StaticResource TextHeadline}" VerticalAlignment="Center"/>
-        <ItemsControl ItemsSource="{Binding Chips, ElementName=Root}" Margin="16,0,12,-8" VerticalAlignment="Center">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Border Style="{StaticResource ToneBadge}" Padding="12,5" Margin="0,0,8,8">
-                        <TextBlock Text="{Binding Text}" Style="{StaticResource ToneBadgeText}"/>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
     </DockPanel>
 </UserControl>

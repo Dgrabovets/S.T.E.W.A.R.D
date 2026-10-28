@@ -210,33 +210,33 @@ public sealed class MainViewModel : PanelViewModel
 
         MailSettings = new JsonSettingsViewModel(
             SettingsProbe.MailFile(root),
-            "Почта проверяется по IMAP. Пароль приложения выпускается в настройках почтового сервиса, он не равен паролю от ящика.",
+            "Пароль приложения выпускается в настройках почтового сервиса: это не пароль от ящика.",
             [
-                new SettingFieldViewModel("Mail.Login", "Логин почты", "Адрес учебного ящика."),
-                new SettingFieldViewModel("Mail.AppPassword", "Пароль приложения", "Закрыт точками. Чтобы заменить, впиши новый.", secret: true),
-                new SettingFieldViewModel("Mail.Host", "Сервер IMAP", "Например imap.yandex.ru."),
-                new SettingFieldViewModel("Mail.Port", "Порт", "Обычно 993.", number: true),
+                new SettingFieldViewModel("Mail.Login", "Логин почты", ""),
+                new SettingFieldViewModel("Mail.AppPassword", "Пароль приложения", "", secret: true),
+                new SettingFieldViewModel("Mail.Host", "Сервер IMAP", ""),
+                new SettingFieldViewModel("Mail.Port", "Порт", "", number: true),
                 new SettingFieldViewModel("Mail.LookbackDays", "Сколько дней назад смотреть", "Письма старше не разбираются.", number: true),
-                new SettingFieldViewModel("Singularity.Token", "Токен Singularity", "Ключ, по которому задачи попадают в SingularityApp.", secret: true),
+                new SettingFieldViewModel("Singularity.Token", "Токен Singularity", "", secret: true),
             ],
             () => FileRequested?.Invoke("mail"));
         ReelsSettings = new JsonSettingsViewModel(
             SettingsProbe.ReelsFile(root),
-            "Бот в Telegram принимает ссылки на рилсы. Вход в Instagram берётся из браузера, в котором ты уже вошёл.",
+            "Вход в Instagram берётся из браузера, в котором ты уже вошёл.",
             [
-                new SettingFieldViewModel("BotToken", "Токен бота", "Выдаёт BotFather. Закрыт точками.", secret: true),
-                new SettingFieldViewModel("AllowedUserId", "Номер владельца", "Числовой идентификатор твоего аккаунта в Telegram.", number: true),
-                new SettingFieldViewModel("CookiesFromBrowser", "Браузер для входа в Instagram", "Например firefox. Пусто, если вход не нужен."),
-                new SettingFieldViewModel("ClaudeCommand", "Команда Claude", "Чем разбирать идеи. Обычно claude."),
+                new SettingFieldViewModel("BotToken", "Токен бота", "Его выдаёт BotFather.", secret: true),
+                new SettingFieldViewModel("AllowedUserId", "Номер владельца", "Числовой идентификатор твоего аккаунта в Telegram. Бот отвечает только ему.", number: true),
+                new SettingFieldViewModel("CookiesFromBrowser", "Браузер для входа в Instagram", "Например firefox."),
+                new SettingFieldViewModel("ClaudeCommand", "Команда Claude", ""),
             ],
             () => FileRequested?.Invoke("reels"));
         LmsSettings = new JsonSettingsViewModel(
             SettingsProbe.LmsFile(root),
-            "Вход в LMS по логину и паролю. Вход в MTS Link сохраняется отдельно командой Steward.Lms.exe login.",
+            "Вход в MTS Link сохраняется отдельно: запусти Steward.Lms.exe login.",
             [
-                new SettingFieldViewModel("Login", "Логин LMS", "Логин или почта для входа."),
-                new SettingFieldViewModel("Password", "Пароль LMS", "Закрыт точками.", secret: true),
-                new SettingFieldViewModel("MaxFetchPerRun", "Расшифровок за запуск", "Сколько занятий выгружать за один запуск.", number: true),
+                new SettingFieldViewModel("Login", "Логин LMS", ""),
+                new SettingFieldViewModel("Password", "Пароль LMS", "", secret: true),
+                new SettingFieldViewModel("MaxFetchPerRun", "Расшифровок за запуск", "", number: true),
             ],
             () => FileRequested?.Invoke("lms"));
         MailSettings.Saved += saved;

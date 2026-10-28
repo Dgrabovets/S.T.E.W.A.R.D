@@ -47,6 +47,11 @@ public sealed class SettingFieldViewModel(string path, string title, string hint
     public bool IsNumber { get; } = number;
 
     /// <summary>
+    /// У поля есть пояснение
+    /// </summary>
+    public bool HasHint => Hint.Length > 0;
+
+    /// <summary>
     /// Значение открыто на экране
     /// </summary>
     public bool IsPlain => !IsSecret;

@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Windows;
 
 namespace Steward.Views;
@@ -12,11 +11,6 @@ public partial class PageHeaderView : System.Windows.Controls.UserControl
     /// Название страницы
     /// </summary>
     public static readonly DependencyProperty TitleProperty = DependencyProperty.Register(nameof(Title), typeof(string), typeof(PageHeaderView), new PropertyMetadata(string.Empty));
-
-    /// <summary>
-    /// Плашки состояния
-    /// </summary>
-    public static readonly DependencyProperty ChipsProperty = DependencyProperty.Register(nameof(Chips), typeof(IEnumerable), typeof(PageHeaderView), new PropertyMetadata(null));
 
     /// <summary>
     /// Создаёт шапку
@@ -33,14 +27,5 @@ public partial class PageHeaderView : System.Windows.Controls.UserControl
     {
         get => (string)GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
-    }
-
-    /// <summary>
-    /// Плашки состояния
-    /// </summary>
-    public IEnumerable? Chips
-    {
-        get => (IEnumerable?)GetValue(ChipsProperty);
-        set => SetValue(ChipsProperty, value);
     }
 }

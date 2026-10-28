@@ -252,8 +252,9 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <views:PageHeaderView Title="Рилсы" Chips="{Binding ReelsChips}"/>
+                                <views:PageHeaderView Title="Рилсы"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <ItemsControl ItemsSource="{Binding ReelsChips}" Style="{StaticResource ChipsRow}" Margin="0,0,0,8"/>
                                     <views:JsonSettingsView DataContext="{Binding ReelsSettings}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource ContentPanel}">
@@ -392,8 +393,9 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
-                                <views:PageHeaderView Title="Почта" Chips="{Binding MailChips}"/>
+                                <views:PageHeaderView Title="Почта"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <ItemsControl ItemsSource="{Binding MailChips}" Style="{StaticResource ChipsRow}" Margin="0,0,0,8"/>
                                     <views:JsonSettingsView DataContext="{Binding MailSettings}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource ContentPanel}">
@@ -434,12 +436,12 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
-                                <views:PageHeaderView Title="Расписание" Chips="{Binding ScheduleChips}"/>
+                                <views:PageHeaderView Title="Расписание"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <ItemsControl ItemsSource="{Binding ScheduleChips}" Style="{StaticResource ChipsRow}" Margin="0,0,0,8"/>
                                     <views:ScheduleSettingsView DataContext="{Binding Settings}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource ContentPanel}">
-                                <Button Content="Перезапустить сверку" Command="{Binding Settings.RestartCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left"/>
                                 <TextBlock Text="Последние сверки" Style="{StaticResource TextTitle}" Margin="4,24,0,8"/>
                                 <ItemsControl ItemsSource="{Binding RecentChecks}">
                                     <ItemsControl.ItemTemplate>
@@ -466,8 +468,9 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
-                                <views:PageHeaderView Title="Расшифровки" Chips="{Binding TranscriptChips}"/>
+                                <views:PageHeaderView Title="Расшифровки"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <ItemsControl ItemsSource="{Binding TranscriptChips}" Style="{StaticResource ChipsRow}" Margin="0,0,0,8"/>
                                     <views:JsonSettingsView DataContext="{Binding LmsSettings}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource ContentPanel}">
