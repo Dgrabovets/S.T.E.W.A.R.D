@@ -15,8 +15,9 @@ public sealed class TaskCardViewModel
     /// <param name="run">Действие кнопки «Запустить»</param>
     /// <param name="activity">Что показывает индикатор процесса</param>
     /// <param name="activitySince">Когда процесс закончился, если индикатор показывает галочку</param>
+    /// <param name="metrics">Показатели под текстом карточки: Docker, контейнер и так далее</param>
     /// <param name="openSettings">Действие шестерёнки: открыть страницу процесса с настройками. Пусто, если у процесса нет страницы</param>
-    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default, Action<string>? openSettings = null)
+    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default, Action<string>? openSettings = null, IReadOnlyList<StatusTileViewModel>? metrics = null)
     {
         Id = row.Id;
         Kind = ActivityKinds.Of(row);
@@ -30,6 +31,7 @@ public sealed class TaskCardViewModel
         Muted = row.Muted;
         CanRun = row.CanRun;
         RunCommand = new RelayCommand(() => run(row.Id), () => row.CanRun);
+        Metrics = metrics ?? [];
         HasSettings = openSettings is not null;
         SettingsCommand = new RelayCommand(() => openSettings?.Invoke(row.Id));
     }
@@ -93,6 +95,16 @@ public sealed class TaskCardViewModel
     /// Запускает задачу сейчас
     /// </summary>
     public RelayCommand RunCommand { get; }
+
+    /// <summary>
+    /// Показатели под текстом карточки
+    /// </summary>
+    public IReadOnlyList<StatusTileViewModel> Metrics { get; }
+
+    /// <summary>
+    /// У карточки есть показатели
+    /// </summary>
+    public bool HasMetrics => Metrics.Count > 0;
 
     /// <summary>
     /// У процесса есть страница с настройками

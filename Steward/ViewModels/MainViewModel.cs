@@ -136,9 +136,9 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
-    /// Плитки состояния процессов для страницы «Статус»: расписание, почта, рилсы и расшифровки
+    /// Строки задач последнего обновления
     /// </summary>
-    public IReadOnlyList<StatusGroupViewModel> ServiceGroups { get; private set; } = [];
+    private IReadOnlyList<TaskStatusRow> _rows = [];
 
     /// <summary>
     /// Плитки расписания: Docker, контейнер, следующая сверка и изменения за неделю
@@ -286,6 +286,30 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
+    /// Собирает карточки задач вместе с показателями процессов
+    /// </summary>
+    private void BuildTasks()
+    {
+        IReadOnlyList<StatusTileViewModel> Metrics(string id) => id switch
+        {
+            TaskRows.SCHEDULE_ID => _scheduleTiles,
+            "mail" => Tiles(_mailChips),
+            "reels" => Tiles(_reelsChips),
+            "lms" => Tiles(_transcriptChips),
+            _ => [],
+        };
+
+        Tasks = _rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), _activity.StateOf(row), _activity.FinishedAt(row.Id), NavItems.Any(item => item.RowId == row.Id) ? OpenProcessSettings : null, Metrics(row.Id))).ToArray();
+    }
+
+    /// <summary>
+    /// Превращает плашки состояния в показатели без подписи
+    /// </summary>
+    /// <param name="chips">Плашки</param>
+    /// <returns>Показатели</returns>
+    private static IReadOnlyList<StatusTileViewModel> Tiles(IReadOnlyList<StatusChipViewModel> chips) => [.. chips.Select(chip => new StatusTileViewModel(string.Empty, chip.Text, chip.Tone))];
+
+    /// <summary>
     /// Открывает страницу процесса сразу с настройками
     /// </summary>
     /// <param name="id">Идентификатор процесса</param>
@@ -299,21 +323,9 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
-    /// Собирает плитки состояния всех процессов для страницы «Статус»
+    /// Обновляет показатели в карточках задач после смены плашек состояния
     /// </summary>
-    private void RebuildServices()
-    {
-        static IReadOnlyList<StatusTileViewModel> Tiles(IReadOnlyList<StatusChipViewModel> chips) => [.. chips.Select(chip => new StatusTileViewModel(string.Empty, chip.Text, chip.Tone))];
-
-        ServiceGroups =
-        [
-            new StatusGroupViewModel("Расписание", _scheduleTiles),
-            new StatusGroupViewModel("Почта", Tiles(_mailChips)),
-            new StatusGroupViewModel("Рилсы", Tiles(_reelsChips)),
-            new StatusGroupViewModel("Расшифровки", Tiles(_transcriptChips)),
-        ];
-        Raise(nameof(ServiceGroups));
-    }
+    private void RebuildServices() => BuildTasks();
 
     /// <summary>
     /// Просит открыть файл настроек процесса: «mail», «reels» или «lms»
@@ -609,7 +621,8 @@ public sealed class MainViewModel : PanelViewModel
         var rows = TaskRows.Build(snapshot, jobs);
         IsReelsBusy = rows.Any(row => row.Id == "reels" && row.Working);
         _activity.Track(rows, DateTimeOffset.UtcNow);
-        Tasks = rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), _activity.StateOf(row), _activity.FinishedAt(row.Id), NavItems.Any(item => item.RowId == row.Id) ? OpenProcessSettings : null)).ToArray();
+        _rows = rows;
+        BuildTasks();
         Groups = BuildJournal(snapshot, records);
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
         Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();
