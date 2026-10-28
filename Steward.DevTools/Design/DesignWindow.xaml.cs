@@ -15,17 +15,6 @@ public partial class DesignWindow : Window
     {
         InitializeComponent();
         DataContext = this;
-        Cluster.Items =
-        [
-            new GooeyItem("\uE80F", "Статусы", () => { }),
-            new GooeyItem("\uEA80", "Идеи", () => { }),
-            new GooeyItem("\uE7BE", "Домашние задания", () => { }),
-            new GooeyItem("\uE81C", "Журнал", () => { }),
-            new GooeyItem("\uE713", "Настройки", () => { }, DividerBefore: true),
-            new GooeyItem("\uE7E8", "Выход", () => { }),
-        ];
-        Cluster.IsOpen = true;
-        Loaded += (_, _) => Cluster.SnapToState();
     }
 
     /// <summary>

@@ -53,16 +53,6 @@ public sealed class TrayHost : IDisposable
     private HomeworkFormatsViewModel? _formats;
 
     /// <summary>
-    /// Окно настроек, пока оно открыто
-    /// </summary>
-    private SettingsWindow? _settings;
-
-    /// <summary>
-    /// Меню из капель, которое открывается по щелчку на иконку
-    /// </summary>
-    private readonly TrayMenuWindow _menu = new();
-
-    /// <summary>
     /// Иконка трея
     /// </summary>
     private readonly NotifyIcon _icon;
@@ -145,29 +135,18 @@ public sealed class TrayHost : IDisposable
             Text = "Расписание",
         };
 
-        _icon.MouseDown += (_, args) =>
-        {
-            if (args.Button is MouseButtons.Left or MouseButtons.Right)
-                _menu.NotifyIconPressed();
-        };
-
+        // Щелчок по иконке открывает единственное окно приложения, правая кнопка даёт короткое меню
         _icon.MouseClick += (_, args) =>
         {
-            if (args.Button is MouseButtons.Left or MouseButtons.Right)
-                ShowMenu();
+            if (args.Button == MouseButtons.Left)
+                ShowMain();
         };
 
-        _icon.DoubleClick += (_, _) => ShowMain();
         _icon.BalloonTipClicked += (_, _) => ShowMain();
-        _menu.SetItems(
-        [
-            new GooeyItem("\uE80F", "Статусы", () => ShowMain(AppPageEnum.Status)),
-            new GooeyItem("\uEA80", "Идеи", () => ShowMain(AppPageEnum.Ideas)),
-            new GooeyItem("\uE7BE", "Домашние задания", () => ShowMain(AppPageEnum.Homework)),
-            new GooeyItem("\uE81C", "Журнал", () => ShowMain(AppPageEnum.Journal)),
-            new GooeyItem("\uE713", "Настройки", ShowSettings, DividerBefore: true),
-            new GooeyItem("\uE7E8", "Выход", Exit),
-        ]);
+        var trayMenu = new ContextMenuStrip();
+        trayMenu.Items.Add("Открыть Steward", null, (_, _) => ShowMain());
+        trayMenu.Items.Add("Выход", null, (_, _) => Exit());
+        _icon.ContextMenuStrip = trayMenu;
 
         _iconTimer.Tick += (_, _) => RenderIcon();
         RenderIcon();
@@ -178,9 +157,6 @@ public sealed class TrayHost : IDisposable
 
         _jobs.Changed += (_, _) => ApplyAll();
         _jobs.Start();
-
-        // Быстрый статус прогревается заранее, чтобы первый щелчок по иконке не ждал разбор разметки
-        System.Windows.Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, _menu.Warm);
     }
 
     /// <summary>
@@ -196,8 +172,6 @@ public sealed class TrayHost : IDisposable
         _jobs.Dispose();
         _icon.Visible = false;
         _icon.Dispose();
-        _menu.Close();
-        _settings?.Close();
         _main?.CloseForExit();
         _iconTimer.Stop();
         _current?.Dispose();
@@ -304,12 +278,8 @@ public sealed class TrayHost : IDisposable
 
         _jobRows = _jobs.Rows();
         ApplyIcon(_snapshot);
-        if (_menu.IsVisible)
-            _menu.Apply(_snapshot, _jobRows);
         if (_main is { IsVisible: true })
             ApplyMain();
-        if (_settings is { IsVisible: true })
-            _settings.Model.Formats = Formats();
 
         NotifyJobProblems(_jobRows);
     }
@@ -386,17 +356,6 @@ public sealed class TrayHost : IDisposable
     #region Window
 
     /// <summary>
-    /// Открывает меню из капель у курсора или прячет его
-    /// </summary>
-    private void ShowMenu()
-    {
-        if (!_menu.IsVisible)
-            _menu.Apply(_snapshot, _jobRows);
-
-        _menu.ToggleFromIcon();
-    }
-
-    /// <summary>
     /// Открывает главное окно приложения с самыми свежими данными
     /// </summary>
     /// <param name="page">Раздел, который нужно открыть, или <see langword="null"/>, чтобы оставить прежний</param>
@@ -417,6 +376,8 @@ public sealed class TrayHost : IDisposable
             _main.Model.IdeaApproved += ApproveIdea;
             _main.Model.IdeaRejected += idea => _jobs.DeleteIdea(idea.Id);
             _main.Model.LinkRequested += OpenLink;
+            _main.Model.Settings.LinkRequested += OpenLink;
+            _main.Model.Settings.RestartRequested += async (_, _) => await RestartContainerAsync();
             _main.Model.ExitRequested += (_, _) => Exit();
         }
 
@@ -513,6 +474,7 @@ public sealed class TrayHost : IDisposable
     {
         _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
         _main.ApplyHomework(_jobs.HomeworkRows());
+        _main.Model.Formats = Formats();
     }
 
     /// <summary>
@@ -528,40 +490,18 @@ public sealed class TrayHost : IDisposable
     }
 
     /// <summary>
-    /// Открывает окно настроек или выводит открытое на передний план
+    /// Пересоздаёт контейнер расписания и пишет итог на странице «Расписание»
     /// </summary>
-    private void ShowSettings()
-    {
-        if (_exiting)
-            return;
-
-        if (_settings is null)
-        {
-            var window = new SettingsWindow();
-            window.Model.LinkRequested += OpenLink;
-            window.Model.RestartRequested += async (_, _) => await RestartContainerAsync(window);
-            window.Closed += (_, _) => _settings = null;
-            _settings = window;
-        }
-
-        _settings.Model.Formats = Formats();
-
-        _settings.Show();
-        _settings.Activate();
-    }
-
-    /// <summary>
-    /// Пересоздаёт контейнер расписания и пишет итог в окно настроек
-    /// </summary>
-    /// <param name="window">Окно настроек, в которое пишется итог</param>
     /// <returns>Задача, которая завершается, когда перезапуск закончился</returns>
-    private async Task RestartContainerAsync(SettingsWindow window)
+    private async Task RestartContainerAsync()
     {
         var restarted = await _probe.RestartAsync(CancellationToken.None);
         if (_exiting)
             return;
 
-        window.SetStatus(restarted ? "Контейнер перезапущен" : "Не удалось перезапустить контейнер");
+        if (_main is not null)
+            _main.Model.Settings.SettingsMessage = restarted ? "Контейнер перезапущен" : "Не удалось перезапустить контейнер";
+
         if (restarted)
             await RefreshAsync();
     }

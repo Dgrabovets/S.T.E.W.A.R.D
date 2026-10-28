@@ -32,6 +32,62 @@
             <Setter Property="LineHeight" Value="22"/>
         </Style>
 
+        <DataTemplate x:Key="TaskCardTemplate">
+                    <Border x:Name="Card" Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ctl:ActivityOrb Width="24" Height="24" Style="{StaticResource ActivityOrb}" VerticalAlignment="Top" Margin="-4,0,12,0"/>
+                            <StackPanel Grid.Column="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="Name" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Headline}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBodyLarge}" Margin="12,2,0,0"/>
+                                </StackPanel>
+                                <ItemsControl x:Name="Reason" ItemsSource="{Binding DetailLines}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,3">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="16"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="•"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <Button x:Name="Run" Grid.Column="2" Content="Запустить" Style="{StaticResource ActionButton}" Margin="12,0,0,0"
+                                    VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
+                    <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding CanRun}" Value="True">
+                            <Setter TargetName="Run" Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Muted}" Value="True">
+                            <Setter TargetName="Name" Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                            <Setter TargetName="Card" Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
+                            <Setter TargetName="Reason" Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+
+        <Style x:Key="CardHost" TargetType="ContentControl">
+            <Setter Property="ContentTemplate" Value="{StaticResource TaskCardTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Content" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="PageHost" TargetType="Grid">
             <Setter Property="Visibility" Value="Collapsed"/>
         </Style>
@@ -74,18 +130,49 @@
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="210"/>
+                    <ColumnDefinition Width="250"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <Grid Margin="16,8,8,16">
-                    <StackPanel>
-                        <RadioButton GroupName="Nav" Content="Статус" Style="{StaticResource NavButton}" IsChecked="{Binding IsStatusPage, Mode=TwoWay}"/>
-                        <RadioButton GroupName="Nav" Content="Идеи" Style="{StaticResource NavButton}" IsChecked="{Binding IsIdeasPage, Mode=TwoWay}"/>
-                        <RadioButton GroupName="Nav" Content="Домашние задания" Style="{StaticResource NavButton}" IsChecked="{Binding IsHomeworkPage, Mode=TwoWay}"/>
-                        <RadioButton GroupName="Nav" Content="Журнал" Style="{StaticResource NavButton}" IsChecked="{Binding IsJournalPage, Mode=TwoWay}"/>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding NavGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <Border BorderBrush="{StaticResource AccentTextBrush}" BorderThickness="2,0,0,0" Padding="8,0,0,0" Margin="10,14,0,6">
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource TextCaption}"/>
+                                        </Border>
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <RadioButton GroupName="Nav" Style="{StaticResource NavButton}" IsChecked="{Binding IsSelected, Mode=TwoWay}">
+                                                        <views:NavTabContent/>
+                                                    </RadioButton>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="1">
+                        <Border Height="1" Background="{StaticResource LineBrush}" Margin="8,8,8,8"/>
+                        <ItemsControl ItemsSource="{Binding SystemItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <RadioButton GroupName="Nav" Style="{StaticResource NavButton}" IsChecked="{Binding IsSelected, Mode=TwoWay}">
+                                        <views:NavTabContent/>
+                                    </RadioButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
-                    <Button Content="Выход" Style="{StaticResource GhostButton}" VerticalAlignment="Bottom" HorizontalAlignment="Left" Command="{Binding ExitCommand}"/>
                 </Grid>
 
                 <Grid Grid.Column="1" Margin="8,4,24,24">
@@ -110,56 +197,7 @@
                                         <TextBlock Text="{Binding RegistryErrors}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                     </StackPanel>
                                 </Border>
-                                <ItemsControl ItemsSource="{Binding Tasks}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border x:Name="Card" Style="{StaticResource Card}">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <ctl:ActivityOrb Width="24" Height="24" Style="{StaticResource ActivityOrb}" VerticalAlignment="Top" Margin="-4,0,12,0"/>
-                                                    <StackPanel Grid.Column="1">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock x:Name="Name" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="{Binding Headline}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBodyLarge}" Margin="12,2,0,0"/>
-                                                        </StackPanel>
-                                                        <ItemsControl x:Name="Reason" ItemsSource="{Binding DetailLines}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,8,0,0">
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate>
-                                                                    <Grid Margin="0,0,0,3">
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="16"/>
-                                                                            <ColumnDefinition Width="*"/>
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <TextBlock Text="•"/>
-                                                                        <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap"/>
-                                                                    </Grid>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                    </StackPanel>
-                                                    <Button x:Name="Run" Grid.Column="2" Content="Запустить" Style="{StaticResource ActionButton}" Margin="12,0,0,0"
-                                                            VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"/>
-                                                </Grid>
-                                            </Border>
-                                            <DataTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding CanRun}" Value="True">
-                                                    <Setter TargetName="Run" Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Muted}" Value="True">
-                                                    <Setter TargetName="Name" Property="Foreground" Value="{StaticResource MutedBrush}"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
-                                                    <Setter TargetName="Card" Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
-                                                    <Setter TargetName="Reason" Property="Foreground" Value="{StaticResource DangerBrush}"/>
-                                                </DataTrigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <ItemsControl ItemsSource="{Binding Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}"/>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -177,6 +215,7 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
+                                <TextBlock Text="Рилсы" Style="{StaticResource PageTitle}"/>
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding IsReelsBusy, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel Orientation="Horizontal">
                                         <ctl:ActivityOrb Width="26" Height="26" Kind="Composing" Foreground="{StaticResource WorkingBrush}" Margin="-4,-2,12,-2"/>
@@ -294,6 +333,69 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- Почта -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid" BasedOn="{StaticResource PageHost}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMailPage}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Почта" Style="{StaticResource PageTitle}"/>
+                                <ContentControl Content="{Binding MailCard}" Style="{StaticResource CardHost}"/>
+                                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                                    <TextBlock Style="{StaticResource PageHint}" TextWrapping="Wrap"
+                                               Text="Почта проверяется утром, вечером и при запуске приложения. Разобранные письма превращаются в задачи в Singularity. Здесь появятся настройки и список разобранных писем."/>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- Расписание -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid" BasedOn="{StaticResource PageHost}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSchedulePage}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Расписание" Style="{StaticResource PageTitle}"/>
+                                <ContentControl Content="{Binding ScheduleCard}" Style="{StaticResource CardHost}"/>
+                                <views:ScheduleSettingsView DataContext="{Binding Settings}" Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- Расшифровки -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid" BasedOn="{StaticResource PageHost}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTranscriptsPage}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Расшифровки" Style="{StaticResource PageTitle}"/>
+                                <ContentControl Content="{Binding LmsCard}" Style="{StaticResource CardHost}"/>
+                                <views:HomeworkFormatsView DataContext="{Binding Formats}" Margin="0,12,0,0"/>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>

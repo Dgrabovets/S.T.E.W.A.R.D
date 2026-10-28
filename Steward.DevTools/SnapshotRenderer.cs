@@ -67,22 +67,6 @@ public static class SnapshotRenderer
         {
             window = new DesignWindow { SizeToContent = SizeToContent.Manual, Height = 1560 };
         }
-        else if (string.Equals(parts[0], "tray", StringComparison.OrdinalIgnoreCase))
-        {
-            var menu = new TrayMenuWindow();
-            menu.Apply(snapshot, jobs);
-            menu.SetItems(
-            [
-                new GooeyItem("\uE80F", "Статусы", () => { }),
-                new GooeyItem("\uEA80", "Идеи", () => { }),
-                new GooeyItem("\uE7BE", "Домашние задания", () => { }),
-                new GooeyItem("\uE81C", "Журнал", () => { }),
-                new GooeyItem("\uE713", "Настройки", () => { }, DividerBefore: true),
-                new GooeyItem("\uE7E8", "Выход", () => { }),
-            ]);
-            window = menu;
-            afterShow = () => menu.Expand(animate: false);
-        }
         else if (string.Equals(parts[0], "slider", StringComparison.OrdinalIgnoreCase))
         {
             window = SliderSheet();
@@ -95,27 +79,13 @@ public static class SnapshotRenderer
         {
             window = OrbSheet();
         }
-        else if (string.Equals(parts[0], "settings", StringComparison.OrdinalIgnoreCase))
-        {
-            var settings = new SettingsWindow();
-            settings.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
-
-            // «settings:formats»: раскрыт блок «Форматы заданий»
-            if (parts.Length > 1 && string.Equals(parts[1], "formats", StringComparison.OrdinalIgnoreCase))
-            {
-                settings.FormatsToggle.IsChecked = true;
-                settings.ScheduleToggle.IsChecked = false;
-                settleSeconds = 1.0;
-            }
-
-            window = settings;
-        }
         else
         {
             var main = new MainWindow();
             main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"], SampleIdeas(now));
             main.ApplyHomework(SampleHomework());
-            if (parts.Length > 1 && string.Equals(parts[1], "homework", StringComparison.OrdinalIgnoreCase))
+            main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
+            if (parts.Length > 1 && parts[1].ToLowerInvariant() is "homework" or "transcripts" or "schedule")
                 settleSeconds = 1.0;
 
             if (parts.Length > 1 && Enum.TryParse<AppPageEnum>(parts[1], ignoreCase: true, out var page))
@@ -375,6 +345,7 @@ public static class SnapshotRenderer
         new JobRow("reels", "Рилсы", "Ждёт тебя", "Разобрано 3 рилса\nБез решения: 3", RowToneEnum.Attention, 3, true),
         new JobRow("mts", "MTS Link", "Не удалось", "Нет доступа к LMS: войдите заново (вчера в 19:00)", RowToneEnum.Problem, 0, true),
         new JobRow("telegram", "Telegram-бот", "Выполняется", "Запущена сегодня в 12:00", RowToneEnum.Working, 0, true),
+        new JobRow("lms", "Занятия LMS", "Выполнено сегодня в 08:00", "Расшифровки: получено 2 из 2", RowToneEnum.Ok, 0, true),
         new JobRow("homework", "Домашние задания", "Отключена", "Чтобы включить, поставь enabled: true в config/jobs.json", RowToneEnum.Idle, 0, false),
     ];
 

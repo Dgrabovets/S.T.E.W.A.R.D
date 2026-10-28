@@ -86,9 +86,6 @@
                 </Border>
             </ctl:CollapsibleBody>
 
-            <TextBlock Text="Меню из капель" Style="{StaticResource Section}"/>
-            <ctl:GooeyCluster x:Name="Cluster" Fill="{StaticResource RaisedBrush}" Outline="{StaticResource LineStrongBrush}" Foreground="{StaticResource TextBrush}" StateBrush="{StaticResource OkBrush}"/>
-
                 </StackPanel>
                 <StackPanel Grid.Column="1">
             <TextBlock Text="Кнопки" Style="{StaticResource Section}"/>

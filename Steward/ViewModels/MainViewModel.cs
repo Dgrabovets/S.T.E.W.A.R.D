@@ -49,6 +49,11 @@ public sealed class MainViewModel : PanelViewModel
     private readonly ActivityTracker _activity = new();
 
     /// <summary>
+    /// Предметы и занятия с отметками
+    /// </summary>
+    private HomeworkFormatsViewModel? _formats;
+
+    /// <summary>
     /// Карточки идей, которые ждут решения
     /// </summary>
     private IReadOnlyList<IdeaCardViewModel> _ideas = [];
@@ -74,7 +79,60 @@ public sealed class MainViewModel : PanelViewModel
     public MainViewModel() : base("Проверка")
     {
         ClearJournalCommand = new RelayCommand(() => ClearJournalRequested?.Invoke(this, EventArgs.Empty));
+
+        NavItemViewModel Item(AppPageEnum page, string title, string? rowId) => new(page, title, rowId, () => _page, picked => Select(true, picked));
+        var mail = Item(AppPageEnum.Mail, "Почта", "mail");
+        var ideas = Item(AppPageEnum.Ideas, "Рилсы", "reels");
+        var schedule = Item(AppPageEnum.Schedule, "Расписание", TaskRows.SCHEDULE_ID);
+        var transcripts = Item(AppPageEnum.Transcripts, "Расшифровки", "lms");
+        var homework = Item(AppPageEnum.Homework, "Домашние задания", "homework");
+        SystemItems = [Item(AppPageEnum.Status, "Статус", null), Item(AppPageEnum.Journal, "Журнал", null)];
+        NavGroups = [new NavGroupViewModel("Моя жизнь", [mail, ideas]), new NavGroupViewModel("Учёба", [schedule, transcripts, homework])];
     }
+
+    /// <summary>
+    /// Группы вкладок левой панели сверху вниз: «Моя жизнь» и «Учёба»
+    /// </summary>
+    public IReadOnlyList<NavGroupViewModel> NavGroups { get; }
+
+    /// <summary>
+    /// Системные вкладки внизу левой панели под линией: «Статус» и «Журнал»
+    /// </summary>
+    public IReadOnlyList<NavItemViewModel> SystemItems { get; }
+
+    /// <summary>
+    /// Все вкладки левой панели одним списком
+    /// </summary>
+    private IEnumerable<NavItemViewModel> NavItems => NavGroups.SelectMany(group => group.Items).Concat(SystemItems);
+
+    /// <summary>
+    /// Настройки расписания: они живут на странице «Расписание»
+    /// </summary>
+    public SettingsViewModel Settings { get; } = new();
+
+    /// <summary>
+    /// Предметы и занятия с отметками: страница «Расшифровки»
+    /// </summary>
+    public HomeworkFormatsViewModel? Formats
+    {
+        get => _formats;
+        set => Set(ref _formats, value);
+    }
+
+    /// <summary>
+    /// Карточка состояния почты на странице «Почта»
+    /// </summary>
+    public TaskCardViewModel? MailCard => Tasks.FirstOrDefault(card => card.Id == "mail");
+
+    /// <summary>
+    /// Карточка состояния расписания на странице «Расписание»
+    /// </summary>
+    public TaskCardViewModel? ScheduleCard => Tasks.FirstOrDefault(card => card.Id == TaskRows.SCHEDULE_ID);
+
+    /// <summary>
+    /// Карточка состояния выгрузки занятий на странице «Расшифровки»
+    /// </summary>
+    public TaskCardViewModel? LmsCard => Tasks.FirstOrDefault(card => card.Id == "lms");
 
     /// <summary>
     /// Просит запустить задачу: параметр — идентификатор
@@ -167,6 +225,24 @@ public sealed class MainViewModel : PanelViewModel
     /// <summary>
     /// Текущий раздел
     /// </summary>
+    public bool IsMailPage
+    {
+        get => _page == AppPageEnum.Mail;
+        set => Select(value, AppPageEnum.Mail);
+    }
+
+    public bool IsSchedulePage
+    {
+        get => _page == AppPageEnum.Schedule;
+        set => Select(value, AppPageEnum.Schedule);
+    }
+
+    public bool IsTranscriptsPage
+    {
+        get => _page == AppPageEnum.Transcripts;
+        set => Select(value, AppPageEnum.Transcripts);
+    }
+
     public AppPageEnum Page
     {
         get => _page;
@@ -299,7 +375,28 @@ public sealed class MainViewModel : PanelViewModel
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
         Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();
 
+        Raise(nameof(MailCard));
+        Raise(nameof(ScheduleCard));
+        Raise(nameof(LmsCard));
+        UpdateNav(ideas.Count(idea => idea.State == IdeaStateEnum.New));
         ApplySummary(rows);
+    }
+
+    /// <summary>
+    /// Раскрашивает сферы вкладок по состоянию процессов и ставит числа: сколько идей ждёт решения и сколько заданий найдено
+    /// </summary>
+    /// <param name="newIdeas">Сколько идей ждёт решения</param>
+    private void UpdateNav(int newIdeas)
+    {
+        foreach (var item in NavItems)
+        {
+            if (item.RowId is { } id && Tasks.FirstOrDefault(card => card.Id == id) is { } card)
+                item.Update(card.Kind, card.Activity, card.ActivitySince, card.Tone, item.Page == AppPageEnum.Ideas ? newIdeas : 0);
+            else if (item.Page == AppPageEnum.Status)
+                item.Update(ActivityKindEnum.Beacon, ActivityStateEnum.None, default, Tone, 0);
+            else if (item.Page == AppPageEnum.Ideas)
+                item.Update(ActivityKindEnum.Dormant, ActivityStateEnum.None, default, PanelToneEnum.Idle, newIdeas);
+        }
     }
 
     /// <summary>
@@ -404,7 +501,12 @@ public sealed class MainViewModel : PanelViewModel
     /// Показывает найденные домашние задания
     /// </summary>
     /// <param name="rows">Задания с занятиями от свежих к старым</param>
-    public void ApplyHomework(IReadOnlyList<HomeworkRow> rows) => Homework = [.. rows.Select(row => new HomeworkCardViewModel(row))];
+    public void ApplyHomework(IReadOnlyList<HomeworkRow> rows)
+    {
+        Homework = [.. rows.Select(row => new HomeworkCardViewModel(row))];
+        if (NavItems.FirstOrDefault(item => item.Page == AppPageEnum.Homework) is { } item)
+            item.Update(item.Kind, item.Activity, item.ActivitySince, item.Tone, rows.Count);
+    }
 
     /// <summary>
     /// Переключает раздел и сообщает окну обо всех зависящих свойствах
@@ -424,6 +526,11 @@ public sealed class MainViewModel : PanelViewModel
         Raise(nameof(IsIdeasPage));
         Raise(nameof(IsHomeworkPage));
         Raise(nameof(IsJournalPage));
+        Raise(nameof(IsMailPage));
+        Raise(nameof(IsSchedulePage));
+        Raise(nameof(IsTranscriptsPage));
+        foreach (var item in NavItems)
+            item.RefreshSelection();
     }
 
     #endregion Updating
