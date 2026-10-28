@@ -172,7 +172,6 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <TextBlock Text="{Binding SelectedSubject.Summary}" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="20,0,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -194,23 +193,32 @@
 
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="360"/>
+                        <ColumnDefinition Width="340"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <ItemsControl ItemsSource="{Binding SelectedSubject.Lessons}" Margin="0,0,12,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border x:Name="Row" Style="{StaticResource Card}" Margin="0,0,0,8" Padding="14,10">
+                                <Border x:Name="Row" Style="{StaticResource Card}" Margin="0,0,0,8" Padding="12,8">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Meta}" Style="{StaticResource TextBody}" TextWrapping="Wrap"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                            <Button Content="Посмотреть расшифровку" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}"
-                                                    Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}"/>
-                                            <Button Content="Расшифровать" Command="{Binding FetchCommand}" Style="{StaticResource ActionButton}"
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Meta}" Style="{StaticResource TextBody}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                            <Button Grid.Column="1" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" Padding="7" Margin="8,0,0,0" ToolTip="Посмотреть расшифровку"
+                                                    Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}">
+                                                <Canvas Width="18" Height="18">
+                                                    <Path Stroke="{StaticResource TextBrush}" StrokeThickness="1.5" StrokeLineJoin="Round" Data="M1.5,9 C4,4.5 6.5,3 9,3 C11.5,3 14,4.5 16.5,9 C14,13.5 11.5,15 9,15 C6.5,15 4,13.5 1.5,9 Z"/>
+                                                    <Ellipse Canvas.Left="6.5" Canvas.Top="6.5" Width="5" Height="5" Stroke="{StaticResource TextBrush}" StrokeThickness="1.5"/>
+                                                </Canvas>
+                                            </Button>
+                                            <Button Grid.Column="1" Content="Расшифровать" Command="{Binding FetchCommand}" Style="{StaticResource ActionButton}" Margin="8,0,0,0"
                                                     Visibility="{Binding CanFetch, Converter={StaticResource BoolToVisibility}}"/>
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding Status}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                        </Grid>
+                                        <TextBlock Text="{Binding Status}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,6,0,0"
                                                    Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}"/>
                                     </StackPanel>
                                 </Border>
@@ -241,12 +249,35 @@
                                     <TextBlock Text="{Binding OpenLesson.Meta}" Style="{StaticResource TextTitle}" TextWrapping="Wrap" Margin="0,0,40,0"/>
                                     <Button Content="✕" Command="{Binding CloseLessonCommand}" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Закрыть"/>
                                 </Grid>
-                                <TextBlock Text="Резюме встречи" Style="{StaticResource TextCaption}" Margin="0,12,0,4"/>
-                                <FlowDocumentScrollViewer Document="{Binding SummaryDocument}" Style="{StaticResource ReaderViewer}" MaxHeight="260"/>
-                                <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0">
+                                <TextBlock Text="{Binding ReadingTopic}" Foreground="{StaticResource AccentTextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap" Margin="0,10,0,0"
+                                           Visibility="{Binding HasReadingTopic, Converter={StaticResource BoolToVisibility}}"/>
+                                <TextBlock Text="В файле расшифровки нет резюме: заново запроси расшифровку занятия." Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,10,0,0"
+                                           Visibility="{Binding ReadingEmpty, Converter={StaticResource BoolToVisibility}}"/>
+                                <Border Style="{StaticResource ToneBadge}" Padding="10,3" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                        Visibility="{Binding HasReadingPoints, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="{Binding ReadingCount}" Style="{StaticResource ToneBadgeText}"/>
+                                </Border>
+                                <TextBlock Text="Пройдено" Style="{StaticResource TextCaption}" Margin="0,14,0,6"
+                                           Visibility="{Binding HasReadingPoints, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingPoints}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="18"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="•" Foreground="{StaticResource AccentTextBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,12,0,0"
+                                        Visibility="{Binding HasReadingOverview, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel>
-                                        <TextBlock Text="Полный текст" Style="{StaticResource TextCaption}" Margin="0,0,0,4"/>
-                                        <FlowDocumentScrollViewer Document="{Binding BodyDocument}" Style="{StaticResource ReaderViewer}" Height="460"/>
+                                        <TextBlock Text="Что было на занятии" Style="{StaticResource TextCaption}" Margin="0,0,0,6"/>
+                                        <TextBlock Text="{Binding ReadingOverview}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -273,7 +304,7 @@
 
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="360"/>
+                        <ColumnDefinition Width="340"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 

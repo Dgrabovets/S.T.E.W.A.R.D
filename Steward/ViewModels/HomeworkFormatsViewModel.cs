@@ -76,14 +76,9 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private LessonFormatViewModel? _openLesson;
 
     /// <summary>
-    /// Резюме открытой расшифровки
+    /// Разбор открытой расшифровки: тема, содержание, ключевые моменты
     /// </summary>
-    private FlowDocument? _summaryDocument;
-
-    /// <summary>
-    /// Полный текст открытой расшифровки
-    /// </summary>
-    private FlowDocument? _bodyDocument;
+    private TranscriptText _reading = new(string.Empty, string.Empty, []);
 
     /// <summary>
     /// Готовый файл, открытый в предпросмотре
@@ -268,22 +263,44 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public bool HasOpenLesson => OpenLesson is not null;
 
     /// <summary>
-    /// Резюме открытой расшифровки
+    /// Тема открытой встречи
     /// </summary>
-    public FlowDocument? SummaryDocument
-    {
-        get => _summaryDocument;
-        private set => Set(ref _summaryDocument, value);
-    }
+    public string ReadingTopic => _reading.Topic;
 
     /// <summary>
-    /// Полный текст открытой расшифровки
+    /// Что было на занятии, связным текстом
     /// </summary>
-    public FlowDocument? BodyDocument
-    {
-        get => _bodyDocument;
-        private set => Set(ref _bodyDocument, value);
-    }
+    public string ReadingOverview => _reading.Overview;
+
+    /// <summary>
+    /// Ключевые моменты: что пройдено на занятии
+    /// </summary>
+    public IReadOnlyList<string> ReadingPoints => _reading.Points;
+
+    /// <summary>
+    /// Сколько пунктов пройдено на занятии
+    /// </summary>
+    public string ReadingCount => _reading.Points.Count == 0 ? "Пунктов нет" : $"Пройдено пунктов: {_reading.Points.Count}";
+
+    /// <summary>
+    /// У встречи есть тема
+    /// </summary>
+    public bool HasReadingTopic => _reading.Topic.Length > 0;
+
+    /// <summary>
+    /// Есть ключевые моменты
+    /// </summary>
+    public bool HasReadingPoints => _reading.Points.Count > 0;
+
+    /// <summary>
+    /// Есть краткое содержание
+    /// </summary>
+    public bool HasReadingOverview => _reading.Overview.Length > 0;
+
+    /// <summary>
+    /// Разбор расшифровки пустой: резюме в файле нет
+    /// </summary>
+    public bool ReadingEmpty => _reading.Topic.Length == 0 && _reading.Overview.Length == 0 && _reading.Points.Count == 0;
 
     /// <summary>
     /// Готовый файл, открытый в предпросмотре
@@ -343,9 +360,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
         foreach (var other in Lessons)
             other.IsOpen = other == lesson;
 
-        var text = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty);
-        SummaryDocument = text.Summary.Length > 0 ? DocumentPreviewBuilder.FromText(text.Summary) : null;
-        BodyDocument = DocumentPreviewBuilder.FromText(text.Body.Length > 0 ? text.Body : "Расшифровка пустая.");
+        _reading = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty);
+        RaiseReading();
         OpenLesson = lesson;
     }
 
@@ -358,8 +374,23 @@ public sealed class HomeworkFormatsViewModel : Bindable
             lesson.IsOpen = false;
 
         OpenLesson = null;
-        SummaryDocument = null;
-        BodyDocument = null;
+        _reading = new TranscriptText(string.Empty, string.Empty, []);
+        RaiseReading();
+    }
+
+    /// <summary>
+    /// Сообщает окну, что разбор расшифровки изменился
+    /// </summary>
+    private void RaiseReading()
+    {
+        Raise(nameof(ReadingTopic));
+        Raise(nameof(ReadingOverview));
+        Raise(nameof(ReadingPoints));
+        Raise(nameof(ReadingCount));
+        Raise(nameof(ReadingEmpty));
+        Raise(nameof(HasReadingTopic));
+        Raise(nameof(HasReadingPoints));
+        Raise(nameof(HasReadingOverview));
     }
 
     /// <summary>
