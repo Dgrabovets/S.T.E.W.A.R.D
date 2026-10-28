@@ -125,6 +125,37 @@ public sealed class SubjectViewModel : Bindable
     public bool HasFormats => FormatOptions.Count > 0;
 
     /// <summary>
+    /// Выбранный пункт списка «Что делать»: список в плитке выбирает его, а модель передаёт выбор дальше
+    /// </summary>
+    public LessonStateOptionViewModel? SelectedStateOption
+    {
+        get => StateOptions.FirstOrDefault(option => option.IsSelected);
+        set
+        {
+            if (value is not null && !value.IsSelected)
+                value.SelectCommand.Execute(null);
+        }
+    }
+
+    /// <summary>
+    /// Выбранный пункт списка форматов заданий
+    /// </summary>
+    public FormatOptionViewModel? SelectedFormatOption
+    {
+        get => FormatOptions.FirstOrDefault(option => option.IsSelected);
+        set
+        {
+            if (value is not null && !value.IsSelected)
+                value.SelectCommand.Execute(null);
+        }
+    }
+
+    /// <summary>
+    /// Список форматов нужен: расшифровки забираются, значит, будут и домашние задания
+    /// </summary>
+    public bool ShowFormat => HasFormats && State == LessonStateEnum.Fetch;
+
+    /// <summary>
     /// Текущая отметка предмета: от неё зависит цвет кружка на плитке
     /// </summary>
     public LessonStateEnum State
@@ -136,6 +167,8 @@ public sealed class SubjectViewModel : Bindable
                 return;
 
             Raise(nameof(Caption));
+            Raise(nameof(ShowFormat));
+            Raise(nameof(SelectedStateOption));
         }
     }
 
@@ -151,6 +184,7 @@ public sealed class SubjectViewModel : Bindable
                 return;
 
             Raise(nameof(Caption));
+            Raise(nameof(SelectedFormatOption));
         }
     }
 
