@@ -289,6 +289,84 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
+    /// Читает найденные задания занятия. <see langword="null"/>, если задания ещё не искали
+    /// </summary>
+    public Func<string, IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>?>? ItemsReader { get; set; }
+
+    /// <summary>
+    /// Убирает задание в архив: ключ занятия и номер задания
+    /// </summary>
+    public Action<string, int>? ItemArchived { get; set; }
+
+    /// <summary>
+    /// Заводит задачу в SingularityApp: ключ занятия и номер задания. Возвращает итог и признак ошибки
+    /// </summary>
+    public Func<string, int, Task<(string Message, bool Failed)>>? ItemToSingularity { get; set; }
+
+    /// <summary>
+    /// Удаляет готовые файлы занятия
+    /// </summary>
+    public Action<string>? DraftsDeleted { get; set; }
+
+    /// <summary>
+    /// Нужно открыть окно «Переделать» для занятия
+    /// </summary>
+    public event Action<LessonFormatViewModel>? RedoDialogRequested;
+
+    /// <summary>
+    /// Нужно спросить, удалять ли готовое задание занятия
+    /// </summary>
+    public event Action<LessonFormatViewModel>? DeleteConfirmRequested;
+
+    /// <summary>
+    /// Удаляет готовое задание занятия после подтверждения и обновляет карточку
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    public void DeleteDrafts(LessonFormatViewModel lesson)
+    {
+        DraftsDeleted?.Invoke(lesson.Id);
+        RefreshDrafts(lesson);
+        lesson.ShowResult("Готовое задание удалено", failed: false);
+    }
+
+    /// <summary>
+    /// Обновляет найденные задания занятия
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    private void RefreshItems(LessonFormatViewModel lesson)
+    {
+        var found = ItemsReader?.Invoke(lesson.Id);
+        lesson.SetItems(
+            [.. (found ?? []).Select(row => new LessonItemViewModel(row.Number, row.Item, row.InSingularity, entry => ArchiveItem(lesson, row.Number), entry => { _ = AddToSingularityAsync(lesson, row.Number); }))],
+            found is not null);
+    }
+
+    /// <summary>
+    /// Убирает задание в архив и обновляет список
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания</param>
+    private void ArchiveItem(LessonFormatViewModel lesson, int number)
+    {
+        ItemArchived?.Invoke(lesson.Id, number);
+        RefreshItems(lesson);
+    }
+
+    /// <summary>
+    /// Заводит задачу в SingularityApp, показывает итог и обновляет список
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания</param>
+    /// <returns>Задача, которая завершается, когда SingularityApp ответил</returns>
+    private async Task AddToSingularityAsync(LessonFormatViewModel lesson, int number)
+    {
+        lesson.ShowResult("Завожу задачу в Singularity…", failed: false);
+        var result = ItemToSingularity is null ? ("Singularity не подключён", true) : await ItemToSingularity(lesson.Id, number);
+        lesson.ShowResult(result.Item1, result.Item2);
+        RefreshItems(lesson);
+    }
+
+    /// <summary>
     /// Находит готовые файлы заданий по ключу занятия
     /// </summary>
     public Func<string, IReadOnlyList<string>>? DraftLister { get; set; }
@@ -576,14 +654,16 @@ public sealed class HomeworkFormatsViewModel : Bindable
             {
                 if (!known.TryGetValue(item.Lesson.Id, out var row))
                 {
-                    row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson) };
+                    row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
                     RefreshDrafts(row);
+                    RefreshItems(row);
 
                     return row;
                 }
 
                 row.HasTranscript = _hasTranscript(item.Lesson);
                 RefreshDrafts(row);
+                RefreshItems(row);
 
                 return row;
             })

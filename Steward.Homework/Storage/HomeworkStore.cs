@@ -292,7 +292,7 @@ public sealed class HomeworkStore(string directory)
             {
                 var items = ReadItems(lesson.Id) ?? [];
 
-                return items.Select((item, index) => new HomeworkRow(lesson, FormatFor(lesson.Id), item, index + 1, created.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1))));
+                return items.Select((item, index) => new HomeworkRow(lesson, FormatFor(lesson.Id), item, index + 1, created.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1)))).Where(row => !IsArchived(lesson.Id, row.Number));
             })
         ];
     }
@@ -335,6 +335,97 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
+    /// Папка с описанием и файлами задания из LMS
+    /// </summary>
+    /// <param name="activityId">Номер работы в LMS</param>
+    /// <returns>Путь к <c>assignments/&lt;номер&gt;</c></returns>
+    /// <exception cref="ArgumentException">Номер не подходит для имени папки</exception>
+    public string AssignmentDirectory(string activityId) => Path.Combine(directory, "assignments", SafeName(activityId));
+
+    /// <summary>
+    /// Описания и файлы несданных заданий предмета из LMS: <c>assignment.md</c> и читаемые вложения каждого
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <returns>Пути к файлам. Пустой список, если описания ещё не выгружены</returns>
+    public IReadOnlyList<string> AssignmentFiles(string subject)
+    {
+        var files = new List<string>();
+        foreach (var work in LoadActivities().Where(work => !work.IsQuiz && !work.Done && work.Id.Length > 0 && string.Equals(work.Subject, subject, StringComparison.OrdinalIgnoreCase)))
+        {
+            string folder;
+            try
+            {
+                folder = AssignmentDirectory(work.Id);
+            }
+            catch (ArgumentException)
+            {
+                continue;
+            }
+
+            if (!Directory.Exists(folder))
+                continue;
+
+            files.AddRange(Directory.EnumerateFiles(folder).Where(file => !file.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) && !file.EndsWith(".pptx", StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal));
+        }
+
+        return files;
+    }
+
+    /// <summary>
+    /// Файл с отметками найденных заданий: «archived» для убранных в архив
+    /// </summary>
+    private string ItemStatesFile => Path.Combine(directory, "item-states.json");
+
+    /// <summary>
+    /// Ключ найденного задания в файле отметок
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns>Строка вида «занятие:номер»</returns>
+    private static string ItemKey(string lessonId, int number) => $"{lessonId}:{number}";
+
+    /// <summary>
+    /// Задание убрано в архив: оно не показывается в списке и не готовится
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns>
+    /// <see langword="true"/>, если задание в архиве
+    /// </returns>
+    public bool IsArchived(string lessonId, int number) =>
+        (Read<Dictionary<string, string>>(ItemStatesFile) ?? []).TryGetValue(ItemKey(lessonId, number), out var state) && state == "archived";
+
+    /// <summary>
+    /// Убирает задание в архив или возвращает его
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="archived">В архив</param>
+    public void SetArchived(string lessonId, int number, bool archived)
+    {
+        var states = new Dictionary<string, string>(Read<Dictionary<string, string>>(ItemStatesFile) ?? [], StringComparer.Ordinal);
+        if (archived)
+            states[ItemKey(lessonId, number)] = "archived";
+        else
+            states.Remove(ItemKey(lessonId, number));
+
+        Directory.CreateDirectory(directory);
+
+        var temp = ItemStatesFile + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(states, Json));
+        File.Move(temp, ItemStatesFile, overwrite: true);
+    }
+
+    /// <summary>
+    /// Нужно ли искать задания в расшифровке: расшифровка есть, файла заданий нет, а занятие готовится как «Расшифровывать» не в формате «Не готовить»
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>
+    /// <see langword="true"/>, если поиск заданий пора запускать
+    /// </returns>
+    public bool ShouldExtract(Lesson lesson) => HasTranscript(lesson.Id) && !File.Exists(ItemsPath(lesson.Id)) && PreparesHomework(lesson);
+
+    /// <summary>
     /// Читает работы из LMS, которые выгрузка записала в <c>activities.json</c>
     /// </summary>
     /// <returns>Работы. Пустой список, если файла нет или он испорчен</returns>
@@ -355,7 +446,8 @@ public sealed class HomeworkStore(string directory)
                     item.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.Number && kind.GetInt32() == 1,
                     item.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.True,
                     item.TryGetProperty("section", out var section) ? section.GetString() ?? string.Empty : string.Empty,
-                    item.TryGetProperty("due", out var due) && due.ValueKind == JsonValueKind.String && DateTime.TryParse(due.GetString(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dueDate) ? DateOnly.FromDateTime(dueDate) : null))
+                    item.TryGetProperty("due", out var due) && due.ValueKind == JsonValueKind.String && DateTime.TryParse(due.GetString(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dueDate) ? DateOnly.FromDateTime(dueDate) : null,
+                    item.TryGetProperty("id", out var id) ? id.GetString() ?? string.Empty : string.Empty))
             ];
         }
         catch (Exception exception) when (exception is IOException or JsonException or InvalidOperationException)

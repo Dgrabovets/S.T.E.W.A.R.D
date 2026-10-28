@@ -393,6 +393,7 @@
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -417,8 +418,45 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,2,0,0"
+                                                        Visibility="{Binding HasDrafts, Converter={StaticResource BoolToVisibility}}">
+                                                <Button Command="{Binding RedoCommand}" Style="{StaticResource IconButton}" ToolTip="Переделать: написать, что не понравилось">
+                                                    <Path Data="{StaticResource IconRedo}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="18" Height="18"/>
+                                                </Button>
+                                                <Button Command="{Binding DeleteCommand}" Style="{StaticResource IconButton}" ToolTip="Удалить готовое задание">
+                                                    <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                                                </Button>
+                                            </StackPanel>
                                         </StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0"
+                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
+                                            <TextBlock Text="{Binding ItemsHint}" Style="{StaticResource TextCaption}" TextWrapping="Wrap"
+                                                       Visibility="{Binding HasItemsHint, Converter={StaticResource BoolToVisibility}}"/>
+                                            <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,4">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel>
+                                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                                    <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                                                    <TextBlock Text="{Binding Requirements}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                                               Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
+                                                                </StackPanel>
+                                                                <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                                                    <Button Content="В архив" Command="{Binding ArchiveCommand}" Style="{StaticResource GhostButton}" ToolTip="Убрать задание из списка: оно не будет готовиться"/>
+                                                                    <Button Content="В Singularity" Command="{Binding AddToSingularityCommand}" Style="{StaticResource GhostButton}" ToolTip="Завести задачу по заданию в Singularity"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0"
                                                     Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
                                             <ctl:ActivityOrb Width="28" Height="28" Style="{StaticResource ActivityOrb}" Margin="-6,-4,8,-4"/>
                                             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextWrapping="Wrap">
@@ -439,23 +477,6 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBlock Text="Найденные задания" Style="{StaticResource TextCaption}" Margin="4,8,0,6" Visibility="{Binding SelectedSubject.HasHomework, Converter={StaticResource BoolToVisibility}}"/>
-                    <ItemsControl ItemsSource="{Binding SelectedSubject.Homework}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Style="{StaticResource Card}" Margin="0,0,10,8" Padding="14,10">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                        <TextBlock Style="{StaticResource TextCaption}" Margin="0,4,0,0">
-                                            <Run Text="{Binding Lesson, Mode=OneWay}"/><Run Text="  ·  "/><Run Text="{Binding Due, Mode=OneWay}"/><Run Text="  ·  "/><Run Text="{Binding Status, Mode=OneWay}"/>
-                                        </TextBlock>
-                                        <TextBlock Text="{Binding Requirements}" Style="{StaticResource TextSecondary}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                                   Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
                 </StackPanel>
             </StackPanel>
         </StackPanel>

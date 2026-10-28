@@ -6,7 +6,8 @@ namespace Steward.Homework.Models;
 /// <param name="Format">Формат работы</param>
 /// <param name="Extra">Дополнительное указание агенту. Пусто, если не нужно</param>
 /// <param name="GuideIds">Ключи методических указаний и образцов, которые нужно учесть. <see langword="null"/>: все включённые</param>
-public sealed record PrepareRequest(HomeworkFormatEnum Format, string Extra, IReadOnlySet<string>? GuideIds)
+/// <param name="Redo">Работу делают заново: прежняя версия остаётся как образец того, что не понравилось, а в указании записаны замечания</param>
+public sealed record PrepareRequest(HomeworkFormatEnum Format, string Extra, IReadOnlySet<string>? GuideIds, bool Redo = false)
 {
     /// <summary>
     /// Запрос без дополнительного указания: берутся все включённые материалы

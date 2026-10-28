@@ -763,6 +763,7 @@
         <PathGeometry Figures="M1.5,9 C4,4.5 6.5,3 9,3 C11.5,3 14,4.5 16.5,9 C14,13.5 11.5,15 9,15 C6.5,15 4,13.5 1.5,9 Z"/>
         <EllipseGeometry Center="9,9" RadiusX="2.5" RadiusY="2.5"/>
     </GeometryGroup>
+    <PathGeometry x:Key="IconRedo" Figures="M15,9 A6,6 0 1 1 11.8,3.7 M15,2.5 V6.5 H11"/>
     <PathGeometry x:Key="IconClose" Figures="M4,4 L14,14 M14,4 L4,14"/>
 
     <!-- Галочка: квадрат со скруглением, при выборе заливается акцентом -->

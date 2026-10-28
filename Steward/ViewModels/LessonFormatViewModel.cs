@@ -47,6 +47,16 @@ public sealed class LessonFormatViewModel : Bindable
     private IReadOnlyList<DraftFileViewModel> _drafts = [];
 
     /// <summary>
+    /// Найденные задания
+    /// </summary>
+    private IReadOnlyList<LessonItemViewModel> _items = [];
+
+    /// <summary>
+    /// Поиск заданий уже прошёл
+    /// </summary>
+    private bool _itemsSearched;
+
+    /// <summary>
     /// Расшифровку этого занятия уже попросили забрать
     /// </summary>
     private bool _fetchRequested;
@@ -69,6 +79,8 @@ public sealed class LessonFormatViewModel : Bindable
         _chosen = chosen;
         _prepare = prepare;
         PrepareCommand = new RelayCommand(() => PrepareRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
+        RedoCommand = new RelayCommand(() => RedoRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
+        DeleteCommand = new RelayCommand(() => DeleteRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
         OpenCommand = new RelayCommand(() => Opened?.Invoke(this), () => HasTranscript);
         FetchCommand = new RelayCommand(
             () =>
@@ -149,7 +161,85 @@ public sealed class LessonFormatViewModel : Bindable
     /// <summary>
     /// Кнопка «Подготовить задание» нужна: готовых файлов ещё нет. Когда они есть, вместо неё кнопки «Посмотреть задание»
     /// </summary>
-    public bool CanPrepare => !HasDrafts;
+    public bool CanPrepare => !HasDrafts && PendingCount > 0;
+
+    /// <summary>
+    /// Найденные в расшифровке задания, кроме убранных в архив. <see langword="null"/>, пока задания не искали
+    /// </summary>
+    public IReadOnlyList<LessonItemViewModel> Items
+    {
+        get => _items;
+        private set
+        {
+            if (!Set(ref _items, value))
+                return;
+
+            Raise(nameof(HasItems));
+            Raise(nameof(PendingCount));
+            Raise(nameof(CanPrepare));
+            Raise(nameof(ItemsHint));
+            Raise(nameof(HasItemsHint));
+        }
+    }
+
+    /// <summary>
+    /// Есть найденные задания
+    /// </summary>
+    public bool HasItems => Items.Count > 0;
+
+    /// <summary>
+    /// Сколько заданий ещё нужно сделать: не сданы и не в архиве
+    /// </summary>
+    public int PendingCount => Items.Count(item => !item.IsDone);
+
+    /// <summary>
+    /// Поиск заданий в расшифровке уже прошёл
+    /// </summary>
+    public bool ItemsSearched
+    {
+        get => _itemsSearched;
+        set
+        {
+            if (!Set(ref _itemsSearched, value))
+                return;
+
+            Raise(nameof(ItemsHint));
+            Raise(nameof(HasItemsHint));
+        }
+    }
+
+    /// <summary>
+    /// Подсказка, когда заданий нет: ещё ищутся или в расшифровке их не оказалось
+    /// </summary>
+    public string ItemsHint => HasItems ? string.Empty : ItemsSearched ? "В расшифровке заданий нет" : "Задания ищутся при разборе занятия, они появятся после ближайшей выгрузки";
+
+    /// <summary>
+    /// Есть подсказка про задания
+    /// </summary>
+    public bool HasItemsHint => ItemsHint.Length > 0;
+
+    /// <summary>
+    /// Показывает итог действия над заданием: «Задача заведена» или причину ошибки
+    /// </summary>
+    /// <param name="text">Текст итога</param>
+    /// <param name="failed">Это ошибка</param>
+    public void ShowResult(string text, bool failed)
+    {
+        Failed = failed;
+        Status = text;
+    }
+
+    /// <summary>
+    /// Обновляет список найденных заданий
+    /// </summary>
+    /// <param name="items">Строки заданий</param>
+    /// <param name="searched">Поиск заданий уже прошёл</param>
+    public void SetItems(IReadOnlyList<LessonItemViewModel> items, bool searched)
+    {
+        ItemsSearched = searched;
+        if (!items.Select(item => (item.Number, item.Title, item.Meta)).SequenceEqual(Items.Select(item => (item.Number, item.Title, item.Meta))))
+            Items = items;
+    }
 
     /// <summary>
     /// У занятия уже есть расшифровка: тогда можно подготовить задания
@@ -301,6 +391,26 @@ public sealed class LessonFormatViewModel : Bindable
     /// Формат, в котором готовили или будут готовить задания занятия
     /// </summary>
     public HomeworkFormatEnum Format { get; private set; }
+
+    /// <summary>
+    /// Вызывается, когда нужно открыть окно «Переделать» для этого занятия
+    /// </summary>
+    public Action<LessonFormatViewModel>? RedoRequested { get; set; }
+
+    /// <summary>
+    /// Вызывается, когда нужно удалить готовое задание этого занятия
+    /// </summary>
+    public Action<LessonFormatViewModel>? DeleteRequested { get; set; }
+
+    /// <summary>
+    /// Просит открыть окно, где записывают, что не понравилось, и переделать работу
+    /// </summary>
+    public RelayCommand RedoCommand { get; }
+
+    /// <summary>
+    /// Удаляет готовое задание
+    /// </summary>
+    public RelayCommand DeleteCommand { get; }
 
     /// <summary>
     /// Вызывается, когда нужно открыть окно «Подготовить задание» для этого занятия

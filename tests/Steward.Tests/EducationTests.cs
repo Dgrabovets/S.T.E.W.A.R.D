@@ -455,13 +455,139 @@ public class EducationTests
 
             model.DraftLister = _ => [];
             model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
-            Assert.True(lesson.CanPrepare);
+            Assert.False(lesson.HasDrafts);
             Assert.Equal("MD", HomeworkFormats.Title(HomeworkFormatEnum.Text));
         }
         finally
         {
             directory.Delete(recursive: true);
         }
+    }
+
+    /// <summary>
+    /// Убранное в архив задание не показывается, не попадает в строки заданий и возвращается из архива, а поиск заданий нужен только там, где их ещё не искали
+    /// </summary>
+    [Fact]
+    public void Archived_items_are_hidden_and_the_search_runs_once()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-archive-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 19), RecordUrl: "https://record.example/1");
+            store.SetSubjectState("Гейм-дизайн", LessonStateEnum.Fetch);
+            Directory.CreateDirectory(Path.GetDirectoryName(store.TranscriptPath("e1"))!);
+            File.WriteAllText(store.TranscriptPath("e1"), "== Расшифровка ==");
+
+            Assert.True(store.ShouldExtract(lesson));
+
+            Directory.CreateDirectory(Path.GetDirectoryName(store.ItemsPath("e1"))!);
+            File.WriteAllText(store.ItemsPath("e1"), """[{"title":"Один"},{"title":"Два"}]""");
+            File.WriteAllText(Path.Combine(directory.FullName, "lessons.json"), """[{"id":"e1","title":"Гейм-дизайн","date":"2026-10-19"}]""");
+
+            Assert.False(store.ShouldExtract(lesson));
+            Assert.Equal(2, store.LoadRows().Count);
+
+            store.SetArchived("e1", 1, archived: true);
+            Assert.True(store.IsArchived("e1", 1));
+            Assert.False(store.IsArchived("e1", 2));
+            Assert.Equal(["Два"], store.LoadRows().Select(row => row.Item.Title).ToArray());
+
+            store.SetArchived("e1", 1, archived: false);
+            Assert.Equal(2, store.LoadRows().Count);
+
+            store.SetSubjectState("Гейм-дизайн", LessonStateEnum.Analyze);
+            File.Delete(store.ItemsPath("e1"));
+            Assert.False(store.ShouldExtract(lesson));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Строка найденного задания показывает срок и пометки, сокращает требования и передаёт нажатия «В архив» и «В Singularity»
+    /// </summary>
+    [Fact]
+    public void An_item_row_shows_the_meta_and_reports_its_buttons()
+    {
+        var archived = new List<int>();
+        var added = new List<int>();
+        var row = new LessonItemViewModel(2, new HomeworkItem("Отчёт", new DateOnly(2026, 11, 2), new string('я', 400), string.Empty, true), false, item => archived.Add(item.Number), item => added.Add(item.Number));
+
+        Assert.Equal("Срок: 02.11.2026  ·  уже сдано", row.Meta);
+        Assert.Equal(221, row.Requirements.Length);
+        Assert.True(row.AddToSingularityCommand.CanExecute(null));
+
+        row.ArchiveCommand.Execute(null);
+        row.AddToSingularityCommand.Execute(null);
+
+        Assert.Equal([2], archived);
+        Assert.Equal([2], added);
+        Assert.False(new LessonItemViewModel(1, new HomeworkItem("А", null, string.Empty, string.Empty), true, _ => { }, _ => { }).AddToSingularityCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// Кнопка подготовки есть, только если нашлись несданные задания и готовых файлов ещё нет, а задания, архив и отметка поиска обновляются из чтения
+    /// </summary>
+    [Fact]
+    public void The_prepare_button_needs_pending_items_and_no_ready_files()
+    {
+        var found = new List<(int Number, HomeworkItem Item, bool InSingularity)>();
+        var searched = false;
+        var archived = new List<(string, int)>();
+        var model = new HomeworkFormatsViewModel([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((1, string.Empty)))
+        {
+            ItemsReader = _ => searched ? found : null,
+            ItemArchived = (id, number) => archived.Add((id, number)),
+        };
+        var lesson = model.Lessons.Single();
+
+        Assert.False(lesson.CanPrepare);
+        Assert.Contains("ищутся", lesson.ItemsHint, StringComparison.Ordinal);
+
+        searched = true;
+        found.Add((1, new HomeworkItem("Отчёт", null, string.Empty, string.Empty), false));
+        model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+
+        Assert.True(lesson.CanPrepare);
+        Assert.Single(lesson.Items);
+
+        found[0] = (1, new HomeworkItem("Отчёт", null, string.Empty, string.Empty, true), false);
+        model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+        Assert.False(lesson.CanPrepare);
+
+        found.Clear();
+        found.Add((1, new HomeworkItem("Отчёт", null, string.Empty, string.Empty), false));
+        model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+        lesson.Items[0].ArchiveCommand.Execute(null);
+
+        Assert.Equal([("a", 1)], archived);
+
+        found.Clear();
+        model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+        Assert.Contains("заданий нет", lesson.ItemsHint, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Просьба на подготовку получает условия заданий из LMS, а просьба на поиск заданий получает пути к их описаниям
+    /// </summary>
+    [Fact]
+    public void Assignment_descriptions_reach_both_prompts()
+    {
+        var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 19));
+        var item = new HomeworkItem("Отчёт", null, string.Empty, string.Empty);
+
+        var draft = DraftBuilder.Prompt(lesson, item, 1, HomeworkFormatEnum.Word, "t.txt", "r.md", null, string.Empty, [@"D:\a\1\assignment.md"]);
+        var search = HomeworkExtractionPrompt.Build(lesson, "t.txt", "r.json", [new ActivityInfo("Гейм-дизайн", "Задание 5", false, false, "Баланс", null, "99")], new Dictionary<string, string> { ["99"] = @"D:\a\99\assignment.md" });
+
+        Assert.Contains(@"D:\a\1\assignment.md", draft, StringComparison.Ordinal);
+        Assert.Contains("Условия заданий предмета из LMS", draft, StringComparison.Ordinal);
+        Assert.Contains(@"условие и файлы: D:\a\99\assignment.md", search, StringComparison.Ordinal);
+        Assert.DoesNotContain("Условия заданий предмета", DraftBuilder.Prompt(lesson, item, 1, HomeworkFormatEnum.Word, "t.txt", "r.md"), StringComparison.Ordinal);
+        Assert.True(new PrepareRequest(HomeworkFormatEnum.Word, "замечания", null, Redo: true).Redo);
+        Assert.False(PrepareRequest.Default(HomeworkFormatEnum.Word).Redo);
     }
 
     /// <summary>

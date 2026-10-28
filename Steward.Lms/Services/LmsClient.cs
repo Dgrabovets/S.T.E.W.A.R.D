@@ -134,6 +134,36 @@ public sealed partial class LmsClient : IDisposable
     }
 
     /// <summary>
+    /// Читает страницу LMS как текст
+    /// </summary>
+    /// <param name="url">Полный адрес страницы</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>HTML страницы</returns>
+    public Task<string> PageAsync(string url, CancellationToken cancellationToken) => _http.GetStringAsync(url, cancellationToken);
+
+    /// <summary>
+    /// Скачивает файл с сайта LMS под текущим входом
+    /// </summary>
+    /// <param name="url">Полный адрес файла</param>
+    /// <param name="path">Куда записать</param>
+    /// <param name="maxBytes">Больше стольких байт не качается</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>
+    /// <see langword="true"/>, если файл скачан
+    /// </returns>
+    public async Task<bool> DownloadAsync(string url, string path, long maxBytes, CancellationToken cancellationToken)
+    {
+        using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > maxBytes || response.Content.Headers.ContentType?.MediaType is "text/html")
+            return false;
+
+        await using var output = File.Create(path);
+        await response.Content.CopyToAsync(output, cancellationToken);
+
+        return true;
+    }
+
+    /// <summary>
     /// Освобождает HTTP-клиент
     /// </summary>
     public void Dispose() => _http.Dispose();

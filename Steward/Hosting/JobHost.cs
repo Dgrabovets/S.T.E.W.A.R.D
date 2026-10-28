@@ -260,7 +260,7 @@ public sealed class JobHost : IDisposable
     /// <returns>Пояснение, если открыть не удалось, иначе пустая строка</returns>
     public string OpenFile(string path)
     {
-        var editor = Path.GetExtension(path).Equals(".md", StringComparison.OrdinalIgnoreCase) ? MdEditor() : string.Empty;
+        var editor = Path.GetExtension(path).Equals(".md", StringComparison.OrdinalIgnoreCase) ? LmsSetting("MdEditor", "code") : string.Empty;
         try
         {
             System.Diagnostics.Process.Start(editor.Length > 0 ? new System.Diagnostics.ProcessStartInfo(editor, $"\"{path}\"") { UseShellExecute = true } : new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
@@ -287,32 +287,32 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
-    /// Программа для MD-файлов из настроек выгрузки занятий
+    /// Читает строковую настройку из <c>lmssettings.json</c>
     /// </summary>
-    /// <returns>Команда программы, по умолчанию «code»</returns>
-    private static string MdEditor()
+    /// <param name="key">Ключ без учёта регистра</param>
+    /// <param name="fallback">Что вернуть, если файла, ключа или значения нет</param>
+    /// <returns>Значение настройки или запасное</returns>
+    private static string LmsSetting(string key, string fallback)
     {
         try
         {
             var file = SettingsProbe.LmsFile(DataLocation.RepoRootOrStart());
-            if (File.Exists(file) && System.Text.Json.JsonDocument.Parse(File.ReadAllText(file)) is { } document)
+            if (!File.Exists(file))
+                return fallback;
+
+            using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(file), new System.Text.Json.JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = System.Text.Json.JsonCommentHandling.Skip });
+            foreach (var property in document.RootElement.EnumerateObject())
             {
-                using (document)
-                {
-                    foreach (var property in document.RootElement.EnumerateObject())
-                    {
-                        if (property.NameEquals("mdEditor") || string.Equals(property.Name, "MdEditor", StringComparison.OrdinalIgnoreCase))
-                            return property.Value.GetString() is { Length: > 0 } value ? value : "code";
-                    }
-                }
+                if (string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == System.Text.Json.JsonValueKind.String && property.Value.GetString() is { Length: > 0 } value)
+                    return value;
             }
         }
         catch (Exception exception) when (exception is IOException or System.Text.Json.JsonException or UnauthorizedAccessException)
         {
-            // Файл настроек не читается: берём программу по умолчанию из кода
+            // Файл настроек не читается: берём запасное значение
         }
 
-        return "code";
+        return fallback;
     }
 
     /// <summary>
@@ -393,32 +393,159 @@ public sealed class JobHost : IDisposable
     /// <returns>Сколько заданий найдено и текст ошибки, если не получилось</returns>
     public async Task<(int Count, string Error)> PrepareHomeworkAsync(Lesson lesson, PrepareRequest request, CancellationToken cancellationToken)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_homework.ItemsPath(lesson.Id))!);
-
         var works = _homework.LoadActivities().Where(work => string.Equals(work.Subject, lesson.Title, StringComparison.OrdinalIgnoreCase)).ToArray();
-        var prompt = HomeworkExtractionPrompt.Build(lesson, _homework.TranscriptPath(lesson.Id), _homework.ItemsPath(lesson.Id), works);
-        var error = await ClaudeAgent.RunAsync(prompt, _homework.Root, cancellationToken);
-        if (error.Length > 0)
-            return (0, error);
+        if (_homework.ReadItems(lesson.Id) is null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_homework.ItemsPath(lesson.Id))!);
 
-        if (_homework.ReadItems(lesson.Id) is not { } items)
+            var prompt = HomeworkExtractionPrompt.Build(lesson, _homework.TranscriptPath(lesson.Id), _homework.ItemsPath(lesson.Id), works, AssignmentDescriptions(works), LmsSetting("StudentName", string.Empty));
+            var error = await ClaudeAgent.RunAsync(prompt, _homework.Root, cancellationToken);
+            if (error.Length > 0)
+                return (0, error);
+        }
+
+        if (_homework.ReadItems(lesson.Id) is not { } found)
             return (0, "Claude не записал файл заданий");
 
+        // Сданные и убранные в архив задания не готовятся
+        var items = found.Select((item, index) => item with { Done = item.Done || _homework.IsArchived(lesson.Id, index + 1) }).ToArray();
         var format = request.Format;
         var pending = items.Count(item => !item.Done);
-        if (items.Count > 0 && pending == 0)
-            return (0, "Все задания этого занятия уже сданы");
+        if (items.Length > 0 && pending == 0)
+            return (0, "Все задания этого занятия уже сданы или в архиве");
 
-        if (items.Count == 0 || format == HomeworkFormatEnum.Skip)
-            return (items.Count, string.Empty);
+        if (items.Length == 0 || format == HomeworkFormatEnum.Skip)
+            return (items.Length, string.Empty);
 
-        var (_, draftError) = await DraftBuilder.BuildAsync(_homework, lesson, items, format, ClaudeAgent.RunAsync, cancellationToken, _guides.Materials(lesson.Title, request.GuideIds), request.Extra);
+        var extra = request.Extra;
+        if (request.Redo)
+            extra = MoveToPrevious(lesson.Id) is { Count: > 0 } previous ? $"Это переделка: прежняя версия лежит здесь: {string.Join(", ", previous)}. Замечания студента, исправь именно их и сохрани удачные места: {request.Extra}" : request.Extra;
+
+        var assignments = _homework.AssignmentFiles(lesson.Title);
+        var (_, draftError) = await DraftBuilder.BuildAsync(_homework, lesson, items, format, ClaudeAgent.RunAsync, cancellationToken, _guides.Materials(lesson.Title, request.GuideIds), extra, assignments);
         if (draftError.Length > 0)
-            return (items.Count, draftError);
+            return (pending, draftError);
 
         RunNow(LMS_ID);
 
         return (pending, string.Empty);
+    }
+
+    /// <summary>
+    /// Путь к описанию каждой работы предмета из LMS, которое выгрузила программа
+    /// </summary>
+    /// <param name="works">Работы предмета</param>
+    /// <returns>Путь к <c>assignment.md</c> по номеру работы</returns>
+    private IReadOnlyDictionary<string, string> AssignmentDescriptions(IReadOnlyList<ActivityInfo> works) => works
+        .Where(work => work.Id.Length > 0 && File.Exists(Path.Combine(_homework.AssignmentDirectory(work.Id), "assignment.md")))
+        .ToDictionary(work => work.Id, work => Path.Combine(_homework.AssignmentDirectory(work.Id), "assignment.md"), StringComparer.Ordinal);
+
+    /// <summary>
+    /// Переносит прежние готовые файлы занятия в <c>.previous</c> и делает из Word и презентаций текстовые копии, чтобы агент прочитал прежнюю версию
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Пути к файлам прежней версии, которые агент может прочитать</returns>
+    private List<string> MoveToPrevious(string lessonId)
+    {
+        var readable = new List<string>();
+        var folder = _homework.DraftsDirectory(lessonId);
+        var previous = Path.Combine(folder, ".previous");
+        foreach (var file in _homework.DraftFiles(lessonId))
+        {
+            Directory.CreateDirectory(previous);
+
+            var target = Path.Combine(previous, Path.GetFileName(file));
+            File.Move(file, target, overwrite: true);
+            var extension = Path.GetExtension(target);
+            try
+            {
+                if (extension.Equals(".docx", StringComparison.OrdinalIgnoreCase))
+                    File.WriteAllText(target + ".txt", OfficeText.Docx(target));
+                else if (extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase))
+                    File.WriteAllText(target + ".txt", OfficeText.Pptx(target));
+
+                readable.Add(File.Exists(target + ".txt") ? target + ".txt" : target);
+            }
+            catch (Exception exception) when (exception is IOException or InvalidDataException or System.Xml.XmlException)
+            {
+                readable.Add(target);
+            }
+        }
+
+        return readable;
+    }
+
+    /// <summary>
+    /// Удаляет готовые файлы занятия вместе с прежними версиями: кнопка «Подготовить задание» вернётся
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    public void DeleteDrafts(string lessonId)
+    {
+        var folder = _homework.DraftsDirectory(lessonId);
+        if (Directory.Exists(folder))
+            Directory.Delete(folder, recursive: true);
+    }
+
+    /// <summary>
+    /// Найденные в расшифровке задания занятия без убранных в архив
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Задания с номером и отметкой «задача в Singularity заведена». <see langword="null"/>, если задания ещё не искали</returns>
+    public IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>? Items(string lessonId)
+    {
+        if (_homework.ReadItems(lessonId) is not { } items)
+            return null;
+
+        var lesson = _homework.LoadLessons().FirstOrDefault(item => item.Id == lessonId);
+        var created = _homework.LoadCreated();
+
+        return [.. items.Select((item, index) => (Number: index + 1, Item: item, InSingularity: lesson is not null && created.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1)))).Where(row => !_homework.IsArchived(lessonId, row.Number))];
+    }
+
+    /// <summary>
+    /// Убирает найденное задание в архив
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии</param>
+    public void ArchiveItem(string lessonId, int number) => _homework.SetArchived(lessonId, number, archived: true);
+
+    /// <summary>
+    /// Заводит задачу SingularityApp по заданию: запускает <c>Steward.Lms.exe task</c>, который знает токен и проект
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии</param>
+    /// <returns>Итог одной строкой и признак ошибки</returns>
+    public async Task<(string Message, bool Failed)> AddItemToSingularityAsync(string lessonId, int number)
+    {
+        var program = Path.Combine(DataLocation.RepoRootOrStart(), "Steward.Lms", "publish", "Steward.Lms.exe");
+        if (!File.Exists(program))
+            return ("Не найден Steward.Lms.exe: собери проект Steward.Lms в publish", true);
+
+        var start = new System.Diagnostics.ProcessStartInfo(program, $"task {lessonId} {number}")
+        {
+            WorkingDirectory = Path.GetDirectoryName(program)!,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+            StandardErrorEncoding = System.Text.Encoding.UTF8,
+        };
+        using var process = System.Diagnostics.Process.Start(start) ?? throw new InvalidOperationException("Процесс не запустился");
+        var output = process.StandardOutput.ReadToEndAsync();
+        var errors = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(TimeSpan.FromSeconds(60)))
+        {
+            process.Kill(entireProcessTree: true);
+
+            return ("Singularity не ответил за минуту", true);
+        }
+
+        await Task.WhenAll(output, errors);
+        var text = (process.ExitCode == 0 ? output.Result : errors.Result + output.Result).Trim().Split('\n').LastOrDefault(line => line.Trim().Length > 0)?.Trim() ?? string.Empty;
+        text = text.Length > 12 && char.IsDigit(text[0]) && text.Contains("  ", StringComparison.Ordinal) ? text[(text.IndexOf("  ", StringComparison.Ordinal) + 2)..] : text;
+
+        return (text.Length > 0 ? text : process.ExitCode == 0 ? "Задача заведена" : "Не удалось завести задачу", process.ExitCode != 0);
     }
 
     /// <summary>

@@ -96,6 +96,10 @@ public static class SnapshotRenderer
 
             window = new GuidesWindow(model) { WindowStartupLocation = WindowStartupLocation.Manual };
         }
+        else if (string.Equals(parts[0], "redo", StringComparison.OrdinalIgnoreCase))
+        {
+            window = new RedoWindow("25.10.2026  ·  Лекция 3  ·  2 ч 43 мин") { WindowStartupLocation = WindowStartupLocation.Manual };
+        }
         else if (string.Equals(parts[0], "prepare", StringComparison.OrdinalIgnoreCase))
         {
             // Окно «Подготовить задание» на примерных материалах
@@ -139,7 +143,11 @@ public static class SnapshotRenderer
             {
                 var drafts = SampleDrafts();
                 education.TranscriptReader = _ => "Занятие: Гейм-дизайн, Лекция 1\nДата: 07.09.2026\n\n== Резюме ==\nТема встречи: Обсуждение курса по геймдизайну\n\nКраткое содержание:\nУчастники познакомились и обсудили содержание курса.\n\nКлючевые моменты:\n• Знакомство участников\n• Системность и реализация идей\n\n== Расшифровка ==\n[00:00] Преподаватель: Добрый день, начинаем.\n[00:12] Студент: Слышно хорошо.\n[00:30] Преподаватель: Сегодня разберём игровые циклы и баланс.";
-                education.DraftLister = _ => drafts;
+                var firstId = SampleLessons().Select(item => item.Lesson.Id).First();
+                education.DraftLister = id => id == firstId ? [drafts[0]] : [];
+                education.ItemsReader = id => id == firstId
+                    ? [(1, new HomeworkItem("Выбрать игру и написать по ней аналитический отчёт", new DateOnly(2026, 11, 2), "Объём 1-2 страницы. Разобрать правила, конфликт, агентность, обратную связь и место игры в истории.", string.Empty), false)]
+                    : [(1, new HomeworkItem("Собрать главное меню в Unity", new DateOnly(2026, 11, 5), "Первый этап практики: меню с кнопками и окном настроек звука.", string.Empty), false), (2, new HomeworkItem("Сделать второй этап: привязать UI к коду", null, string.Empty, string.Empty, true), true)];
                 education.GuideFolder = @"D:\data\homework\guides";
                 education.GuideLister = _ =>
                 [

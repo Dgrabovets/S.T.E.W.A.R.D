@@ -29,13 +29,38 @@ public partial class HomeworkFormatsView : UserControl
         {
             old.GuidesDialogRequested -= ShowGuides;
             old.PrepareDialogRequested -= ShowPrepare;
+            old.RedoDialogRequested -= ShowRedo;
+            old.DeleteConfirmRequested -= ConfirmDelete;
         }
 
         if (e.NewValue is HomeworkFormatsViewModel current)
         {
             current.GuidesDialogRequested += ShowGuides;
             current.PrepareDialogRequested += ShowPrepare;
+            current.RedoDialogRequested += ShowRedo;
+            current.DeleteConfirmRequested += ConfirmDelete;
         }
+    }
+
+    /// <summary>
+    /// Открывает окно «Переделать задание» и, если записаны замечания, запускает подготовку заново
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    private async void ShowRedo(LessonFormatViewModel lesson)
+    {
+        var remarks = RedoWindow.Ask(Window.GetWindow(this), lesson.Meta);
+        if (remarks is not null)
+            await lesson.PrepareAsync(new Steward.Homework.Models.PrepareRequest(lesson.Format, remarks, null, Redo: true));
+    }
+
+    /// <summary>
+    /// Спрашивает, удалять ли готовое задание, и удаляет после подтверждения
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    private void ConfirmDelete(LessonFormatViewModel lesson)
+    {
+        if (DataContext is HomeworkFormatsViewModel model && ConfirmWindow.Ask("Удалить готовое задание?", $"{lesson.Meta}: файлы будут удалены, и задание можно будет подготовить заново.", "Удалить", "Отмена"))
+            model.DeleteDrafts(lesson);
     }
 
     /// <summary>

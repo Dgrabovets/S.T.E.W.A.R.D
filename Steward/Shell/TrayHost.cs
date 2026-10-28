@@ -568,6 +568,10 @@ public sealed class TrayHost : IDisposable
         _formats.TranscriptReader = _jobs.ReadTranscript;
         _formats.DraftLister = _jobs.DraftFiles;
         _formats.AnalysisReader = _jobs.ReadAnalysis;
+        _formats.ItemsReader = _jobs.Items;
+        _formats.ItemArchived = _jobs.ArchiveItem;
+        _formats.ItemToSingularity = _jobs.AddItemToSingularityAsync;
+        _formats.DraftsDeleted = _jobs.DeleteDrafts;
         _formats.GuideLister = _jobs.Guides;
         _formats.GuideFilesAdded = _jobs.AddGuideFiles;
         _formats.GuideFolderAdded = _jobs.AddGuideFolder;

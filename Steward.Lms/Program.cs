@@ -50,6 +50,22 @@ internal static class Program
                     Log(await TasksAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")), dryRun: args.Contains("--dry-run")));
 
                     return 0;
+                case "page":
+                    using (var lms = new LmsClient(settings))
+                    {
+                        await lms.LoginAsync(CancellationToken.None);
+                        File.WriteAllText(args[2], await lms.PageAsync(args[1], CancellationToken.None));
+                    }
+
+                    return 0;
+                case "extract":
+                    Log(await ExtractAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
+
+                    return 0;
+                case "task":
+                    Log(await AddTaskAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")), args[1], int.Parse(args[2], CultureInfo.InvariantCulture)));
+
+                    return 0;
                 case "analyze":
                     Log(await AnalyzeAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
 
@@ -80,6 +96,7 @@ internal static class Program
                     summary += "\n" + await FetchAsync(browser, settings, store, settings.MaxFetchPerRun);
                     summary += "\n" + await TasksAsync(settings, store, dryRun: !settings.CreateTasks);
                     summary += "\n" + await AnalyzeAsync(settings, store);
+                    summary += "\n" + await ExtractAsync(settings, store);
                     summary += "\n" + await PublishAsync(settings, store);
                     Log(summary);
                     Report(statusStore, ProcessStateEnum.Ok, summary, null);
@@ -138,6 +155,7 @@ internal static class Program
             activities.AddRange(await lms.ActivitiesAsync(course, CancellationToken.None));
 
         ActivityStore.Save(store.Root, activities);
+        await AssignmentSync.SyncAsync(lms, store, activities, Log);
         foreach (var subject in activities.Where(activity => !activity.Done).GroupBy(activity => activity.Subject).OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase))
             Log($"Не сдано: {subject.Key}: {subject.Count()} ({store.SubjectStateFor(subject.Key)})");
 
@@ -254,6 +272,82 @@ internal static class Program
         }
 
         return $"Разбор занятий: {done} из {todo.Length}";
+    }
+
+    /// <summary>
+    /// Ищет домашние задания в расшифровках занятий, у которых их ещё не искали, и записывает найденное в <c>items</c>. Условия заданий берутся из LMS: агент получает и список работ, и пути к их описаниям
+    /// </summary>
+    /// <param name="settings">Настройки: сколько занятий обрабатывать за запуск</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <returns>Строка итога для статуса</returns>
+    private static async Task<string> ExtractAsync(LmsSettings settings, HomeworkStore store)
+    {
+        var todo = store.LoadLessons().Where(store.ShouldExtract).Take(Math.Max(settings.MaxAnalyzePerRun, 0)).ToArray();
+        if (todo.Length == 0)
+            return "Поиск заданий: новых занятий нет";
+
+        var activities = store.LoadActivities();
+        var descriptions = activities
+            .Where(work => work.Id.Length > 0 && File.Exists(Path.Combine(store.AssignmentDirectory(work.Id), "assignment.md")))
+            .ToDictionary(work => work.Id, work => Path.Combine(store.AssignmentDirectory(work.Id), "assignment.md"), StringComparer.Ordinal);
+
+        var done = 0;
+        foreach (var lesson in todo)
+        {
+            var path = store.ItemsPath(lesson.Id);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+            var works = activities.Where(work => string.Equals(work.Subject, lesson.Title, StringComparison.OrdinalIgnoreCase)).ToArray();
+            var error = await ClaudeAgent.RunAsync(HomeworkExtractionPrompt.Build(lesson, store.TranscriptPath(lesson.Id), path, works, descriptions, settings.StudentName), store.Root, [.. descriptions.Values.Select(file => Path.GetDirectoryName(file)!).Distinct()], CancellationToken.None);
+            if (error.Length == 0 && store.ReadItems(lesson.Id) is null)
+                error = "Claude не записал файл заданий";
+
+            if (error.Length > 0)
+            {
+                Log($"Поиск заданий не удался: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}: {error}");
+
+                continue;
+            }
+
+            Log($"Задания: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}: {store.ReadItems(lesson.Id)!.Count}");
+            done++;
+        }
+
+        return $"Поиск заданий: {done} из {todo.Length}";
+    }
+
+    /// <summary>
+    /// Заводит задачу SingularityApp по найденному заданию по просьбе пользователя: кнопка «Добавить в Singularity» в окне. Флаг <c>CreateTasks</c> здесь не нужен, потому что запись просит сам человек
+    /// </summary>
+    /// <param name="settings">Настройки: подключение к SingularityApp</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns>Строка итога</returns>
+    /// <exception cref="InvalidOperationException">Занятия или задания нет, либо Singularity не настроен</exception>
+    private static async Task<string> AddTaskAsync(LmsSettings settings, HomeworkStore store, string lessonId, int number)
+    {
+        if (settings.Singularity is not { Token.Length: > 0 } configured || configured.Token.StartsWith('<'))
+            throw new InvalidOperationException("Singularity не настроен: впиши токен в lmssettings.json");
+
+        var lesson = store.LoadLessons().FirstOrDefault(item => item.Id == lessonId) ?? throw new InvalidOperationException("Занятие не найдено");
+        var items = store.ReadItems(lessonId) ?? throw new InvalidOperationException("У занятия нет найденных заданий");
+        if (number < 1 || number > items.Count)
+            throw new InvalidOperationException("Такого задания нет");
+
+        var externalId = HomeworkTaskBuilder.ExternalId(lesson, number);
+        using var singularity = new Steward.Mail.Services.SingularityClient(configured);
+        var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+        var known = await singularity.ListExternalIdsAsync(new DateTimeOffset(lesson.Date.AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), CancellationToken.None);
+        if (!known.Contains(externalId))
+        {
+            var drafts = Directory.Exists(store.DraftsDirectory(lessonId)) ? Directory.EnumerateFiles(store.DraftsDirectory(lessonId), $"Задание {number}.*").Order(StringComparer.Ordinal).ToArray() : [];
+            await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, items[number - 1], number, store.FormatFor(lessonId), configured.ProjectId, offset, drafts), CancellationToken.None);
+        }
+
+        store.MarkCreated([externalId]);
+
+        return known.Contains(externalId) ? $"Задача по заданию уже была в Singularity: {items[number - 1].Title}" : $"Задача заведена в Singularity: {items[number - 1].Title}";
     }
 
     /// <summary>
