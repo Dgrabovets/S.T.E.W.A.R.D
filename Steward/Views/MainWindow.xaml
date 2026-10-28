@@ -154,12 +154,6 @@
                         </TextBlock.Foreground>
                     </TextBlock>
                 </StackPanel>
-                <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="10,4,16,4" VerticalAlignment="Center" Margin="0,0,12,0">
-                    <StackPanel Orientation="Horizontal">
-                        <ctl:ActivityOrb Width="24" Height="24" Style="{StaticResource SummaryOrb}" Margin="0,0,6,0"/>
-                        <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource ToneBadgeText}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
                 <Button Grid.Column="2" Content="—" Style="{StaticResource GhostButton}" Click="Minimize_OnClick" ToolTip="Свернуть"/>
                 <Button x:Name="MaximizeButton" Grid.Column="3" Content="☐" Style="{StaticResource GhostButton}" Click="Maximize_OnClick" ToolTip="Развернуть"/>
                 <Button Grid.Column="4" Content="✕" Style="{StaticResource GhostButton}" Click="Close_OnClick" ToolTip="Скрыть в трей"/>
