@@ -25,6 +25,11 @@ public sealed class MainViewModel : PanelViewModel
     private bool _settingsOpen;
 
     /// <summary>
+    /// Процессы, чья главная страница это настройки
+    /// </summary>
+    private IReadOnlySet<string> _settingsHome = new HashSet<string>(StringComparer.Ordinal) { TaskRows.SCHEDULE_ID };
+
+    /// <summary>
     /// Карточки задач
     /// </summary>
     private IReadOnlyList<TaskCardViewModel> _tasks = [];
@@ -131,24 +136,29 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
+    /// Плитки состояния процессов для страницы «Статус»: расписание, почта, рилсы и расшифровки
+    /// </summary>
+    public IReadOnlyList<StatusGroupViewModel> ServiceGroups { get; private set; } = [];
+
+    /// <summary>
+    /// Плитки расписания: Docker, контейнер, следующая сверка и изменения за неделю
+    /// </summary>
+    private IReadOnlyList<StatusTileViewModel> _scheduleTiles = [];
+
+    /// <summary>
     /// Плашки состояния настроек почты
     /// </summary>
-    public IReadOnlyList<StatusChipViewModel> MailChips { get; private set; } = [];
+    private IReadOnlyList<StatusChipViewModel> _mailChips = [];
 
     /// <summary>
     /// Плашки состояния бота рилсов и входа в Instagram
     /// </summary>
-    public IReadOnlyList<StatusChipViewModel> ReelsChips { get; private set; } = [];
+    private IReadOnlyList<StatusChipViewModel> _reelsChips = [];
 
     /// <summary>
-    /// Плашки состояния выгрузки занятий: вход в LMS и MTS Link, запись в SingularityApp
+    /// Плашки состояния выгрузки занятий
     /// </summary>
-    public IReadOnlyList<StatusChipViewModel> TranscriptChips { get; private set; } = [];
-
-    /// <summary>
-    /// Плашки состояния расписания: Docker и контейнер
-    /// </summary>
-    public IReadOnlyList<StatusChipViewModel> ScheduleChips { get; private set; } = [];
+    private IReadOnlyList<StatusChipViewModel> _transcriptChips = [];
 
     /// <summary>
     /// Письма, разобранные при последних проверках почты: «Отзыв», «Ответить», «Инфо» со временем проверки
@@ -156,9 +166,14 @@ public sealed class MainViewModel : PanelViewModel
     public IReadOnlyList<LogLine> MailLetters { get; private set; } = [];
 
     /// <summary>
-    /// Последние сверки расписания короткими строками
+    /// Сводка по почте за неделю: проверки, разобранные письма, письма, на которые нужно ответить
     /// </summary>
-    public IReadOnlyList<string> RecentChecks { get; private set; } = [];
+    public IReadOnlyList<StatusTileViewModel> MailSummary { get; private set; } = [];
+
+    /// <summary>
+    /// Последние проверки почты короткими строками: время и итог
+    /// </summary>
+    public IReadOnlyList<LogLine> MailChecks { get; private set; } = [];
 
     /// <summary>
     /// Настройки почты
@@ -180,7 +195,7 @@ public sealed class MainViewModel : PanelViewModel
     /// </summary>
     public bool IsSettingsOpen
     {
-        get => _settingsOpen;
+        get => _settingsOpen || HomeIsSettings;
         set
         {
             if (Set(ref _settingsOpen, value))
@@ -189,14 +204,37 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
+    /// Главная страница процесса и есть его настройки: у процесса нет другого содержимого, или в реестре задано «homePage»: «settings»
+    /// </summary>
+    public bool HomeIsSettings => NavItems.FirstOrDefault(item => item.Page == _page)?.RowId is { } id && _settingsHome.Contains(id);
+
+    /// <summary>
+    /// Кнопка «Настройки» нужна: у страницы есть содержимое, кроме настроек
+    /// </summary>
+    public bool CanToggleSettings => !HomeIsSettings;
+
+    /// <summary>
+    /// Запоминает процессы, чья главная страница это настройки. Расписание такое всегда, потому что им занимается контейнер, а не задача реестра
+    /// </summary>
+    /// <param name="ids">Идентификаторы процессов из реестра с «homePage»: «settings»</param>
+    public void SetSettingsHome(IEnumerable<string> ids)
+    {
+        _settingsHome = new HashSet<string>(ids, StringComparer.Ordinal) { TaskRows.SCHEDULE_ID };
+        Raise(nameof(HomeIsSettings));
+        Raise(nameof(CanToggleSettings));
+        Raise(nameof(IsSettingsOpen));
+        Raise(nameof(IsContentOpen));
+    }
+
+    /// <summary>
     /// Показано содержимое страницы, а не настройки
     /// </summary>
-    public bool IsContentOpen => !_settingsOpen;
+    public bool IsContentOpen => !IsSettingsOpen;
 
     /// <summary>
     /// Переключает страницу между содержимым и настройками
     /// </summary>
-    public RelayCommand ToggleSettingsCommand => new(() => IsSettingsOpen = !IsSettingsOpen);
+    public RelayCommand ToggleSettingsCommand => new(() => IsSettingsOpen = !_settingsOpen);
 
     /// <summary>
     /// Заводит страницы настроек процессов, если их ещё нет
@@ -248,6 +286,23 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
+    /// Собирает плитки состояния всех процессов для страницы «Статус»
+    /// </summary>
+    private void RebuildServices()
+    {
+        static IReadOnlyList<StatusTileViewModel> Tiles(IReadOnlyList<StatusChipViewModel> chips) => [.. chips.Select(chip => new StatusTileViewModel(string.Empty, chip.Text, chip.Tone))];
+
+        ServiceGroups =
+        [
+            new StatusGroupViewModel("Расписание", _scheduleTiles),
+            new StatusGroupViewModel("Почта", Tiles(_mailChips)),
+            new StatusGroupViewModel("Рилсы", Tiles(_reelsChips)),
+            new StatusGroupViewModel("Расшифровки", Tiles(_transcriptChips)),
+        ];
+        Raise(nameof(ServiceGroups));
+    }
+
+    /// <summary>
     /// Просит открыть файл настроек процесса: «mail», «reels» или «lms»
     /// </summary>
     public event Action<string>? FileRequested;
@@ -275,12 +330,10 @@ public sealed class MainViewModel : PanelViewModel
     /// <param name="transcripts">Плашки выгрузки занятий</param>
     public void ApplyChips(IReadOnlyList<StatusChipViewModel> mail, IReadOnlyList<StatusChipViewModel> reels, IReadOnlyList<StatusChipViewModel> transcripts)
     {
-        MailChips = mail;
-        ReelsChips = reels;
-        TranscriptChips = transcripts;
-        Raise(nameof(MailChips));
-        Raise(nameof(ReelsChips));
-        Raise(nameof(TranscriptChips));
+        _mailChips = mail;
+        _reelsChips = reels;
+        _transcriptChips = transcripts;
+        RebuildServices();
     }
 
     /// <summary>
@@ -548,17 +601,32 @@ public sealed class MainViewModel : PanelViewModel
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
         Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();
 
-        ScheduleChips =
+        var weekAgo = DateTimeOffset.Now.AddDays(-7);
+        var last = snapshot.Entries.Count > 0 ? snapshot.Entries.Max(entry => entry.Time) : (DateTimeOffset?)null;
+        var next = last is { } seen ? seen.AddMinutes(Settings.IntervalMinutes) : (DateTimeOffset?)null;
+        _scheduleTiles =
         [
-            new StatusChipViewModel(snapshot.DockerAvailable ? "Docker запущен" : "Docker не запущен", snapshot.DockerAvailable ? PanelToneEnum.Running : PanelToneEnum.Problem),
-            new StatusChipViewModel(snapshot.ContainerRunning ? "Контейнер расписания работает" : "Контейнер расписания остановлен", snapshot.ContainerRunning ? PanelToneEnum.Running : PanelToneEnum.Attention),
+            new StatusTileViewModel("Docker", snapshot.DockerAvailable ? "запущен" : "не запущен", snapshot.DockerAvailable ? PanelToneEnum.Running : PanelToneEnum.Problem),
+            new StatusTileViewModel("Контейнер", snapshot.ContainerRunning ? "работает" : "остановлен", snapshot.ContainerRunning ? PanelToneEnum.Running : PanelToneEnum.Attention),
+            new StatusTileViewModel("Следующая сверка", next is { } due ? (due <= DateTimeOffset.Now ? "ожидается" : "около " + due.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)) : "нет данных", PanelToneEnum.Idle),
+            new StatusTileViewModel("Изменений за неделю", snapshot.Entries.Count(entry => entry.Tone == LogToneEnum.Update && entry.Time >= weekAgo).ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
         ];
-        RecentChecks = [.. snapshot.Entries.Take(5).Select(entry => $"{entry.Time.ToString("dd.MM HH:mm", System.Globalization.CultureInfo.InvariantCulture)}  {entry.Title}: {entry.Detail.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault()}")];
+        RebuildServices();
+        var mailRuns = records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).ToArray();
+        var mailWeek = mailRuns.Where(record => record.StartedAt >= weekAgo).ToArray();
+        var weekLetters = mailWeek.SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal)))).ToArray();
+        MailSummary =
+        [
+            new StatusTileViewModel("Проверок за неделю", mailWeek.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
+            new StatusTileViewModel("Разобрано писем", weekLetters.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
+            new StatusTileViewModel("Нужно ответить", weekLetters.Count(line => line.Text.StartsWith("Ответить:", StringComparison.Ordinal) || line.Text.StartsWith("[тест] Ответить:", StringComparison.Ordinal)).ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
+        ];
+        MailChecks = [.. mailRuns.Take(5).Select(record => new LogLine(record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm", System.Globalization.CultureInfo.InvariantCulture), record.Outcome == RunOutcomeEnum.Ok ? "проверка прошла" : "проверка не прошла", record.Outcome == RunOutcomeEnum.Ok ? PanelToneEnum.Running : PanelToneEnum.Problem))];
+        Raise(nameof(MailSummary));
+        Raise(nameof(MailChecks));
         MailLetters = [.. records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).Take(5)
             .SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal))))
             .Take(12)];
-        Raise(nameof(ScheduleChips));
-        Raise(nameof(RecentChecks));
         Raise(nameof(MailLetters));
         Raise(nameof(MailCard));
         Raise(nameof(ScheduleCard));
@@ -708,6 +776,10 @@ public sealed class MainViewModel : PanelViewModel
         _page = page;
         IsSettingsOpen = false;
         Raise(nameof(Page));
+        Raise(nameof(HomeIsSettings));
+        Raise(nameof(CanToggleSettings));
+        Raise(nameof(IsSettingsOpen));
+        Raise(nameof(IsContentOpen));
         Raise(nameof(IsStatusPage));
         Raise(nameof(IsIdeasPage));
         Raise(nameof(IsHomeworkPage));

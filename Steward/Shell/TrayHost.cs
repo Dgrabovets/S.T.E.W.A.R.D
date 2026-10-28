@@ -515,6 +515,7 @@ public sealed class TrayHost : IDisposable
         _main.ApplyHomework(_jobs.HomeworkRows());
         var root = DataLocation.RepoRootOrStart();
         _main.Model.AttachSettings(root, ApplyMain);
+        _main.Model.SetSettingsHome(_jobs.SettingsHomeIds());
         _main.Model.ApplyChips(SettingsProbe.Mail(root), SettingsProbe.Reels(root), SettingsProbe.Transcripts(root));
         _main.Model.Formats = Formats();
     }

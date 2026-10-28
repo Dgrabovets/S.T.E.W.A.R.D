@@ -180,6 +180,12 @@ public sealed class JobHost : IDisposable
     public IReadOnlyList<HomeworkRow> HomeworkRows() => _homework.LoadRows();
 
     /// <summary>
+    /// Процессы, главная страница которых это настройки
+    /// </summary>
+    /// <returns>Идентификаторы процессов с «homePage»: «settings»</returns>
+    public IReadOnlyList<string> SettingsHomeIds() => [.. _jobs.Where(job => string.Equals(job.HomePage, "settings", StringComparison.OrdinalIgnoreCase)).Select(job => job.Id)];
+
+    /// <summary>
     /// Проверяет, лежит ли расшифровка занятия
     /// </summary>
     /// <param name="lesson">Занятие</param>

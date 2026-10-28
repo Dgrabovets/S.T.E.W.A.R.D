@@ -14,7 +14,8 @@
         </Style>
     </UserControl.Resources>
     <DockPanel Margin="4,0,0,8" LastChildFill="False">
-        <Button DockPanel.Dock="Right" Style="{StaticResource SettingsToggle}" VerticalAlignment="Center"/>
+        <Button DockPanel.Dock="Right" Style="{StaticResource SettingsToggle}" VerticalAlignment="Center"
+                Visibility="{Binding CanToggleSettings, Converter={StaticResource BoolToVisibility}}"/>
         <TextBlock DockPanel.Dock="Left" Text="{Binding Title, ElementName=Root}" Style="{StaticResource TextHeadline}" VerticalAlignment="Center"/>
     </DockPanel>
 </UserControl>

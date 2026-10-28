@@ -106,6 +106,26 @@
             </Style.Triggers>
         </Style>
 
+        <DataTemplate x:Key="TileTemplate">
+            <Border Style="{StaticResource ToneBadge}" CornerRadius="{StaticResource RadiusCard}" Padding="14,10" Margin="0,0,8,8" MinWidth="170">
+                <StackPanel>
+                    <TextBlock Text="{Binding Label}" Style="{StaticResource TextCaption}" Visibility="{Binding HasLabel, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBlock Text="{Binding Value}" Style="{StaticResource ToneBadgeText}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <Style x:Key="TilesRow" TargetType="ItemsControl">
+            <Setter Property="ItemTemplate" Value="{StaticResource TileTemplate}"/>
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ContentPanel" TargetType="StackPanel">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
@@ -229,6 +249,17 @@
                                     </StackPanel>
                                 </Border>
                                 <ItemsControl ItemsSource="{Binding Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}"/>
+                                <TextBlock Text="Состояние" Style="{StaticResource PageTitle}" Margin="4,20,0,8"/>
+                                <ItemsControl ItemsSource="{Binding ServiceGroups}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,0,8">
+                                                <TextBlock Text="{Binding Title}" Style="{StaticResource TextTitle}" Margin="4,0,0,8"/>
+                                                <ItemsControl ItemsSource="{Binding Tiles}" Style="{StaticResource TilesRow}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -248,7 +279,6 @@
                             <StackPanel>
                                 <views:PageHeaderView Title="Рилсы"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
-                                    <ItemsControl ItemsSource="{Binding ReelsChips}" Style="{StaticResource ChipsRow}" Margin="0,0,0,8"/>
                                     <views:JsonSettingsView DataContext="{Binding ReelsSettings}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource ContentPanel}">
@@ -389,25 +419,39 @@
                             <StackPanel Margin="0,0,12,0">
                                 <views:PageHeaderView Title="Почта"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
-                                    <ItemsControl ItemsSource="{Binding MailChips}" Style="{StaticResource ChipsRow}" Margin="0,0,0,8"/>
                                     <views:JsonSettingsView DataContext="{Binding MailSettings}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource ContentPanel}">
-                                <TextBlock Text="Разобранные письма" Style="{StaticResource TextTitle}" Margin="4,12,0,8"/>
+                                <TextBlock Text="Сводка за неделю" Style="{StaticResource TextTitle}" Margin="4,0,0,8"/>
+                                <ItemsControl ItemsSource="{Binding MailSummary}" Style="{StaticResource TilesRow}"/>
+                                <TextBlock Text="Что разобрано последним" Style="{StaticResource TextTitle}" Margin="4,16,0,8"/>
                                 <TextBlock Style="{StaticResource PageHint}" TextWrapping="Wrap" Margin="4,0,0,8"
-                                           Text="Почта проверяется утром, вечером и при запуске приложения. Каждое письмо от человека или с отзывом превращается в задачу в Singularity, а здесь видно, что разобрано в последних проверках."/>
+                                           Text="Каждое письмо от человека или с отзывом превращается в задачу в Singularity. Здесь письма из последних проверок."/>
                                 <ItemsControl ItemsSource="{Binding MailLetters}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Style="{StaticResource LogLine}">
+                                            <Border Style="{StaticResource ToneBadge}" CornerRadius="{StaticResource RadiusCard}" Padding="14,10" Margin="0,0,0,8">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="*"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Text="{Binding Time}" Style="{StaticResource TextMono}" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource TextMono}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Time}" Style="{StaticResource TextCaption}" Margin="0,2,12,0"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource ToneBadgeText}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
                                                 </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Последние проверки" Style="{StaticResource TextTitle}" Margin="4,16,0,8"/>
+                                <ItemsControl ItemsSource="{Binding MailChecks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource ToneBadge}" CornerRadius="{StaticResource RadiusCard}" Padding="14,8" Margin="0,0,0,6">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Time}" Style="{StaticResource TextCaption}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Text}" Style="{StaticResource ToneBadgeText}"/>
+                                                </StackPanel>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -432,18 +476,7 @@
                             <StackPanel Margin="0,0,12,0">
                                 <views:PageHeaderView Title="Расписание"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
-                                    <ItemsControl ItemsSource="{Binding ScheduleChips}" Style="{StaticResource ChipsRow}" Margin="0,0,0,8"/>
                                     <views:ScheduleSettingsView DataContext="{Binding Settings}"/>
-                                </StackPanel>
-                                <StackPanel Style="{StaticResource ContentPanel}">
-                                <TextBlock Text="Последние сверки" Style="{StaticResource TextTitle}" Margin="4,24,0,8"/>
-                                <ItemsControl ItemsSource="{Binding RecentChecks}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding}" Style="{StaticResource TextSecondary}" Margin="4,0,0,6" TextWrapping="Wrap"/>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
                                 </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
@@ -464,7 +497,6 @@
                             <StackPanel Margin="0,0,12,0">
                                 <views:PageHeaderView Title="Расшифровки"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
-                                    <ItemsControl ItemsSource="{Binding TranscriptChips}" Style="{StaticResource ChipsRow}" Margin="0,0,0,8"/>
                                     <views:JsonSettingsView DataContext="{Binding LmsSettings}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource ContentPanel}">
