@@ -283,6 +283,11 @@ public sealed class SubjectViewModel : Bindable
     /// <summary>
     /// У скольких занятий уже есть расшифровка
     /// </summary>
+    public IReadOnlyList<LessonFormatViewModel> LessonsWithTranscript => [.. Lessons.Where(lesson => lesson.HasTranscript)];
+
+    /// <summary>
+    /// Сколько занятий расшифровано
+    /// </summary>
     public int Transcribed => Lessons.Count(lesson => lesson.HasTranscript);
 
     /// <summary>
@@ -326,6 +331,7 @@ public sealed class SubjectViewModel : Bindable
     /// </summary>
     private void RaiseCounters()
     {
+        Raise(nameof(LessonsWithTranscript));
         Raise(nameof(TranscribedText));
         Raise(nameof(Transcribed));
         Raise(nameof(Total));

@@ -1,4 +1,3 @@
-using System.Windows.Documents;
 using Steward.Homework.Models;
 using Steward.Models;
 using Steward.Mvvm;
@@ -82,16 +81,6 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private TranscriptText _reading = TranscriptText.Empty;
 
     /// <summary>
-    /// Готовый файл, открытый в предпросмотре
-    /// </summary>
-    private DraftFileViewModel? _openDraft;
-
-    /// <summary>
-    /// Документ предпросмотра
-    /// </summary>
-    private FlowDocument? _previewDocument;
-
-    /// <summary>
     /// Работы из LMS
     /// </summary>
     private IReadOnlyList<ActivityInfo> _activities = [];
@@ -132,7 +121,6 @@ public sealed class HomeworkFormatsViewModel : Bindable
         ShowTranscriptsCommand = new RelayCommand(() => HomeworkTab = false);
         ShowHomeworkCommand = new RelayCommand(() => HomeworkTab = true);
         CloseLessonCommand = new RelayCommand(CloseLesson);
-        CloseDraftCommand = new RelayCommand(CloseDraft);
         _fetchRequested = fetchRequested;
         _subjectFormatChosen = subjectFormatChosen;
         _stateChosen = stateChosen;
@@ -270,7 +258,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// </summary>
     /// <returns>Модель окна</returns>
     public GuidesDialogViewModel CreateGuidesDialog() => new(
-        SelectedSubject?.Title ?? string.Empty,
+        string.Empty,
         subject => GuideLister?.Invoke(subject) ?? [],
         GuideFolder,
         path => PathOpened?.Invoke(path),
@@ -292,7 +280,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// </summary>
     public void RefreshGuides()
     {
-        var entries = SelectedSubject is { } subject ? GuideLister?.Invoke(subject.Title) ?? [] : [];
+        var entries = GuideLister?.Invoke(string.Empty) ?? [];
         _guideCount = entries.Count(entry => entry.Kind == GuideKindEnum.Guide);
         _exampleCount = entries.Count(entry => entry.Kind == GuideKindEnum.Example);
         Raise(nameof(GuideSummary));
@@ -360,11 +348,6 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// Закрывает открытую расшифровку
     /// </summary>
     public RelayCommand CloseLessonCommand { get; }
-
-    /// <summary>
-    /// Закрывает предпросмотр файла
-    /// </summary>
-    public RelayCommand CloseDraftCommand { get; }
 
     /// <summary>
     /// Занятие, расшифровка которого открыта
@@ -492,33 +475,6 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public bool ReadingEmpty => _reading.Topic.Length == 0 && _reading.Overview.Length == 0 && _reading.Points.Count == 0;
 
     /// <summary>
-    /// Готовый файл, открытый в предпросмотре
-    /// </summary>
-    public DraftFileViewModel? OpenDraft
-    {
-        get => _openDraft;
-        private set
-        {
-            if (Set(ref _openDraft, value))
-                Raise(nameof(HasPreview));
-        }
-    }
-
-    /// <summary>
-    /// Предпросмотр файла открыт
-    /// </summary>
-    public bool HasPreview => OpenDraft is not null;
-
-    /// <summary>
-    /// Документ предпросмотра
-    /// </summary>
-    public FlowDocument? PreviewDocument
-    {
-        get => _previewDocument;
-        private set => Set(ref _previewDocument, value);
-    }
-
-    /// <summary>
     /// Запоминает работы из LMS и обновляет счётчики на плитках предметов
     /// </summary>
     /// <param name="activities">Задания и тесты</param>
@@ -595,37 +551,6 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Открывает предпросмотр готового файла
-    /// </summary>
-    /// <param name="file">Файл</param>
-    private void OpenDraftFile(DraftFileViewModel file)
-    {
-        foreach (var lesson in Lessons)
-        {
-            foreach (var other in lesson.Drafts)
-                other.IsOpen = other == file;
-        }
-
-        PreviewDocument = DocumentPreviewBuilder.Build(file.Path);
-        OpenDraft = file;
-    }
-
-    /// <summary>
-    /// Закрывает предпросмотр
-    /// </summary>
-    private void CloseDraft()
-    {
-        foreach (var lesson in Lessons)
-        {
-            foreach (var other in lesson.Drafts)
-                other.IsOpen = false;
-        }
-
-        OpenDraft = null;
-        PreviewDocument = null;
-    }
-
-    /// <summary>
     /// Обновляет список готовых файлов занятия, не пересоздавая его, пока файлы те же
     /// </summary>
     /// <param name="lesson">Занятие</param>
@@ -635,7 +560,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         if (paths.SequenceEqual(lesson.Drafts.Select(draft => draft.Path)))
             return;
 
-        lesson.Drafts = [.. paths.Select(path => new DraftFileViewModel(path, OpenDraftFile))];
+        lesson.Drafts = [.. paths.Select(path => new DraftFileViewModel(path, file => PathOpened?.Invoke(file), paths.Count == 1))];
     }
 
     /// <summary>

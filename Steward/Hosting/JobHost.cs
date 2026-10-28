@@ -254,6 +254,68 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
+    /// Открывает файл или папку. MD-файлы открываются в программе из настройки «Программа для MD-файлов» (по умолчанию Visual Studio Code), остальное в программе по умолчанию
+    /// </summary>
+    /// <param name="path">Путь к файлу или папке</param>
+    /// <returns>Пояснение, если открыть не удалось, иначе пустая строка</returns>
+    public string OpenFile(string path)
+    {
+        var editor = Path.GetExtension(path).Equals(".md", StringComparison.OrdinalIgnoreCase) ? MdEditor() : string.Empty;
+        try
+        {
+            System.Diagnostics.Process.Start(editor.Length > 0 ? new System.Diagnostics.ProcessStartInfo(editor, $"\"{path}\"") { UseShellExecute = true } : new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+
+            return string.Empty;
+        }
+        catch (System.ComponentModel.Win32Exception) when (editor.Length > 0)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+
+                return string.Empty;
+            }
+            catch (System.ComponentModel.Win32Exception exception)
+            {
+                return exception.Message;
+            }
+        }
+        catch (System.ComponentModel.Win32Exception exception)
+        {
+            return exception.Message;
+        }
+    }
+
+    /// <summary>
+    /// Программа для MD-файлов из настроек выгрузки занятий
+    /// </summary>
+    /// <returns>Команда программы, по умолчанию «code»</returns>
+    private static string MdEditor()
+    {
+        try
+        {
+            var file = SettingsProbe.LmsFile(DataLocation.RepoRootOrStart());
+            if (File.Exists(file) && System.Text.Json.JsonDocument.Parse(File.ReadAllText(file)) is { } document)
+            {
+                using (document)
+                {
+                    foreach (var property in document.RootElement.EnumerateObject())
+                    {
+                        if (property.NameEquals("mdEditor") || string.Equals(property.Name, "MdEditor", StringComparison.OrdinalIgnoreCase))
+                            return property.Value.GetString() is { Length: > 0 } value ? value : "code";
+                    }
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or System.Text.Json.JsonException or UnauthorizedAccessException)
+        {
+            // Файл настроек не читается: берём программу по умолчанию из кода
+        }
+
+        return "code";
+    }
+
+    /// <summary>
     /// Запоминает папку по пути на диске: оригиналы остаются на месте
     /// </summary>
     /// <param name="subject">Название предмета</param>
@@ -333,7 +395,8 @@ public sealed class JobHost : IDisposable
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_homework.ItemsPath(lesson.Id))!);
 
-        var prompt = HomeworkExtractionPrompt.Build(lesson, _homework.TranscriptPath(lesson.Id), _homework.ItemsPath(lesson.Id));
+        var works = _homework.LoadActivities().Where(work => string.Equals(work.Subject, lesson.Title, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var prompt = HomeworkExtractionPrompt.Build(lesson, _homework.TranscriptPath(lesson.Id), _homework.ItemsPath(lesson.Id), works);
         var error = await ClaudeAgent.RunAsync(prompt, _homework.Root, cancellationToken);
         if (error.Length > 0)
             return (0, error);
@@ -342,6 +405,10 @@ public sealed class JobHost : IDisposable
             return (0, "Claude не записал файл заданий");
 
         var format = request.Format;
+        var pending = items.Count(item => !item.Done);
+        if (items.Count > 0 && pending == 0)
+            return (0, "Все задания этого занятия уже сданы");
+
         if (items.Count == 0 || format == HomeworkFormatEnum.Skip)
             return (items.Count, string.Empty);
 
@@ -351,7 +418,7 @@ public sealed class JobHost : IDisposable
 
         RunNow(LMS_ID);
 
-        return (items.Count, string.Empty);
+        return (pending, string.Empty);
     }
 
     /// <summary>

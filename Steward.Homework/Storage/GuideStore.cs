@@ -64,11 +64,11 @@ public sealed partial class GuideStore(string directory)
     }
 
     /// <summary>
-    /// Материалы одного предмета
+    /// Материалы для подготовки заданий. Они общие для всех предметов: один набор методических указаний и образцов подходит к любому предмету
     /// </summary>
-    /// <param name="subject">Название предмета</param>
-    /// <returns>Материалы предмета</returns>
-    public IReadOnlyList<GuideEntry> ForSubject(string subject) => [.. Load().Where(entry => string.Equals(entry.Subject, subject, StringComparison.OrdinalIgnoreCase))];
+    /// <param name="subject">Название предмета. Не влияет на выбор, оставлено для совместимости</param>
+    /// <returns>Все материалы</returns>
+    public IReadOnlyList<GuideEntry> ForSubject(string subject) => Load();
 
     /// <summary>
     /// Копирует файл в папку материалов предмета и запоминает его
@@ -304,7 +304,7 @@ public sealed partial class GuideStore(string directory)
     {
         var slug = string.Concat(subject.Where(symbol => char.IsLetterOrDigit(symbol) || symbol is ' ' or '-')).Trim();
 
-        return Path.Combine(Folder, slug.Length > 0 ? slug : "предмет");
+        return Path.Combine(Folder, slug.Length > 0 ? slug : "Общие");
     }
 
     /// <summary>

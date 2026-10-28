@@ -7,4 +7,5 @@ namespace Steward.Homework.Models;
 /// <param name="Due">Срок сдачи или <see langword="null"/>, если на занятии его не назвали</param>
 /// <param name="Requirements">Требования к работе: объём, оформление, что обязательно включить</param>
 /// <param name="Link">Ссылка на задание, если её назвали, иначе пусто</param>
-public sealed record HomeworkItem(string Title, DateOnly? Due, string Requirements, string Link);
+/// <param name="Done">Задание уже сдано: по данным LMS работа по этому заданию отправлена. Такие задания не готовятся</param>
+public sealed record HomeworkItem(string Title, DateOnly? Due, string Requirements, string Link, bool Done = false);

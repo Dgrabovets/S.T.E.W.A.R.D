@@ -71,7 +71,7 @@ public sealed class GuidesDialogViewModel : Bindable
     /// <summary>
     /// Создаёт окно
     /// </summary>
-    /// <param name="subject">Название предмета</param>
+    /// <param name="subject">Название предмета. Материалы общие для всех предметов, поэтому здесь пусто</param>
     /// <param name="lister">Читает материалы предмета</param>
     /// <param name="folder">Папка материалов приложения</param>
     /// <param name="open">Открывает файл или папку</param>

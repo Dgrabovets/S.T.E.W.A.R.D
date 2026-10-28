@@ -1,39 +1,27 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using Steward.Mvvm;
 
 namespace Steward.ViewModels;
 
 /// <summary>
-/// Готовый файл с домашним заданием: показывается в списке занятия и открывается в предпросмотре
+/// Готовый файл с домашним заданием: на карточке занятия ему соответствует кнопка «Посмотреть задание», она открывает файл в нужной программе
 /// </summary>
-public sealed class DraftFileViewModel : Bindable
+public sealed partial class DraftFileViewModel
 {
     /// <summary>
-    /// Файл открыт в предпросмотре
-    /// </summary>
-    private bool _isOpen;
-
-    /// <summary>
-    /// Создаёт строку файла
+    /// Создаёт кнопку
     /// </summary>
     /// <param name="path">Путь к файлу</param>
-    /// <param name="open">Действие по нажатию: открыть предпросмотр</param>
-    public DraftFileViewModel(string path, Action<DraftFileViewModel> open)
+    /// <param name="open">Открывает файл в программе для его формата</param>
+    /// <param name="single">У занятия один готовый файл: тогда на кнопке нет номера задания</param>
+    public DraftFileViewModel(string path, Action<string> open, bool single)
     {
         Path = path;
         Name = System.IO.Path.GetFileName(path);
-        Kind = System.IO.Path.GetExtension(path).ToLowerInvariant() switch
-        {
-            ".docx" => "Word",
-            ".pptx" => "Презентация",
-            ".md" or ".markdown" => "Markdown",
-            ".txt" => "Текст",
-            ".pdf" => "PDF",
-            "" => "Файл",
-            var other => "Код " + other,
-        };
-        Meta = $"{Kind}  ·  {File.GetLastWriteTime(path).ToString("dd.MM HH:mm", System.Globalization.CultureInfo.InvariantCulture)}";
-        OpenCommand = new RelayCommand(() => open(this));
+        var number = Number().Match(Name);
+        ButtonTitle = single || !number.Success ? "Посмотреть задание" : $"Посмотреть задание {number.Groups[1].Value}";
+        OpenCommand = new RelayCommand(() => open(path));
     }
 
     /// <summary>
@@ -47,26 +35,15 @@ public sealed class DraftFileViewModel : Bindable
     public string Name { get; }
 
     /// <summary>
-    /// Что за формат
+    /// Подпись кнопки
     /// </summary>
-    public string Kind { get; }
+    public string ButtonTitle { get; }
 
     /// <summary>
-    /// Формат и время создания
-    /// </summary>
-    public string Meta { get; }
-
-    /// <summary>
-    /// Файл открыт в предпросмотре
-    /// </summary>
-    public bool IsOpen
-    {
-        get => _isOpen;
-        set => Set(ref _isOpen, value);
-    }
-
-    /// <summary>
-    /// Открывает предпросмотр
+    /// Открывает файл
     /// </summary>
     public RelayCommand OpenCommand { get; }
+
+    [GeneratedRegex(@"^Задание (\d+)")]
+    private static partial Regex Number();
 }

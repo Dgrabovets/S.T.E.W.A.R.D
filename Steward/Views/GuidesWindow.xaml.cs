@@ -38,32 +38,33 @@ public partial class GuidesWindow : Window
     }
 
     /// <summary>
-    /// Выбирает файлы в проводнике
+    /// Выбирает в проводнике файлы или папку одним окном: выбранные файлы добавляются как есть, а если открыть папку и нажать «Открыть», добавляется вся папка
     /// </summary>
     /// <param name="sender">Кнопка</param>
     /// <param name="e">Событие</param>
     private void Browse_OnClick(object sender, RoutedEventArgs e)
     {
+        const string PLACEHOLDER = "Выбор этой папки";
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Multiselect = true,
-            Title = "Выбери файлы",
+            CheckFileExists = false,
+            ValidateNames = false,
+            FileName = PLACEHOLDER,
+            Title = "Выбери файлы или открой папку и нажми «Открыть»",
             Filter = "Документы и текст|*.docx;*.pptx;*.pdf;*.md;*.txt;*.rtf|Все файлы|*.*",
         };
-        if (dialog.ShowDialog(this) == true)
-            ((GuidesDialogViewModel)DataContext).AddFiles(dialog.FileNames);
-    }
+        if (dialog.ShowDialog(this) != true)
+            return;
 
-    /// <summary>
-    /// Выбирает папку в проводнике
-    /// </summary>
-    /// <param name="sender">Кнопка</param>
-    /// <param name="e">Событие</param>
-    private void Folder_OnClick(object sender, RoutedEventArgs e)
-    {
-        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Выбери папку" };
-        if (dialog.ShowDialog(this) == true)
-            ((GuidesDialogViewModel)DataContext).AddFolder(dialog.FolderName);
+        var model = (GuidesDialogViewModel)DataContext;
+        model.AddFiles([.. dialog.FileNames.Where(System.IO.File.Exists)]);
+        foreach (var name in dialog.FileNames.Where(name => !System.IO.File.Exists(name) && System.IO.Path.GetFileName(name) == PLACEHOLDER))
+        {
+            var folder = System.IO.Path.GetDirectoryName(name);
+            if (folder is not null && System.IO.Directory.Exists(folder))
+                model.AddFolder(folder);
+        }
     }
 
     /// <summary>

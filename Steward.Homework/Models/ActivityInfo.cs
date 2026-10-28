@@ -7,4 +7,6 @@ namespace Steward.Homework.Models;
 /// <param name="Name">Название работы</param>
 /// <param name="IsQuiz">Это тест, а не задание</param>
 /// <param name="Done">Работа сдана</param>
-public sealed record ActivityInfo(string Subject, string Name, bool IsQuiz, bool Done);
+/// <param name="Section">Раздел курса, в котором лежит работа</param>
+/// <param name="Due">Срок сдачи или <see langword="null"/>, если его нет</param>
+public sealed record ActivityInfo(string Subject, string Name, bool IsQuiz, bool Done, string Section = "", DateOnly? Due = null);

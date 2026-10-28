@@ -58,6 +58,11 @@
                         <Border.InputBindings>
                             <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCommand}"/>
                         </Border.InputBindings>
+                        <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
                         <StackPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -73,7 +78,8 @@
                             <ProgressBar Value="{Binding AssignmentsProgress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
                             <TextBlock Text="{Binding QuizzesText}" Style="{StaticResource TextCaption}" Margin="0,8,0,0"/>
                             <ProgressBar Value="{Binding QuizzesProgress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                        </StackPanel>
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,12,0,0">
                                 <ComboBox Style="{StaticResource FieldChoice}" Width="172" Margin="0,0,8,0"
                                           ItemsSource="{Binding StateOptions}" SelectedItem="{Binding SelectedStateOption, Mode=TwoWay}"
                                           Visibility="{Binding HasStates, Converter={StaticResource BoolToVisibility}}">
@@ -93,7 +99,7 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
                             </StackPanel>
-                        </StackPanel>
+                        </Grid>
                     </Border>
                     <DataTemplate.Triggers>
                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
@@ -373,22 +379,47 @@
                         <Button Grid.Column="1" Content="Методические указания" Command="{Binding ManageGuidesCommand}" Style="{StaticResource OutlineButton}" BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"/>
                     </Grid>
                 </Border>
-                <Grid Margin="0,8,0,0" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="340"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-
-                    <ItemsControl ItemsSource="{Binding SelectedSubject.Lessons}" Margin="0,0,12,0">
+                <StackPanel Margin="0,8,0,0" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl ItemsSource="{Binding SelectedSubject.LessonsWithTranscript}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Style="{StaticResource Card}" Margin="0,0,0,8" Padding="14,10"
-                                        Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Headline}" Style="{StaticResource TextBody}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Headline}"/>
-                                        <TextBlock Text="{Binding Duration}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" Visibility="{Binding HasDuration, Converter={StaticResource BoolToVisibility}}"/>
-                                        <Button Content="Подготовить задание" Command="{Binding PrepareCommand}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,8,0,0"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0" Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
+                                <Border Style="{StaticResource Card}" Margin="0,0,10,10" Padding="14,12">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Headline}" Style="{StaticResource TextBody}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Headline}"/>
+                                            <TextBlock Text="{Binding Duration}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" Visibility="{Binding HasDuration, Converter={StaticResource BoolToVisibility}}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <Button Content="Подготовить задание" Command="{Binding PrepareCommand}" Style="{StaticResource PrimaryButton}"
+                                                    Visibility="{Binding CanPrepare, Converter={StaticResource BoolToVisibility}}"/>
+                                            <ItemsControl ItemsSource="{Binding Drafts}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="{Binding ButtonTitle}" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" Margin="0,2,0,2" ToolTip="{Binding Name}"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0"
+                                                    Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
                                             <ctl:ActivityOrb Width="28" Height="28" Style="{StaticResource ActivityOrb}" Margin="-6,-4,8,-4"/>
                                             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextWrapping="Wrap">
                                                 <TextBlock.Style>
@@ -402,70 +433,30 @@
                                                 </TextBlock.Style>
                                             </TextBlock>
                                         </StackPanel>
-                                        <ItemsControl ItemsSource="{Binding Drafts}" Margin="0,8,0,0">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Button Command="{Binding OpenCommand}" Style="{StaticResource RowButton}" Margin="0,0,0,4">
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}"/>
-                                                        </StackPanel>
-                                                    </Button>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <StackPanel Grid.Column="1">
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,8" VerticalAlignment="Top">
-                            <StackPanel>
-                                <TextBlock TextWrapping="Wrap" Text="Когда задание будет готово, файл появится у занятия слева. Нажми на него, и он откроется здесь: Word, презентация, текст или код.">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource TextSecondary}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasPreview}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <StackPanel Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}">
-                                    <Grid>
-                                        <StackPanel Margin="0,0,40,0">
-                                            <TextBlock Text="{Binding OpenDraft.Name}" Style="{StaticResource TextTitle}" TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding OpenDraft.Meta}" Style="{StaticResource TextCaption}"/>
-                                        </StackPanel>
-                                        <Button Content="✕" Command="{Binding CloseDraftCommand}" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Закрыть"/>
-                                    </Grid>
-                                    <FlowDocumentScrollViewer Document="{Binding PreviewDocument}" Style="{StaticResource ReaderViewer}" Height="560" Margin="0,10,0,0"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <TextBlock Text="Найденные задания" Style="{StaticResource TextCaption}" Margin="4,8,0,6" Visibility="{Binding SelectedSubject.HasHomework, Converter={StaticResource BoolToVisibility}}"/>
-                        <ItemsControl ItemsSource="{Binding SelectedSubject.Homework}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Style="{StaticResource Card}" Margin="0,0,0,8" Padding="14,10">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                            <TextBlock Style="{StaticResource TextCaption}" Margin="0,4,0,0">
-                                                <Run Text="{Binding Lesson, Mode=OneWay}"/><Run Text="  ·  "/><Run Text="{Binding Due, Mode=OneWay}"/><Run Text="  ·  "/><Run Text="{Binding Status, Mode=OneWay}"/>
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding Requirements}" Style="{StaticResource TextSecondary}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                                       Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Grid>
+                    <TextBlock Text="Найденные задания" Style="{StaticResource TextCaption}" Margin="4,8,0,6" Visibility="{Binding SelectedSubject.HasHomework, Converter={StaticResource BoolToVisibility}}"/>
+                    <ItemsControl ItemsSource="{Binding SelectedSubject.Homework}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Card}" Margin="0,0,10,8" Padding="14,10">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                        <TextBlock Style="{StaticResource TextCaption}" Margin="0,4,0,0">
+                                            <Run Text="{Binding Lesson, Mode=OneWay}"/><Run Text="  ·  "/><Run Text="{Binding Due, Mode=OneWay}"/><Run Text="  ·  "/><Run Text="{Binding Status, Mode=OneWay}"/>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Requirements}" Style="{StaticResource TextSecondary}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                   Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
             </StackPanel>
         </StackPanel>
     </StackPanel>

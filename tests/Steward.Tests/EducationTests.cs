@@ -236,7 +236,6 @@ public class EducationTests
 
             var copied = store.AddFile("Гейм-дизайн", GuideKindEnum.Guide, docx);
             var folder = store.AddReference("Гейм-дизайн", GuideKindEnum.Example, outside.FullName);
-            store.AddFile("Базы данных", GuideKindEnum.Guide, docx);
 
             Assert.True(File.Exists(copied.Path));
             Assert.StartsWith(store.Folder, copied.Path, StringComparison.OrdinalIgnoreCase);
@@ -247,7 +246,7 @@ public class EducationTests
             Assert.Equal("https://drive.google.com/uc?export=download&id=abc123", GuideStore.Direct(web.Url));
             Assert.Equal("https://docs.google.com/document/d/XYZ/export?format=docx", GuideStore.Direct("https://docs.google.com/document/d/XYZ/edit"));
             Assert.Equal(3, store.ForSubject("гейм-дизайн").Count);
-            Assert.Single(store.ForSubject("Базы данных"));
+            Assert.Equal(3, store.ForSubject("Базы данных").Count);
             Assert.Throws<ArgumentException>(() => store.AddReference("Гейм-дизайн", GuideKindEnum.Guide, "не путь и не файл"));
 
             var materials = store.Materials("Гейм-дизайн");
@@ -364,7 +363,7 @@ public class EducationTests
         };
         var model = new PrepareDialogViewModel("25.10.2026 · Лекция 3", HomeworkFormatEnum.Skip, materials, @"D:\g");
 
-        Assert.Equal(["Word", "Презентация", "Текст", "Код"], model.Formats.Select(choice => choice.Title).ToArray());
+        Assert.Equal(["Word", "Презентация", "MD", "Код"], model.Formats.Select(choice => choice.Title).ToArray());
         Assert.Equal(HomeworkFormatEnum.Word, model.Format);
         Assert.True(model.Formats[0].IsSelected);
         Assert.False(model.NoMaterials);
@@ -380,6 +379,89 @@ public class EducationTests
         Assert.Equal("уложись в страницу", request.Extra);
         Assert.Equal(["e1"], request.GuideIds!.ToArray());
         Assert.True(new PrepareDialogViewModel("x", HomeworkFormatEnum.Word, [], string.Empty).NoMaterials);
+    }
+
+    /// <summary>
+    /// Задание, которое по данным LMS уже сдано, читается из ответа агента, не готовится, а в просьбе агенту есть список работ предмета
+    /// </summary>
+    [Fact]
+    public async Task A_submitted_item_is_read_and_skipped_when_preparing()
+    {
+        var items = HomeworkItemParser.Parse("""[{"title":"Отчёт 1","done":true},{"title":"Отчёт 2","done":false},{"title":"Отчёт 3"}]""");
+
+        Assert.Equal([true, false, false], items.Select(item => item.Done).ToArray());
+
+        var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 19));
+        var prompt = HomeworkExtractionPrompt.Build(lesson, "t.txt", "r.json", [new ActivityInfo("Гейм-дизайн", "Задание 1", false, true, "Баланс", new DateOnly(2026, 10, 23)), new ActivityInfo("Гейм-дизайн", "Итоговый тест", true, false)]);
+
+        Assert.Contains("Задание 1; раздел: Баланс; срок: 23.10.2026; сдано", prompt, StringComparison.Ordinal);
+        Assert.Contains("Итоговый тест; раздел: ; срок: нет; не сдано; тест", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Работы предмета в LMS", HomeworkExtractionPrompt.Build(lesson, "t.txt", "r.json"), StringComparison.Ordinal);
+
+        var directory = Directory.CreateTempSubdirectory("steward-done-");
+        try
+        {
+            var calls = 0;
+            DraftBuilder.AgentRun agent = (request, _, _, _) =>
+            {
+                calls++;
+                File.WriteAllText(ResultPath(request), "# Работа");
+
+                return Task.FromResult(string.Empty);
+            };
+
+            var (files, error) = await DraftBuilder.BuildAsync(new HomeworkStore(directory.FullName), lesson, items, HomeworkFormatEnum.Text, agent, CancellationToken.None);
+
+            Assert.Empty(error);
+            Assert.Equal(2, calls);
+            Assert.Equal(2, files.Count);
+            Assert.DoesNotContain(files, file => Path.GetFileName(file).StartsWith("Задание 1.", StringComparison.Ordinal));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Когда у занятия есть готовые файлы, кнопка «Подготовить задание» уходит, а вместо неё кнопки «Посмотреть задание»: у одного файла без номера, у нескольких с номером. Файл открывается через переданное действие
+    /// </summary>
+    [Fact]
+    public void Ready_files_replace_the_prepare_button_with_view_buttons()
+    {
+        var opened = new List<string>();
+        var model = new HomeworkFormatsViewModel([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((1, string.Empty)));
+        model.PathOpened = opened.Add;
+        var directory = Directory.CreateTempSubdirectory("steward-view-");
+        try
+        {
+            var first = Path.Combine(directory.FullName, "Задание 1. Отчёт.docx");
+            var second = Path.Combine(directory.FullName, "Задание 2. План.md");
+            File.WriteAllText(first, "x");
+            model.DraftLister = _ => [first];
+            model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+            var lesson = model.Lessons.Single();
+
+            Assert.False(lesson.CanPrepare);
+            Assert.Equal("Посмотреть задание", lesson.Drafts.Single().ButtonTitle);
+
+            File.WriteAllText(second, "x");
+            model.DraftLister = _ => [first, second];
+            model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+            lesson.Drafts[1].OpenCommand.Execute(null);
+
+            Assert.Equal(["Посмотреть задание 1", "Посмотреть задание 2"], lesson.Drafts.Select(draft => draft.ButtonTitle).ToArray());
+            Assert.Equal([second], opened);
+
+            model.DraftLister = _ => [];
+            model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+            Assert.True(lesson.CanPrepare);
+            Assert.Equal("MD", HomeworkFormats.Title(HomeworkFormatEnum.Text));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
     }
 
     /// <summary>

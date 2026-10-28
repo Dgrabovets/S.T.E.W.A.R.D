@@ -65,7 +65,8 @@ public static class HomeworkItemParser
             title,
             DateOnly.TryParseExact(Text(element, "due"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var due) ? due : null,
             Text(element, "requirements"),
-            Text(element, "link"));
+            Text(element, "link"),
+            element.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.True);
     }
 
     /// <summary>

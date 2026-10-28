@@ -24,7 +24,7 @@ public static class HomeworkFormats
     {
         HomeworkFormatEnum.Word => "Word",
         HomeworkFormatEnum.Presentation => "Презентация",
-        HomeworkFormatEnum.Text => "Текст",
+        HomeworkFormatEnum.Text => "MD",
         HomeworkFormatEnum.Code => "Код",
         _ => "Не готовить",
     };

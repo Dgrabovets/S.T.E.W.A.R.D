@@ -367,14 +367,16 @@ public sealed class TrayHost : IDisposable
         if (path.Length == 0)
             return;
 
-        try
+        if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase))
         {
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            OpenLink(path);
+
+            return;
         }
-        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            _icon.ShowBalloonTip(BALLOON_MS, "Материалы", "Не удалось открыть: " + exception.Message, ToolTipIcon.None);
-        }
+
+        var error = _jobs.OpenFile(path);
+        if (error.Length > 0)
+            _icon.ShowBalloonTip(BALLOON_MS, "Файл", "Не удалось открыть: " + error, ToolTipIcon.None);
     }
 
     /// <summary>

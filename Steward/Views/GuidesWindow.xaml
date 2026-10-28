@@ -58,7 +58,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="Методические указания" Style="{StaticResource TextHeadline}"/>
-                    <TextBlock Text="{Binding Subject}" Style="{StaticResource TextCaption}" Margin="0,2,0,0"/>
+                    <TextBlock Text="Общие для всех предметов" Style="{StaticResource TextCaption}" Margin="0,2,0,0"/>
                 </StackPanel>
                 <Button Grid.Column="1" Click="Close_OnClick" Style="{StaticResource IconButton}" VerticalAlignment="Top" ToolTip="Закрыть">
                     <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
@@ -116,8 +116,7 @@
                            Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}"/>
                 <Grid>
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="Обзор…" Click="Browse_OnClick" Style="{StaticResource OutlineButton}" ToolTip="Выбрать файлы в проводнике"/>
-                        <Button Content="Папка…" Click="Folder_OnClick" Style="{StaticResource ActionButton}" Margin="8,0,0,0" ToolTip="Выбрать папку в проводнике"/>
+                        <Button Content="Обзор…" Click="Browse_OnClick" Style="{StaticResource OutlineButton}" ToolTip="Выбери файлы или открой папку и нажми «Открыть»: добавится вся папка"/>
                         <Button Content="Ссылка" Click="Link_OnClick" Style="{StaticResource ActionButton}" Margin="8,0,0,0" ToolTip="Взять ссылку на файл из буфера обмена. То же делает Ctrl+V"/>
                     </StackPanel>
                     <Button Content="Готово" Click="Close_OnClick" IsDefault="True" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right"/>

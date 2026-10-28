@@ -133,8 +133,11 @@ public sealed class LessonFormatViewModel : Bindable
         get => _drafts;
         set
         {
-            if (Set(ref _drafts, value))
-                Raise(nameof(HasDrafts));
+            if (!Set(ref _drafts, value))
+                return;
+
+            Raise(nameof(HasDrafts));
+            Raise(nameof(CanPrepare));
         }
     }
 
@@ -142,6 +145,11 @@ public sealed class LessonFormatViewModel : Bindable
     /// У занятия есть готовые файлы
     /// </summary>
     public bool HasDrafts => Drafts.Count > 0;
+
+    /// <summary>
+    /// Кнопка «Подготовить задание» нужна: готовых файлов ещё нет. Когда они есть, вместо неё кнопки «Посмотреть задание»
+    /// </summary>
+    public bool CanPrepare => !HasDrafts;
 
     /// <summary>
     /// У занятия уже есть расшифровка: тогда можно подготовить задания

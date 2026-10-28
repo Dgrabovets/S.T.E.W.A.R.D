@@ -353,7 +353,9 @@ public sealed class HomeworkStore(string directory)
                     item.TryGetProperty("subject", out var subject) ? subject.GetString() ?? string.Empty : string.Empty,
                     item.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
                     item.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.Number && kind.GetInt32() == 1,
-                    item.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.True))
+                    item.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.True,
+                    item.TryGetProperty("section", out var section) ? section.GetString() ?? string.Empty : string.Empty,
+                    item.TryGetProperty("due", out var due) && due.ValueKind == JsonValueKind.String && DateTime.TryParse(due.GetString(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dueDate) ? DateOnly.FromDateTime(dueDate) : null))
             ];
         }
         catch (Exception exception) when (exception is IOException or JsonException or InvalidOperationException)
