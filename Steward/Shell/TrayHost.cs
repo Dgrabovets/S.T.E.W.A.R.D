@@ -544,7 +544,11 @@ public sealed class TrayHost : IDisposable
     private HomeworkFormatsViewModel Formats()
     {
         _formats ??= new HomeworkFormatsViewModel(_jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None), _jobs.SetSubjectState, _jobs.SubjectState, _jobs.RequestTranscript, _jobs.SetSubjectFormat);
+        _formats.TranscriptReader = _jobs.ReadTranscript;
+        _formats.DraftLister = _jobs.DraftFiles;
         _formats.Update(_jobs.Lessons());
+        _formats.ApplyActivities(_jobs.Activities());
+        _formats.ApplyHomework(_jobs.HomeworkRows());
 
         return _formats;
     }

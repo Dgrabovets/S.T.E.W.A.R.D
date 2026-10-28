@@ -180,6 +180,26 @@ public sealed class JobHost : IDisposable
     public IReadOnlyList<HomeworkRow> HomeworkRows() => _homework.LoadRows();
 
     /// <summary>
+    /// Читает текст расшифровки занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Текст или пустая строка</returns>
+    public string ReadTranscript(string lessonId) => _homework.ReadTranscript(lessonId);
+
+    /// <summary>
+    /// Находит готовые файлы заданий занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Пути к файлам</returns>
+    public IReadOnlyList<string> DraftFiles(string lessonId) => _homework.DraftFiles(lessonId);
+
+    /// <summary>
+    /// Читает работы из LMS для счётчиков на плитках предметов
+    /// </summary>
+    /// <returns>Задания и тесты</returns>
+    public IReadOnlyList<ActivityInfo> Activities() => _homework.LoadActivities();
+
+    /// <summary>
     /// Процессы, главная страница которых это настройки
     /// </summary>
     /// <returns>Идентификаторы процессов с «homePage»: «settings»</returns>

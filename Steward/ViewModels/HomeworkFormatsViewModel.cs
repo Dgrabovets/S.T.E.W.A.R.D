@@ -1,5 +1,7 @@
+using System.Windows.Documents;
 using Steward.Homework.Models;
 using Steward.Mvvm;
+using Steward.Preview;
 
 namespace Steward.ViewModels;
 
@@ -64,6 +66,46 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private IReadOnlyDictionary<string, HomeworkFormatEnum> _formatByTitle = new Dictionary<string, HomeworkFormatEnum>();
 
     /// <summary>
+    /// Открыта вкладка «Домашние задания»
+    /// </summary>
+    private bool _homeworkTab;
+
+    /// <summary>
+    /// Занятие, расшифровка которого открыта
+    /// </summary>
+    private LessonFormatViewModel? _openLesson;
+
+    /// <summary>
+    /// Резюме открытой расшифровки
+    /// </summary>
+    private FlowDocument? _summaryDocument;
+
+    /// <summary>
+    /// Полный текст открытой расшифровки
+    /// </summary>
+    private FlowDocument? _bodyDocument;
+
+    /// <summary>
+    /// Готовый файл, открытый в предпросмотре
+    /// </summary>
+    private DraftFileViewModel? _openDraft;
+
+    /// <summary>
+    /// Документ предпросмотра
+    /// </summary>
+    private FlowDocument? _previewDocument;
+
+    /// <summary>
+    /// Работы из LMS
+    /// </summary>
+    private IReadOnlyList<ActivityInfo> _activities = [];
+
+    /// <summary>
+    /// Задания, найденные в расшифровках
+    /// </summary>
+    private IReadOnlyList<HomeworkCardViewModel> _homeworkCards = [];
+
+    /// <summary>
     /// Создаёт модель без занятий
     /// </summary>
     /// <param name="chosen">Вызывается при выборе формата: параметры — ключ занятия и формат</param>
@@ -80,6 +122,10 @@ public sealed class HomeworkFormatsViewModel : Bindable
         Action<Lesson>? fetchRequested = null,
         Action<string, HomeworkFormatEnum>? subjectFormatChosen = null)
     {
+        ShowTranscriptsCommand = new RelayCommand(() => HomeworkTab = false);
+        ShowHomeworkCommand = new RelayCommand(() => HomeworkTab = true);
+        CloseLessonCommand = new RelayCommand(CloseLesson);
+        CloseDraftCommand = new RelayCommand(CloseDraft);
         _fetchRequested = fetchRequested;
         _subjectFormatChosen = subjectFormatChosen;
         _stateChosen = stateChosen;
@@ -148,6 +194,219 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public bool IsEmpty => Lessons.Count == 0;
 
     /// <summary>
+    /// Читает текст расшифровки по ключу занятия
+    /// </summary>
+    public Func<string, string>? TranscriptReader { get; set; }
+
+    /// <summary>
+    /// Находит готовые файлы заданий по ключу занятия
+    /// </summary>
+    public Func<string, IReadOnlyList<string>>? DraftLister { get; set; }
+
+    /// <summary>
+    /// Открыта вкладка «Домашние задания»
+    /// </summary>
+    public bool HomeworkTab
+    {
+        get => _homeworkTab;
+        private set
+        {
+            if (!Set(ref _homeworkTab, value))
+                return;
+
+            Raise(nameof(IsTranscriptsTab));
+            Raise(nameof(IsHomeworkTab));
+        }
+    }
+
+    /// <summary>
+    /// Открыта вкладка «Расшифровки»
+    /// </summary>
+    public bool IsTranscriptsTab => !_homeworkTab;
+
+    /// <summary>
+    /// Открыта вкладка «Домашние задания»
+    /// </summary>
+    public bool IsHomeworkTab => _homeworkTab;
+
+    /// <summary>
+    /// Переключает на вкладку «Расшифровки»
+    /// </summary>
+    public RelayCommand ShowTranscriptsCommand { get; }
+
+    /// <summary>
+    /// Переключает на вкладку «Домашние задания»
+    /// </summary>
+    public RelayCommand ShowHomeworkCommand { get; }
+
+    /// <summary>
+    /// Закрывает открытую расшифровку
+    /// </summary>
+    public RelayCommand CloseLessonCommand { get; }
+
+    /// <summary>
+    /// Закрывает предпросмотр файла
+    /// </summary>
+    public RelayCommand CloseDraftCommand { get; }
+
+    /// <summary>
+    /// Занятие, расшифровка которого открыта
+    /// </summary>
+    public LessonFormatViewModel? OpenLesson
+    {
+        get => _openLesson;
+        private set
+        {
+            if (Set(ref _openLesson, value))
+                Raise(nameof(HasOpenLesson));
+        }
+    }
+
+    /// <summary>
+    /// Расшифровка открыта
+    /// </summary>
+    public bool HasOpenLesson => OpenLesson is not null;
+
+    /// <summary>
+    /// Резюме открытой расшифровки
+    /// </summary>
+    public FlowDocument? SummaryDocument
+    {
+        get => _summaryDocument;
+        private set => Set(ref _summaryDocument, value);
+    }
+
+    /// <summary>
+    /// Полный текст открытой расшифровки
+    /// </summary>
+    public FlowDocument? BodyDocument
+    {
+        get => _bodyDocument;
+        private set => Set(ref _bodyDocument, value);
+    }
+
+    /// <summary>
+    /// Готовый файл, открытый в предпросмотре
+    /// </summary>
+    public DraftFileViewModel? OpenDraft
+    {
+        get => _openDraft;
+        private set
+        {
+            if (Set(ref _openDraft, value))
+                Raise(nameof(HasPreview));
+        }
+    }
+
+    /// <summary>
+    /// Предпросмотр файла открыт
+    /// </summary>
+    public bool HasPreview => OpenDraft is not null;
+
+    /// <summary>
+    /// Документ предпросмотра
+    /// </summary>
+    public FlowDocument? PreviewDocument
+    {
+        get => _previewDocument;
+        private set => Set(ref _previewDocument, value);
+    }
+
+    /// <summary>
+    /// Запоминает работы из LMS и обновляет счётчики на плитках предметов
+    /// </summary>
+    /// <param name="activities">Задания и тесты</param>
+    public void ApplyActivities(IReadOnlyList<ActivityInfo> activities)
+    {
+        _activities = activities;
+        foreach (var subject in Subjects)
+            subject.SetActivities([.. activities.Where(item => string.Equals(item.Subject, subject.Title, StringComparison.OrdinalIgnoreCase))]);
+    }
+
+    /// <summary>
+    /// Запоминает задания, найденные в расшифровках, и раскладывает их по предметам
+    /// </summary>
+    /// <param name="rows">Задания с занятиями</param>
+    public void ApplyHomework(IReadOnlyList<HomeworkRow> rows)
+    {
+        _homeworkCards = [.. rows.Select(row => new HomeworkCardViewModel(row))];
+        foreach (var subject in Subjects)
+            subject.Homework = [.. _homeworkCards.Where(card => card.Subject == subject.Title)];
+    }
+
+    /// <summary>
+    /// Показывает расшифровку занятия: резюме и полный текст
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    private void OpenTranscript(LessonFormatViewModel lesson)
+    {
+        foreach (var other in Lessons)
+            other.IsOpen = other == lesson;
+
+        var text = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty);
+        SummaryDocument = text.Summary.Length > 0 ? DocumentPreviewBuilder.FromText(text.Summary) : null;
+        BodyDocument = DocumentPreviewBuilder.FromText(text.Body.Length > 0 ? text.Body : "Расшифровка пустая.");
+        OpenLesson = lesson;
+    }
+
+    /// <summary>
+    /// Закрывает расшифровку
+    /// </summary>
+    private void CloseLesson()
+    {
+        foreach (var lesson in Lessons)
+            lesson.IsOpen = false;
+
+        OpenLesson = null;
+        SummaryDocument = null;
+        BodyDocument = null;
+    }
+
+    /// <summary>
+    /// Открывает предпросмотр готового файла
+    /// </summary>
+    /// <param name="file">Файл</param>
+    private void OpenDraftFile(DraftFileViewModel file)
+    {
+        foreach (var lesson in Lessons)
+        {
+            foreach (var other in lesson.Drafts)
+                other.IsOpen = other == file;
+        }
+
+        PreviewDocument = DocumentPreviewBuilder.Build(file.Path);
+        OpenDraft = file;
+    }
+
+    /// <summary>
+    /// Закрывает предпросмотр
+    /// </summary>
+    private void CloseDraft()
+    {
+        foreach (var lesson in Lessons)
+        {
+            foreach (var other in lesson.Drafts)
+                other.IsOpen = false;
+        }
+
+        OpenDraft = null;
+        PreviewDocument = null;
+    }
+
+    /// <summary>
+    /// Обновляет список готовых файлов занятия, не пересоздавая его, пока файлы те же
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    private void RefreshDrafts(LessonFormatViewModel lesson)
+    {
+        var paths = DraftLister?.Invoke(lesson.Id) ?? [];
+        if (paths.SequenceEqual(lesson.Drafts.Select(draft => draft.Path)))
+            return;
+
+        lesson.Drafts = [.. paths.Select(path => new DraftFileViewModel(path, OpenDraftFile))];
+    }
+
+    /// <summary>
     /// Обновляет список. Строки известных занятий остаются теми же, поэтому идущая подготовка и выбор на экране не сбрасываются
     /// </summary>
     /// <param name="lessons">Занятия с выбранными форматами от свежих к старым</param>
@@ -159,9 +418,15 @@ public sealed class HomeworkFormatsViewModel : Bindable
             .Select(item =>
             {
                 if (!known.TryGetValue(item.Lesson.Id, out var row))
-                    return new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested);
+                {
+                    row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript };
+                    RefreshDrafts(row);
+
+                    return row;
+                }
 
                 row.HasTranscript = _hasTranscript(item.Lesson);
+                RefreshDrafts(row);
 
                 return row;
             })
@@ -201,6 +466,10 @@ public sealed class HomeworkFormatsViewModel : Bindable
 
         if (!subjects.SequenceEqual(Subjects))
             Subjects = subjects;
+
+        ApplyActivities(_activities);
+        foreach (var subject in subjects)
+            subject.Homework = [.. _homeworkCards.Where(card => card.Subject == subject.Title)];
 
         // Выбранный предмет остаётся выбранным после обновления, а если выбора ещё не было, открывается первый
         Select(subjects.FirstOrDefault(subject => subject.Title == SelectedSubject?.Title) ?? subjects.FirstOrDefault());

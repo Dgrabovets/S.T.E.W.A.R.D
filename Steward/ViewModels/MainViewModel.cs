@@ -100,10 +100,9 @@ public sealed class MainViewModel : PanelViewModel
         var mail = Item(AppPageEnum.Mail, "Почта", "mail");
         var ideas = Item(AppPageEnum.Ideas, "Рилсы", "reels");
         var schedule = Item(AppPageEnum.Schedule, "Расписание", TaskRows.SCHEDULE_ID);
-        var transcripts = Item(AppPageEnum.Transcripts, "Расшифровки", "lms");
-        var homework = Item(AppPageEnum.Homework, "Домашние задания", "homework");
+        var transcripts = Item(AppPageEnum.Transcripts, "Автоматизация образования", "lms");
         SystemItems = [Item(AppPageEnum.Status, "Статус", null), Item(AppPageEnum.Journal, "Журнал", null)];
-        NavGroups = [new NavGroupViewModel("Моя жизнь", [mail, ideas]), new NavGroupViewModel("Учёба", [schedule, transcripts, homework])];
+        NavGroups = [new NavGroupViewModel("Моя жизнь", [mail, ideas]), new NavGroupViewModel("Учёба", [schedule, transcripts])];
     }
 
     /// <summary>

@@ -275,6 +275,63 @@ public sealed class HomeworkStore(string directory)
     public string TranscriptPath(string lessonId) => Path.Combine(directory, "transcripts", SafeName(lessonId) + ".txt");
 
     /// <summary>
+    /// Читает текст расшифровки занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Текст или пустая строка, если расшифровки нет</returns>
+    public string ReadTranscript(string lessonId)
+    {
+        try
+        {
+            return File.Exists(TranscriptPath(lessonId)) ? File.ReadAllText(TranscriptPath(lessonId)) : string.Empty;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Готовые файлы с домашним заданием занятия: всё, что лежит в <c>drafts/&lt;ключ&gt;</c>
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Пути к файлам от новых к старым. Пустой список, если ничего не готовили</returns>
+    public IReadOnlyList<string> DraftFiles(string lessonId)
+    {
+        var folder = Path.Combine(directory, "drafts", SafeName(lessonId));
+
+        return Directory.Exists(folder) ? [.. Directory.EnumerateFiles(folder).OrderByDescending(File.GetLastWriteTimeUtc)] : [];
+    }
+
+    /// <summary>
+    /// Читает работы из LMS, которые выгрузка записала в <c>activities.json</c>
+    /// </summary>
+    /// <returns>Работы. Пустой список, если файла нет или он испорчен</returns>
+    public IReadOnlyList<ActivityInfo> LoadActivities()
+    {
+        try
+        {
+            if (!File.Exists(Path.Combine(directory, "activities.json")))
+                return [];
+
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "activities.json")));
+
+            return
+            [
+                .. document.RootElement.EnumerateArray().Select(item => new ActivityInfo(
+                    item.TryGetProperty("subject", out var subject) ? subject.GetString() ?? string.Empty : string.Empty,
+                    item.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+                    item.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.Number && kind.GetInt32() == 1,
+                    item.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.True))
+            ];
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or InvalidOperationException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
     /// Путь к файлу с заданиями, который записывает агент
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>

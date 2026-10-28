@@ -175,6 +175,78 @@ public sealed class SubjectViewModel : Bindable
     }
 
     /// <summary>
+    /// Сколько занятий расшифровано, словами для плитки
+    /// </summary>
+    public string TranscribedText => $"Расшифровано {Transcribed} из {Total}";
+
+    /// <summary>
+    /// Работы предмета из LMS: задания и тесты
+    /// </summary>
+    private IReadOnlyList<Steward.Homework.Models.ActivityInfo> _activities = [];
+
+    /// <summary>
+    /// Задания предмета, найденные в расшифровках
+    /// </summary>
+    private IReadOnlyList<HomeworkCardViewModel> _homework = [];
+
+    /// <summary>
+    /// Запоминает работы предмета из LMS и обновляет счётчики плитки
+    /// </summary>
+    /// <param name="activities">Работы этого предмета</param>
+    public void SetActivities(IReadOnlyList<Steward.Homework.Models.ActivityInfo> activities)
+    {
+        _activities = activities;
+        Raise(nameof(AssignmentsText));
+        Raise(nameof(AssignmentsProgress));
+        Raise(nameof(QuizzesText));
+        Raise(nameof(QuizzesProgress));
+        Raise(nameof(HasQuizzes));
+    }
+
+    /// <summary>
+    /// «Сдано 2 из 3»
+    /// </summary>
+    public string AssignmentsText => _activities.Count(item => !item.IsQuiz) is var total and > 0 ? $"Сдано {_activities.Count(item => !item.IsQuiz && item.Done)} из {total}" : "Заданий нет";
+
+    /// <summary>
+    /// Доля сданных заданий
+    /// </summary>
+    public double AssignmentsProgress => _activities.Count(item => !item.IsQuiz) is var total and > 0 ? (double)_activities.Count(item => !item.IsQuiz && item.Done) / total : 0;
+
+    /// <summary>
+    /// «Тесты 1 из 2»
+    /// </summary>
+    public string QuizzesText => _activities.Count(item => item.IsQuiz) is var total and > 0 ? $"Тесты {_activities.Count(item => item.IsQuiz && item.Done)} из {total}" : "Тестов нет";
+
+    /// <summary>
+    /// Доля пройденных тестов
+    /// </summary>
+    public double QuizzesProgress => _activities.Count(item => item.IsQuiz) is var total and > 0 ? (double)_activities.Count(item => item.IsQuiz && item.Done) / total : 0;
+
+    /// <summary>
+    /// У предмета есть тесты
+    /// </summary>
+    public bool HasQuizzes => _activities.Any(item => item.IsQuiz);
+
+    /// <summary>
+    /// Задания предмета, найденные в расшифровках
+    /// </summary>
+    public IReadOnlyList<HomeworkCardViewModel> Homework
+    {
+        get => _homework;
+        set
+        {
+            if (Set(ref _homework, value))
+                Raise(nameof(HasHomework));
+        }
+    }
+
+    /// <summary>
+    /// По предмету найдены задания
+    /// </summary>
+    public bool HasHomework => Homework.Count > 0;
+
+    /// <summary>
     /// У скольких занятий уже есть расшифровка
     /// </summary>
     public int Transcribed => Lessons.Count(lesson => lesson.HasTranscript);
@@ -220,6 +292,7 @@ public sealed class SubjectViewModel : Bindable
     /// </summary>
     private void RaiseCounters()
     {
+        Raise(nameof(TranscribedText));
         Raise(nameof(Transcribed));
         Raise(nameof(Total));
         Raise(nameof(Progress));

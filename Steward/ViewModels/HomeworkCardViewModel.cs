@@ -21,6 +21,8 @@ public sealed class HomeworkCardViewModel
     public HomeworkCardViewModel(HomeworkRow row)
     {
         Title = row.Item.Title;
+        Subject = row.Lesson.Title;
+        LessonId = row.Lesson.Id;
         Lesson = $"{row.Lesson.Title}, {row.Lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}";
         Due = row.Item.Due is { } due ? $"Срок: {due.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}" : "Срок не назван";
         Format = HomeworkFormats.Title(row.Format);
@@ -32,6 +34,16 @@ public sealed class HomeworkCardViewModel
             _ => ("Ждёт создания задачи", PanelToneEnum.Attention, ActivityKindEnum.Attention),
         };
     }
+
+    /// <summary>
+    /// Предмет, к которому относится задание
+    /// </summary>
+    public string Subject { get; }
+
+    /// <summary>
+    /// Ключ занятия, на котором задали
+    /// </summary>
+    public string LessonId { get; }
 
     /// <summary>
     /// Что нужно сделать

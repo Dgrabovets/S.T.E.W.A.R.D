@@ -17,7 +17,7 @@ public class NavigationTests
 
         Assert.Equal(["Моя жизнь", "Учёба"], model.NavGroups.Select(group => group.Title).ToArray());
         Assert.Equal(["Почта", "Рилсы"], model.NavGroups[0].Items.Select(item => item.Title).ToArray());
-        Assert.Equal(["Расписание", "Расшифровки", "Домашние задания"], model.NavGroups[1].Items.Select(item => item.Title).ToArray());
+        Assert.Equal(["Расписание", "Автоматизация образования"], model.NavGroups[1].Items.Select(item => item.Title).ToArray());
         Assert.Equal(["Статус", "Журнал"], model.SystemItems.Select(item => item.Title).ToArray());
     }
 

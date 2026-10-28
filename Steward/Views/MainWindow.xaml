@@ -208,7 +208,7 @@
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="276"/>
+                    <ColumnDefinition Width="312"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
@@ -363,59 +363,6 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                                 </StackPanel>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Grid>
-
-                    <!-- ДЗ -->
-                    <Grid>
-                        <Grid.Style>
-                            <Style TargetType="Grid" BasedOn="{StaticResource PageHost}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsHomeworkPage}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
-                            <Border Style="{StaticResource Card}" Visibility="{Binding IsHomeworkEmpty, Converter={StaticResource BoolToVisibility}}">
-                                <StackPanel>
-                                    <TextBlock Text="Заданий пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                                    <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
-                                               Text="Они появятся здесь после кнопки «Подготовить задания» в настройках, в блоке «Форматы заданий». Для каждого видно срок, формат и создана ли задача в SingularityApp."/>
-                                </StackPanel>
-                            </Border>
-                            <ItemsControl ItemsSource="{Binding Homework}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Style="{StaticResource Card}" Margin="0,0,0,12">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding Lesson}" Style="{StaticResource PageHint}" Margin="0,4,0,0"/>
-                                                    <TextBlock Style="{StaticResource PageHint}" Margin="0,4,0,0">
-                                                        <Run Text="{Binding Due, Mode=OneWay}"/><Run Text="  ·  "/><Run Text="{Binding Format, Mode=OneWay}"/>
-                                                    </TextBlock>
-                                                    <TextBlock Text="{Binding Requirements}" Style="{StaticResource PageHint}" Foreground="{StaticResource TextBrush}" Margin="0,8,0,0" TextWrapping="Wrap"
-                                                               Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
-                                                </StackPanel>
-                                                <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="8,4,12,4" VerticalAlignment="Top" Margin="16,0,0,0">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <ctl:ActivityOrb Width="22" Height="22" Style="{StaticResource StatusOrb}" Margin="0,0,6,0"/>
-                                                        <TextBlock Text="{Binding Status}" Style="{StaticResource ToneBadgeText}" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -585,7 +532,7 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
-                                <views:PageHeaderView Title="Расшифровки"/>
+                                <views:PageHeaderView Title="Автоматизация образования"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
                                     <views:JsonSettingsView DataContext="{Binding LmsSettings}"/>
                                 </StackPanel>

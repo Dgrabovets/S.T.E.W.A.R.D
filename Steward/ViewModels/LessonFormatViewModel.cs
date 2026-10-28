@@ -42,6 +42,16 @@ public sealed class LessonFormatViewModel : Bindable
     private bool _isMenuOpen;
 
     /// <summary>
+    /// Расшифровка открыта на странице
+    /// </summary>
+    private bool _isOpen;
+
+    /// <summary>
+    /// Готовые файлы
+    /// </summary>
+    private IReadOnlyList<DraftFileViewModel> _drafts = [];
+
+    /// <summary>
     /// Расшифровку этого занятия уже попросили забрать
     /// </summary>
     private bool _fetchRequested;
@@ -59,7 +69,9 @@ public sealed class LessonFormatViewModel : Bindable
     {
         Id = lesson.Id;
         _hasTranscript = hasTranscript;
+        Lesson = lesson;
         PrepareCommand = new RelayCommand(() => IsMenuOpen = !IsMenuOpen, () => Activity != ActivityStateEnum.Working);
+        OpenCommand = new RelayCommand(() => Opened?.Invoke(this), () => HasTranscript);
         FetchCommand = new RelayCommand(
             () =>
             {
@@ -90,6 +102,48 @@ public sealed class LessonFormatViewModel : Bindable
     /// Ключ занятия
     /// </summary>
     public string Id { get; }
+
+    /// <summary>
+    /// Занятие
+    /// </summary>
+    public Lesson Lesson { get; }
+
+    /// <summary>
+    /// Вызывается, когда нужно показать расшифровку этого занятия
+    /// </summary>
+    public Action<LessonFormatViewModel>? Opened { get; set; }
+
+    /// <summary>
+    /// Открывает расшифровку занятия на странице
+    /// </summary>
+    public RelayCommand OpenCommand { get; }
+
+    /// <summary>
+    /// Расшифровка этого занятия открыта на странице
+    /// </summary>
+    public bool IsOpen
+    {
+        get => _isOpen;
+        set => Set(ref _isOpen, value);
+    }
+
+    /// <summary>
+    /// Готовые файлы с заданием: они показываются на вкладке «Домашние задания»
+    /// </summary>
+    public IReadOnlyList<DraftFileViewModel> Drafts
+    {
+        get => _drafts;
+        set
+        {
+            if (Set(ref _drafts, value))
+                Raise(nameof(HasDrafts));
+        }
+    }
+
+    /// <summary>
+    /// У занятия есть готовые файлы
+    /// </summary>
+    public bool HasDrafts => Drafts.Count > 0;
 
     /// <summary>
     /// У занятия уже есть расшифровка: тогда можно подготовить задания

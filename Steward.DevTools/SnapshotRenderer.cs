@@ -105,6 +105,30 @@ public static class SnapshotRenderer
                 settleSeconds = 1.0;
             }
 
+            // «main:transcripts:read» и «main:transcripts:docx|pptx|code|md»: открыта расшифровка или предпросмотр готового файла
+            if (parts.Length > 2 && parts[1].Equals("transcripts", StringComparison.OrdinalIgnoreCase) && main.Model.Formats is { } education)
+            {
+                var drafts = SampleDrafts();
+                education.TranscriptReader = _ => "Занятие: Гейм-дизайн, Лекция 1\nДата: 07.09.2026\n\n== Резюме ==\nТема встречи: Обсуждение курса по геймдизайну\n\nКраткое содержание:\nУчастники познакомились и обсудили содержание курса.\n\nКлючевые моменты:\n• Знакомство участников\n• Системность и реализация идей\n\n== Расшифровка ==\n[00:00] Преподаватель: Добрый день, начинаем.\n[00:12] Студент: Слышно хорошо.\n[00:30] Преподаватель: Сегодня разберём игровые циклы и баланс.";
+                education.DraftLister = _ => drafts;
+                education.Update(SampleLessons());
+                var chosen = education.Subjects.First(item => item.Title == "Гейм-дизайн");
+                chosen.SelectCommand.Execute(null);
+                var first = chosen.Lessons.First(lesson => lesson.HasTranscript);
+                if (parts[2].Equals("read", StringComparison.OrdinalIgnoreCase))
+                {
+                    first.OpenCommand.Execute(null);
+                }
+                else
+                {
+                    education.ShowHomeworkCommand.Execute(null);
+                    var wanted = parts[2].ToLowerInvariant() switch { "docx" => ".docx", "pptx" => ".pptx", "code" => ".py", _ => ".md" };
+                    chosen.Lessons.SelectMany(lesson => lesson.Drafts).First(draft => draft.Path.EndsWith(wanted, StringComparison.OrdinalIgnoreCase)).OpenCommand.Execute(null);
+                }
+
+                settleSeconds = 1.0;
+            }
+
             // «main:done»: задача «telegram» только что закончилась, на её карточке рисуется галочка
             if (parts.Length > 1 && string.Equals(parts[1], "done", StringComparison.OrdinalIgnoreCase))
             {
@@ -357,6 +381,44 @@ public static class SnapshotRenderer
     /// Выдуманные занятия с выбранными форматами ДЗ
     /// </summary>
     /// <returns>Занятия от свежих к старым</returns>
+    /// <summary>
+    /// Создаёт во временной папке по одному готовому файлу каждого формата: Word, презентацию, Markdown и код
+    /// </summary>
+    /// <returns>Пути к файлам</returns>
+    private static IReadOnlyList<string> SampleDrafts()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "steward-sample-drafts");
+        Directory.CreateDirectory(folder);
+
+        const string W = "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"";
+        var docx = Path.Combine(folder, "Задание 1. Игровые циклы.docx");
+        File.Delete(docx);
+        using (var archive = System.IO.Compression.ZipFile.Open(docx, System.IO.Compression.ZipArchiveMode.Create))
+        using (var writer = new StreamWriter(archive.CreateEntry("word/document.xml").Open()))
+        {
+            writer.Write($"<w:document {W}><w:body><w:p><w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr><w:r><w:t>Игровые циклы</w:t></w:r></w:p><w:p><w:r><w:t>Опишите основной цикл вашей игры: </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>действие, награда, прогресс</w:t></w:r><w:r><w:t>.</w:t></w:r></w:p><w:p><w:pPr><w:numPr/></w:pPr><w:r><w:t>Объём: одна страница</w:t></w:r></w:p><w:p><w:pPr><w:numPr/></w:pPr><w:r><w:t>Срок: 23.10</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Этап</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Что делает игрок</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>1</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Исследует уровень</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>");
+        }
+
+        const string P = "xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"";
+        var pptx = Path.Combine(folder, "Презентация. Баланс.pptx");
+        File.Delete(pptx);
+        using (var archive = System.IO.Compression.ZipFile.Open(pptx, System.IO.Compression.ZipArchiveMode.Create))
+        {
+            for (var i = 1; i <= 2; i++)
+            {
+                using var writer = new StreamWriter(archive.CreateEntry($"ppt/slides/slide{i}.xml").Open());
+                writer.Write($"<p:sld {P}><p:cSld><p:spTree><p:sp><p:nvSpPr><p:nvPr><p:ph type=\"title\"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:r><a:t>Баланс игры, часть {i}</a:t></a:r></a:p></p:txBody></p:sp><p:sp><p:txBody><a:p><a:r><a:t>Кривая сложности растёт плавно</a:t></a:r></a:p><a:p><a:r><a:t>Награда соразмерна усилию</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>");
+            }
+        }
+
+        var py = Path.Combine(folder, "balance.py");
+        File.WriteAllText(py, "# Расчёт баланса\ndef reward(level, effort=1.5):\n    \"\"\"Награда растёт с уровнем\"\"\"\n    if level > 10:\n        return level * effort\n    return 5  # базовая награда\n");
+        var md = Path.Combine(folder, "plan.md");
+        File.WriteAllText(md, "# План работы\n\n## Шаги\n\n- Выбрать **жанр** игры\n- Описать цикл `core loop`\n1. Собрать прототип\n\n```csharp\nvar level = 1;\n```\n");
+
+        return [docx, pptx, py, md];
+    }
+
     private static IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> SampleLessons() =>
     [
         (new Lesson("ux-1025", "Гейм-дизайн", new DateOnly(2026, 10, 25), "Лекция 3", string.Empty, 163), HomeworkFormatEnum.Presentation),
