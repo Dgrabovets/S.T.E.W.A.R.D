@@ -26,6 +26,11 @@ public sealed class MailChecker(
     Action<string> log)
 {
     /// <summary>
+    /// Длина описания письма в логе в знаках
+    /// </summary>
+    private const int DESCRIPTION_LENGTH = 220;
+
+    /// <summary>
     /// Читает непрочитанные письма, создаёт задачи и пишет по строке на письмо и на итог
     /// </summary>
     /// <param name="dryRun">
@@ -68,7 +73,7 @@ public sealed class MailChecker(
             }).Add(mail);
 
             log($"{(dryRun ? "[тест] " : string.Empty)}{CategoryLabel(category)}: {mail.FromName} — {mail.Subject}" +
-                (task is null ? string.Empty : $" → задача «{task.Title}»"));
+                (task is null ? string.Empty : $" → задача «{task.Title}»") + Details(mail));
 
         }
 
@@ -83,6 +88,13 @@ public sealed class MailChecker(
 
         return new MailCheckResult(feedback, replies, info, summary);
     }
+
+    /// <summary>
+    /// Хвост строки лога для окна приложения: ссылка на письмо и короткое описание, разделённые знаком «‖»
+    /// </summary>
+    /// <param name="mail">Письмо</param>
+    /// <returns>Строка вида « ‖ ссылка ‖ описание»</returns>
+    private string Details(MailItem mail) => $" ‖ {MailLinks.Letter(mail, settings.Mail)} ‖ {MailText.Truncate(string.Join(' ', mail.Body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)), DESCRIPTION_LENGTH)}";
 
     /// <summary>
     /// Помечает разобранные письма прочитанными. Сбой отметки не роняет проверку: задачи уже созданы, а письма записаны в память о разобранных и повторно не придут

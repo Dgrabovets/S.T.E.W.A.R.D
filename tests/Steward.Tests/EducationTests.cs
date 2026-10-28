@@ -1,0 +1,479 @@
+using System.IO.Compression;
+using System.Text.Json.Nodes;
+using System.Xml.Linq;
+using Steward.Homework.Models;
+using Steward.Homework.Services;
+using Steward.Homework.Storage;
+using Steward.Hosting;
+using Steward.Models;
+using Steward.Preview;
+using Steward.ViewModels;
+
+namespace Steward.Tests;
+
+/// <summary>
+/// Проверяет вкладку «Автоматизация образования»: разбор расшифровок и занятий, готовые файлы заданий, настройки процессов и карточки писем
+/// </summary>
+public class EducationTests
+{
+    /// <summary>
+    /// Достаёт из просьбы путь к файлу результата: он стоит на строке после слов «Результат запиши в файл, путь на следующей строке:»
+    /// </summary>
+    /// <param name="prompt">Просьба</param>
+    /// <returns>Путь</returns>
+    private static string ResultPath(string prompt) => prompt.Split("Результат запиши в файл, путь на следующей строке:")[1].Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)[0];
+
+    /// <summary>
+    /// Резюме и реплики разбираются на части: тема, пункты, решения, задачи и доли слов по участникам
+    /// </summary>
+    [Fact]
+    public void A_transcript_is_split_into_summary_parts_and_speaker_shares()
+    {
+        const string text = "Занятие: Гейм-дизайн\n\n== Резюме ==\nТема встречи: Игровые циклы\n\nКраткое содержание:\nРазобрали цикл.\nЕщё раз про баланс.\n\nКлючевые моменты:\n• Цикл\n• Баланс\n\nПринятые решения:\n• Начать курс\n\nЗадачи:\n• Написать отчёт — Срок: к пятнице\n\n== Расшифровка ==\n[00:00:01] Алексей: раз два три четыре\n[00:00:09] Данила: пять\n[00:00:12] Алексей: шесть";
+
+        var parsed = TranscriptText.Parse(text);
+
+        Assert.Equal("Игровые циклы", parsed.Topic);
+        Assert.Equal("Разобрали цикл.\n\nЕщё раз про баланс.", parsed.Overview);
+        Assert.Equal(["Цикл", "Баланс"], parsed.Points);
+        Assert.Equal(["Начать курс"], parsed.Decisions);
+        Assert.Single(parsed.Tasks);
+        Assert.Equal("Алексей", parsed.Speakers[0].Name);
+        Assert.Equal(5, parsed.Speakers[0].Words);
+        Assert.Equal(6, parsed.Words);
+        Assert.False(parsed.Detailed);
+    }
+
+    /// <summary>
+    /// Подробный разбор от Claude заменяет короткое резюме, а статистика реплик остаётся из текста
+    /// </summary>
+    [Fact]
+    public void A_detailed_analysis_replaces_the_summary()
+    {
+        var analysis = LessonAnalysis.Parse("""
+            ```json
+            {"topic":"Баланс","overview":"Говорили о балансе.","covered":["Кривая сложности"],"topics":[{"title":"Сложность","details":"Растёт плавно."}],"formulations":["Баланс это ощущение честности"],"decisions":[],"tasks":[{"title":"Отчёт","due":"к пятнице"}]}
+            ```
+            """);
+        Assert.NotNull(analysis);
+
+        var parsed = TranscriptText.Parse("== Расшифровка ==\n[00:00:01] Алексей: слово", analysis);
+
+        Assert.True(parsed.Detailed);
+        Assert.Equal("Баланс", parsed.Topic);
+        Assert.Equal(["Кривая сложности"], parsed.Points);
+        Assert.Equal(["Отчёт (срок: к пятнице)"], parsed.Tasks);
+        Assert.Single(parsed.Topics);
+        Assert.Single(parsed.Formulations);
+        Assert.Equal(1, parsed.Words);
+    }
+
+    /// <summary>
+    /// Разбор не JSON и не объект не принимается, лишние и недостающие ключи не мешают
+    /// </summary>
+    [Theory]
+    [InlineData("не json")]
+    [InlineData("[1,2]")]
+    public void A_broken_analysis_is_rejected(string json) => Assert.Null(LessonAnalysis.Parse(json));
+
+    /// <summary>
+    /// Недостающие ключи разбора остаются пустыми
+    /// </summary>
+    [Fact]
+    public void Missing_analysis_keys_stay_empty()
+    {
+        var analysis = LessonAnalysis.Parse("""{"topic":"Тема","extra":1}""");
+
+        Assert.NotNull(analysis);
+        Assert.Equal("Тема", analysis.Topic);
+        Assert.Empty(analysis.Covered);
+        Assert.Empty(analysis.Tasks);
+    }
+
+    /// <summary>
+    /// Заметка с разбором содержит тему, пройденное и формулировки, но не реплики
+    /// </summary>
+    [Fact]
+    public void The_analysis_note_has_the_analysis_and_no_dialogue()
+    {
+        var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 25), "Лекция 3", "https://record.example/1", 163);
+        var analysis = new LessonAnalysis("Баланс", "Говорили о балансе.", ["Кривая"], [new AnalysisTopic("Сложность", "Растёт")], ["Баланс это честность"], ["Начать"], [new AnalysisTask("Отчёт", "к пятнице")]);
+
+        var note = AnalysisNote.Text(lesson, analysis);
+
+        Assert.Contains("Тема: Баланс", note);
+        Assert.Contains("Кривая", note);
+        Assert.Contains("Баланс это честность", note);
+        Assert.Contains("срок: к пятнице", note);
+        Assert.Contains("Запись занятия", note);
+        Assert.Equal("lms:transcript:e1", AnalysisNote.Build(lesson, analysis, null, TimeSpan.Zero).ExternalId);
+    }
+
+    /// <summary>
+    /// Markdown делится на заголовки, пункты и абзацы, жирный текст делится на куски
+    /// </summary>
+    [Fact]
+    public void Markdown_is_split_into_blocks_and_runs()
+    {
+        var blocks = MarkdownBlocks.Parse("# Заголовок\n\nАбзац с **важным** словом.\n- пункт\n1. номер\n```\nкод\n```");
+
+        Assert.Equal([MarkdownBlocks.BlockKind.Heading, MarkdownBlocks.BlockKind.Paragraph, MarkdownBlocks.BlockKind.Bullet, MarkdownBlocks.BlockKind.Bullet, MarkdownBlocks.BlockKind.Paragraph], blocks.Select(block => block.Kind).ToArray());
+        Assert.Equal(1, blocks[0].Level);
+        Assert.Equal([("Абзац с ", false), ("важным", true), (" словом.", false)], MarkdownBlocks.Runs(blocks[1].Text).ToArray());
+        Assert.Equal("важным", MarkdownBlocks.Plain("**важным**"));
+    }
+
+    /// <summary>
+    /// Word собирается из Markdown: в файле заголовок, абзац и жирный текст
+    /// </summary>
+    [Fact]
+    public void A_word_file_is_written_from_markdown()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"steward-{Guid.NewGuid():N}.docx");
+        try
+        {
+            OfficeWriter.WriteWord(path, "# Игровые циклы\n\nОпишите **цикл** игры.\n- пункт");
+
+            using var archive = ZipFile.OpenRead(path);
+            var xml = XDocument.Load(archive.GetEntry("word/document.xml")!.Open());
+            var text = string.Concat(xml.Descendants().Where(node => node.Name.LocalName == "t").Select(node => node.Value));
+
+            Assert.Contains("Игровые циклы", text);
+            Assert.Contains("цикл", text);
+            Assert.Contains("пункт", text);
+            Assert.Contains(xml.Descendants(), node => node.Name.LocalName == "b");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Презентация собирается из Markdown: каждый заголовок это отдельный слайд
+    /// </summary>
+    [Fact]
+    public void A_presentation_has_a_slide_for_each_heading()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"steward-{Guid.NewGuid():N}.pptx");
+        try
+        {
+            OfficeWriter.WriteSlides(path, "# Титул\n\n# Баланс\n- кривая\n- награда");
+
+            using var archive = ZipFile.OpenRead(path);
+            var slides = archive.Entries.Where(entry => entry.FullName.StartsWith("ppt/slides/slide", StringComparison.Ordinal) && entry.FullName.EndsWith(".xml", StringComparison.Ordinal)).ToArray();
+            Assert.Equal(2, slides.Length);
+
+            var second = XDocument.Load(archive.GetEntry("ppt/slides/slide2.xml")!.Open());
+            var text = string.Concat(second.Descendants().Where(node => node.Name.LocalName == "t").Select(node => node.Value));
+            Assert.Contains("Баланс", text);
+            Assert.Contains("награда", text);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Готовые файлы делаются для каждого задания: агент пишет Markdown, Steward собирает Word, уже готовые не переделываются
+    /// </summary>
+    [Fact]
+    public async Task Drafts_are_built_for_every_item_and_not_repeated()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-drafts-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 25));
+            var items = new[] { new HomeworkItem("Описать цикл", null, "одна страница", string.Empty), new HomeworkItem("Баланс", null, string.Empty, string.Empty) };
+            var runs = 0;
+            DraftBuilder.AgentRun agent = (prompt, _, _) =>
+            {
+                runs++;
+                var path = ResultPath(prompt);
+                File.WriteAllText(path, "# Работа\n\nТекст.");
+
+                return Task.FromResult(string.Empty);
+            };
+
+            var (files, error) = await DraftBuilder.BuildAsync(store, lesson, items, HomeworkFormatEnum.Word, agent, CancellationToken.None);
+
+            Assert.Empty(error);
+            Assert.Equal(2, files.Count);
+            Assert.All(files, file => Assert.EndsWith(".docx", file, StringComparison.Ordinal));
+            Assert.Equal(files.Order().ToArray(), store.DraftFiles("e1").Order().ToArray());
+            Assert.False(Directory.Exists(Path.Combine(store.DraftsDirectory("e1"), ".src")));
+
+            await DraftBuilder.BuildAsync(store, lesson, items, HomeworkFormatEnum.Word, agent, CancellationToken.None);
+            Assert.Equal(2, runs);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Ошибка агента не роняет подготовку: остальные задания готовятся, причина возвращается текстом
+    /// </summary>
+    [Fact]
+    public async Task An_agent_failure_is_reported_and_other_items_continue()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-drafts-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 25));
+            var items = new[] { new HomeworkItem("Один", null, string.Empty, string.Empty), new HomeworkItem("Два", null, string.Empty, string.Empty) };
+            var call = 0;
+            DraftBuilder.AgentRun agent = (prompt, _, _) =>
+            {
+                if (call++ == 0)
+                    return Task.FromResult("лимит исчерпан");
+
+                File.WriteAllText(ResultPath(prompt), "# Работа");
+
+                return Task.FromResult(string.Empty);
+            };
+
+            var (files, error) = await DraftBuilder.BuildAsync(store, lesson, items, HomeworkFormatEnum.Text, agent, CancellationToken.None);
+
+            Assert.Single(files);
+            Assert.Contains("Задание 1: лимит исчерпан", error);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Имя файла очищается от запрещённых знаков и обрезается
+    /// </summary>
+    [Fact]
+    public void A_file_name_is_cleaned()
+    {
+        Assert.Equal("Что делать", DraftBuilder.SafeName("Что: делать?"));
+        Assert.Equal("работа", DraftBuilder.SafeName("???"));
+        Assert.True(DraftBuilder.SafeName(new string('а', 100)).Length <= 60);
+    }
+
+    /// <summary>
+    /// Отметка «Только анализ» забирает расшифровку, разбор нужен, а домашние задания не готовятся
+    /// </summary>
+    [Fact]
+    public void The_analyze_state_fetches_and_analyzes_but_skips_homework()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-state-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            var lesson = new Lesson("e1", "Английский", new DateOnly(2026, 10, 25), RecordUrl: "https://record.example/1");
+
+            store.SetSubjectState("Английский", LessonStateEnum.Analyze);
+
+            Assert.True(store.ShouldFetch(lesson));
+            Assert.False(store.PreparesHomework(lesson));
+
+            Directory.CreateDirectory(Path.GetDirectoryName(store.TranscriptPath("e1"))!);
+            File.WriteAllText(store.TranscriptPath("e1"), "== Резюме ==\nТема встречи: Тема");
+            Assert.False(store.ShouldFetch(lesson));
+            Assert.True(store.ShouldAnalyze(lesson));
+
+            Directory.CreateDirectory(Path.GetDirectoryName(store.AnalysisPath("e1"))!);
+            File.WriteAllText(store.AnalysisPath("e1"), """{"topic":"Тема"}""");
+            Assert.False(store.ShouldAnalyze(lesson));
+            Assert.Equal("Тема", store.ReadAnalysis("e1")!.Topic);
+
+            store.SetState("e1", LessonStateEnum.Fetch);
+            Assert.True(store.PreparesHomework(lesson));
+            store.SetState("e1", LessonStateEnum.Skip);
+            Assert.False(store.PreparesHomework(lesson));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Работы из LMS читаются в счётчики: тест отличается от задания, сдано считается отдельно
+    /// </summary>
+    [Fact]
+    public void Activities_are_read_for_the_counters()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-activities-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            Assert.Empty(store.LoadActivities());
+
+            File.WriteAllText(Path.Combine(directory.FullName, "activities.json"), """[{"subject":"Гейм-дизайн","name":"Задание 1","kind":0,"done":true},{"subject":"Гейм-дизайн","name":"Тест","kind":1,"done":false}]""");
+            var activities = store.LoadActivities();
+
+            Assert.Equal(2, activities.Count);
+            Assert.True(activities[0].Done);
+            Assert.True(activities[1].IsQuiz);
+
+            var subject = new SubjectViewModel("Гейм-дизайн", [], LessonStateEnum.Fetch, (_, _) => { }, HomeworkFormatEnum.Word, (_, _) => { });
+            subject.SetActivities(activities);
+
+            Assert.Equal("Сдано 1 из 1", subject.AssignmentsText);
+            Assert.Equal("Тесты 0 из 1", subject.QuizzesText);
+            Assert.Equal(1.0, subject.AssignmentsProgress);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Список формата показывается только при «Расшифровывать», а выбор в списке доходит до хранилища
+    /// </summary>
+    [Fact]
+    public void The_format_list_is_shown_only_for_fetching_subjects()
+    {
+        var chosen = new List<LessonStateEnum>();
+        var subject = new SubjectViewModel("Гейм-дизайн", [], LessonStateEnum.Undecided, (_, state) => chosen.Add(state), HomeworkFormatEnum.Word, (_, _) => { });
+
+        Assert.False(subject.ShowFormat);
+        Assert.Equal(["Ждёт решения", "Расшифровывать", "Только анализ", "Не нужно", "Завершён"], subject.StateOptions.Select(option => option.Title).ToArray());
+
+        subject.SelectedStateOption = subject.StateOptions.Single(option => option.State == LessonStateEnum.Fetch);
+        Assert.True(subject.ShowFormat);
+
+        subject.SelectedStateOption = subject.StateOptions.Single(option => option.State == LessonStateEnum.Analyze);
+        Assert.False(subject.ShowFormat);
+        Assert.Equal([LessonStateEnum.Fetch, LessonStateEnum.Analyze], chosen);
+    }
+
+    /// <summary>
+    /// Карточка письма берёт ссылку и описание из хвоста строки, чужие адреса не принимаются
+    /// </summary>
+    [Fact]
+    public void A_mail_card_reads_the_link_and_description()
+    {
+        var opened = new List<string>();
+        var card = MailLetterViewModel.From(new LogLine("25.10.2026 14:11:06", "Ответить: Иванов Иван — Вопрос → задача «Ответ» ‖ https://mail.example/#q ‖ Когда срок сдачи?", PanelToneEnum.Attention), opened.Add);
+
+        Assert.Equal("Ответить", card.Kind);
+        Assert.Equal("Вопрос", card.Subject);
+        Assert.Equal("Иванов Иван", card.Sender);
+        Assert.Contains("задача создана", card.Meta);
+        Assert.Equal("Когда срок сдачи?", card.Description);
+        Assert.True(card.HasLink);
+
+        card.OpenCommand.Execute(null);
+        Assert.Equal(["https://mail.example/#q"], opened);
+
+        var unsafeCard = MailLetterViewModel.From(new LogLine("25.10.2026 14:11:06", "Инфо: Кто-то — Тема ‖ javascript:alert(1) ‖ текст", PanelToneEnum.Idle), opened.Add);
+        Assert.False(unsafeCard.HasLink);
+
+        var plain = MailLetterViewModel.From(new LogLine("25.10.2026 14:11:06", "Инфо: Яндекс ID — Вы создали пароль", PanelToneEnum.Idle));
+        Assert.False(plain.HasLink);
+        Assert.False(plain.HasDescription);
+    }
+
+    /// <summary>
+    /// Страница настроек читает значения без заглушек, пишет только свои ключи и числа числами
+    /// </summary>
+    [Fact]
+    public void Settings_are_loaded_and_saved_without_touching_other_keys()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-settings-");
+        try
+        {
+            var file = Path.Combine(directory.FullName, "appsettings.json");
+            File.WriteAllText(file, """{"Mail":{"Login":"<логин>","Port":993,"Folder":"INBOX"},"Singularity":{"Token":"секрет"},"Other":true}""");
+            var settings = new JsonSettingsViewModel(
+                file,
+                string.Empty,
+                [new SettingsSectionViewModel("Почта", [new SettingFieldViewModel("mail.login", "Логин", string.Empty), new SettingFieldViewModel("Mail.Port", "Порт", string.Empty, number: true), new SettingFieldViewModel("Singularity.Token", "Токен", string.Empty, secret: true)])],
+                () => { });
+            var saved = 0;
+            settings.Saved += () => saved++;
+
+            var fields = settings.Sections[0].Fields;
+            Assert.Equal(string.Empty, fields[0].Value);
+            Assert.Equal("993", fields[1].Value);
+
+            fields[0].Value = "student@example.com";
+            fields[1].Value = "995";
+            settings.SaveCommand.Execute(null);
+
+            var written = JsonNode.Parse(File.ReadAllText(file))!;
+            Assert.Equal("student@example.com", (string?)written["Mail"]!["Login"]);
+            Assert.Equal(995, (int?)written["Mail"]!["Port"]);
+            Assert.Equal("INBOX", (string?)written["Mail"]!["Folder"]);
+            Assert.Equal("секрет", (string?)written["Singularity"]!["Token"]);
+            Assert.True((bool?)written["Other"]);
+            Assert.Equal(1, saved);
+
+            fields[1].Value = "много";
+            settings.SaveCommand.Execute(null);
+            Assert.Equal(1, saved);
+            Assert.Contains("целое число", settings.Message);
+            Assert.Equal(995, (int?)JsonNode.Parse(File.ReadAllText(file))!["Mail"]!["Port"]);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Проверка настроек видит заглушки и пустые значения, а секреты не читает
+    /// </summary>
+    [Fact]
+    public void The_settings_probe_tells_filled_values_from_placeholders()
+    {
+        var root = Directory.CreateTempSubdirectory("steward-probe-");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(SettingsProbe.MailFile(root.FullName))!);
+            File.WriteAllText(SettingsProbe.MailFile(root.FullName), """{"Mail":{"AppPassword":"<пароль>"},"Singularity":{"Token":"abc"}}""");
+
+            var chips = SettingsProbe.Mail(root.FullName);
+
+            Assert.Equal(["Файл настроек", "Пароль приложения", "Токен Singularity"], chips.Select(chip => chip.Label).ToArray());
+            Assert.Equal("найден", chips[0].Value);
+            Assert.Equal("не задан", chips[1].Value);
+            Assert.Equal("задан", chips[2].Value);
+            Assert.Equal(PanelToneEnum.Attention, chips[1].Tone);
+            Assert.Equal(PanelToneEnum.Running, chips[2].Tone);
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Расширения настроек процессов в реестре: «homePage» читается из файла, расписание всегда открывается настройками
+    /// </summary>
+    [Fact]
+    public void The_schedule_always_opens_on_its_settings()
+    {
+        var model = new MainViewModel();
+        model.SetSettingsHome([]);
+
+        model.Page = AppPageEnum.Schedule;
+        Assert.True(model.HomeIsSettings);
+        Assert.True(model.IsSettingsOpen);
+        Assert.False(model.CanToggleSettings);
+
+        model.Page = AppPageEnum.Mail;
+        Assert.False(model.IsSettingsOpen);
+        model.ToggleSettingsCommand.Execute(null);
+        Assert.True(model.IsSettingsOpen);
+
+        model.Page = AppPageEnum.Status;
+        Assert.False(model.IsSettingsOpen);
+
+        model.SetSettingsHome(["mail"]);
+        model.Page = AppPageEnum.Mail;
+        Assert.True(model.HomeIsSettings);
+    }
+}

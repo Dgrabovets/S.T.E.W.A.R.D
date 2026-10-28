@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Steward.Homework.Models;
+using Steward.Homework.Services;
 using Steward.Homework.Storage;
 using Steward.Lms.Common;
 using Steward.Lms.Models;
@@ -49,6 +50,14 @@ internal static class Program
                     Log(await TasksAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")), dryRun: args.Contains("--dry-run")));
 
                     return 0;
+                case "analyze":
+                    Log(await AnalyzeAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
+
+                    return 0;
+                case "publish":
+                    Log(await PublishAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
+
+                    return 0;
                 case "probe":
                     foreach (var line in await browser.ProbeAsync(args[1], CancellationToken.None))
                         Log(line);
@@ -70,6 +79,8 @@ internal static class Program
                     var summary = await SyncAsync(settings, store);
                     summary += "\n" + await FetchAsync(browser, settings, store, settings.MaxFetchPerRun);
                     summary += "\n" + await TasksAsync(settings, store, dryRun: !settings.CreateTasks);
+                    summary += "\n" + await AnalyzeAsync(settings, store);
+                    summary += "\n" + await PublishAsync(settings, store);
                     Log(summary);
                     Report(statusStore, ProcessStateEnum.Ok, summary, null);
 
@@ -206,6 +217,114 @@ internal static class Program
         {
             singularity?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Просит Claude разобрать занятия, у которых есть расшифровка, но нет разбора, и записывает разбор в <c>analysis</c>. Полный текст по ролям в разбор не попадает
+    /// </summary>
+    /// <param name="settings">Настройки: сколько занятий разбирать за запуск</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <returns>Строка итога для статуса</returns>
+    private static async Task<string> AnalyzeAsync(LmsSettings settings, HomeworkStore store)
+    {
+        var todo = store.LoadLessons().Where(store.ShouldAnalyze).Take(Math.Max(settings.MaxAnalyzePerRun, 0)).ToArray();
+        if (todo.Length == 0)
+            return "Разбор: новых занятий нет";
+
+        var done = 0;
+        foreach (var lesson in todo)
+        {
+            var path = store.AnalysisPath(lesson.Id);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+            var error = await ClaudeAgent.RunAsync(LessonAnalysisPrompt.Build(lesson, store.TranscriptPath(lesson.Id), path), store.Root, CancellationToken.None);
+            if (error.Length == 0 && store.ReadAnalysis(lesson.Id) is null)
+                error = "Claude записал разбор в неверном формате";
+
+            if (error.Length > 0)
+            {
+                File.Delete(path);
+                Log($"Разбор не удался: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}: {error}");
+
+                continue;
+            }
+
+            Log($"Разбор: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}");
+            done++;
+        }
+
+        return $"Разбор занятий: {done} из {todo.Length}";
+    }
+
+    /// <summary>
+    /// Записывает в SingularityApp подробные разборы занятий в заметки и ссылки на готовые файлы заданий в задачи ДЗ. Пока запись выключена, только пишет в лог, что сделала бы. Singularity не принимает вложения, поэтому файлы остаются на диске, а в заметке лежат ссылки
+    /// </summary>
+    /// <param name="settings">Настройки: подключение к SingularityApp и разрешение на запись</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <returns>Строка итога для статуса</returns>
+    private static async Task<string> PublishAsync(LmsSettings settings, HomeworkStore store)
+    {
+        if (settings.Singularity is not { Token.Length: > 0 } configured || configured.Token.StartsWith('<'))
+            return "Заметки: Singularity не настроен";
+
+        var lessons = store.LoadLessons();
+        if (lessons.Count == 0)
+            return "Заметки: занятий нет";
+
+        using var singularity = new Steward.Mail.Services.SingularityClient(configured);
+        var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+        var from = new DateTimeOffset(lessons.Min(lesson => lesson.Date).AddDays(-1).ToDateTime(TimeOnly.MinValue), offset);
+        var published = store.LoadCreated();
+        var written = 0;
+
+        var notes = (await singularity.ListTasksAsync(from, AnalysisNote.KEY_PREFIX, CancellationToken.None)).GroupBy(task => task.ExternalId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        foreach (var lesson in lessons.Where(lesson => !published.Contains("note:" + lesson.Id)))
+        {
+            if (store.ReadAnalysis(lesson.Id) is not { } analysis)
+                continue;
+
+            var key = AnalysisNote.KEY_PREFIX + lesson.Id;
+            Log($"{(settings.CreateTasks ? "Записываю" : "Записал бы")} разбор занятия в Singularity: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}");
+            if (!settings.CreateTasks)
+                continue;
+
+            if (notes.TryGetValue(key, out var existing))
+                await singularity.UpdateNoteAsync(existing.Id, AnalysisNote.Text(lesson, analysis), CancellationToken.None);
+            else
+                await singularity.CreateTaskAsync(AnalysisNote.Build(lesson, analysis, configured.ProjectId, offset), CancellationToken.None);
+
+            store.MarkCreated(["note:" + lesson.Id]);
+            written++;
+        }
+
+        if (settings.CreateTasks)
+            await new HomeworkTaskCreator(store, singularity, configured.ProjectId, TimeProvider.System, Log).RunAsync(CancellationToken.None);
+
+        var homework = (await singularity.ListTasksAsync(from, "hw:", CancellationToken.None)).GroupBy(task => task.ExternalId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        foreach (var lesson in lessons.Where(store.PreparesHomework))
+        {
+            var items = store.ReadItems(lesson.Id);
+            if (items is null || !Directory.Exists(store.DraftsDirectory(lesson.Id)))
+                continue;
+
+            for (var index = 0; index < items.Count; index++)
+            {
+                var files = Directory.EnumerateFiles(store.DraftsDirectory(lesson.Id), $"Задание {index + 1}.*").Order(StringComparer.Ordinal).ToArray();
+                var mark = $"draft:{lesson.Id}:{index + 1}:{string.Join('|', files.Select(Path.GetFileName))}";
+                if (files.Length == 0 || store.LoadCreated().Contains(mark) || !homework.TryGetValue(HomeworkTaskBuilder.ExternalId(lesson, index + 1), out var task))
+                    continue;
+
+                Log($"{(settings.CreateTasks ? "Добавляю" : "Добавил бы")} ссылку на готовую работу в задачу: {items[index].Title}");
+                if (!settings.CreateTasks)
+                    continue;
+
+                await singularity.UpdateNoteAsync(task.Id, HomeworkTaskBuilder.Build(lesson, items[index], index + 1, store.FormatFor(lesson.Id), configured.ProjectId, offset, files).Note, CancellationToken.None);
+                store.MarkCreated([mark]);
+                written++;
+            }
+        }
+
+        return settings.CreateTasks ? $"Заметки и работы в Singularity: записано {written}" : "Заметки и работы: запись в Singularity выключена";
     }
 
     /// <summary>

@@ -129,6 +129,23 @@ public class MailCheckerTests
     }
 
     /// <summary>
+    /// Строка про письмо в логе заканчивается ссылкой на письмо и коротким описанием, их читает окно приложения
+    /// </summary>
+    [Fact]
+    public async Task A_log_line_carries_the_letter_link_and_a_short_description()
+    {
+        var checker = Checker([Samples.Mail("reply")], new RecordingSingularity(), new RecordingNotifier(), out var log);
+
+        await checker.RunAsync(dryRun: true, CancellationToken.None);
+
+        var line = Assert.Single(log, entry => entry.StartsWith("[тест] Ответить:", StringComparison.Ordinal));
+        var parts = line.Split(" ‖ ");
+        Assert.Equal(3, parts.Length);
+        Assert.StartsWith("http", parts[1], StringComparison.Ordinal);
+        Assert.True(parts[2].Length > 0 && parts[2].Length <= 221);
+    }
+
+    /// <summary>
     /// Если вторая задача не создалась, первое письмо уже имеет задачу, и следующая проверка создаёт только вторую
     /// </summary>
     [Fact]

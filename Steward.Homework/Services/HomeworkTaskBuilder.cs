@@ -32,8 +32,9 @@ public static class HomeworkTaskBuilder
     /// <param name="format">Формат, в котором готовить работу</param>
     /// <param name="projectId">Проект SingularityApp или <see langword="null"/></param>
     /// <param name="offset">Часовой пояс начала дня</param>
+    /// <param name="drafts">Пути к готовым файлам по этому заданию. Singularity не принимает вложения, поэтому в заметку идут ссылки на файлы на диске</param>
     /// <returns>Запрос на создание задачи</returns>
-    public static SingularityTaskRequest Build(Lesson lesson, HomeworkItem item, int number, HomeworkFormatEnum format, string? projectId, TimeSpan offset)
+    public static SingularityTaskRequest Build(Lesson lesson, HomeworkItem item, int number, HomeworkFormatEnum format, string? projectId, TimeSpan offset, IReadOnlyList<string>? drafts = null)
     {
         var day = item.Due ?? lesson.Date;
         var note = new QuillDelta().Text($"Занятие: {lesson.Title}, {lesson.Date:dd.MM.yyyy}\nФормат: {HomeworkFormats.Title(format)}\n");
@@ -45,6 +46,13 @@ public static class HomeworkTaskBuilder
 
         if (item.Link.Length > 0)
             note.Divider().Link("Задание", item.Link);
+
+        if (drafts is { Count: > 0 })
+        {
+            note.Text("\nГотовая работа:\n");
+            foreach (var draft in drafts)
+                note.Link(Path.GetFileName(draft), new Uri(draft).AbsoluteUri).Text("\n");
+        }
 
         return new SingularityTaskRequest
         {

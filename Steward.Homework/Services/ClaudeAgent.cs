@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 
-namespace Steward.Hosting;
+namespace Steward.Homework.Services;
 
 /// <summary>
 /// Запускает Claude Code в фоне одним заходом, без чата: сессия не сохраняется, в списке чатов ничего не появляется. Подходит для чётких задач, где диалог не нужен

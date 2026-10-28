@@ -469,6 +469,7 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="12"/>
                                                         <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <Border x:Name="Stripe" Background="{StaticResource LineStrongBrush}" CornerRadius="2" Margin="8,10,0,10"/>
                                                     <StackPanel Grid.Column="1" Margin="14,10,14,10">
@@ -479,7 +480,11 @@
                                                             </Border>
                                                         </StackPanel>
                                                         <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" LineHeight="20" Margin="0,6,0,0"
+                                                                   Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibility}}"/>
                                                     </StackPanel>
+                                                    <Button Grid.Column="2" Content="Открыть письмо" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" VerticalAlignment="Center" Margin="0,0,14,0"
+                                                            Visibility="{Binding HasLink, Converter={StaticResource BoolToVisibility}}"/>
                                                 </Grid>
                                             </Border>
                                             <DataTemplate.Triggers>

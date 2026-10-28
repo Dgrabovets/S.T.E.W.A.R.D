@@ -276,6 +276,8 @@
                                 </ItemsControl>
                                 <TextBlock Text="{Binding ReadingTopic}" Foreground="{StaticResource AccentTextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap" Margin="0,10,0,0"
                                            Visibility="{Binding HasReadingTopic, Converter={StaticResource BoolToVisibility}}"/>
+                                <TextBlock Text="Подробный разбор ещё готовится: он появится после ближайшей выгрузки. Пока показано короткое резюме." Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                           Visibility="{Binding ReadingBrief, Converter={StaticResource BoolToVisibility}}"/>
                                 <TextBlock Text="В файле расшифровки нет резюме: заново запроси расшифровку занятия." Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,10,0,0"
                                            Visibility="{Binding ReadingEmpty, Converter={StaticResource BoolToVisibility}}"/>
                                 <TextBlock Text="Пройдено" Style="{StaticResource TextCaption}" Margin="0,14,0,6"
@@ -301,6 +303,27 @@
                                         <TextBlock Text="{Binding ReadingOverview}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
                                     </StackPanel>
                                 </Border>
+                                <TextBlock Text="Темы" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingTopics, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingTopics}" Visibility="{Binding HasReadingTopics, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,0,10">
+                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Details}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" LineHeight="22" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Формулировки" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingFormulations, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingFormulations}" Visibility="{Binding HasReadingFormulations, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource AccentOutlineBrush}" BorderThickness="2,0,0,0" Padding="10,2,0,2" Margin="0,0,0,8">
+                                                <TextBlock Text="{Binding}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22" FontStyle="Italic"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                                 <TextBlock Text="Принятые решения" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingDecisions, Converter={StaticResource BoolToVisibility}}"/>
                                 <ItemsControl ItemsSource="{Binding ReadingDecisions}" Visibility="{Binding HasReadingDecisions, Converter={StaticResource BoolToVisibility}}">
                                     <ItemsControl.ItemTemplate>
@@ -356,7 +379,20 @@
 
             <!-- Домашние задания -->
             <StackPanel Visibility="{Binding IsHomeworkTab, Converter={StaticResource BoolToVisibility}}">
-                <Grid Margin="0,8,0,0">
+                <TextBlock TextWrapping="Wrap" Margin="4,0,0,8"
+                           Text="Для этого предмета домашние задания не готовятся. Выбери «Расшифровывать» в списке на плитке, и здесь появятся задания и готовые работы.">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TextSecondary}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedSubject.ShowFormat}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Grid Margin="0,8,0,0" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="340"/>
                         <ColumnDefinition Width="*"/>

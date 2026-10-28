@@ -59,6 +59,7 @@ public sealed class LessonStateOptionViewModel : Bindable
     public static string TitleOf(LessonStateEnum state) => state switch
     {
         LessonStateEnum.Fetch => "Расшифровывать",
+        LessonStateEnum.Analyze => "Только анализ",
         LessonStateEnum.Skip => "Не нужно",
         LessonStateEnum.Done => "Завершён",
         _ => "Ждёт решения",

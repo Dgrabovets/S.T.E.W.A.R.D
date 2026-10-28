@@ -10,8 +10,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Templates\slides-template.pptx" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Steward.Mail\Steward.Mail.csproj" />
     <ProjectReference Include="..\Steward.Schedule.Shared\Steward.Schedule.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.2.0" />
   </ItemGroup>
 
 </Project>

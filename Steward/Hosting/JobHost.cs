@@ -187,6 +187,13 @@ public sealed class JobHost : IDisposable
     public string ReadTranscript(string lessonId) => _homework.ReadTranscript(lessonId);
 
     /// <summary>
+    /// Читает подробный разбор занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Разбор или <see langword="null"/>, если его ещё нет</returns>
+    public LessonAnalysis? ReadAnalysis(string lessonId) => _homework.ReadAnalysis(lessonId);
+
+    /// <summary>
     /// Находит готовые файлы заданий занятия
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
@@ -215,7 +222,7 @@ public sealed class JobHost : IDisposable
     public bool HasTranscript(Lesson lesson) => File.Exists(_homework.TranscriptPath(lesson.Id));
 
     /// <summary>
-    /// Просит Claude в фоне найти в расшифровке домашние задания и ждёт, пока он запишет их в файл. Чат при этом не создаётся
+    /// Просит Claude в фоне найти в расшифровке домашние задания, а затем выполнить каждое в выбранном формате и положить готовые файлы в папку занятия. Чат при этом не создаётся
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="cancellationToken">Отменяет запуск</param>
@@ -229,7 +236,20 @@ public sealed class JobHost : IDisposable
         if (error.Length > 0)
             return (0, error);
 
-        return _homework.ReadItems(lesson.Id) is { } items ? (items.Count, string.Empty) : (0, "Claude не записал файл заданий");
+        if (_homework.ReadItems(lesson.Id) is not { } items)
+            return (0, "Claude не записал файл заданий");
+
+        var format = _homework.FormatFor(lesson.Id);
+        if (items.Count == 0 || format == HomeworkFormatEnum.Skip)
+            return (items.Count, string.Empty);
+
+        var (_, draftError) = await DraftBuilder.BuildAsync(_homework, lesson, items, format, ClaudeAgent.RunAsync, cancellationToken);
+        if (draftError.Length > 0)
+            return (items.Count, draftError);
+
+        RunNow(LMS_ID);
+
+        return (items.Count, string.Empty);
     }
 
     /// <summary>

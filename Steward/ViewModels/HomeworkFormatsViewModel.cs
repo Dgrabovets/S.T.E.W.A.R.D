@@ -195,6 +195,11 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Func<string, string>? TranscriptReader { get; set; }
 
     /// <summary>
+    /// Читает разбор занятия по ключу: подробный, который записал Claude. Пусто, если разбора ещё нет
+    /// </summary>
+    public Func<string, LessonAnalysis?>? AnalysisReader { get; set; }
+
+    /// <summary>
     /// Находит готовые файлы заданий по ключу занятия
     /// </summary>
     public Func<string, IReadOnlyList<string>>? DraftLister { get; set; }
@@ -287,6 +292,31 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// Задачи, которые прозвучали на занятии
     /// </summary>
     public IReadOnlyList<string> ReadingTasks => _reading.Tasks;
+
+    /// <summary>
+    /// Разобранные темы с подробностями
+    /// </summary>
+    public IReadOnlyList<AnalysisTopic> ReadingTopics => _reading.Topics;
+
+    /// <summary>
+    /// Важные формулировки, которые прозвучали на занятии
+    /// </summary>
+    public IReadOnlyList<string> ReadingFormulations => _reading.Formulations;
+
+    /// <summary>
+    /// Есть разобранные темы
+    /// </summary>
+    public bool HasReadingTopics => _reading.Topics.Count > 0;
+
+    /// <summary>
+    /// Есть формулировки
+    /// </summary>
+    public bool HasReadingFormulations => _reading.Formulations.Count > 0;
+
+    /// <summary>
+    /// Подробного разбора ещё нет: показано только то, что было в резюме MTS Link
+    /// </summary>
+    public bool ReadingBrief => !_reading.Detailed && !ReadingEmpty;
 
     /// <summary>
     /// Есть принятые решения
@@ -403,7 +433,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         foreach (var other in Lessons)
             other.IsOpen = other == lesson;
 
-        _reading = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty);
+        _reading = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty, AnalysisReader?.Invoke(lesson.Id));
         OpenLesson = lesson;
         RaiseReading();
     }
@@ -437,6 +467,11 @@ public sealed class HomeworkFormatsViewModel : Bindable
         Raise(nameof(ReadingDecisions));
         Raise(nameof(ReadingTasks));
         Raise(nameof(HasReadingDecisions));
+        Raise(nameof(ReadingTopics));
+        Raise(nameof(ReadingFormulations));
+        Raise(nameof(HasReadingTopics));
+        Raise(nameof(HasReadingFormulations));
+        Raise(nameof(ReadingBrief));
         Raise(nameof(HasReadingTasks));
         Raise(nameof(ReadingSpeakers));
         Raise(nameof(HasReadingSpeakers));

@@ -1,3 +1,5 @@
+using Steward.Homework.Models;
+
 namespace Steward.Preview;
 
 /// <summary>
@@ -9,12 +11,15 @@ namespace Steward.Preview;
 /// <param name="Decisions">Принятые решения</param>
 /// <param name="Tasks">Задачи, которые прозвучали на занятии</param>
 /// <param name="Speakers">Кто сколько говорил: имя и число слов, от самого активного</param>
-public sealed record TranscriptText(string Topic, string Overview, IReadOnlyList<string> Points, IReadOnlyList<string> Decisions, IReadOnlyList<string> Tasks, IReadOnlyList<(string Name, int Words)> Speakers)
+/// <param name="Topics">Разобранные темы с подробностями. Есть только у подробного разбора</param>
+/// <param name="Formulations">Важные формулировки. Есть только у подробного разбора</param>
+/// <param name="Detailed">Данные взяты из подробного разбора, а не из короткого резюме MTS Link</param>
+public sealed record TranscriptText(string Topic, string Overview, IReadOnlyList<string> Points, IReadOnlyList<string> Decisions, IReadOnlyList<string> Tasks, IReadOnlyList<(string Name, int Words)> Speakers, IReadOnlyList<AnalysisTopic> Topics, IReadOnlyList<string> Formulations, bool Detailed)
 {
     /// <summary>
     /// Пустой разбор
     /// </summary>
-    public static TranscriptText Empty { get; } = new(string.Empty, string.Empty, [], [], [], []);
+    public static TranscriptText Empty { get; } = new(string.Empty, string.Empty, [], [], [], [], [], [], false);
 
     /// <summary>
     /// Сколько слов сказано на занятии
@@ -25,8 +30,9 @@ public sealed record TranscriptText(string Topic, string Overview, IReadOnlyList
     /// Разбирает файл расшифровки по заголовкам «== Резюме ==» и «== Расшифровка ==»
     /// </summary>
     /// <param name="text">Содержимое файла</param>
+    /// <param name="analysis">Подробный разбор, который записал Claude, или <see langword="null"/>: тогда берётся короткое резюме из файла</param>
     /// <returns>Части резюме и статистика реплик. Пустой разбор, если в файле нет ни резюме, ни реплик</returns>
-    public static TranscriptText Parse(string text)
+    public static TranscriptText Parse(string text, LessonAnalysis? analysis = null)
     {
         var normal = text.Replace("\r\n", "\n", StringComparison.Ordinal);
         var summaryAt = normal.IndexOf("== Резюме ==", StringComparison.Ordinal);
@@ -90,6 +96,12 @@ public sealed record TranscriptText(string Topic, string Overview, IReadOnlyList
             }
         }
 
-        return new TranscriptText(topic, string.Join("\n\n", overview), lists["points"], lists["decisions"], lists["tasks"], [.. words.OrderByDescending(pair => pair.Value).Select(pair => (pair.Key, pair.Value))]);
+        var speakers = words.OrderByDescending(pair => pair.Value).Select(pair => (pair.Key, pair.Value)).ToArray();
+        if (analysis is not null)
+        {
+            return new TranscriptText(analysis.Topic, analysis.Overview, analysis.Covered, analysis.Decisions, [.. analysis.Tasks.Select(task => task.Due.Length > 0 ? $"{task.Title} (срок: {task.Due})" : task.Title)], speakers, analysis.Topics, analysis.Formulations, true);
+        }
+
+        return new TranscriptText(topic, string.Join("\n\n", overview), lists["points"], lists["decisions"], lists["tasks"], speakers, [], [], false);
     }
 }

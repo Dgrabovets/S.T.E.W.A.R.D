@@ -697,7 +697,7 @@ public sealed class MainViewModel : PanelViewModel
         Raise(nameof(MailLastTone));
         MailLetters = [.. records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).Take(5)
             .SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal))))
-            .Take(12).Select(MailLetterViewModel.From)];
+            .Take(12).Select(line => MailLetterViewModel.From(line, link => LinkRequested?.Invoke(link)))];
         Raise(nameof(MailLetters));
         Raise(nameof(MailCard));
         Raise(nameof(ScheduleCard));

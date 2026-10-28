@@ -46,6 +46,11 @@ public sealed class LmsSettings
     public bool CreateTasks { get; init; }
 
     /// <summary>
+    /// Сколько занятий разбирать через Claude за один запуск. Разбор расходует лимит подписки, поэтому остальные подтягиваются в следующих запусках
+    /// </summary>
+    public int MaxAnalyzePerRun { get; init; } = 3;
+
+    /// <summary>
     /// Записи короче этого числа минут считаются пробными запусками и сразу получают отметку «не забирать»
     /// </summary>
     public int MinLessonMinutes { get; init; } = 10;

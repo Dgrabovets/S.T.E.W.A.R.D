@@ -210,7 +210,38 @@ public sealed class HomeworkStore(string directory)
     public bool ShouldFetch(Lesson lesson) =>
         lesson.RecordUrl.Length > 0
         && !HasTranscript(lesson.Id)
-        && (StateFor(lesson.Id) == LessonStateEnum.Fetch || (SubjectStateFor(lesson.Title) == LessonStateEnum.Fetch && StateFor(lesson.Id) is not (LessonStateEnum.Skip or LessonStateEnum.Done)));
+        && (StateFor(lesson.Id) is LessonStateEnum.Fetch or LessonStateEnum.Analyze || (SubjectStateFor(lesson.Title) is LessonStateEnum.Fetch or LessonStateEnum.Analyze && StateFor(lesson.Id) is not (LessonStateEnum.Skip or LessonStateEnum.Done)));
+
+    /// <summary>
+    /// Действующая отметка занятия: своя, а если её нет, отметка предмета. Отметки «Не нужно» и «Завершён» у занятия сильнее отметки предмета
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>Отметка, по которой решается, что делать с занятием</returns>
+    public LessonStateEnum EffectiveState(Lesson lesson)
+    {
+        var own = StateFor(lesson.Id);
+
+        return own is LessonStateEnum.Fetch or LessonStateEnum.Analyze or LessonStateEnum.Skip or LessonStateEnum.Done ? own : SubjectStateFor(lesson.Title);
+    }
+
+    /// <summary>
+    /// Нужно ли разобрать занятие: расшифровка есть, разбора ещё нет, а отметка требует разбора
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>
+    /// <see langword="true"/>, если разбор пора готовить
+    /// </returns>
+    public bool ShouldAnalyze(Lesson lesson) =>
+        HasTranscript(lesson.Id) && !File.Exists(AnalysisPath(lesson.Id)) && EffectiveState(lesson) is LessonStateEnum.Fetch or LessonStateEnum.Analyze;
+
+    /// <summary>
+    /// Нужно ли готовить домашние задания по занятию: отметка «Расшифровывать» и формат не «Не готовить»
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>
+    /// <see langword="true"/>, если задания готовятся
+    /// </returns>
+    public bool PreparesHomework(Lesson lesson) => EffectiveState(lesson) == LessonStateEnum.Fetch && FormatFor(lesson.Id) != HomeworkFormatEnum.Skip;
 
     /// <summary>
     /// Проверяет, лежит ли уже расшифровка занятия
@@ -298,7 +329,7 @@ public sealed class HomeworkStore(string directory)
     /// <returns>Пути к файлам от новых к старым. Пустой список, если ничего не готовили</returns>
     public IReadOnlyList<string> DraftFiles(string lessonId)
     {
-        var folder = Path.Combine(directory, "drafts", SafeName(lessonId));
+        var folder = DraftsDirectory(lessonId);
 
         return Directory.Exists(folder) ? [.. Directory.EnumerateFiles(folder).OrderByDescending(File.GetLastWriteTimeUtc)] : [];
     }
@@ -330,6 +361,39 @@ public sealed class HomeworkStore(string directory)
             return [];
         }
     }
+
+    /// <summary>
+    /// Путь к разбору занятия, который записывает агент
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Путь к <c>analysis/&lt;ключ&gt;.json</c></returns>
+    /// <exception cref="ArgumentException">Ключ не подходит для имени файла</exception>
+    public string AnalysisPath(string lessonId) => Path.Combine(directory, "analysis", SafeName(lessonId) + ".json");
+
+    /// <summary>
+    /// Читает разбор занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Разбор или <see langword="null"/>, если его ещё нет или файл испорчен</returns>
+    public LessonAnalysis? ReadAnalysis(string lessonId)
+    {
+        try
+        {
+            return File.Exists(AnalysisPath(lessonId)) ? LessonAnalysis.Parse(File.ReadAllText(AnalysisPath(lessonId))) : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Папка готовых файлов занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Путь к <c>drafts/&lt;ключ&gt;</c></returns>
+    /// <exception cref="ArgumentException">Ключ не подходит для имени файла</exception>
+    public string DraftsDirectory(string lessonId) => Path.Combine(directory, "drafts", SafeName(lessonId));
 
     /// <summary>
     /// Путь к файлу с заданиями, который записывает агент

@@ -158,6 +158,27 @@ public sealed class SingularityClient : ISingularityClient, IDisposable
     }
 
     /// <summary>
+    /// Заменяет заметку задачи запросом PATCH /v2/task/{id}
+    /// </summary>
+    /// <param name="taskId">Номер задачи в SingularityApp</param>
+    /// <param name="note">Новая заметка в формате Quill Delta</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда SingularityApp принимает запрос</returns>
+    /// <exception cref="HttpRequestException">
+    /// SingularityApp ответил ошибкой. В тексте код ответа и тело
+    /// </exception>
+    public async Task UpdateNoteAsync(string taskId, string note, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"v2/task/{Uri.EscapeDataString(taskId)}") { Content = JsonContent.Create(new { note }) };
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new HttpRequestException($"SingularityApp ответил {(int)response.StatusCode}: {body}");
+        }
+    }
+
+    /// <summary>
     /// Освобождает HTTP-клиент
     /// </summary>
     public void Dispose() => _http.Dispose();

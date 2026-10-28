@@ -48,7 +48,7 @@ public sealed class SubjectViewModel : Bindable
         var options = new List<LessonStateOptionViewModel>();
         if (stateChosen is not null)
         {
-            foreach (var option in Enum.GetValues<LessonStateEnum>())
+            foreach (var option in new[] { LessonStateEnum.Undecided, LessonStateEnum.Fetch, LessonStateEnum.Analyze, LessonStateEnum.Skip, LessonStateEnum.Done })
             {
                 options.Add(new LessonStateOptionViewModel(option, option == state, picked =>
                 {
