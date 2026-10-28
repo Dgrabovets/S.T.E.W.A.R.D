@@ -150,6 +150,13 @@ public sealed partial class GuideStore(string directory)
     }
 
     /// <summary>
+    /// Включает или выключает материал: выключенный остаётся в списке, но при подготовке заданий не учитывается
+    /// </summary>
+    /// <param name="id">Ключ записи</param>
+    /// <param name="enabled">Учитывать материал</param>
+    public void SetEnabled(string id, bool enabled) => Write([.. Load().Select(item => item.Id == id ? item with { Enabled = enabled } : item)]);
+
+    /// <summary>
     /// Убирает материал из списка. Файл, который приложение скопировало к себе, удаляется, оригиналы по ссылке не трогаются
     /// </summary>
     /// <param name="id">Ключ записи</param>
@@ -169,10 +176,14 @@ public sealed partial class GuideStore(string directory)
     /// Собирает материалы предмета для агента: читаемые файлы указаний и образцов и папки, к которым агенту нужен доступ
     /// </summary>
     /// <param name="subject">Название предмета</param>
+    /// <param name="ids">Какие материалы взять. <see langword="null"/>: все включённые</param>
     /// <returns>Файлы по видам и папки</returns>
-    public GuideMaterials Materials(string subject)
+    public GuideMaterials Materials(string subject, IReadOnlySet<string>? ids = null)
     {
-        var entries = ForSubject(subject).Where(entry => entry.Path.Length > 0 && (File.Exists(entry.Path) || Directory.Exists(entry.Path))).ToArray();
+        var entries = ForSubject(subject)
+            .Where(entry => ids is not null ? ids.Contains(entry.Id) : entry.Enabled)
+            .Where(entry => entry.Path.Length > 0 && (File.Exists(entry.Path) || Directory.Exists(entry.Path)))
+            .ToArray();
         var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         List<string> Files(GuideKindEnum kind)
         {

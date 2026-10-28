@@ -30,7 +30,8 @@ public static partial class DraftBuilder
     /// <param name="resultPath">Путь, куда агент запишет работу</param>
     /// <returns>Текст просьбы</returns>
     /// <param name="materials">Методические указания и образцы предмета или <see langword="null"/>, если их нет</param>
-    public static string Prompt(Lesson lesson, HomeworkItem item, int number, HomeworkFormatEnum format, string transcriptPath, string resultPath, GuideMaterials? materials = null)
+    /// <param name="extra">Дополнительное указание из окна «Подготовить задание» или пусто</param>
+    public static string Prompt(Lesson lesson, HomeworkItem item, int number, HomeworkFormatEnum format, string transcriptPath, string resultPath, GuideMaterials? materials = null, string extra = "")
     {
         var how = format switch
         {
@@ -40,7 +41,7 @@ public static partial class DraftBuilder
             _ => "Запиши работу в Markdown: заголовок «#», разделы «##», абзацы, списки «- », важное выделяй «**так**». Оформи как готовый документ для сдачи.",
         };
 
-        var guides = materials is { Any: true } ? GuideSection(materials, format) : string.Empty;
+        var guides = (materials is { Any: true } ? GuideSection(materials, format) : string.Empty) + (extra.Trim().Length > 0 ? "\n\nДополнительное указание от студента, учти его при выполнении: " + extra.Trim() : string.Empty);
 
         return $$"""
             Выполни домашнее задание по занятию «{{lesson.Title}}» от {{lesson.Date:dd.MM.yyyy}}.
@@ -99,7 +100,8 @@ public static partial class DraftBuilder
     /// <param name="cancellationToken">Токен отмены</param>
     /// <returns>Пути к готовым файлам и текст ошибки, если хотя бы одно задание не удалось</returns>
     /// <param name="materials">Методические указания и образцы предмета или <see langword="null"/></param>
-    public static async Task<(IReadOnlyList<string> Files, string Error)> BuildAsync(HomeworkStore store, Lesson lesson, IReadOnlyList<HomeworkItem> items, HomeworkFormatEnum format, AgentRun agent, CancellationToken cancellationToken, GuideMaterials? materials = null)
+    /// <param name="extra">Дополнительное указание из окна «Подготовить задание» или пусто</param>
+    public static async Task<(IReadOnlyList<string> Files, string Error)> BuildAsync(HomeworkStore store, Lesson lesson, IReadOnlyList<HomeworkItem> items, HomeworkFormatEnum format, AgentRun agent, CancellationToken cancellationToken, GuideMaterials? materials = null, string extra = "")
     {
         var folder = store.DraftsDirectory(lesson.Id);
         var source = Path.Combine(folder, ".src");
@@ -120,7 +122,7 @@ public static partial class DraftBuilder
 
             var isCode = format == HomeworkFormatEnum.Code;
             var resultPath = isCode ? Path.Combine(folder, $"Задание {number}.txt") : Path.Combine(source, $"{number}.md");
-            var error = await agent(Prompt(lesson, items[index], number, format, store.TranscriptPath(lesson.Id), isCode ? Path.Combine(folder, $"Задание {number}.<расширение>") : resultPath, materials), store.Root, materials?.Directories ?? [], cancellationToken);
+            var error = await agent(Prompt(lesson, items[index], number, format, store.TranscriptPath(lesson.Id), isCode ? Path.Combine(folder, $"Задание {number}.<расширение>") : resultPath, materials, extra), store.Root, materials?.Directories ?? [], cancellationToken);
             if (error.Length > 0)
             {
                 errors.Add($"Задание {number}: {error}");

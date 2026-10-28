@@ -76,6 +76,8 @@ public sealed class JobHost : IDisposable
     /// </summary>
     private static readonly HttpClient GuideHttp = new() { Timeout = TimeSpan.FromSeconds(60) };
 
+
+
     /// <summary>
     /// Папка идей из рилсов
     /// </summary>
@@ -231,17 +233,17 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
-    /// Запоминает ссылку на файл или папку и, если это адрес в интернете, скачивает файл
+    /// Запоминает ссылку на файл в интернете и скачивает файл. Ссылки Google Диска и Документов превращаются в прямые
     /// </summary>
     /// <param name="subject">Название предмета</param>
     /// <param name="kind">Указания или образцы</param>
-    /// <param name="pathOrUrl">Путь на диске или адрес в интернете</param>
+    /// <param name="url">Адрес в интернете</param>
     /// <returns>Пояснение, если что-то не вышло, иначе пустая строка</returns>
-    public async Task<string> AddGuideLinkAsync(string subject, GuideKindEnum kind, string pathOrUrl)
+    public async Task<string> AddGuideLinkAsync(string subject, GuideKindEnum kind, string url)
     {
         try
         {
-            var entry = _guides.AddReference(subject, kind, pathOrUrl);
+            var entry = _guides.AddReference(subject, kind, url);
 
             return entry.Url.Length > 0 ? (await _guides.DownloadAsync(entry, GuideHttp, CancellationToken.None)).Note : string.Empty;
         }
@@ -250,6 +252,34 @@ public sealed class JobHost : IDisposable
             return exception.Message;
         }
     }
+
+    /// <summary>
+    /// Запоминает папку по пути на диске: оригиналы остаются на месте
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="kind">Указания или образцы</param>
+    /// <param name="path">Путь к папке</param>
+    /// <returns>Пояснение, если что-то не вышло, иначе пустая строка</returns>
+    public string AddGuideFolder(string subject, GuideKindEnum kind, string path)
+    {
+        try
+        {
+            _guides.AddReference(subject, kind, path);
+
+            return string.Empty;
+        }
+        catch (ArgumentException exception)
+        {
+            return exception.Message;
+        }
+    }
+
+    /// <summary>
+    /// Включает или выключает материал
+    /// </summary>
+    /// <param name="id">Ключ записи</param>
+    /// <param name="enabled">Учитывать материал</param>
+    public void SetGuideEnabled(string id, bool enabled) => _guides.SetEnabled(id, enabled);
 
     /// <summary>
     /// Убирает материал предмета
@@ -296,9 +326,10 @@ public sealed class JobHost : IDisposable
     /// Просит Claude в фоне найти в расшифровке домашние задания, а затем выполнить каждое в выбранном формате и положить готовые файлы в папку занятия. Чат при этом не создаётся
     /// </summary>
     /// <param name="lesson">Занятие</param>
+    /// <param name="request">Формат, дополнительное указание и материалы, которые нужно учесть</param>
     /// <param name="cancellationToken">Отменяет запуск</param>
     /// <returns>Сколько заданий найдено и текст ошибки, если не получилось</returns>
-    public async Task<(int Count, string Error)> PrepareHomeworkAsync(Lesson lesson, CancellationToken cancellationToken)
+    public async Task<(int Count, string Error)> PrepareHomeworkAsync(Lesson lesson, PrepareRequest request, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_homework.ItemsPath(lesson.Id))!);
 
@@ -310,11 +341,11 @@ public sealed class JobHost : IDisposable
         if (_homework.ReadItems(lesson.Id) is not { } items)
             return (0, "Claude не записал файл заданий");
 
-        var format = _homework.FormatFor(lesson.Id);
+        var format = request.Format;
         if (items.Count == 0 || format == HomeworkFormatEnum.Skip)
             return (items.Count, string.Empty);
 
-        var (_, draftError) = await DraftBuilder.BuildAsync(_homework, lesson, items, format, ClaudeAgent.RunAsync, cancellationToken, _guides.Materials(lesson.Title));
+        var (_, draftError) = await DraftBuilder.BuildAsync(_homework, lesson, items, format, ClaudeAgent.RunAsync, cancellationToken, _guides.Materials(lesson.Title, request.GuideIds), request.Extra);
         if (draftError.Length > 0)
             return (items.Count, draftError);
 

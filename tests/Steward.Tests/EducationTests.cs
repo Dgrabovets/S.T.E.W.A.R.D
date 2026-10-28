@@ -220,7 +220,7 @@ public class EducationTests
     }
 
     /// <summary>
-    /// Файл, папка и ссылка добавляются как материалы предмета: файл копируется, путь остаётся на месте, Word превращается в читаемый текст с оформлением, ссылки Google становятся прямыми
+    /// Файл и папка добавляются как материалы предмета: файл копируется, путь остаётся на месте, Word превращается в читаемый текст с оформлением, выключенный материал и материалы вне выбора в подготовку не попадают
     /// </summary>
     [Fact]
     public void Guides_are_stored_per_subject_and_made_readable()
@@ -236,18 +236,19 @@ public class EducationTests
 
             var copied = store.AddFile("Гейм-дизайн", GuideKindEnum.Guide, docx);
             var folder = store.AddReference("Гейм-дизайн", GuideKindEnum.Example, outside.FullName);
-            var web = store.AddReference("Гейм-дизайн", GuideKindEnum.Guide, "https://drive.google.com/file/d/abc123/view");
             store.AddFile("Базы данных", GuideKindEnum.Guide, docx);
 
             Assert.True(File.Exists(copied.Path));
             Assert.StartsWith(store.Folder, copied.Path, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(outside.FullName, folder.Path);
+            var web = store.AddReference("Гейм-дизайн", GuideKindEnum.Guide, "https://drive.google.com/file/d/abc123/view");
+
             Assert.Equal(string.Empty, web.Path);
-            Assert.Equal(3, store.ForSubject("гейм-дизайн").Count);
-            Assert.Single(store.ForSubject("Базы данных"));
-            Assert.Throws<ArgumentException>(() => store.AddReference("Гейм-дизайн", GuideKindEnum.Guide, "не путь и не ссылка"));
             Assert.Equal("https://drive.google.com/uc?export=download&id=abc123", GuideStore.Direct(web.Url));
             Assert.Equal("https://docs.google.com/document/d/XYZ/export?format=docx", GuideStore.Direct("https://docs.google.com/document/d/XYZ/edit"));
+            Assert.Equal(3, store.ForSubject("гейм-дизайн").Count);
+            Assert.Single(store.ForSubject("Базы данных"));
+            Assert.Throws<ArgumentException>(() => store.AddReference("Гейм-дизайн", GuideKindEnum.Guide, "не путь и не файл"));
 
             var materials = store.Materials("Гейм-дизайн");
 
@@ -260,6 +261,11 @@ public class EducationTests
             Assert.Contains("Объём три страницы.", text, StringComparison.Ordinal);
             Assert.Contains(materials.Examples, path => path.EndsWith("образец.md", StringComparison.Ordinal));
             Assert.Contains(outside.FullName, materials.Directories);
+
+            store.SetEnabled(copied.Id, false);
+            Assert.Empty(store.Materials("Гейм-дизайн").Guides);
+            Assert.Single(store.Materials("Гейм-дизайн", new HashSet<string> { copied.Id }).Guides);
+            Assert.Empty(store.Materials("Гейм-дизайн", new HashSet<string>()).Examples);
 
             store.Remove(copied.Id);
             Assert.False(File.Exists(copied.Path));
@@ -290,9 +296,90 @@ public class EducationTests
         Assert.Contains(@"D:\g\guide.txt", withGuides, StringComparison.Ordinal);
         Assert.Contains(@"D:\g\example.md", withGuides, StringComparison.Ordinal);
         Assert.Contains("numbers", withGuides, StringComparison.Ordinal);
+        Assert.Contains("Дополнительное указание", DraftBuilder.Prompt(lesson, item, 1, HomeworkFormatEnum.Word, "t.txt", "r.md", null, "уложись в страницу"), StringComparison.Ordinal);
+        Assert.DoesNotContain("Дополнительное указание", without, StringComparison.Ordinal);
         Assert.DoesNotContain("Методические указания по предмету", without, StringComparison.Ordinal);
         Assert.Contains("--add-dir", ClaudeAgent.Arguments("п", "w", [@"D:\g"]));
         Assert.Equal(2, ClaudeAgent.Arguments("п", "w", [@"D:\g"]).Count(argument => argument == "--add-dir"));
+    }
+
+    /// <summary>
+    /// Окно «Методические указания» делит материалы по закладкам, считает их, сохраняет галочку и добавляет файлы на открытую закладку
+    /// </summary>
+    [Fact]
+    public void The_guides_dialog_splits_files_between_tabs_and_saves_the_checkbox()
+    {
+        var entries = new List<GuideEntry>
+        {
+            new("g1", "Гейм-дизайн", GuideKindEnum.Guide, "Указания.docx", @"D:\data\guides\Указания.docx", string.Empty, string.Empty),
+            new("e1", "Гейм-дизайн", GuideKindEnum.Example, "Образец.docx", @"E:\Учёба\Образец.docx", string.Empty, string.Empty, false),
+        };
+        var enabled = new List<(string, bool)>();
+        var added = new List<(GuideKindEnum, string)>();
+        var linked = new List<string>();
+        var model = new GuidesDialogViewModel("Гейм-дизайн", _ => entries, @"D:\data\guides", _ => { }, id => entries.RemoveAll(entry => entry.Id == id), (id, value) => enabled.Add((id, value)), (_, kind, paths) =>
+        {
+            added.Add((kind, paths[0]));
+
+            return string.Empty;
+        }, (_, _, _) => string.Empty, (_, _, link) =>
+        {
+            linked.Add(link);
+
+            return Task.FromResult(string.Empty);
+        });
+
+        Assert.Equal("Указания · 1", model.GuidesTitle);
+        Assert.Equal("Образцы · 1", model.ExamplesTitle);
+        Assert.True(model.Guides[0].IsEnabled);
+        Assert.False(model.Examples[0].IsEnabled);
+        Assert.Equal("Скопировано в папку приложения", model.Guides[0].Meta);
+        Assert.StartsWith("Файл: ", model.Examples[0].Meta, StringComparison.Ordinal);
+
+        model.Examples[0].IsEnabled = true;
+        model.ShowExamplesCommand.Execute(null);
+        model.AddFiles([@"F:\Новый образец.docx"]);
+        model.AddLinkAsync("https://example.com/guide.docx").GetAwaiter().GetResult();
+        model.AddLinkAsync("не ссылка").GetAwaiter().GetResult();
+        Assert.Contains("нет ссылки", model.Message, StringComparison.Ordinal);
+        model.Guides[0].RemoveCommand.Execute(null);
+
+        Assert.Equal(["https://example.com/guide.docx"], linked);
+        Assert.Equal([("e1", true)], enabled);
+        Assert.Equal([(GuideKindEnum.Example, @"F:\Новый образец.docx")], added);
+        Assert.Equal("Указания · 0", model.GuidesTitle);
+        Assert.True(model.GuidesEmpty);
+    }
+
+    /// <summary>
+    /// Окно «Подготовить задание» предлагает форматы, берёт отметки материалов из списка и собирает запрос из выбранного
+    /// </summary>
+    [Fact]
+    public void The_prepare_dialog_builds_the_request_from_the_choices()
+    {
+        var materials = new List<GuideEntry>
+        {
+            new("g1", "Гейм-дизайн", GuideKindEnum.Guide, "Указания.docx", @"D:\g\Указания.docx", string.Empty, string.Empty),
+            new("e1", "Гейм-дизайн", GuideKindEnum.Example, "Образец.docx", @"D:\g\Образец.docx", string.Empty, string.Empty, false),
+        };
+        var model = new PrepareDialogViewModel("25.10.2026 · Лекция 3", HomeworkFormatEnum.Skip, materials, @"D:\g");
+
+        Assert.Equal(["Word", "Презентация", "Текст", "Код"], model.Formats.Select(choice => choice.Title).ToArray());
+        Assert.Equal(HomeworkFormatEnum.Word, model.Format);
+        Assert.True(model.Formats[0].IsSelected);
+        Assert.False(model.NoMaterials);
+
+        model.Formats.Single(choice => choice.Format == HomeworkFormatEnum.Presentation).SelectCommand.Execute(null);
+        model.Examples[0].IsChecked = true;
+        model.Guides[0].IsChecked = false;
+        model.Extra = "  уложись в страницу  ";
+        var request = model.Request();
+
+        Assert.False(model.Formats[0].IsSelected);
+        Assert.Equal(HomeworkFormatEnum.Presentation, request.Format);
+        Assert.Equal("уложись в страницу", request.Extra);
+        Assert.Equal(["e1"], request.GuideIds!.ToArray());
+        Assert.True(new PrepareDialogViewModel("x", HomeworkFormatEnum.Word, [], string.Empty).NoMaterials);
     }
 
     /// <summary>

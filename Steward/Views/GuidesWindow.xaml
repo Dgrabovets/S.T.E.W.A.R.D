@@ -1,0 +1,128 @@
+<Window x:Class="Steward.Views.GuidesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="S.T.E.W.A.R.D"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        FontFamily="{StaticResource FontBase}"
+        Width="680"
+        Height="560"
+        PreviewKeyDown="Window_OnPreviewKeyDown">
+    <Window.Resources>
+        <DataTemplate x:Key="GuideRow">
+            <Border Background="{StaticResource WindowBrush}" CornerRadius="{StaticResource RadiusField}" Padding="12,8" Margin="0,0,0,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" ToolTip="Учитывать при подготовке заданий" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+                        <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Meta}"/>
+                        <TextBlock Text="{Binding Note}" Foreground="{StaticResource AttentionBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"
+                                   Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Command="{Binding OpenCommand}" Style="{StaticResource IconButton}" ToolTip="Открыть">
+                        <Path Data="{StaticResource IconEye}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeLineJoin="Round" Width="18" Height="18"/>
+                    </Button>
+                    <Button Grid.Column="3" Command="{Binding RemoveCommand}" Style="{StaticResource IconButton}" ToolTip="Убрать из списка">
+                        <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+    <Border Style="{StaticResource WindowChrome}">
+        <Grid Margin="24,18,24,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid x:Name="Header" Background="Transparent" MouseLeftButtonDown="Header_OnMouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Методические указания" Style="{StaticResource TextHeadline}"/>
+                    <TextBlock Text="{Binding Subject}" Style="{StaticResource TextCaption}" Margin="0,2,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="1" Click="Close_OnClick" Style="{StaticResource IconButton}" VerticalAlignment="Top" ToolTip="Закрыть">
+                    <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                </Button>
+            </Grid>
+
+            <Border Grid.Row="1" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Margin="0,14,0,12">
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="{Binding GuidesTitle}" Command="{Binding ShowGuidesCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource TabButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsGuidesTab}" Value="True">
+                                        <Setter Property="Tag" Value="Active"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Content="{Binding ExamplesTitle}" Command="{Binding ShowExamplesCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource TabButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsExamplesTab}" Value="True">
+                                        <Setter Property="Tag" Value="Active"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <StackPanel Visibility="{Binding IsGuidesTab, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Требования к структуре, объёму и оформлению работ. Claude читает их до начала работы, и они важнее его собственных решений."/>
+                        <TextBlock Text="Пока ничего нет. Нажми «Обзор…», выбери файлы или вставь ссылку на файл." Style="{StaticResource TextCaption}"
+                                   Visibility="{Binding GuidesEmpty, Converter={StaticResource BoolToVisibility}}"/>
+                        <ItemsControl ItemsSource="{Binding Guides}" ItemTemplate="{StaticResource GuideRow}"/>
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding IsExamplesTab, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Работы, оформленные по указаниям верно. Claude берёт из них стиль, структуру и глубину, а содержание не копирует."/>
+                        <TextBlock Text="Пока ничего нет. Нажми «Обзор…», выбери файлы или вставь ссылку на файл." Style="{StaticResource TextCaption}"
+                                   Visibility="{Binding ExamplesEmpty, Converter={StaticResource BoolToVisibility}}"/>
+                        <ItemsControl ItemsSource="{Binding Examples}" ItemTemplate="{StaticResource GuideRow}"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="3" Margin="0,12,0,0">
+                <TextBlock Text="{Binding Message}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}"/>
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Обзор…" Click="Browse_OnClick" Style="{StaticResource OutlineButton}" ToolTip="Выбрать файлы в проводнике"/>
+                        <Button Content="Папка…" Click="Folder_OnClick" Style="{StaticResource ActionButton}" Margin="8,0,0,0" ToolTip="Выбрать папку в проводнике"/>
+                        <Button Content="Ссылка" Click="Link_OnClick" Style="{StaticResource ActionButton}" Margin="8,0,0,0" ToolTip="Взять ссылку на файл из буфера обмена. То же делает Ctrl+V"/>
+                    </StackPanel>
+                    <Button Content="Готово" Click="Close_OnClick" IsDefault="True" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right"/>
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

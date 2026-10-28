@@ -79,6 +79,35 @@ public static class SnapshotRenderer
         {
             window = OrbSheet();
         }
+        else if (string.Equals(parts[0], "guides", StringComparison.OrdinalIgnoreCase))
+        {
+            // Окно «Методические указания» на примерных материалах
+            var folder = @"D:\data\homework\guides";
+            var entries = new List<GuideEntry>
+            {
+                new("g1", "Гейм-дизайн", GuideKindEnum.Guide, "Методические указания по курсовой.docx", folder + @"\Методические указания по курсовой.docx", string.Empty, string.Empty),
+                new("g2", "Гейм-дизайн", GuideKindEnum.Guide, "Требования к оформлению", @"E:\Учёба\Требования", string.Empty, string.Empty, false),
+                new("g3", "Гейм-дизайн", GuideKindEnum.Guide, "drive.google.com/file/d/abc", string.Empty, "https://drive.google.com/file/d/abc/view", "Ссылка ведёт на страницу, а не на файл. Скачай файл и добавь его кнопкой «Обзор»"),
+                new("e1", "Гейм-дизайн", GuideKindEnum.Example, "Мой образец отчёта.docx", folder + @"\Мой образец отчёта.docx", string.Empty, string.Empty),
+            };
+            var model = new GuidesDialogViewModel("Гейм-дизайн", _ => entries, folder, _ => { }, _ => { }, (_, _) => { }, (_, _, _) => string.Empty, (_, _, _) => string.Empty, (_, _, _) => Task.FromResult(string.Empty));
+            if (parts.Length > 1 && parts[1].Equals("examples", StringComparison.OrdinalIgnoreCase))
+                model.ShowExamplesCommand.Execute(null);
+
+            window = new GuidesWindow(model) { WindowStartupLocation = WindowStartupLocation.Manual };
+        }
+        else if (string.Equals(parts[0], "prepare", StringComparison.OrdinalIgnoreCase))
+        {
+            // Окно «Подготовить задание» на примерных материалах
+            var folder = @"D:\data\homework\guides";
+            var materials = new List<GuideEntry>
+            {
+                new("g1", "Гейм-дизайн", GuideKindEnum.Guide, "Методические указания по курсовой.docx", folder + @"\a.docx", string.Empty, string.Empty),
+                new("g2", "Гейм-дизайн", GuideKindEnum.Guide, "Требования к оформлению", @"E:\Требования", string.Empty, string.Empty, false),
+                new("e1", "Гейм-дизайн", GuideKindEnum.Example, "Мой образец отчёта.docx", folder + @"\b.docx", string.Empty, string.Empty),
+            };
+            window = new PrepareWindow(new PrepareDialogViewModel("25.10.2026  ·  Лекция 3  ·  2 ч 43 мин", HomeworkFormatEnum.Word, materials, folder) { Extra = "Сделай упор на сравнение двух игр" }) { WindowStartupLocation = WindowStartupLocation.Manual };
+        }
         else
         {
             var main = new MainWindow();
@@ -88,7 +117,7 @@ public static class SnapshotRenderer
                 [new StatusChipViewModel("Файл настроек", "найден", PanelToneEnum.Running), new StatusChipViewModel("Пароль приложения", "задан", PanelToneEnum.Running), new StatusChipViewModel("Токен Singularity", "не задан", PanelToneEnum.Attention)],
                 [new StatusChipViewModel("Токен бота", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в Instagram", "firefox", PanelToneEnum.Running)],
                 [new StatusChipViewModel("Вход в LMS", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в MTS Link", "сохранён 27.10", PanelToneEnum.Running), new StatusChipViewModel("Запись в Singularity", "выключена", PanelToneEnum.Attention)]);
-            main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
+            main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", (_, _) => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
             if (parts.Length > 1 && parts[1].ToLowerInvariant() is "homework" or "transcripts" or "schedule")
                 settleSeconds = 1.0;
 
@@ -114,10 +143,9 @@ public static class SnapshotRenderer
                 education.GuideFolder = @"D:\data\homework\guides";
                 education.GuideLister = _ =>
                 [
-                    new GuideEntry("g1", "Гейм-дизайн", GuideKindEnum.Guide, "Методические указания по курсовой.docx", @"D:\data\homework\guides\Гейм-дизайн\Методические указания по курсовой.docx", string.Empty, string.Empty),
-                    new GuideEntry("g2", "Гейм-дизайн", GuideKindEnum.Guide, "Требования к оформлению", @"E:\Учёба\Гейм-дизайн\Требования", string.Empty, string.Empty),
-                    new GuideEntry("g3", "Гейм-дизайн", GuideKindEnum.Example, "Мой образец отчёта.docx", @"D:\data\homework\guides\Гейм-дизайн\Мой образец отчёта.docx", string.Empty, string.Empty),
-                    new GuideEntry("g4", "Гейм-дизайн", GuideKindEnum.Example, "drive.google.com/file/d/abc", string.Empty, "https://drive.google.com/file/d/abc/view", "Ссылка ведёт на страницу, а не на файл. Скачай файл и добавь его кнопкой «Файлы»"),
+                    new GuideEntry("g1", "Гейм-дизайн", GuideKindEnum.Guide, "Методические указания по курсовой.docx", @"D:\data\homework\guides\a.docx", string.Empty, string.Empty),
+                    new GuideEntry("g2", "Гейм-дизайн", GuideKindEnum.Guide, "Требования", @"E:\Учёба", string.Empty, string.Empty),
+                    new GuideEntry("e1", "Гейм-дизайн", GuideKindEnum.Example, "Мой образец отчёта.docx", @"D:\data\homework\guides\b.docx", string.Empty, string.Empty),
                 ];
                 education.Update(SampleLessons());
                 var chosen = education.Subjects.First(item => item.Title == "Гейм-дизайн");

@@ -562,13 +562,15 @@ public sealed class TrayHost : IDisposable
     /// <returns>Модель списка</returns>
     private HomeworkFormatsViewModel Formats()
     {
-        _formats ??= new HomeworkFormatsViewModel(_jobs.SetHomeworkFormat, _jobs.HasTranscript, lesson => _jobs.PrepareHomeworkAsync(lesson, CancellationToken.None), _jobs.SetSubjectState, _jobs.SubjectState, _jobs.RequestTranscript, _jobs.SetSubjectFormat);
+        _formats ??= new HomeworkFormatsViewModel(_jobs.SetHomeworkFormat, _jobs.HasTranscript, (lesson, request) => _jobs.PrepareHomeworkAsync(lesson, request, CancellationToken.None), _jobs.SetSubjectState, _jobs.SubjectState, _jobs.RequestTranscript, _jobs.SetSubjectFormat);
         _formats.TranscriptReader = _jobs.ReadTranscript;
         _formats.DraftLister = _jobs.DraftFiles;
         _formats.AnalysisReader = _jobs.ReadAnalysis;
         _formats.GuideLister = _jobs.Guides;
         _formats.GuideFilesAdded = _jobs.AddGuideFiles;
+        _formats.GuideFolderAdded = _jobs.AddGuideFolder;
         _formats.GuideLinkAdded = _jobs.AddGuideLinkAsync;
+        _formats.GuideEnabledChanged = _jobs.SetGuideEnabled;
         _formats.GuideRemoved = _jobs.RemoveGuide;
         _formats.PathOpened = OpenPath;
         _formats.GuideFolder = System.IO.Path.Combine(DataLocation.DataDirectory(), "homework", "guides");

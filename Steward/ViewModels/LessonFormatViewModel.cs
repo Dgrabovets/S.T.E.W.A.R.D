@@ -37,11 +37,6 @@ public sealed class LessonFormatViewModel : Bindable
     private bool _hasTranscript;
 
     /// <summary>
-    /// Меню выбора формата раскрыто
-    /// </summary>
-    private bool _isMenuOpen;
-
-    /// <summary>
     /// Расшифровка открыта на странице
     /// </summary>
     private bool _isOpen;
@@ -63,14 +58,17 @@ public sealed class LessonFormatViewModel : Bindable
     /// <param name="format">Формат заданий по умолчанию: его отмечает меню, но выбрать можно любой</param>
     /// <param name="chosen">Запоминает формат, в котором подготовлено занятие: ключ занятия и формат</param>
     /// <param name="hasTranscript">Расшифровка уже лежит на диске</param>
-    /// <param name="prepare">Ищет задания в расшифровке занятия: возвращает их число и текст ошибки</param>
+    /// <param name="prepare">Ищет задания в расшифровке занятия и готовит их в выбранном формате: возвращает число заданий и текст ошибки</param>
     /// <param name="fetchRequested">Вызывается по кнопке «Расшифровать»: просит забрать расшифровку занятия, даже если предмет не отмечен. Пусто: кнопки нет</param>
-    public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen, bool hasTranscript, Func<Lesson, Task<(int Count, string Error)>> prepare, Action<Lesson>? fetchRequested = null)
+    public LessonFormatViewModel(Lesson lesson, HomeworkFormatEnum format, Action<string, HomeworkFormatEnum> chosen, bool hasTranscript, Func<Lesson, PrepareRequest, Task<(int Count, string Error)>> prepare, Action<Lesson>? fetchRequested = null)
     {
         Id = lesson.Id;
         _hasTranscript = hasTranscript;
         Lesson = lesson;
-        PrepareCommand = new RelayCommand(() => IsMenuOpen = !IsMenuOpen, () => Activity != ActivityStateEnum.Working);
+        Format = format;
+        _chosen = chosen;
+        _prepare = prepare;
+        PrepareCommand = new RelayCommand(() => PrepareRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
         OpenCommand = new RelayCommand(() => Opened?.Invoke(this), () => HasTranscript);
         FetchCommand = new RelayCommand(
             () =>
@@ -86,19 +84,17 @@ public sealed class LessonFormatViewModel : Bindable
         Duration = lesson.Minutes > 0 ? $"{lesson.Minutes / 60} ч {lesson.Minutes % 60:00} мин" : string.Empty;
         Headline = string.Join("  ·  ", new[] { Date, lesson.Label }.Where(part => part.Length > 0));
         Meta = string.Join("  ·  ", new[] { Headline, Duration }.Where(part => part.Length > 0));
-        var options = new List<FormatOptionViewModel>();
-        foreach (var option in HomeworkFormats.All)
-        {
-            options.Add(new FormatOptionViewModel(option, option == format, async picked =>
-            {
-                IsMenuOpen = false;
-                chosen(lesson.Id, picked);
-                await PrepareAsync(lesson, prepare);
-            }));
-        }
-
-        Options = options;
     }
+
+    /// <summary>
+    /// Запоминает формат занятия
+    /// </summary>
+    private readonly Action<string, HomeworkFormatEnum> _chosen;
+
+    /// <summary>
+    /// Ищет задания и готовит работы
+    /// </summary>
+    private readonly Func<Lesson, PrepareRequest, Task<(int Count, string Error)>> _prepare;
 
     /// <summary>
     /// Ключ занятия
@@ -182,15 +178,6 @@ public sealed class LessonFormatViewModel : Bindable
             Raise(nameof(CanFetch));
             CommandManager.InvalidateRequerySuggested();
         }
-    }
-
-    /// <summary>
-    /// Меню выбора формата раскрыто
-    /// </summary>
-    public bool IsMenuOpen
-    {
-        get => _isMenuOpen;
-        set => Set(ref _isMenuOpen, value);
     }
 
     /// <summary>
@@ -303,36 +290,50 @@ public sealed class LessonFormatViewModel : Bindable
     public bool HasDuration => Duration.Length > 0;
 
     /// <summary>
-    /// Форматы в меню подготовки. Нажатие выбирает формат и сразу запускает поиск заданий. Формат по умолчанию отмечен
+    /// Формат, в котором готовили или будут готовить задания занятия
     /// </summary>
-    public IReadOnlyList<FormatOptionViewModel> Options { get; }
+    public HomeworkFormatEnum Format { get; private set; }
+
+    /// <summary>
+    /// Вызывается, когда нужно открыть окно «Подготовить задание» для этого занятия
+    /// </summary>
+    public Action<LessonFormatViewModel>? PrepareRequested { get; set; }
 
     /// <summary>
     /// Отмечает в меню формат по умолчанию, когда его сменили в карточке предмета
     /// </summary>
     /// <param name="format">Новый формат по умолчанию</param>
-    public void SetDefaultFormat(HomeworkFormatEnum format)
+    public void SetDefaultFormat(HomeworkFormatEnum format) => Format = format;
+
+    /// <summary>
+    /// Запоминает выбранный в окне формат и запускает подготовку заданий
+    /// </summary>
+    /// <param name="request">Формат, дополнительное указание и материалы, которые нужно учесть</param>
+    /// <returns>Задача, которая завершается, когда подготовка закончена</returns>
+    public Task PrepareAsync(PrepareRequest request)
     {
-        foreach (var option in Options)
-            option.IsSelected = option.Format == format;
+        _chosen(Lesson.Id, request.Format);
+        Format = request.Format;
+
+        return RunPrepareAsync(Lesson, request);
     }
 
     /// <summary>
-    /// Ищет задания в расшифровке и показывает ход поиска
+    /// Ищет задания в расшифровке, готовит работы и показывает ход подготовки
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    /// <param name="prepare">Ищет задания: возвращает их число и текст ошибки</param>
-    /// <returns>Задача, которая завершается, когда поиск закончен</returns>
-    private async Task PrepareAsync(Lesson lesson, Func<Lesson, Task<(int Count, string Error)>> prepare)
+    /// <param name="request">Что выбрано в окне</param>
+    /// <returns>Задача, которая завершается, когда подготовка закончена</returns>
+    private async Task RunPrepareAsync(Lesson lesson, PrepareRequest request)
     {
         Failed = false;
-        Status = "Ищу задания…";
+        Status = "Ищу задания и готовлю работы…";
         Activity = ActivityStateEnum.Working;
 
         (int Count, string Error) result;
         try
         {
-            result = await prepare(lesson);
+            result = await _prepare(lesson, request);
         }
         catch (Exception exception)
         {

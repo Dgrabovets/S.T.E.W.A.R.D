@@ -44,7 +44,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <summary>
     /// Ищет задания в расшифровке занятия
     /// </summary>
-    private readonly Func<Lesson, Task<(int Count, string Error)>> _prepare;
+    private readonly Func<Lesson, PrepareRequest, Task<(int Count, string Error)>> _prepare;
 
     /// <summary>
     /// Строки занятий
@@ -102,29 +102,14 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private IReadOnlyList<HomeworkCardViewModel> _homeworkCards = [];
 
     /// <summary>
-    /// Методические указания выбранного предмета
+    /// Сколько методических указаний у выбранного предмета
     /// </summary>
-    private IReadOnlyList<GuideViewModel> _guides = [];
+    private int _guideCount;
 
     /// <summary>
-    /// Образцы работ выбранного предмета
+    /// Сколько образцов у выбранного предмета
     /// </summary>
-    private IReadOnlyList<GuideViewModel> _examples = [];
-
-    /// <summary>
-    /// Что введено в поле ссылки на указания
-    /// </summary>
-    private string _guideLinkText = string.Empty;
-
-    /// <summary>
-    /// Что введено в поле ссылки на образец
-    /// </summary>
-    private string _exampleLinkText = string.Empty;
-
-    /// <summary>
-    /// Сообщение о добавлении материала
-    /// </summary>
-    private string _guideMessage = string.Empty;
+    private int _exampleCount;
 
     /// <summary>
     /// Создаёт модель без занятий
@@ -137,14 +122,13 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public HomeworkFormatsViewModel(
         Action<string, HomeworkFormatEnum> chosen,
         Func<Lesson, bool> hasTranscript,
-        Func<Lesson, Task<(int Count, string Error)>> prepare,
+        Func<Lesson, PrepareRequest, Task<(int Count, string Error)>> prepare,
         Action<string, LessonStateEnum>? stateChosen = null,
         Func<string, LessonStateEnum>? stateOf = null,
         Action<Lesson>? fetchRequested = null,
         Action<string, HomeworkFormatEnum>? subjectFormatChosen = null)
     {
-        AddGuideLinkCommand = new RelayCommand(async () => await AddLinkAsync(GuideKindEnum.Guide));
-        AddExampleLinkCommand = new RelayCommand(async () => await AddLinkAsync(GuideKindEnum.Example));
+        ManageGuidesCommand = new RelayCommand(() => GuidesDialogRequested?.Invoke());
         ShowTranscriptsCommand = new RelayCommand(() => HomeworkTab = false);
         ShowHomeworkCommand = new RelayCommand(() => HomeworkTab = true);
         CloseLessonCommand = new RelayCommand(CloseLesson);
@@ -171,7 +155,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> lessons,
         Action<string, HomeworkFormatEnum> chosen,
         Func<Lesson, bool> hasTranscript,
-        Func<Lesson, Task<(int Count, string Error)>> prepare,
+        Func<Lesson, PrepareRequest, Task<(int Count, string Error)>> prepare,
         Action<string, LessonStateEnum>? stateChosen = null,
         Func<string, LessonStateEnum>? stateOf = null,
         Action<Lesson>? fetchRequested = null,
@@ -242,9 +226,19 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Func<string, GuideKindEnum, IReadOnlyList<string>, string>? GuideFilesAdded { get; set; }
 
     /// <summary>
-    /// Запоминает ссылку или путь, скачивает файл и возвращает пояснение или пустую строку
+    /// Запоминает папку по пути на диске и возвращает текст ошибки или пустую строку
+    /// </summary>
+    public Func<string, GuideKindEnum, string, string>? GuideFolderAdded { get; set; }
+
+    /// <summary>
+    /// Запоминает ссылку в интернете, скачивает файл и возвращает пояснение или пустую строку
     /// </summary>
     public Func<string, GuideKindEnum, string, Task<string>>? GuideLinkAdded { get; set; }
+
+    /// <summary>
+    /// Сохраняет галочку «учитывать» у материала
+    /// </summary>
+    public Action<string, bool>? GuideEnabledChanged { get; set; }
 
     /// <summary>
     /// Убирает материал по ключу
@@ -252,112 +246,58 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Action<string>? GuideRemoved { get; set; }
 
     /// <summary>
-    /// Открывает файл, папку или ссылку в программе по умолчанию
+    /// Открывает файл или папку в программе по умолчанию
     /// </summary>
     public Action<string>? PathOpened { get; set; }
 
     /// <summary>
-    /// Методические указания выбранного предмета
+    /// Сводка для строки над занятиями: сколько указаний и образцов у выбранного предмета
     /// </summary>
-    public IReadOnlyList<GuideViewModel> Guides
-    {
-        get => _guides;
-        private set => Set(ref _guides, value);
-    }
+    public string GuideSummary => $"Указаний: {_guideCount}  ·  образцов: {_exampleCount}";
 
     /// <summary>
-    /// Образцы работ выбранного предмета
+    /// Плашка «Указаний: 2» для строки над занятиями
     /// </summary>
-    public IReadOnlyList<GuideViewModel> Examples
-    {
-        get => _examples;
-        private set => Set(ref _examples, value);
-    }
+    public string GuideCountText => $"Указаний: {_guideCount}";
 
     /// <summary>
-    /// Путь или ссылка на методические указания, которые вводит пользователь
+    /// Плашка «Образцов: 1» для строки над занятиями
     /// </summary>
-    public string GuideLinkText
-    {
-        get => _guideLinkText;
-        set => Set(ref _guideLinkText, value);
-    }
+    public string ExampleCountText => $"Образцов: {_exampleCount}";
 
     /// <summary>
-    /// Путь или ссылка на образец, которые вводит пользователь
+    /// Создаёт окно «Методические указания» для выбранного предмета
     /// </summary>
-    public string ExampleLinkText
-    {
-        get => _exampleLinkText;
-        set => Set(ref _exampleLinkText, value);
-    }
+    /// <returns>Модель окна</returns>
+    public GuidesDialogViewModel CreateGuidesDialog() => new(
+        SelectedSubject?.Title ?? string.Empty,
+        subject => GuideLister?.Invoke(subject) ?? [],
+        GuideFolder,
+        path => PathOpened?.Invoke(path),
+        id => GuideRemoved?.Invoke(id),
+        (id, enabled) => GuideEnabledChanged?.Invoke(id, enabled),
+        (subject, kind, paths) => GuideFilesAdded?.Invoke(subject, kind, paths) ?? string.Empty,
+        (subject, kind, path) => GuideFolderAdded?.Invoke(subject, kind, path) ?? string.Empty,
+        (subject, kind, link) => GuideLinkAdded?.Invoke(subject, kind, link) ?? Task.FromResult(string.Empty));
 
     /// <summary>
-    /// Что случилось при добавлении материала
+    /// Создаёт окно «Подготовить задание» для занятия
     /// </summary>
-    public string GuideMessage
-    {
-        get => _guideMessage;
-        private set
-        {
-            if (Set(ref _guideMessage, value))
-                Raise(nameof(HasGuideMessage));
-        }
-    }
+    /// <param name="lesson">Занятие</param>
+    /// <returns>Модель окна</returns>
+    public PrepareDialogViewModel CreatePrepareDialog(LessonFormatViewModel lesson) => new(lesson.Meta, lesson.Format, GuideLister?.Invoke(lesson.Title) ?? [], GuideFolder);
 
     /// <summary>
-    /// Есть сообщение о добавлении материала
-    /// </summary>
-    public bool HasGuideMessage => GuideMessage.Length > 0;
-
-    /// <summary>
-    /// Добавляет файлы, которые выбрал пользователь
-    /// </summary>
-    /// <param name="kind">Указания или образцы</param>
-    /// <param name="paths">Выбранные файлы</param>
-    public void AddFiles(GuideKindEnum kind, IReadOnlyList<string> paths)
-    {
-        if (SelectedSubject is null || paths.Count == 0)
-            return;
-
-        GuideMessage = GuideFilesAdded?.Invoke(SelectedSubject.Title, kind, paths) ?? string.Empty;
-        RefreshGuides();
-    }
-
-    /// <summary>
-    /// Добавляет ссылку или путь, который ввёл пользователь
-    /// </summary>
-    /// <param name="kind">Указания или образцы</param>
-    private async Task AddLinkAsync(GuideKindEnum kind)
-    {
-        var text = kind == GuideKindEnum.Guide ? GuideLinkText : ExampleLinkText;
-        if (SelectedSubject is null || text.Trim().Length == 0 || GuideLinkAdded is null)
-            return;
-
-        GuideMessage = "Добавляю…";
-        GuideMessage = await GuideLinkAdded(SelectedSubject.Title, kind, text);
-        if (kind == GuideKindEnum.Guide)
-            GuideLinkText = string.Empty;
-        else
-            ExampleLinkText = string.Empty;
-
-        RefreshGuides();
-    }
-
-    /// <summary>
-    /// Перечитывает материалы выбранного предмета
+    /// Пересчитывает сводку по материалам выбранного предмета
     /// </summary>
     public void RefreshGuides()
     {
         var entries = SelectedSubject is { } subject ? GuideLister?.Invoke(subject.Title) ?? [] : [];
-        GuideViewModel Row(GuideEntry entry) => new(entry, GuideFolder, path => PathOpened?.Invoke(path), row =>
-        {
-            GuideRemoved?.Invoke(row.Id);
-            RefreshGuides();
-        });
-
-        Guides = [.. entries.Where(entry => entry.Kind == GuideKindEnum.Guide).Select(Row)];
-        Examples = [.. entries.Where(entry => entry.Kind == GuideKindEnum.Example).Select(Row)];
+        _guideCount = entries.Count(entry => entry.Kind == GuideKindEnum.Guide);
+        _exampleCount = entries.Count(entry => entry.Kind == GuideKindEnum.Example);
+        Raise(nameof(GuideSummary));
+        Raise(nameof(GuideCountText));
+        Raise(nameof(ExampleCountText));
     }
 
     /// <summary>
@@ -392,14 +332,19 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public bool IsHomeworkTab => _homeworkTab;
 
     /// <summary>
-    /// Добавляет ссылку или путь к методическим указаниям
+    /// Открывает окно «Методические указания»
     /// </summary>
-    public RelayCommand AddGuideLinkCommand { get; }
+    public RelayCommand ManageGuidesCommand { get; }
 
     /// <summary>
-    /// Добавляет ссылку или путь к образцу
+    /// Нужно открыть окно «Методические указания» выбранного предмета
     /// </summary>
-    public RelayCommand AddExampleLinkCommand { get; }
+    public event Action? GuidesDialogRequested;
+
+    /// <summary>
+    /// Нужно открыть окно «Подготовить задание» для занятия
+    /// </summary>
+    public event Action<LessonFormatViewModel>? PrepareDialogRequested;
 
     /// <summary>
     /// Переключает на вкладку «Расшифровки»
@@ -706,7 +651,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             {
                 if (!known.TryGetValue(item.Lesson.Id, out var row))
                 {
-                    row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript };
+                    row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson) };
                     RefreshDrafts(row);
 
                     return row;
@@ -772,7 +717,6 @@ public sealed class HomeworkFormatsViewModel : Bindable
             other.IsSelected = other == subject;
 
         SelectedSubject = subject;
-        GuideMessage = string.Empty;
         RefreshGuides();
     }
 }
