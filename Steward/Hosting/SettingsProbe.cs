@@ -42,9 +42,9 @@ public static class SettingsProbe
 
         return
         [
-            Chip(document is not null, "Файл настроек найден", "Нет файла настроек почты"),
-            Chip(Filled(document, "Mail", "AppPassword"), "Пароль приложения задан", "Не задан пароль приложения"),
-            Chip(Filled(document, "Singularity", "Token"), "Токен Singularity задан", "Не задан токен Singularity"),
+            Chip(document is not null, "Файл настроек", "найден", "не найден"),
+            Chip(Filled(document, "Mail", "AppPassword"), "Пароль приложения", "задан", "не задан"),
+            Chip(Filled(document, "Singularity", "Token"), "Токен Singularity", "задан", "не задан"),
         ];
     }
 
@@ -62,11 +62,11 @@ public static class SettingsProbe
 
         return
         [
-            Chip(Filled(document, null, "botToken"), "Токен бота задан", "Не задан токен бота"),
-            Chip(document is not null && document.RootElement.TryGetProperty("allowedUserId", out var owner) && owner.ValueKind == JsonValueKind.Number && owner.GetInt64() != 0, "Владелец бота задан", "Не задан владелец бота"),
+            Chip(Filled(document, null, "botToken"), "Токен бота", "задан", "не задан"),
+            Chip(document is not null && document.RootElement.TryGetProperty("allowedUserId", out var owner) && owner.ValueKind == JsonValueKind.Number && owner.GetInt64() != 0, "Владелец бота", "задан", "не задан"),
             browser.Length == 0
-                ? new StatusChipViewModel("Вход в Instagram не настроен", PanelToneEnum.Attention)
-                : Chip(profile || !string.Equals(browser, "firefox", StringComparison.OrdinalIgnoreCase), $"Вход в Instagram: {browser}", $"Нет профиля {browser}: войди в Instagram в браузере"),
+                ? new StatusChipViewModel("Вход в Instagram", "не настроен", PanelToneEnum.Attention)
+                : Chip(profile || !string.Equals(browser, "firefox", StringComparison.OrdinalIgnoreCase), "Вход в Instagram", browser, $"нет профиля {browser}"),
         ];
     }
 
@@ -83,9 +83,9 @@ public static class SettingsProbe
 
         return
         [
-            Chip(Filled(document, null, "login") && Filled(document, null, "password"), "Вход в LMS: логин и пароль заданы", "Не заданы логин и пароль LMS"),
-            Chip(File.Exists(state), $"Вход в MTS Link сохранён {(File.Exists(state) ? File.GetLastWriteTime(state).ToString("dd.MM") : string.Empty)}".TrimEnd(), "Нет входа в MTS Link: запусти Steward.Lms.exe login"),
-            create ? new StatusChipViewModel("Запись в Singularity включена", PanelToneEnum.Running) : new StatusChipViewModel("Запись в Singularity выключена", PanelToneEnum.Attention),
+            Chip(Filled(document, null, "login") && Filled(document, null, "password"), "Вход в LMS", "задан", "не заданы логин и пароль"),
+            Chip(File.Exists(state), "Вход в MTS Link", File.Exists(state) ? "сохранён " + File.GetLastWriteTime(state).ToString("dd.MM") : string.Empty, "нет входа"),
+            create ? new StatusChipViewModel("Запись в Singularity", "включена", PanelToneEnum.Running) : new StatusChipViewModel("Запись в Singularity", "выключена", PanelToneEnum.Attention),
         ];
     }
 
@@ -93,10 +93,11 @@ public static class SettingsProbe
     /// Собирает чип: зелёный, когда всё в порядке, и жёлтый, когда нет
     /// </summary>
     /// <param name="ok">Всё задано</param>
-    /// <param name="good">Подпись, когда всё в порядке</param>
-    /// <param name="bad">Подпись, когда нет</param>
-    /// <returns>Чип состояния</returns>
-    private static StatusChipViewModel Chip(bool ok, string good, string bad) => new(ok ? good : bad, ok ? PanelToneEnum.Running : PanelToneEnum.Attention);
+    /// <param name="label">Что проверяется</param>
+    /// <param name="good">Значение, когда всё в порядке</param>
+    /// <param name="bad">Значение, когда нет</param>
+    /// <returns>Показатель состояния</returns>
+    private static StatusChipViewModel Chip(bool ok, string label, string good, string bad) => new(label, ok ? good : bad, ok ? PanelToneEnum.Running : PanelToneEnum.Attention);
 
     /// <summary>
     /// Проверяет, что значение в файле настроек заполнено и не осталось заглушкой в угловых скобках

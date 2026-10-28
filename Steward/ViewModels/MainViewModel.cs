@@ -166,14 +166,29 @@ public sealed class MainViewModel : PanelViewModel
     public IReadOnlyList<LogLine> MailLetters { get; private set; } = [];
 
     /// <summary>
-    /// Сводка по почте за неделю: проверки, разобранные письма, письма, на которые нужно ответить
+    /// Сколько писем разобрано в каждый из последних семи дней
     /// </summary>
-    public IReadOnlyList<StatusTileViewModel> MailSummary { get; private set; } = [];
+    public IReadOnlyList<ChartBarViewModel> MailDays { get; private set; } = [];
 
     /// <summary>
-    /// Последние проверки почты короткими строками: время и итог
+    /// Разобранные за неделю письма по видам: «Ответить», «Отзыв», «Инфо»
     /// </summary>
-    public IReadOnlyList<LogLine> MailChecks { get; private set; } = [];
+    public IReadOnlyList<ChartShareViewModel> MailKinds { get; private set; } = [];
+
+    /// <summary>
+    /// Сколько раз за неделю проверялась почта
+    /// </summary>
+    public int MailChecksCount { get; private set; }
+
+    /// <summary>
+    /// Когда и чем закончилась последняя проверка почты
+    /// </summary>
+    public string MailLastCheck { get; private set; } = "проверок ещё не было";
+
+    /// <summary>
+    /// Последняя проверка почты прошла
+    /// </summary>
+    public PanelToneEnum MailLastTone { get; private set; } = PanelToneEnum.Idle;
 
     /// <summary>
     /// Настройки почты
@@ -307,7 +322,7 @@ public sealed class MainViewModel : PanelViewModel
     /// </summary>
     /// <param name="chips">Плашки</param>
     /// <returns>Показатели</returns>
-    private static IReadOnlyList<StatusTileViewModel> Tiles(IReadOnlyList<StatusChipViewModel> chips) => [.. chips.Select(chip => new StatusTileViewModel(string.Empty, chip.Text, chip.Tone))];
+    private static IReadOnlyList<StatusTileViewModel> Tiles(IReadOnlyList<StatusChipViewModel> chips) => [.. chips.Select(chip => new StatusTileViewModel(chip.Label, chip.Value, chip.Tone))];
 
     /// <summary>
     /// Открывает страницу процесса сразу с настройками
@@ -640,16 +655,25 @@ public sealed class MainViewModel : PanelViewModel
         RebuildServices();
         var mailRuns = records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).ToArray();
         var mailWeek = mailRuns.Where(record => record.StartedAt >= weekAgo).ToArray();
-        var weekLetters = mailWeek.SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal)))).ToArray();
-        MailSummary =
-        [
-            new StatusTileViewModel("Проверок за неделю", mailWeek.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
-            new StatusTileViewModel("Разобрано писем", weekLetters.Length.ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
-            new StatusTileViewModel("Нужно ответить", weekLetters.Count(line => line.Text.StartsWith("Ответить:", StringComparison.Ordinal) || line.Text.StartsWith("[тест] Ответить:", StringComparison.Ordinal)).ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
-        ];
-        MailChecks = [.. mailRuns.Take(5).Select(record => new LogLine(record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm", System.Globalization.CultureInfo.InvariantCulture), record.Outcome == RunOutcomeEnum.Ok ? "проверка прошла" : "проверка не прошла", record.Outcome == RunOutcomeEnum.Ok ? PanelToneEnum.Running : PanelToneEnum.Problem))];
-        Raise(nameof(MailSummary));
-        Raise(nameof(MailChecks));
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var tagged = mailWeek.SelectMany(record => LogLines.Parse(record.Output ?? string.Empty)
+            .Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal)))
+            .Select(line => (Day: record.StartedAt.ToLocalTime().Date, Kind: line.Text.Replace("[тест] ", string.Empty, StringComparison.Ordinal).Split(':')[0]))).ToArray();
+        var today = DateTime.Now.Date;
+        var perDay = Enumerable.Range(0, 7).Select(offset => today.AddDays(offset - 6)).Select(day => (Day: day, Count: tagged.Count(item => item.Day == day))).ToArray();
+        var tallest = Math.Max(1, perDay.Max(item => item.Count));
+        MailDays = [.. perDay.Select(item => new ChartBarViewModel(item.Day.ToString("ddd", new System.Globalization.CultureInfo("ru-RU")), item.Count, item.Count == 0 ? 2 : 6 + 54.0 * item.Count / tallest))];
+        var kinds = new[] { ("Ответить", PanelToneEnum.Attention), ("Отзыв", PanelToneEnum.Running), ("Инфо", PanelToneEnum.Idle) };
+        var most = Math.Max(1, kinds.Max(kind => tagged.Count(item => item.Kind == kind.Item1)));
+        MailKinds = [.. kinds.Select(kind => new ChartShareViewModel(kind.Item1, tagged.Count(item => item.Kind == kind.Item1), (double)tagged.Count(item => item.Kind == kind.Item1) / most, kind.Item2))];
+        MailChecksCount = mailWeek.Length;
+        MailLastCheck = mailRuns.Length == 0 ? "проверок ещё не было" : $"{mailRuns[0].StartedAt.ToLocalTime().ToString("dd.MM HH:mm", culture)}, {(mailRuns[0].Outcome == RunOutcomeEnum.Ok ? "прошла" : "не прошла")}";
+        MailLastTone = mailRuns.Length == 0 ? PanelToneEnum.Idle : mailRuns[0].Outcome == RunOutcomeEnum.Ok ? PanelToneEnum.Running : PanelToneEnum.Problem;
+        Raise(nameof(MailDays));
+        Raise(nameof(MailKinds));
+        Raise(nameof(MailChecksCount));
+        Raise(nameof(MailLastCheck));
+        Raise(nameof(MailLastTone));
         MailLetters = [.. records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).Take(5)
             .SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal))))
             .Take(12)];

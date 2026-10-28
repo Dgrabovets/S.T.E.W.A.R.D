@@ -85,9 +85,9 @@ public static class SnapshotRenderer
             main.Apply(snapshot, jobs, SampleRecords(now), ["Задача «reels»: путь содержит {repo}, а корень репозитория не найден"], SampleIdeas(now));
             main.ApplyHomework(SampleHomework());
             main.Model.ApplyChips(
-                [new StatusChipViewModel("Файл настроек найден", PanelToneEnum.Running), new StatusChipViewModel("Пароль приложения задан", PanelToneEnum.Running), new StatusChipViewModel("Не задан токен Singularity", PanelToneEnum.Attention)],
-                [new StatusChipViewModel("Токен бота задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в Instagram: firefox", PanelToneEnum.Running)],
-                [new StatusChipViewModel("Вход в LMS: логин и пароль заданы", PanelToneEnum.Running), new StatusChipViewModel("Вход в MTS Link сохранён 27.10", PanelToneEnum.Running), new StatusChipViewModel("Запись в Singularity выключена", PanelToneEnum.Attention)]);
+                [new StatusChipViewModel("Файл настроек", "найден", PanelToneEnum.Running), new StatusChipViewModel("Пароль приложения", "задан", PanelToneEnum.Running), new StatusChipViewModel("Токен Singularity", "не задан", PanelToneEnum.Attention)],
+                [new StatusChipViewModel("Токен бота", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в Instagram", "firefox", PanelToneEnum.Running)],
+                [new StatusChipViewModel("Вход в LMS", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в MTS Link", "сохранён 27.10", PanelToneEnum.Running), new StatusChipViewModel("Запись в Singularity", "выключена", PanelToneEnum.Attention)]);
             main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", _ => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
             if (parts.Length > 1 && parts[1].ToLowerInvariant() is "homework" or "transcripts" or "schedule")
                 settleSeconds = 1.0;
