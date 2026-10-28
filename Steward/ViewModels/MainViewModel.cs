@@ -163,7 +163,7 @@ public sealed class MainViewModel : PanelViewModel
     /// <summary>
     /// Письма, разобранные при последних проверках почты: «Отзыв», «Ответить», «Инфо» со временем проверки
     /// </summary>
-    public IReadOnlyList<LogLine> MailLetters { get; private set; } = [];
+    public IReadOnlyList<MailLetterViewModel> MailLetters { get; private set; } = [];
 
     /// <summary>
     /// Сколько писем разобрано в каждый из последних семи дней
@@ -676,7 +676,7 @@ public sealed class MainViewModel : PanelViewModel
         Raise(nameof(MailLastTone));
         MailLetters = [.. records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).Take(5)
             .SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal))))
-            .Take(12)];
+            .Take(12).Select(MailLetterViewModel.From)];
         Raise(nameof(MailLetters));
         Raise(nameof(MailCard));
         Raise(nameof(ScheduleCard));
