@@ -444,7 +444,7 @@
                                         <ColumnDefinition Width="2*"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+                                    <Border Style="{StaticResource Card}" Margin="0,0,8,0" VerticalAlignment="Top">
                                         <StackPanel>
                                             <TextBlock Text="Проверок за неделю" Style="{StaticResource TextCaption}"/>
                                             <TextBlock Text="{Binding MailChecksCount}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeHeadline}" FontWeight="SemiBold" Margin="0,4,0,8"/>

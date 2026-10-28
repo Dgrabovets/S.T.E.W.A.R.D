@@ -265,31 +265,48 @@ public sealed class MainViewModel : PanelViewModel
             SettingsProbe.MailFile(root),
             "Пароль приложения выпускается в настройках почтового сервиса: это не пароль от ящика.",
             [
-                new SettingFieldViewModel("Mail.Login", "Логин почты", ""),
-                new SettingFieldViewModel("Mail.AppPassword", "Пароль приложения", "", secret: true),
-                new SettingFieldViewModel("Mail.Host", "Сервер IMAP", ""),
-                new SettingFieldViewModel("Mail.Port", "Порт", "", number: true),
-                new SettingFieldViewModel("Mail.LookbackDays", "Сколько дней назад смотреть", "Письма старше не разбираются.", number: true),
-                new SettingFieldViewModel("Singularity.Token", "Токен Singularity", "", secret: true),
+                new SettingsSectionViewModel("Учётная запись", [
+                    new SettingFieldViewModel("Mail.Login", "Логин почты", ""),
+                    new SettingFieldViewModel("Mail.AppPassword", "Пароль приложения", "", secret: true),
+                    new SettingFieldViewModel("Mail.Host", "Сервер IMAP", ""),
+                    new SettingFieldViewModel("Mail.Port", "Порт", "", number: true),
+                ]),
+                new SettingsSectionViewModel("Разбор писем", [
+                    new SettingFieldViewModel("Mail.LookbackDays", "Сколько дней назад смотреть", "Письма старше не разбираются.", number: true),
+                ]),
+                new SettingsSectionViewModel("SingularityApp", [
+                    new SettingFieldViewModel("Singularity.Token", "Токен", "", secret: true),
+                ]),
             ],
             () => FileRequested?.Invoke("mail"));
         ReelsSettings = new JsonSettingsViewModel(
             SettingsProbe.ReelsFile(root),
             "Вход в Instagram берётся из браузера, в котором ты уже вошёл.",
             [
-                new SettingFieldViewModel("BotToken", "Токен бота", "Его выдаёт BotFather.", secret: true),
-                new SettingFieldViewModel("AllowedUserId", "Номер владельца", "Числовой идентификатор твоего аккаунта в Telegram. Бот отвечает только ему.", number: true),
-                new SettingFieldViewModel("CookiesFromBrowser", "Браузер для входа в Instagram", "Например firefox."),
-                new SettingFieldViewModel("ClaudeCommand", "Команда Claude", ""),
+                new SettingsSectionViewModel("Telegram-бот", [
+                    new SettingFieldViewModel("BotToken", "Токен бота", "Его выдаёт BotFather.", secret: true),
+                    new SettingFieldViewModel("AllowedUserId", "Номер владельца", "Числовой идентификатор твоего аккаунта в Telegram. Бот отвечает только ему.", number: true),
+                ]),
+                new SettingsSectionViewModel("Instagram", [
+                    new SettingFieldViewModel("CookiesFromBrowser", "Браузер для входа", "Например firefox."),
+                ]),
+                new SettingsSectionViewModel("Разбор идей", [
+                    new SettingFieldViewModel("ClaudeCommand", "Команда Claude", ""),
+                ]),
             ],
             () => FileRequested?.Invoke("reels"));
         LmsSettings = new JsonSettingsViewModel(
             SettingsProbe.LmsFile(root),
-            "Вход в MTS Link сохраняется отдельно: запусти Steward.Lms.exe login.",
+            string.Empty,
             [
-                new SettingFieldViewModel("Login", "Логин LMS", ""),
-                new SettingFieldViewModel("Password", "Пароль LMS", "", secret: true),
-                new SettingFieldViewModel("MaxFetchPerRun", "Расшифровок за запуск", "", number: true),
+                new SettingsSectionViewModel("Учётные данные LMS", [
+                    new SettingFieldViewModel("Login", "Логин", ""),
+                    new SettingFieldViewModel("Password", "Пароль", "", secret: true),
+                ]),
+                new SettingsSectionViewModel("Вход в MTS Link", [], "Войти в MTS Link", "Откроется окно браузера: войди один раз, вход сохранится.", () => MtsLoginRequested?.Invoke()),
+                new SettingsSectionViewModel("Выгрузка", [
+                    new SettingFieldViewModel("MaxFetchPerRun", "Занятий за один запуск", "Сколько расшифровок забирать за раз.", number: true),
+                ]),
             ],
             () => FileRequested?.Invoke("lms"));
         MailSettings.Saved += saved;
@@ -341,6 +358,11 @@ public sealed class MainViewModel : PanelViewModel
     /// Обновляет показатели в карточках задач после смены плашек состояния
     /// </summary>
     private void RebuildServices() => BuildTasks();
+
+    /// <summary>
+    /// Просит открыть окно входа в MTS Link
+    /// </summary>
+    public event Action? MtsLoginRequested;
 
     /// <summary>
     /// Просит открыть файл настроек процесса: «mail», «reels» или «lms»
@@ -667,7 +689,7 @@ public sealed class MainViewModel : PanelViewModel
         var most = Math.Max(1, kinds.Max(kind => tagged.Count(item => item.Kind == kind.Item1)));
         MailKinds = [.. kinds.Select(kind => new ChartShareViewModel(kind.Item1, tagged.Count(item => item.Kind == kind.Item1), (double)tagged.Count(item => item.Kind == kind.Item1) / most, kind.Item2))];
         MailChecksCount = mailWeek.Length;
-        MailLastCheck = mailRuns.Length == 0 ? "проверок ещё не было" : $"{mailRuns[0].StartedAt.ToLocalTime().ToString("dd.MM HH:mm", culture)}, {(mailRuns[0].Outcome == RunOutcomeEnum.Ok ? "прошла" : "не прошла")}";
+        MailLastCheck = mailRuns.Length == 0 ? "проверок ещё не было" : mailRuns[0].StartedAt.ToLocalTime().ToString("dd.MM HH:mm", culture) + (mailRuns[0].Outcome == RunOutcomeEnum.Ok ? string.Empty : ", не прошла");
         MailLastTone = mailRuns.Length == 0 ? PanelToneEnum.Idle : mailRuns[0].Outcome == RunOutcomeEnum.Ok ? PanelToneEnum.Running : PanelToneEnum.Problem;
         Raise(nameof(MailDays));
         Raise(nameof(MailKinds));

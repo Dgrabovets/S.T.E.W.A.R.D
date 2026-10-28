@@ -31,13 +31,14 @@ public sealed class JsonSettingsViewModel : Bindable
     /// </summary>
     /// <param name="file">Путь к файлу настроек</param>
     /// <param name="intro">Пояснение над полями</param>
-    /// <param name="fields">Поля страницы</param>
+    /// <param name="sections">Разделы страницы с полями</param>
     /// <param name="openFile">Действие кнопки «Открыть файл настроек»</param>
-    public JsonSettingsViewModel(string file, string intro, IReadOnlyList<SettingFieldViewModel> fields, Action openFile)
+    public JsonSettingsViewModel(string file, string intro, IReadOnlyList<SettingsSectionViewModel> sections, Action openFile)
     {
         _file = file;
         Intro = intro;
-        Fields = fields;
+        Sections = sections;
+        Fields = [.. sections.SelectMany(section => section.Fields)];
         OpenFileCommand = new RelayCommand(openFile);
         SaveCommand = new RelayCommand(Save);
         Load();
@@ -54,9 +55,19 @@ public sealed class JsonSettingsViewModel : Bindable
     public string Intro { get; }
 
     /// <summary>
-    /// Поля страницы
+    /// Разделы страницы с полями
     /// </summary>
-    public IReadOnlyList<SettingFieldViewModel> Fields { get; }
+    public IReadOnlyList<SettingsSectionViewModel> Sections { get; }
+
+    /// <summary>
+    /// Все поля страницы одним списком
+    /// </summary>
+    private IReadOnlyList<SettingFieldViewModel> Fields { get; }
+
+    /// <summary>
+    /// Над разделами есть пояснение
+    /// </summary>
+    public bool HasIntro => Intro.Length > 0;
 
     /// <summary>
     /// Открывает файл настроек в программе по умолчанию

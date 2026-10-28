@@ -359,6 +359,22 @@ public sealed class TrayHost : IDisposable
     #region Window
 
     /// <summary>
+    /// Запускает вход в MTS Link: окно браузера, в котором нужно войти один раз
+    /// </summary>
+    private void LoginToMts()
+    {
+        var program = System.IO.Path.Combine(DataLocation.RepoRootOrStart(), "Steward.Lms", "publish", "Steward.Lms.exe");
+        if (!System.IO.File.Exists(program))
+        {
+            _icon.ShowBalloonTip(BALLOON_MS, "MTS Link", "Не найден Steward.Lms.exe: собери проект Steward.Lms в publish", ToolTipIcon.None);
+
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo(program, "login") { UseShellExecute = true, WorkingDirectory = System.IO.Path.GetDirectoryName(program)! });
+    }
+
+    /// <summary>
     /// Открывает файл настроек процесса в программе по умолчанию
     /// </summary>
     /// <param name="kind">Какой файл: «mail», «reels» или «lms»</param>
@@ -413,6 +429,7 @@ public sealed class TrayHost : IDisposable
             _main.Model.IdeaRejected += idea => _jobs.DeleteIdea(idea.Id);
             _main.Model.LinkRequested += OpenLink;
             _main.Model.FileRequested += OpenSettingsFile;
+            _main.Model.MtsLoginRequested += LoginToMts;
             _main.Model.Settings.LinkRequested += OpenLink;
             _main.Model.Settings.RestartRequested += async (_, _) => await RestartContainerAsync();
             _main.Model.ExitRequested += (_, _) => Exit();
