@@ -83,7 +83,9 @@ public sealed class LessonFormatViewModel : Bindable
             () => fetchRequested is not null && !FetchRequested);
         Title = lesson.Title;
         Date = lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
-        Meta = string.Join("  ·  ", new[] { Date, lesson.Label, lesson.Minutes > 0 ? $"{lesson.Minutes / 60} ч {lesson.Minutes % 60:00} мин" : string.Empty }.Where(part => part.Length > 0));
+        Duration = lesson.Minutes > 0 ? $"{lesson.Minutes / 60} ч {lesson.Minutes % 60:00} мин" : string.Empty;
+        Headline = string.Join("  ·  ", new[] { Date, lesson.Label }.Where(part => part.Length > 0));
+        Meta = string.Join("  ·  ", new[] { Headline, Duration }.Where(part => part.Length > 0));
         var options = new List<FormatOptionViewModel>();
         foreach (var option in HomeworkFormats.All)
         {
@@ -279,6 +281,26 @@ public sealed class LessonFormatViewModel : Bindable
     /// Дата, подпись занятия и длительность записи одной строкой
     /// </summary>
     public string Meta { get; }
+
+    /// <summary>
+    /// Название занятия для заголовка читалки: предмет и подпись, например «Гейм-дизайн, Лекция 3»
+    /// </summary>
+    public string Caption => Lesson.Label.Length > 0 ? $"{Lesson.Title}, {Lesson.Label}" : Lesson.Title;
+
+    /// <summary>
+    /// Первая строка карточки: дата и название занятия
+    /// </summary>
+    public string Headline { get; }
+
+    /// <summary>
+    /// Вторая строка карточки: длительность записи
+    /// </summary>
+    public string Duration { get; }
+
+    /// <summary>
+    /// У записи известна длительность
+    /// </summary>
+    public bool HasDuration => Duration.Length > 0;
 
     /// <summary>
     /// Форматы в меню подготовки. Нажатие выбирает формат и сразу запускает поиск заданий. Формат по умолчанию отмечен

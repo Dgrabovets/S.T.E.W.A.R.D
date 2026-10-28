@@ -1,5 +1,6 @@
 using System.Windows.Documents;
 using Steward.Homework.Models;
+using Steward.Models;
 using Steward.Mvvm;
 using Steward.Preview;
 
@@ -78,7 +79,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <summary>
     /// Разбор открытой расшифровки: тема, содержание, ключевые моменты
     /// </summary>
-    private TranscriptText _reading = new(string.Empty, string.Empty, []);
+    private TranscriptText _reading = TranscriptText.Empty;
 
     /// <summary>
     /// Готовый файл, открытый в предпросмотре
@@ -278,6 +279,48 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public IReadOnlyList<string> ReadingPoints => _reading.Points;
 
     /// <summary>
+    /// Принятые решения
+    /// </summary>
+    public IReadOnlyList<string> ReadingDecisions => _reading.Decisions;
+
+    /// <summary>
+    /// Задачи, которые прозвучали на занятии
+    /// </summary>
+    public IReadOnlyList<string> ReadingTasks => _reading.Tasks;
+
+    /// <summary>
+    /// Есть принятые решения
+    /// </summary>
+    public bool HasReadingDecisions => _reading.Decisions.Count > 0;
+
+    /// <summary>
+    /// Есть задачи
+    /// </summary>
+    public bool HasReadingTasks => _reading.Tasks.Count > 0;
+
+    /// <summary>
+    /// Кто сколько говорил, в процентах от всех слов
+    /// </summary>
+    public IReadOnlyList<ChartShareViewModel> ReadingSpeakers => [.. _reading.Speakers.Take(6).Select(speaker => new ChartShareViewModel(speaker.Name, _reading.Words == 0 ? 0 : (int)Math.Round(100.0 * speaker.Words / _reading.Words), _reading.Speakers[0].Words == 0 ? 0 : (double)speaker.Words / _reading.Speakers[0].Words, PanelToneEnum.Idle))];
+
+    /// <summary>
+    /// Есть статистика по репликам
+    /// </summary>
+    public bool HasReadingSpeakers => _reading.Speakers.Count > 0;
+
+    /// <summary>
+    /// Показатели занятия: дата, длительность, слов, участников
+    /// </summary>
+    public IReadOnlyList<StatusTileViewModel> ReadingStats => OpenLesson is null ? [] :
+    [
+        new StatusTileViewModel("Дата", OpenLesson.Date, PanelToneEnum.Idle),
+        new StatusTileViewModel("Длительность", OpenLesson.HasDuration ? OpenLesson.Duration : "не указана", PanelToneEnum.Idle),
+        new StatusTileViewModel("Пройдено", _reading.Points.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
+        new StatusTileViewModel("Участников", _reading.Speakers.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
+        new StatusTileViewModel("Слов", _reading.Words.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("ru-RU")), PanelToneEnum.Idle),
+    ];
+
+    /// <summary>
     /// Сколько пунктов пройдено на занятии
     /// </summary>
     public string ReadingCount => _reading.Points.Count == 0 ? "Пунктов нет" : $"Пройдено пунктов: {_reading.Points.Count}";
@@ -361,8 +404,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
             other.IsOpen = other == lesson;
 
         _reading = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty);
-        RaiseReading();
         OpenLesson = lesson;
+        RaiseReading();
     }
 
     /// <summary>
@@ -374,7 +417,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             lesson.IsOpen = false;
 
         OpenLesson = null;
-        _reading = new TranscriptText(string.Empty, string.Empty, []);
+        _reading = TranscriptText.Empty;
         RaiseReading();
     }
 
@@ -391,6 +434,13 @@ public sealed class HomeworkFormatsViewModel : Bindable
         Raise(nameof(HasReadingTopic));
         Raise(nameof(HasReadingPoints));
         Raise(nameof(HasReadingOverview));
+        Raise(nameof(ReadingDecisions));
+        Raise(nameof(ReadingTasks));
+        Raise(nameof(HasReadingDecisions));
+        Raise(nameof(HasReadingTasks));
+        Raise(nameof(ReadingSpeakers));
+        Raise(nameof(HasReadingSpeakers));
+        Raise(nameof(ReadingStats));
     }
 
     /// <summary>

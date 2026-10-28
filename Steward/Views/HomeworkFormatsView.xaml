@@ -207,7 +207,10 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Meta}" Style="{StaticResource TextBody}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Headline}" Style="{StaticResource TextBody}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Headline}"/>
+                                                <TextBlock Text="{Binding Duration}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" Visibility="{Binding HasDuration, Converter={StaticResource BoolToVisibility}}"/>
+                                            </StackPanel>
                                             <Button Grid.Column="1" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" Padding="7" Margin="8,0,0,0" ToolTip="Посмотреть расшифровку"
                                                     Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}">
                                                 <Canvas Width="18" Height="18">
@@ -246,17 +249,36 @@
                             </TextBlock>
                             <StackPanel Visibility="{Binding HasOpenLesson, Converter={StaticResource BoolToVisibility}}">
                                 <Grid>
-                                    <TextBlock Text="{Binding OpenLesson.Meta}" Style="{StaticResource TextTitle}" TextWrapping="Wrap" Margin="0,0,40,0"/>
+                                    <TextBlock Text="{Binding OpenLesson.Caption}" Style="{StaticResource TextTitle}" TextWrapping="Wrap" Margin="0,0,40,0"/>
                                     <Button Content="✕" Command="{Binding CloseLessonCommand}" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" VerticalAlignment="Top" ToolTip="Закрыть"/>
                                 </Grid>
+                                <ItemsControl ItemsSource="{Binding ReadingStats}" Margin="0,12,0,0" AlternationCount="100">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="Cell" BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1,0,0,0" Padding="14,0,6,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource TextCaption}"/>
+                                                    <TextBlock Text="{Binding Value}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <Trigger Property="ItemsControl.AlternationIndex" Value="0">
+                                                    <Setter TargetName="Cell" Property="BorderThickness" Value="0"/>
+                                                    <Setter TargetName="Cell" Property="Padding" Value="0,0,6,0"/>
+                                                </Trigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                                 <TextBlock Text="{Binding ReadingTopic}" Foreground="{StaticResource AccentTextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap" Margin="0,10,0,0"
                                            Visibility="{Binding HasReadingTopic, Converter={StaticResource BoolToVisibility}}"/>
                                 <TextBlock Text="В файле расшифровки нет резюме: заново запроси расшифровку занятия." Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,10,0,0"
                                            Visibility="{Binding ReadingEmpty, Converter={StaticResource BoolToVisibility}}"/>
-                                <Border Style="{StaticResource ToneBadge}" Padding="10,3" HorizontalAlignment="Left" Margin="0,12,0,0"
-                                        Visibility="{Binding HasReadingPoints, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="{Binding ReadingCount}" Style="{StaticResource ToneBadgeText}"/>
-                                </Border>
                                 <TextBlock Text="Пройдено" Style="{StaticResource TextCaption}" Margin="0,14,0,6"
                                            Visibility="{Binding HasReadingPoints, Converter={StaticResource BoolToVisibility}}"/>
                                 <ItemsControl ItemsSource="{Binding ReadingPoints}">
@@ -280,6 +302,52 @@
                                         <TextBlock Text="{Binding ReadingOverview}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
                                     </StackPanel>
                                 </Border>
+                                <TextBlock Text="Принятые решения" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingDecisions, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingDecisions}" Visibility="{Binding HasReadingDecisions, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="18"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="•" Foreground="{StaticResource AccentTextBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Задачи с занятия" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingTasks, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingTasks}" Visibility="{Binding HasReadingTasks, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="18"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="•" Foreground="{StaticResource AccentTextBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Кто говорил" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingSpeakers, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingSpeakers}" Visibility="{Binding HasReadingSpeakers, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,0,8">
+                                                <Grid>
+                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextTrimming="CharacterEllipsis" Margin="0,0,48,0"/>
+                                                    <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}">
+                                                        <Run Text="{Binding Value, Mode=OneWay}"/><Run Text="%"/>
+                                                    </TextBlock>
+                                                </Grid>
+                                                <ProgressBar Value="{Binding Share, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -314,7 +382,8 @@
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,8" Padding="14,10"
                                         Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Meta}" Style="{StaticResource TextBody}" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Headline}" Style="{StaticResource TextBody}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Headline}"/>
+                                        <TextBlock Text="{Binding Duration}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" Visibility="{Binding HasDuration, Converter={StaticResource BoolToVisibility}}"/>
                                         <Grid Margin="0,8,0,0">
                                             <Button x:Name="PrepareButton" Content="Подготовить задания  ▾" Command="{Binding PrepareCommand}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left"/>
                                             <Popup IsOpen="{Binding IsMenuOpen, Mode=TwoWay}" PlacementTarget="{Binding ElementName=PrepareButton}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True" VerticalOffset="4">
