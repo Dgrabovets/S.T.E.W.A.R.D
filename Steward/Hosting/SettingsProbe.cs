@@ -43,7 +43,7 @@ public static class SettingsProbe
         return
         [
             Chip(document is not null, "Файл настроек найден", "Нет файла настроек почты"),
-            Chip(Filled(document, "Mail", "Password"), "Пароль приложения задан", "Не задан пароль приложения"),
+            Chip(Filled(document, "Mail", "AppPassword"), "Пароль приложения задан", "Не задан пароль приложения"),
             Chip(Filled(document, "Singularity", "Token"), "Токен Singularity задан", "Не задан токен Singularity"),
         ];
     }

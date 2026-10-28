@@ -1,4 +1,5 @@
 using Steward.Homework.Models;
+using Steward.Hosting;
 using Steward.Ideas.Models;
 using Steward.Models;
 using Steward.Mvvm;
@@ -17,6 +18,11 @@ public sealed class MainViewModel : PanelViewModel
     /// Текущий раздел
     /// </summary>
     private AppPageEnum _page = AppPageEnum.Status;
+
+    /// <summary>
+    /// Вместо содержимого страницы показаны её настройки
+    /// </summary>
+    private bool _settingsOpen;
 
     /// <summary>
     /// Карточки задач
@@ -153,6 +159,93 @@ public sealed class MainViewModel : PanelViewModel
     /// Последние сверки расписания короткими строками
     /// </summary>
     public IReadOnlyList<string> RecentChecks { get; private set; } = [];
+
+    /// <summary>
+    /// Настройки почты
+    /// </summary>
+    public JsonSettingsViewModel? MailSettings { get; private set; }
+
+    /// <summary>
+    /// Настройки бота рилсов
+    /// </summary>
+    public JsonSettingsViewModel? ReelsSettings { get; private set; }
+
+    /// <summary>
+    /// Настройки выгрузки занятий
+    /// </summary>
+    public JsonSettingsViewModel? LmsSettings { get; private set; }
+
+    /// <summary>
+    /// Вместо содержимого страницы показаны её настройки
+    /// </summary>
+    public bool IsSettingsOpen
+    {
+        get => _settingsOpen;
+        set
+        {
+            if (Set(ref _settingsOpen, value))
+                Raise(nameof(IsContentOpen));
+        }
+    }
+
+    /// <summary>
+    /// Показано содержимое страницы, а не настройки
+    /// </summary>
+    public bool IsContentOpen => !_settingsOpen;
+
+    /// <summary>
+    /// Переключает страницу между содержимым и настройками
+    /// </summary>
+    public RelayCommand ToggleSettingsCommand => new(() => IsSettingsOpen = !IsSettingsOpen);
+
+    /// <summary>
+    /// Заводит страницы настроек процессов, если их ещё нет
+    /// </summary>
+    /// <param name="root">Корень репозитория</param>
+    /// <param name="saved">Вызывается после записи любого из файлов</param>
+    public void AttachSettings(string root, Action saved)
+    {
+        if (MailSettings is not null)
+            return;
+
+        MailSettings = new JsonSettingsViewModel(
+            SettingsProbe.MailFile(root),
+            "Почта проверяется по IMAP. Пароль приложения выпускается в настройках почтового сервиса, он не равен паролю от ящика.",
+            [
+                new SettingFieldViewModel("Mail.Login", "Логин почты", "Адрес учебного ящика."),
+                new SettingFieldViewModel("Mail.AppPassword", "Пароль приложения", "Закрыт точками. Чтобы заменить, впиши новый.", secret: true),
+                new SettingFieldViewModel("Mail.Host", "Сервер IMAP", "Например imap.yandex.ru."),
+                new SettingFieldViewModel("Mail.Port", "Порт", "Обычно 993.", number: true),
+                new SettingFieldViewModel("Mail.LookbackDays", "Сколько дней назад смотреть", "Письма старше не разбираются.", number: true),
+                new SettingFieldViewModel("Singularity.Token", "Токен Singularity", "Ключ, по которому задачи попадают в SingularityApp.", secret: true),
+            ],
+            () => FileRequested?.Invoke("mail"));
+        ReelsSettings = new JsonSettingsViewModel(
+            SettingsProbe.ReelsFile(root),
+            "Бот в Telegram принимает ссылки на рилсы. Вход в Instagram берётся из браузера, в котором ты уже вошёл.",
+            [
+                new SettingFieldViewModel("BotToken", "Токен бота", "Выдаёт BotFather. Закрыт точками.", secret: true),
+                new SettingFieldViewModel("AllowedUserId", "Номер владельца", "Числовой идентификатор твоего аккаунта в Telegram.", number: true),
+                new SettingFieldViewModel("CookiesFromBrowser", "Браузер для входа в Instagram", "Например firefox. Пусто, если вход не нужен."),
+                new SettingFieldViewModel("ClaudeCommand", "Команда Claude", "Чем разбирать идеи. Обычно claude."),
+            ],
+            () => FileRequested?.Invoke("reels"));
+        LmsSettings = new JsonSettingsViewModel(
+            SettingsProbe.LmsFile(root),
+            "Вход в LMS по логину и паролю. Вход в MTS Link сохраняется отдельно командой Steward.Lms.exe login.",
+            [
+                new SettingFieldViewModel("Login", "Логин LMS", "Логин или почта для входа."),
+                new SettingFieldViewModel("Password", "Пароль LMS", "Закрыт точками.", secret: true),
+                new SettingFieldViewModel("MaxFetchPerRun", "Расшифровок за запуск", "Сколько занятий выгружать за один запуск.", number: true),
+            ],
+            () => FileRequested?.Invoke("lms"));
+        MailSettings.Saved += saved;
+        ReelsSettings.Saved += saved;
+        LmsSettings.Saved += saved;
+        Raise(nameof(MailSettings));
+        Raise(nameof(ReelsSettings));
+        Raise(nameof(LmsSettings));
+    }
 
     /// <summary>
     /// Просит открыть файл настроек процесса: «mail», «reels» или «lms»
@@ -302,18 +395,27 @@ public sealed class MainViewModel : PanelViewModel
         set => Select(value, AppPageEnum.Mail);
     }
 
+    /// <summary>
+    /// Открыт раздел «Расписание»
+    /// </summary>
     public bool IsSchedulePage
     {
         get => _page == AppPageEnum.Schedule;
         set => Select(value, AppPageEnum.Schedule);
     }
 
+    /// <summary>
+    /// Открыт раздел «Расшифровки»
+    /// </summary>
     public bool IsTranscriptsPage
     {
         get => _page == AppPageEnum.Transcripts;
         set => Select(value, AppPageEnum.Transcripts);
     }
 
+    /// <summary>
+    /// Текущий раздел
+    /// </summary>
     public AppPageEnum Page
     {
         get => _page;
@@ -604,6 +706,7 @@ public sealed class MainViewModel : PanelViewModel
             return;
 
         _page = page;
+        IsSettingsOpen = false;
         Raise(nameof(Page));
         Raise(nameof(IsStatusPage));
         Raise(nameof(IsIdeasPage));

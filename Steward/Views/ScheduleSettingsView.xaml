@@ -8,7 +8,7 @@
             <TextBlock Text="{Binding SettingsMessage}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"
                        Visibility="{Binding HasSettingsMessage, Converter={StaticResource BoolToVisibility}}"/>
 
-            <ToggleButton x:Name="ScheduleToggle" IsChecked="False" Style="{StaticResource SectionToggle}" Margin="0,8,0,0">
+            <ToggleButton x:Name="ScheduleToggle" IsChecked="True" Visibility="Collapsed" Style="{StaticResource SectionToggle}" Margin="0,8,0,0">
                 <TextBlock Text="Настройки" Style="{StaticResource TextTitle}"/>
             </ToggleButton>
             <controls:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsChecked, ElementName=ScheduleToggle}">

@@ -422,6 +422,8 @@ public sealed class TrayHost : IDisposable
         ApplyMain();
         if (page is { } selected)
             _main.Model.Page = selected;
+        else if (!_main.IsVisible)
+            _main.Model.Page = AppPageEnum.Status;
 
         _main.ShowAndActivate();
     }
@@ -512,6 +514,7 @@ public sealed class TrayHost : IDisposable
         _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
         _main.ApplyHomework(_jobs.HomeworkRows());
         var root = DataLocation.RepoRootOrStart();
+        _main.Model.AttachSettings(root, ApplyMain);
         _main.Model.ApplyChips(SettingsProbe.Mail(root), SettingsProbe.Reels(root), SettingsProbe.Transcripts(root));
         _main.Model.Formats = Formats();
     }

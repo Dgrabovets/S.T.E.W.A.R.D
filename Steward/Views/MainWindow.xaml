@@ -106,6 +106,23 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="ContentPanel" TargetType="StackPanel">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SettingsPanel" TargetType="StackPanel">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="PageHost" TargetType="Grid">
             <Setter Property="Visibility" Value="Collapsed"/>
         </Style>
@@ -235,9 +252,11 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <TextBlock Text="Рилсы" Style="{StaticResource PageTitle}"/>
-                                <ItemsControl ItemsSource="{Binding ReelsChips}" Style="{StaticResource ChipsRow}"/>
-                                <Button Content="Открыть файл настроек" Command="{Binding OpenReelsSettingsCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+                                <views:PageHeaderView Title="Рилсы" Chips="{Binding ReelsChips}"/>
+                                <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <views:JsonSettingsView DataContext="{Binding ReelsSettings}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource ContentPanel}">
                                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding IsReelsBusy, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel Orientation="Horizontal">
                                         <ctl:ActivityOrb Width="26" Height="26" Kind="Composing" Foreground="{StaticResource WorkingBrush}" Margin="-4,-2,12,-2"/>
@@ -302,6 +321,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -372,11 +392,12 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
-                                <TextBlock Text="Почта" Style="{StaticResource PageTitle}"/>
-                                <ContentControl Content="{Binding MailCard}" Style="{StaticResource CardHost}"/>
-                                <ItemsControl ItemsSource="{Binding MailChips}" Style="{StaticResource ChipsRow}"/>
-                                <Button Content="Открыть файл настроек" Command="{Binding OpenMailSettingsCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Разобранные письма" Style="{StaticResource TextTitle}" Margin="4,24,0,8"/>
+                                <views:PageHeaderView Title="Почта" Chips="{Binding MailChips}"/>
+                                <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <views:JsonSettingsView DataContext="{Binding MailSettings}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource ContentPanel}">
+                                <TextBlock Text="Разобранные письма" Style="{StaticResource TextTitle}" Margin="4,12,0,8"/>
                                 <TextBlock Style="{StaticResource PageHint}" TextWrapping="Wrap" Margin="4,0,0,8"
                                            Text="Почта проверяется утром, вечером и при запуске приложения. Каждое письмо от человека или с отзывом превращается в задачу в Singularity, а здесь видно, что разобрано в последних проверках."/>
                                 <ItemsControl ItemsSource="{Binding MailLetters}">
@@ -395,6 +416,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -412,9 +434,11 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
-                                <TextBlock Text="Расписание" Style="{StaticResource PageTitle}"/>
-                                <ContentControl Content="{Binding ScheduleCard}" Style="{StaticResource CardHost}"/>
-                                <ItemsControl ItemsSource="{Binding ScheduleChips}" Style="{StaticResource ChipsRow}"/>
+                                <views:PageHeaderView Title="Расписание" Chips="{Binding ScheduleChips}"/>
+                                <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <views:ScheduleSettingsView DataContext="{Binding Settings}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource ContentPanel}">
                                 <Button Content="Перезапустить сверку" Command="{Binding Settings.RestartCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left"/>
                                 <TextBlock Text="Последние сверки" Style="{StaticResource TextTitle}" Margin="4,24,0,8"/>
                                 <ItemsControl ItemsSource="{Binding RecentChecks}">
@@ -424,7 +448,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <views:ScheduleSettingsView DataContext="{Binding Settings}" Margin="0,12,0,0"/>
+                                </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -442,11 +466,13 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
-                                <TextBlock Text="Расшифровки" Style="{StaticResource PageTitle}"/>
-                                <ContentControl Content="{Binding LmsCard}" Style="{StaticResource CardHost}"/>
-                                <ItemsControl ItemsSource="{Binding TranscriptChips}" Style="{StaticResource ChipsRow}"/>
-                                <Button Content="Открыть файл настроек" Command="{Binding OpenLmsSettingsCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
-                                <views:HomeworkFormatsView DataContext="{Binding Formats}"/>
+                                <views:PageHeaderView Title="Расшифровки" Chips="{Binding TranscriptChips}"/>
+                                <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <views:JsonSettingsView DataContext="{Binding LmsSettings}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource ContentPanel}">
+                                    <views:HomeworkFormatsView DataContext="{Binding Formats}"/>
+                                </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
