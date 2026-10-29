@@ -137,7 +137,17 @@ public static partial class DraftBuilder
                 continue;
             }
 
-            var produced = isCode ? Directory.EnumerateFiles(folder, $"Задание {number}.*").FirstOrDefault() : Convert(folder, number, items[index].Title, format, resultPath);
+            string? produced;
+            try
+            {
+                produced = isCode ? Directory.EnumerateFiles(folder, $"Задание {number}.*").FirstOrDefault() : Convert(folder, number, items[index].Title, format, resultPath);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or System.Xml.XmlException or DocumentFormat.OpenXml.Packaging.OpenXmlPackageException)
+            {
+                errors.Add($"Задание {number}: не удалось собрать файл: {exception.Message}");
+
+                continue;
+            }
             if (produced is null)
                 errors.Add($"Задание {number}: агент не записал файл");
             else
@@ -170,24 +180,47 @@ public static partial class DraftBuilder
         if (!File.Exists(sourcePath) || new FileInfo(sourcePath).Length == 0)
             return null;
 
-        var markdown = File.ReadAllText(sourcePath);
+        var markdown = XmlSafe(File.ReadAllText(sourcePath));
         var name = $"Задание {number}. {SafeName(title)}";
         var path = Path.Combine(folder, name + format switch { HomeworkFormatEnum.Word => ".docx", HomeworkFormatEnum.Presentation => ".pptx", _ => ".md" });
-        switch (format)
+        var partial = path + ".partial";
+        try
         {
-            case HomeworkFormatEnum.Word:
-                OfficeWriter.WriteWord(path, markdown);
-                break;
-            case HomeworkFormatEnum.Presentation:
-                OfficeWriter.WriteSlides(path, markdown);
-                break;
-            default:
-                File.WriteAllText(path, WordStyleFree(markdown));
-                break;
+            switch (format)
+            {
+                case HomeworkFormatEnum.Word:
+                    OfficeWriter.WriteWord(partial, markdown);
+                    break;
+                case HomeworkFormatEnum.Presentation:
+                    OfficeWriter.WriteSlides(partial, markdown);
+                    break;
+                default:
+                    File.WriteAllText(partial, WordStyleFree(markdown));
+                    break;
+            }
+
+            File.Move(partial, path, overwrite: true);
+        }
+        catch
+        {
+            File.Delete(partial);
+
+            throw;
         }
 
         return path;
     }
+
+    /// <summary>
+    /// Убирает из текста знаки, которых нет в XML 1.0: управляющие и одиночные суррогаты. Иначе Word и PowerPoint считают файл битым
+    /// </summary>
+    /// <param name="text">Текст работы</param>
+    /// <returns>Текст без недопустимых знаков</returns>
+    private static string XmlSafe(string text) => string.Concat(text.Where((symbol, index) =>
+        symbol is '\t' or '\n' or '\r'
+        || (symbol >= ' ' && !char.IsSurrogate(symbol) && symbol is not ('\uFFFE' or '\uFFFF'))
+        || (char.IsHighSurrogate(symbol) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
+        || (char.IsLowSurrogate(symbol) && index > 0 && char.IsHighSurrogate(text[index - 1]))));
 
     /// <summary>
     /// Убирает из текста блок оформления и теги титульного листа: в Markdown и тексте они не нужны

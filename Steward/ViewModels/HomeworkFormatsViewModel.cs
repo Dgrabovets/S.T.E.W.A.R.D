@@ -1,3 +1,4 @@
+using System.IO;
 using Steward.Homework.Models;
 using Steward.Models;
 using Steward.Mvvm;
@@ -121,6 +122,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         ShowTranscriptsCommand = new RelayCommand(() => HomeworkTab = false);
         ShowHomeworkCommand = new RelayCommand(() => HomeworkTab = true);
         CloseLessonCommand = new RelayCommand(CloseLesson);
+        CopyBriefCommand = new RelayCommand(CopyBrief);
         _fetchRequested = fetchRequested;
         _subjectFormatChosen = subjectFormatChosen;
         _stateChosen = stateChosen;
@@ -294,9 +296,34 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Func<string, IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>?>? ItemsReader { get; set; }
 
     /// <summary>
+    /// Проверяет готовую работу занятия и возвращает пустую строку или причину ошибки
+    /// </summary>
+    public Func<Lesson, Task<string>>? DraftChecker { get; set; }
+
+    /// <summary>
+    /// Находит отчёт о проверке по ключу занятия. Пусто, если проверки не было
+    /// </summary>
+    public Func<string, string>? CheckReader { get; set; }
+
+    /// <summary>
     /// Убирает задание в архив: ключ занятия и номер задания
     /// </summary>
     public Action<string, int>? ItemArchived { get; set; }
+
+    /// <summary>
+    /// Находит адрес страницы задания в LMS по ключу занятия и номеру задания. Пусто, если задание не связано с работой LMS
+    /// </summary>
+    public Func<string, int, string>? ItemUrlReader { get; set; }
+
+    /// <summary>
+    /// Отмечает задание сданным или снимает отметку: ключ занятия, номер задания и новое значение
+    /// </summary>
+    public Action<string, int, bool>? ItemSubmitted { get; set; }
+
+    /// <summary>
+    /// Читает текст условия задания по ключу занятия и номеру задания
+    /// </summary>
+    public Func<string, int, string>? ItemConditionReader { get; set; }
 
     /// <summary>
     /// Заводит задачу в SingularityApp: ключ занятия и номер задания. Возвращает итог и признак ошибки
@@ -324,7 +351,17 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="lesson">Занятие</param>
     public void DeleteDrafts(LessonFormatViewModel lesson)
     {
-        DraftsDeleted?.Invoke(lesson.Id);
+        try
+        {
+            DraftsDeleted?.Invoke(lesson.Id);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            lesson.ShowResult("Не удалось удалить: закрой файл задания в Word или PowerPoint и повтори. " + exception.Message, failed: true);
+
+            return;
+        }
+
         RefreshDrafts(lesson);
         lesson.ShowResult("Готовое задание удалено", failed: false);
     }
@@ -337,8 +374,60 @@ public sealed class HomeworkFormatsViewModel : Bindable
     {
         var found = ItemsReader?.Invoke(lesson.Id);
         lesson.SetItems(
-            [.. (found ?? []).Select(row => new LessonItemViewModel(row.Number, row.Item, row.InSingularity, entry => ArchiveItem(lesson, row.Number), entry => { _ = AddToSingularityAsync(lesson, row.Number); }))],
+            [.. (found ?? []).Select(row => new LessonItemViewModel(row.Number, row.Item, row.InSingularity, entry => ArchiveItem(lesson, row.Number), entry => { _ = AddToSingularityAsync(lesson, row.Number); }, entry => OpenItemInLms(lesson, row.Number), entry => ToggleSubmitted(lesson, row.Number, !entry.Submitted), entry => CopyCondition(lesson, row.Number)))],
             found is not null);
+    }
+
+    /// <summary>
+    /// Открывает страницу задания в LMS или говорит, почему не вышло
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания</param>
+    private void OpenItemInLms(LessonFormatViewModel lesson, int number)
+    {
+        var url = ItemUrlReader?.Invoke(lesson.Id, number) ?? string.Empty;
+        if (url.Length == 0)
+            lesson.ShowResult("Задание не связано с работой в LMS: страницу открыть нельзя", failed: true);
+        else
+            PathOpened?.Invoke(url);
+    }
+
+    /// <summary>
+    /// Отмечает задание сданным или снимает отметку и обновляет список
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания</param>
+    /// <param name="submitted">Новое значение</param>
+    private void ToggleSubmitted(LessonFormatViewModel lesson, int number, bool submitted)
+    {
+        ItemSubmitted?.Invoke(lesson.Id, number, submitted);
+        RefreshItems(lesson);
+    }
+
+    /// <summary>
+    /// Копирует условие задания в буфер обмена
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания</param>
+    private void CopyCondition(LessonFormatViewModel lesson, int number)
+    {
+        var text = ItemConditionReader?.Invoke(lesson.Id, number) ?? string.Empty;
+        if (text.Length == 0)
+        {
+            lesson.ShowResult("Условия нет: задание не найдено", failed: true);
+
+            return;
+        }
+
+        try
+        {
+            System.Windows.Clipboard.SetText(text);
+            lesson.ShowResult("Условие скопировано в буфер обмена", failed: false);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            lesson.ShowResult("Буфер обмена занят другой программой, повтори", failed: true);
+        }
     }
 
     /// <summary>
@@ -426,6 +515,38 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// Закрывает открытую расшифровку
     /// </summary>
     public RelayCommand CloseLessonCommand { get; }
+
+    /// <summary>
+    /// Копирует конспект к практике по открытой расшифровке
+    /// </summary>
+    public RelayCommand CopyBriefCommand { get; }
+
+    /// <summary>
+    /// Кладёт в буфер обмена конспект к практике: что повторить и что знать по открытому занятию
+    /// </summary>
+    private void CopyBrief()
+    {
+        if (OpenLesson is not { } lesson)
+            return;
+
+        var text = Steward.Preview.PracticeBrief.Build(lesson.Title, lesson.Date, _reading);
+        if (text.Length == 0)
+        {
+            lesson.ShowResult("Конспекта пока нет: подробный разбор появится после ближайшей выгрузки", failed: true);
+
+            return;
+        }
+
+        try
+        {
+            System.Windows.Clipboard.SetText(text);
+            lesson.ShowResult("Конспект к практике скопирован в буфер обмена", failed: false);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            lesson.ShowResult("Буфер обмена занят другой программой, повтори", failed: true);
+        }
+    }
 
     /// <summary>
     /// Занятие, расшифровка которого открыта
@@ -634,6 +755,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="lesson">Занятие</param>
     private void RefreshDrafts(LessonFormatViewModel lesson)
     {
+        lesson.HasCheck = (CheckReader?.Invoke(lesson.Id) ?? string.Empty).Length > 0;
         var paths = DraftLister?.Invoke(lesson.Id) ?? [];
         if (paths.SequenceEqual(lesson.Drafts.Select(draft => draft.Path)))
             return;
@@ -654,7 +776,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             {
                 if (!known.TryGetValue(item.Lesson.Id, out var row))
                 {
-                    row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
+                    row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => { _ = lesson.RunCheckAsync(DraftChecker ?? (_ => Task.FromResult("Проверка не подключена"))); }, CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
                     RefreshDrafts(row);
                     RefreshItems(row);
 

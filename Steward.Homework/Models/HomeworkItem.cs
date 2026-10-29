@@ -7,5 +7,8 @@ namespace Steward.Homework.Models;
 /// <param name="Due">Срок сдачи или <see langword="null"/>, если на занятии его не назвали</param>
 /// <param name="Requirements">Требования к работе: объём, оформление, что обязательно включить</param>
 /// <param name="Link">Ссылка на задание, если её назвали, иначе пусто</param>
-/// <param name="Done">Задание уже сдано: по данным LMS работа по этому заданию отправлена. Такие задания не готовятся</param>
-public sealed record HomeworkItem(string Title, DateOnly? Due, string Requirements, string Link, bool Done = false);
+/// <param name="Done">Задание уже сдано: по данным LMS работа по этому заданию отправлена или студент отметил его сданным сам. Такие задания не готовятся</param>
+/// <param name="ActivityId">Номер работы в LMS, к которой относится задание, или пусто, если агент её не определил. По нему открывается страница задания и берётся условие</param>
+/// <param name="Submitted">Задание отметил сам студент. Эту отметку можно снять, в отличие от сдачи по данным LMS</param>
+/// <param name="Changed">Дата, когда преподаватель изменил условие работы в LMS, или <see langword="null"/>, если правок не было</param>
+public sealed record HomeworkItem(string Title, DateOnly? Due, string Requirements, string Link, bool Done = false, string ActivityId = "", bool Submitted = false, DateOnly? Changed = null);

@@ -246,6 +246,9 @@
                                 </ItemsControl>
                                 <TextBlock Text="{Binding ReadingTopic}" Foreground="{StaticResource AccentTextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap" Margin="0,10,0,0"
                                            Visibility="{Binding HasReadingTopic, Converter={StaticResource BoolToVisibility}}"/>
+                                <Button Content="Скопировать конспект к практике" Command="{Binding CopyBriefCommand}" Style="{StaticResource OutlineButton}" HorizontalAlignment="Left" Margin="0,10,0,0"
+                                        ToolTip="Темы, формулировки и задачи занятия одним текстом: повторить перед практикой"
+                                        Visibility="{Binding HasReadingTopics, Converter={StaticResource BoolToVisibility}}"/>
                                 <TextBlock Text="Подробный разбор ещё готовится: он появится после ближайшей выгрузки. Пока показано короткое резюме." Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,6,0,0"
                                            Visibility="{Binding ReadingBrief, Converter={StaticResource BoolToVisibility}}"/>
                                 <TextBlock Text="В файле расшифровки нет резюме: заново запроси расшифровку занятия." Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,10,0,0"
@@ -420,6 +423,9 @@
                                             </ItemsControl>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,2,0,0"
                                                         Visibility="{Binding HasDrafts, Converter={StaticResource BoolToVisibility}}">
+                                                <Button Content="Проверить" Command="{Binding CheckCommand}" Style="{StaticResource GhostButton}" ToolTip="Сверить работу с условием и методичкой и найти факты без опоры. Работа не меняется"/>
+                                                <Button Content="Результат проверки" Command="{Binding OpenCheckCommand}" Style="{StaticResource GhostButton}" ToolTip="Открыть отчёт о проверке"
+                                                        Visibility="{Binding HasCheck, Converter={StaticResource BoolToVisibility}}"/>
                                                 <Button Command="{Binding RedoCommand}" Style="{StaticResource IconButton}" ToolTip="Переделать: написать, что не понравилось">
                                                     <Path Data="{StaticResource IconRedo}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="18" Height="18"/>
                                                 </Button>
@@ -435,22 +441,23 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,4">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                </Grid.ColumnDefinitions>
+                                                            <StackPanel>
                                                                 <StackPanel>
-                                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                                    <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" TextWrapping="Wrap"/>
-                                                                    <TextBlock Text="{Binding Requirements}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"
-                                                                               Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
-                                                                </StackPanel>
-                                                                <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                                                                    <Button Content="В архив" Command="{Binding ArchiveCommand}" Style="{StaticResource GhostButton}" ToolTip="Убрать задание из списка: оно не будет готовиться"/>
-                                                                    <Button Content="В Singularity" Command="{Binding AddToSingularityCommand}" Style="{StaticResource GhostButton}" ToolTip="Завести задачу по заданию в Singularity"/>
-                                                                </StackPanel>
-                                                            </Grid>
+                                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                                <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                                                <TextBlock Text="{Binding Requirements}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                                           Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
+                                                            </StackPanel>
+                                                                <WrapPanel Margin="0,4,0,0">
+                                                                    <Button Content="В архив" Command="{Binding ArchiveCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Убрать задание из списка: оно не будет готовиться"/>
+                                                                    <Button Content="В Singularity" Command="{Binding AddToSingularityCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Завести задачу по заданию в Singularity"/>
+                                                                    <Button Content="Открыть в LMS" Command="{Binding OpenInLmsCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Открыть страницу задания в LMS"/>
+                                                                    <Button Content="{Binding SubmitLabel}" Command="{Binding ToggleSubmittedCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Сданное задание не готовится. Отметку можно снять"
+                                                                            Visibility="{Binding CanToggleSubmitted, Converter={StaticResource BoolToVisibility}}"/>
+                                                                    <Button Content="Скопировать условие" Command="{Binding CopyConditionCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Положить условие задания в буфер обмена"/>
+                                                                
+                                                                </WrapPanel>
+                                                            </StackPanel>
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>

@@ -81,6 +81,8 @@ public sealed class LessonFormatViewModel : Bindable
         PrepareCommand = new RelayCommand(() => PrepareRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
         RedoCommand = new RelayCommand(() => RedoRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
         DeleteCommand = new RelayCommand(() => DeleteRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
+        CheckCommand = new RelayCommand(() => CheckRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
+        OpenCheckCommand = new RelayCommand(() => CheckOpened?.Invoke(this), () => HasCheck);
         OpenCommand = new RelayCommand(() => Opened?.Invoke(this), () => HasTranscript);
         FetchCommand = new RelayCommand(
             () =>
@@ -102,6 +104,11 @@ public sealed class LessonFormatViewModel : Bindable
     /// Запоминает формат занятия
     /// </summary>
     private readonly Action<string, HomeworkFormatEnum> _chosen;
+
+    /// <summary>
+    /// Есть отчёт о проверке готовой работы
+    /// </summary>
+    private bool _hasCheck;
 
     /// <summary>
     /// Ищет задания и готовит работы
@@ -411,6 +418,63 @@ public sealed class LessonFormatViewModel : Bindable
     /// Удаляет готовое задание
     /// </summary>
     public RelayCommand DeleteCommand { get; }
+
+    /// <summary>
+    /// Вызывается, когда нужно проверить готовую работу
+    /// </summary>
+    public Action<LessonFormatViewModel>? CheckRequested { get; set; }
+
+    /// <summary>
+    /// Вызывается, когда нужно открыть отчёт о проверке
+    /// </summary>
+    public Action<LessonFormatViewModel>? CheckOpened { get; set; }
+
+    /// <summary>
+    /// Просит проверить готовую работу: сверить с условием и указаниями
+    /// </summary>
+    public RelayCommand CheckCommand { get; }
+
+    /// <summary>
+    /// Открывает отчёт о проверке
+    /// </summary>
+    public RelayCommand OpenCheckCommand { get; }
+
+    /// <summary>
+    /// У занятия есть отчёт о проверке готовой работы
+    /// </summary>
+    public bool HasCheck
+    {
+        get => _hasCheck;
+        set => Set(ref _hasCheck, value);
+    }
+
+    /// <summary>
+    /// Запускает проверку готовой работы и показывает ход
+    /// </summary>
+    /// <param name="check">Проверяет работу и возвращает пустую строку или причину ошибки</param>
+    /// <returns>Задача, которая завершается, когда проверка закончена</returns>
+    public async Task RunCheckAsync(Func<Lesson, Task<string>> check)
+    {
+        Failed = false;
+        Status = "Проверяю работу: сверяю с условием и указаниями…";
+        Activity = ActivityStateEnum.Working;
+
+        string error;
+        try
+        {
+            error = await check(Lesson);
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+        }
+
+        Failed = error.Length > 0;
+        Status = Failed ? error : "Проверка готова: отчёт можно открыть кнопкой «Результат проверки»";
+        ActivitySince = DateTimeOffset.UtcNow;
+        Activity = Failed ? ActivityStateEnum.None : ActivityStateEnum.Done;
+        HasCheck = !Failed;
+    }
 
     /// <summary>
     /// Вызывается, когда нужно открыть окно «Подготовить задание» для этого занятия

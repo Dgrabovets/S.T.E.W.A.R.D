@@ -6,7 +6,7 @@ using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
 namespace Steward.Views;
 
 /// <summary>
-/// Окно «Переделать задание»: короткое поле, куда пишут, что не понравилось. Открывается поверх окна приложения и по его центру
+/// Окно «Переделать задание»: короткое поле, куда пишут, что не понравилось, и кнопка, которой прикладывают файлы с замечаниями преподавателя. Открывается поверх окна приложения и по его центру
 /// </summary>
 public partial class RedoWindow : Window
 {
@@ -22,6 +22,11 @@ public partial class RedoWindow : Window
     }
 
     /// <summary>
+    /// Прикреплённые файлы с замечаниями
+    /// </summary>
+    private readonly List<string> _files = [];
+
+    /// <summary>
     /// Что написал пользователь
     /// </summary>
     public string Text => Remarks.Text.Trim();
@@ -31,8 +36,8 @@ public partial class RedoWindow : Window
     /// </summary>
     /// <param name="owner">Окно приложения</param>
     /// <param name="heading">Занятие, работа по которому переделывается</param>
-    /// <returns>Замечания или <see langword="null"/>, если окно закрыли без переделки</returns>
-    public static string? Ask(Window? owner, string heading)
+    /// <returns>Замечания и файлы или <see langword="null"/>, если окно закрыли без переделки</returns>
+    public static (string Text, IReadOnlyList<string> Files)? Ask(Window? owner, string heading)
     {
         var window = new RedoWindow(heading);
         if (owner is { IsVisible: true })
@@ -40,7 +45,28 @@ public partial class RedoWindow : Window
         else
             window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        return window.ShowDialog() == true ? window.Text : null;
+        return window.ShowDialog() == true ? (window.Text, window._files) : null;
+    }
+
+    /// <summary>
+    /// Выбирает файлы с замечаниями преподавателя
+    /// </summary>
+    /// <param name="sender">Кнопка</param>
+    /// <param name="e">Событие</param>
+    private void Attach_OnClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Файлы с замечаниями преподавателя",
+            Multiselect = true,
+            Filter = "Замечания|*.docx;*.pptx;*.pdf;*.txt;*.md;*.png;*.jpg;*.jpeg|Все файлы|*.*",
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        _files.Clear();
+        _files.AddRange(dialog.FileNames);
+        Attached.Text = string.Join(", ", _files.Select(System.IO.Path.GetFileName));
     }
 
     /// <summary>
@@ -50,7 +76,7 @@ public partial class RedoWindow : Window
     /// <param name="e">Событие</param>
     private void Confirm_OnClick(object sender, RoutedEventArgs e)
     {
-        if (Text.Length == 0)
+        if (Text.Length == 0 && _files.Count == 0)
         {
             Remarks.Focus();
 

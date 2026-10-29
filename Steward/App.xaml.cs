@@ -1,3 +1,5 @@
+using System.IO;
+using Steward.Status.Common;
 using Steward.ViewModels;
 using Steward.Shell;
 
@@ -39,6 +41,17 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
 
+        DispatcherUnhandledException += (_, args) =>
+        {
+            LogUnhandled(args.Exception);
+            args.Handled = true;
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            LogUnhandled(args.Exception);
+            args.SetObserved();
+        };
+
         _instance = new Mutex(true, SINGLE_INSTANCE_NAME, out var created);
         if (!created)
         {
@@ -51,6 +64,23 @@ public partial class App : System.Windows.Application
         var open = Array.IndexOf(e.Args, OPEN_ARGUMENT);
         if (open >= 0 && open + 1 < e.Args.Length && Enum.TryParse<AppPageEnum>(e.Args[open + 1], ignoreCase: true, out var page))
             _host.ShowMain(page);
+    }
+
+    /// <summary>
+    /// Записывает необработанную ошибку в <c>data/steward-errors.log</c>: иконка в трее не должна исчезать из-за одного сбоя, а причину потом можно найти в файле
+    /// </summary>
+    /// <param name="exception">Ошибка</param>
+    private static void LogUnhandled(Exception exception)
+    {
+        try
+        {
+            var file = Path.Combine(DataLocation.DataDirectory(), "steward-errors.log");
+            File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {exception}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch (Exception logging) when (logging is IOException or UnauthorizedAccessException)
+        {
+            // Журнал недоступен: ошибку уже погасили, дальше работаем
+        }
     }
 
     /// <summary>

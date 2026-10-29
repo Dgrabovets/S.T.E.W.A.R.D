@@ -49,9 +49,24 @@ public partial class HomeworkFormatsView : UserControl
     private async void ShowRedo(LessonFormatViewModel lesson)
     {
         var remarks = RedoWindow.Ask(Window.GetWindow(this), lesson.Meta);
-        if (remarks is not null)
-            await lesson.PrepareAsync(new Steward.Homework.Models.PrepareRequest(lesson.Format, remarks, null, Redo: true));
+        if (remarks is { } answer)
+            await lesson.PrepareAsync(new Steward.Homework.Models.PrepareRequest(FormatOfDrafts(lesson), answer.Text, null, Redo: true, RemarkFiles: answer.Files));
     }
+
+    /// <summary>
+    /// Формат готовой работы по расширению её файла: переделка идёт в том же формате, что и прежняя версия
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>Формат прежней работы или формат занятия, если по файлам он не ясен</returns>
+    private static Steward.Homework.Models.HomeworkFormatEnum FormatOfDrafts(LessonFormatViewModel lesson) =>
+        System.IO.Path.GetExtension(lesson.Drafts.FirstOrDefault()?.Path ?? string.Empty).ToLowerInvariant() switch
+        {
+            ".docx" => Steward.Homework.Models.HomeworkFormatEnum.Word,
+            ".pptx" => Steward.Homework.Models.HomeworkFormatEnum.Presentation,
+            ".txt" or ".md" => Steward.Homework.Models.HomeworkFormatEnum.Text,
+            { Length: > 0 } => Steward.Homework.Models.HomeworkFormatEnum.Code,
+            _ => lesson.Format,
+        };
 
     /// <summary>
     /// Спрашивает, удалять ли готовое задание, и удаляет после подтверждения

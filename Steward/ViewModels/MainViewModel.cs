@@ -55,6 +55,11 @@ public sealed class MainViewModel : PanelViewModel
     private IReadOnlyList<HomeworkCardViewModel> _homework = [];
 
     /// <summary>
+    /// Напоминания о сроках сдачи
+    /// </summary>
+    private IReadOnlyList<DeadlineCardViewModel> _deadlines = [];
+
+    /// <summary>
     /// Следит за выполняющимися и только что закончившимися задачами
     /// </summary>
     private readonly ActivityTracker _activity = new();
@@ -589,6 +594,34 @@ public sealed class MainViewModel : PanelViewModel
     /// Найденных заданий пока нет
     /// </summary>
     public bool IsHomeworkEmpty => Homework.Count == 0;
+
+    /// <summary>
+    /// Напоминания о ближайших сроках сдачи на экране «Статус»
+    /// </summary>
+    public IReadOnlyList<DeadlineCardViewModel> Deadlines
+    {
+        get => _deadlines;
+        private set
+        {
+            if (_deadlines.Count == value.Count && _deadlines.Zip(value).All(pair => pair.First.Title == pair.Second.Title && pair.First.When == pair.Second.When && pair.First.Subject == pair.Second.Subject))
+                return;
+
+            Set(ref _deadlines, value);
+            Raise(nameof(HasDeadlines));
+        }
+    }
+
+    /// <summary>
+    /// Есть несданные работы со сроком в ближайшие дни
+    /// </summary>
+    public bool HasDeadlines => Deadlines.Count > 0;
+
+    /// <summary>
+    /// Показывает напоминания о сроках
+    /// </summary>
+    /// <param name="deadlines">Сроки по возрастанию даты</param>
+    /// <param name="today">Сегодняшняя дата</param>
+    public void ApplyDeadlines(IReadOnlyList<Deadline> deadlines, DateOnly today) => Deadlines = [.. deadlines.Select(deadline => new DeadlineCardViewModel(deadline, today))];
 
     /// <summary>
     /// Карточки идей, которые ждут решения

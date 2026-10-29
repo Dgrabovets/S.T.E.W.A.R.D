@@ -47,6 +47,19 @@ public class AssignmentTests
     }
 
     /// <summary>
+    /// Отпечаток условия не меняется от повторного чтения и меняется, когда преподаватель поправил текст или срок
+    /// </summary>
+    [Fact]
+    public void The_fingerprint_changes_only_when_the_assignment_changes()
+    {
+        var first = AssignmentSync.Fingerprint(AssignmentParser.Parse(Page));
+
+        Assert.Equal(first, AssignmentSync.Fingerprint(AssignmentParser.Parse(Page)));
+        Assert.NotEqual(first, AssignmentSync.Fingerprint(AssignmentParser.Parse(Page.Replace("Соберите", "Нарисуйте", StringComparison.Ordinal))));
+        Assert.NotEqual(first, AssignmentSync.Fingerprint(AssignmentParser.Parse(Page.Replace("23 октября", "30 октября", StringComparison.Ordinal))));
+    }
+
+    /// <summary>
     /// Описание задания для агента содержит предмет, срок, условие и пути к файлам
     /// </summary>
     [Fact]

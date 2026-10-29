@@ -23,6 +23,23 @@ public static class AssignmentSync
     private const int MAX_FILES = 6;
 
     /// <summary>
+    /// Через сколько часов страница задания читается заново, чтобы заметить правки преподавателя
+    /// </summary>
+    private const int RECHECK_HOURS = 6;
+
+    /// <summary>
+    /// Отпечаток условия: хэш текста, дат и списка файлов. Если он изменился, преподаватель поправил задание
+    /// </summary>
+    /// <param name="details">Что написано на странице</param>
+    /// <returns>Шестнадцатеричный хэш</returns>
+    public static string Fingerprint(AssignmentDetails details)
+    {
+        var text = string.Join('\n', [details.Text, .. details.Dates, .. details.Files.Select(file => file.Name + "|" + file.Url)]);
+
+        return System.Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+    }
+
+    /// <summary>
     /// Собирает текст файла <c>assignment.md</c>: название, предмет, срок и условие, а под ним список файлов
     /// </summary>
     /// <param name="activity">Работа из LMS</param>
@@ -75,13 +92,26 @@ public static class AssignmentSync
         foreach (var activity in activities.Where(item => item.Kind == ActivityKindEnum.Assignment && !item.Done))
         {
             var folder = store.AssignmentDirectory(activity.Id);
-            if (File.Exists(Path.Combine(folder, "assignment.md")))
+            var described = Path.Combine(folder, "assignment.md");
+            var checkedFile = Path.Combine(folder, "checked.txt");
+            if (File.Exists(described) && File.Exists(checkedFile) && DateTime.UtcNow - File.GetLastWriteTimeUtc(checkedFile) < TimeSpan.FromHours(RECHECK_HOURS))
                 continue;
 
             try
             {
                 var details = AssignmentParser.Parse(await lms.PageAsync(activity.Url, CancellationToken.None));
                 Directory.CreateDirectory(folder);
+
+                var fingerprintFile = Path.Combine(folder, "fingerprint.txt");
+                var fingerprint = Fingerprint(details);
+                var previous = File.Exists(fingerprintFile) ? File.ReadAllText(fingerprintFile).Trim() : string.Empty;
+                if (File.Exists(described) && (previous.Length == 0 || previous == fingerprint))
+                {
+                    File.WriteAllText(fingerprintFile, fingerprint);
+                    File.WriteAllText(checkedFile, DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+
+                    continue;
+                }
 
                 var saved = new List<(string, string)>();
                 foreach (var file in details.Files.Take(MAX_FILES))
@@ -95,8 +125,19 @@ public static class AssignmentSync
                     Readable(path);
                 }
 
-                File.WriteAllText(Path.Combine(folder, "assignment.md"), Describe(activity, details, saved));
-                log($"Описание задания: {activity.Subject}, {activity.Name}, файлов: {saved.Count}");
+                File.WriteAllText(described, Describe(activity, details, saved));
+                File.WriteAllText(fingerprintFile, fingerprint);
+                File.WriteAllText(checkedFile, DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
+                if (previous.Length > 0)
+                {
+                    File.WriteAllText(Path.Combine(folder, "changed.txt"), DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                    log($"Условие задания изменено в LMS: {activity.Subject}, {activity.Name}");
+                }
+                else
+                {
+                    log($"Описание задания: {activity.Subject}, {activity.Name}, файлов: {saved.Count}");
+                }
+
                 done++;
             }
             catch (Exception exception) when (exception is HttpRequestException or IOException or UnauthorizedAccessException or InvalidDataException)

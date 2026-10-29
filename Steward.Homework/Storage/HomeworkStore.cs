@@ -337,7 +337,7 @@ public sealed class HomeworkStore(string directory)
     {
         var folder = DraftsDirectory(lessonId);
 
-        return Directory.Exists(folder) ? [.. Directory.EnumerateFiles(folder).OrderByDescending(File.GetLastWriteTimeUtc)] : [];
+        return Directory.Exists(folder) ? [.. Directory.EnumerateFiles(folder).Where(file => !Path.GetFileName(file).StartsWith("~$", StringComparison.Ordinal) && !file.EndsWith(".partial", StringComparison.OrdinalIgnoreCase) && !file.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase)).OrderByDescending(File.GetLastWriteTimeUtc)] : [];
     }
 
     /// <summary>
@@ -402,16 +402,127 @@ public sealed class HomeworkStore(string directory)
         (Read<Dictionary<string, string>>(ItemStatesFile) ?? []).TryGetValue(ItemKey(lessonId, number), out var state) && state == "archived";
 
     /// <summary>
+    /// Ближайшие сроки несданных работ: из LMS и из найденных в расшифровках заданий. Сданные, отмеченные вручную и убранные в архив не попадают
+    /// </summary>
+    /// <param name="today">Сегодняшняя дата</param>
+    /// <param name="aheadDays">На сколько дней вперёд смотреть</param>
+    /// <param name="overdueDays">Сколько дней после срока ещё напоминать</param>
+    /// <returns>Сроки по возрастанию даты</returns>
+    public IReadOnlyList<Deadline> Deadlines(DateOnly today, int aheadDays, int overdueDays)
+    {
+        var items = new List<(string Subject, HomeworkItem Item)>();
+        foreach (var lesson in LoadLessons())
+        {
+            var skipped = ArchivedNumbers(lesson.Id).Union(SubmittedNumbers(lesson.Id)).ToHashSet();
+            var found = ReadItems(lesson.Id) ?? [];
+            items.AddRange(found.Where((_, index) => !skipped.Contains(index + 1)).Select(item => (lesson.Title, item)));
+        }
+
+        return DeadlineBuilder.Build(LoadActivities(), items, today, aheadDays, overdueDays);
+    }
+
+    /// <summary>
+    /// Путь к отчёту о проверке готовой работы. Он лежит в служебной папке, поэтому не попадает в список готовых файлов
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Путь к <c>drafts/&lt;ключ&gt;/.check/report.md</c></returns>
+    public string CheckReportPath(string lessonId) => Path.Combine(DraftsDirectory(lessonId), ".check", "report.md");
+
+    /// <summary>
+    /// Дата, когда программа заметила правку условия работы в LMS
+    /// </summary>
+    /// <param name="activityId">Номер работы в LMS</param>
+    /// <returns>Дата или <see langword="null"/>, если правок не было</returns>
+    public DateOnly? AssignmentChangedOn(string activityId)
+    {
+        if (activityId.Length == 0 || !activityId.All(char.IsAsciiDigit))
+            return null;
+
+        try
+        {
+            var file = Path.Combine(AssignmentDirectory(activityId), "changed.txt");
+
+            return File.Exists(file) && DateOnly.TryParseExact(File.ReadAllText(file).Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Текст условия задания: название, срок и требования из расшифровки, а ниже условие из LMS, если оно выгружено
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns>Текст или пустая строка, если такого задания нет</returns>
+    public string Condition(string lessonId, int number)
+    {
+        if (ReadItems(lessonId) is not { } items || number < 1 || number > items.Count)
+            return string.Empty;
+
+        var item = items[number - 1];
+        var text = new System.Text.StringBuilder(item.Title);
+        if (item.Due is { } due)
+            text.AppendLine().Append("Срок: ").Append(due.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture));
+
+        if (item.Requirements.Length > 0)
+            text.AppendLine().Append("Требования: ").Append(item.Requirements);
+
+        if (item.ActivityId.Length > 0 && item.ActivityId.All(char.IsAsciiDigit))
+        {
+            var file = Path.Combine(AssignmentDirectory(item.ActivityId), "assignment.md");
+            try
+            {
+                if (File.Exists(file))
+                    text.AppendLine().AppendLine().Append("Условие из LMS:").AppendLine().Append(File.ReadAllText(file));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Условие из LMS не читается: остаётся текст из расшифровки
+            }
+        }
+
+        return text.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Номера заданий занятия, которые студент отметил сданными сам
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Номера заданий с единицы</returns>
+    public IReadOnlySet<int> SubmittedNumbers(string lessonId) => NumbersWithState(lessonId, "submitted");
+
+    /// <summary>
+    /// Отмечает задание сданным вручную или снимает отметку. Задание в архиве не трогается
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="submitted">Сдано</param>
+    public void SetSubmitted(string lessonId, int number, bool submitted) => SetItemState(lessonId, number, submitted ? "submitted" : null);
+
+    /// <summary>
     /// Номера заданий занятия, убранных в архив. Файл отметок читается один раз на весь список
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <returns>Номера заданий с единицы</returns>
     public IReadOnlySet<int> ArchivedNumbers(string lessonId)
     {
+        return NumbersWithState(lessonId, "archived");
+    }
+
+    /// <summary>
+    /// Номера заданий занятия с заданной отметкой из файла отметок
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="state">Отметка: «archived» или «submitted»</param>
+    /// <returns>Номера заданий с единицы</returns>
+    private IReadOnlySet<int> NumbersWithState(string lessonId, string state)
+    {
         var prefix = lessonId + ":";
 
         return (Read<Dictionary<string, string>>(ItemStatesFile) ?? [])
-            .Where(pair => pair.Value == "archived" && pair.Key.StartsWith(prefix, StringComparison.Ordinal) && int.TryParse(pair.Key.AsSpan(prefix.Length), out _))
+            .Where(pair => pair.Value == state && pair.Key.StartsWith(prefix, StringComparison.Ordinal) && int.TryParse(pair.Key.AsSpan(prefix.Length), out _))
             .Select(pair => int.Parse(pair.Key.AsSpan(prefix.Length)))
             .ToHashSet();
     }
@@ -422,11 +533,19 @@ public sealed class HomeworkStore(string directory)
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии, с единицы</param>
     /// <param name="archived">В архив</param>
-    public void SetArchived(string lessonId, int number, bool archived)
+    public void SetArchived(string lessonId, int number, bool archived) => SetItemState(lessonId, number, archived ? "archived" : null);
+
+    /// <summary>
+    /// Записывает отметку задания в файл отметок или убирает её
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="state">Отметка или <see langword="null"/>, чтобы убрать</param>
+    private void SetItemState(string lessonId, int number, string? state)
     {
         var states = new Dictionary<string, string>(Read<Dictionary<string, string>>(ItemStatesFile) ?? [], StringComparer.Ordinal);
-        if (archived)
-            states[ItemKey(lessonId, number)] = "archived";
+        if (state is not null)
+            states[ItemKey(lessonId, number)] = state;
         else
             states.Remove(ItemKey(lessonId, number));
 

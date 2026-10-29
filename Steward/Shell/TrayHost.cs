@@ -551,6 +551,7 @@ public sealed class TrayHost : IDisposable
     {
         _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
         _main.ApplyHomework(_jobs.HomeworkRows());
+        _main.Model.ApplyDeadlines(_jobs.Deadlines(), DateOnly.FromDateTime(DateTime.Now));
         var root = DataLocation.RepoRootOrStart();
         _main.Model.AttachSettings(root, ApplyMain);
         _main.Model.SetSettingsHome(_jobs.SettingsHomeIds());
@@ -570,6 +571,11 @@ public sealed class TrayHost : IDisposable
         _formats.AnalysisReader = _jobs.ReadAnalysis;
         _formats.ItemsReader = _jobs.Items;
         _formats.ItemArchived = _jobs.ArchiveItem;
+        _formats.DraftChecker = lesson => _jobs.CheckDraftsAsync(lesson, CancellationToken.None);
+        _formats.CheckReader = _jobs.CheckReport;
+        _formats.ItemUrlReader = _jobs.ItemUrl;
+        _formats.ItemSubmitted = _jobs.SetItemSubmitted;
+        _formats.ItemConditionReader = _jobs.ItemCondition;
         _formats.ItemToSingularity = _jobs.AddItemToSingularityAsync;
         _formats.DraftsDeleted = _jobs.DeleteDrafts;
         _formats.GuideLister = _jobs.Guides;
