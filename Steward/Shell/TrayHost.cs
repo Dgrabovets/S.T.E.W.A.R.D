@@ -595,6 +595,11 @@ public sealed class TrayHost : IDisposable
         _formats.ItemToSingularity = _jobs.AddItemToSingularityAsync;
         _formats.DraftsDeleted = _jobs.DeleteDrafts;
         _formats.WorkAttacher = _jobs.AttachWork;
+        _formats.PipelineReader = _jobs.ItemPipeline;
+        _formats.ItemConfirmer = _jobs.ConfirmItem;
+        _formats.ConditionFixer = _jobs.FixItemCondition;
+        _formats.SampleRegistrar = _jobs.RegisterSubmittedSample;
+        _formats.SubmittedFileSetter = _jobs.SetSubmittedFile;
         _formats.GuideLister = _jobs.Guides;
         _formats.GuideFilesAdded = _jobs.AddGuideFiles;
         _formats.GuideFolderAdded = _jobs.AddGuideFolder;

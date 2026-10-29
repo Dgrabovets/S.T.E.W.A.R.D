@@ -216,6 +216,91 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     }
 
     /// <summary>
+    /// Сообщение владельцу, когда проверку нельзя запустить из-за идущей фоновой подготовки
+    /// </summary>
+    public const string CHECK_BUSY_MESSAGE = "Работы сейчас готовятся в фоне: проверь заново через несколько минут";
+
+    /// <summary>
+    /// Проверка по кнопке «Проверить заново»: занимает ту же блокировку, что и подготовка, но не ждёт её. Пока идёт фоновая подготовка, агент не запускается
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <returns>Пустая строка, если отчёт записан, иначе причина</returns>
+    public async Task<string> CheckNowAsync(Lesson lesson, CancellationToken cancellationToken)
+    {
+        using var hold = TryHold();
+        if (hold is null)
+            return CHECK_BUSY_MESSAGE;
+
+        return await CheckAsync(lesson, cancellationToken);
+    }
+
+    /// <summary>
+    /// Делает работу задания, которое владелец только что отметил сданным, образцом предмета. Тот же путь, что и в фоновой подготовке: один раз на задание, образец владельца черновиком не заменяется. Вызывается не из потока окна: список образцов может быть занят до 10 секунд
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns>Пустая строка или предупреждение, что образец не записался</returns>
+    public string RegisterSubmittedSample(Lesson lesson, int number) => RegisterSample(lesson, number);
+
+    /// <summary>
+    /// Делает выбранный владельцем файл образцом сданного задания вместо черновика: «Указать файл сданной работы». Файл копируется в образцы предмета, запись помечается как работа владельца
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="file">Путь к сданному файлу</param>
+    /// <returns>Пустая строка или причина, почему образец не записался</returns>
+    public string RegisterSubmittedFile(Lesson lesson, int number, string file)
+    {
+        try
+        {
+            if (store.ReadItems(lesson.Id) is not { } items || number < 1 || number > items.Count)
+                return $"Задания с номером {number} в этом занятии нет";
+
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file))
+                return "Файл не найден: " + file;
+
+            guides.AddSample(lesson.Title, lesson.Id, number, file, fromUser: true);
+            _ledger.MarkSample($"{lesson.Id}:{number}");
+
+            return string.Empty;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
+        {
+            return "Образец не записался: " + exception.Message;
+        }
+    }
+
+    /// <summary>
+    /// Записывает правку условия по кнопке «Поправить условие»: задание подтверждается и пойдёт дальше само, а правка сохраняется замечанием вида «условие» только для этого предмета, чтобы её учитывали поиск заданий и следующие работы. Вызывается не из потока окна: файл замечаний может быть занят до 10 секунд
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="title">Верное название, пусто значит оставить прежнее</param>
+    /// <param name="requirements">Верные требования, пусто значит оставить прежние</param>
+    /// <returns>Пустая строка или предупреждение, что замечание не записалось</returns>
+    /// <exception cref="IOException">Правку не удалось записать</exception>
+    public string FixCondition(Lesson lesson, int number, string title, string requirements)
+    {
+        store.SetOverride(lesson.Id, number, title, requirements);
+
+        var text = RemarkStore.Flatten(string.Join(". ", new[] { title.Trim(), requirements.Trim() }.Where(part => part.Length > 0)));
+        if (text.Length == 0)
+            return string.Empty;
+
+        try
+        {
+            remarks.Add(new Remark(Guid.NewGuid().ToString("N"), DateOnly.FromDateTime(DateTime.Now), lesson.Title, lesson.Id, number, "Верное условие задания: " + text, RemarkKindEnum.Condition, Global: false));
+
+            return string.Empty;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return "Условие поправлено, но замечание не записалось: " + exception.Message;
+        }
+    }
+
+    /// <summary>
     /// Просит агента проверить готовые работы занятия: сверить с условием и методическими указаниями и найти факты без опоры. Работы при этом не меняются
     /// </summary>
     /// <param name="lesson">Занятие</param>
@@ -445,20 +530,24 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="number">Номер задания, с единицы</param>
-    private void RegisterSample(Lesson lesson, int number)
+    /// <returns>Пустая строка или предупреждение, что образец не записался; фоновая подготовка его не показывает</returns>
+    private string RegisterSample(Lesson lesson, int number)
     {
         var key = $"{lesson.Id}:{number}";
         if (_ledger.SampleRegistered(key) || store.SampleCandidate(lesson.Id, number) is not { } file)
-            return;
+            return string.Empty;
 
         try
         {
             guides.AddSample(lesson.Title, lesson.Id, number, file, fromUser: false);
             _ledger.MarkSample(key);
+
+            return string.Empty;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
         {
             // Список образцов занят или файл недоступен: повтор на следующем запуске
+            return "Сдано, но образец предмета не записался, повторю при ближайшей выгрузке: " + exception.Message;
         }
     }
 

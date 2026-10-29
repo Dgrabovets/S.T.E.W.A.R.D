@@ -1,5 +1,7 @@
 using Steward.Homework.Models;
 using Steward.Homework.Services;
+using Steward.Homework.Storage;
+using Steward.ViewModels;
 
 namespace Steward.Tests;
 
@@ -269,5 +271,450 @@ public class PipelineTests
         var order = lessons.OrderBy(item => PipelineStepper.LessonGroup(item.Items, item.Pending)).ThenByDescending(item => item.Date).Select(item => item.Id);
 
         Assert.Equal(["d", "b", "c", "a", "e"], order);
+    }
+
+    /// <summary>
+    /// Временная папка домашних заданий с занятием и его заданиями
+    /// </summary>
+    /// <param name="itemsJson">Задания в JSON, как их пишет агент</param>
+    /// <returns>Хранилище, занятие и папка, которую нужно удалить после теста</returns>
+    private static (HomeworkStore Store, Lesson Lesson, string Folder) NewStore(string itemsJson)
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "steward-card-" + Guid.NewGuid().ToString("N"));
+        var store = new HomeworkStore(folder);
+        store.SaveLessons([Sample]);
+        Directory.CreateDirectory(Path.Combine(folder, "items"));
+        File.WriteAllText(store.ItemsPath(Sample.Id), itemsJson);
+
+        return (store, Sample, folder);
+    }
+
+    /// <summary>
+    /// Кладёт файл в папку готовых работ занятия
+    /// </summary>
+    /// <param name="store">Хранилище</param>
+    /// <param name="name">Имя файла</param>
+    /// <returns>Путь к файлу</returns>
+    private static string AddDraft(HomeworkStore store, string name)
+    {
+        Directory.CreateDirectory(store.DraftsDirectory(Sample.Id));
+        var path = Path.Combine(store.DraftsDirectory(Sample.Id), name);
+        File.WriteAllText(path, "работа");
+
+        return path;
+    }
+
+    /// <summary>
+    /// Удаляет временную папку теста
+    /// </summary>
+    /// <param name="folder">Папка</param>
+    private static void Clean(string folder)
+    {
+        if (Directory.Exists(folder))
+            Directory.Delete(folder, recursive: true);
+    }
+
+    /// <summary>
+    /// Модель списка с одним занятием, задания и шаги которого читаются из хранилища
+    /// </summary>
+    /// <param name="store">Хранилище</param>
+    /// <returns>Модель списка</returns>
+    private static HomeworkFormatsViewModel ModelOver(HomeworkStore store)
+    {
+        var model = new HomeworkFormatsViewModel((_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = id => store.ReadItems(id) is { } items
+                ? [.. items.Select((item, index) => (index + 1, store.SubmittedNumbers(id).Contains(index + 1) ? item with { Done = true, Submitted = true } : item, false))]
+                : null,
+            PipelineReader = _ => store.PipelineInfo(Sample),
+            PathOpened = _ => { },
+        };
+        model.Update([(Sample, HomeworkFormatEnum.Word)]);
+
+        return model;
+    }
+
+    /// <summary>
+    /// Шаг задания считается по его файлу: недописанные <c>.partial</c>, <c>.tmp</c> и <c>~$</c> не делают задание готовым, отчёт о проверке занятия не делает «Проверено» задание без работы, отметка «сдано» главнее всего
+    /// </summary>
+    [Fact]
+    public void The_step_ignores_partial_and_lock_files_and_a_check_needs_a_work()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "Первое"}, {"title": "Второе"}]""");
+        try
+        {
+            AddDraft(store, "Задание 1. Отчёт.docx.partial");
+            AddDraft(store, "~$Задание 1. Отчёт.docx");
+            AddDraft(store, "Задание 1.tmp");
+
+            Assert.Equal(PipelineStepEnum.Found, store.PipelineInfo(lesson)[1].Step);
+            Assert.Equal(string.Empty, store.PipelineInfo(lesson)[1].WorkPath);
+
+            var work = AddDraft(store, "Задание 1. Отчёт.docx");
+            Assert.Equal(PipelineStepEnum.Ready, store.PipelineInfo(lesson)[1].Step);
+            Assert.Equal(work, store.PipelineInfo(lesson)[1].WorkPath);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(store.CheckReportPath(lesson.Id))!);
+            File.WriteAllText(store.CheckReportPath(lesson.Id), "отчёт");
+            var info = store.PipelineInfo(lesson);
+            Assert.Equal(PipelineStepEnum.Checked, info[1].Step);
+            Assert.Equal(PipelineStepEnum.Found, info[2].Step);
+
+            store.SetSubmitted(lesson.Id, 2, true);
+            Assert.Equal(PipelineStepEnum.Submitted, store.PipelineInfo(lesson)[2].Step);
+        }
+        finally
+        {
+            Clean(folder);
+        }
+    }
+
+    /// <summary>
+    /// Задание без работы получает подсказку, что будет дальше; задание, на котором агент споткнулся три раза, говорит об ошибке
+    /// </summary>
+    [Fact]
+    public void A_found_item_explains_what_happens_next()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "Первое"}]""");
+        try
+        {
+            store.SetSubjectState(lesson.Title, LessonStateEnum.Fetch);
+            Assert.Contains("сама", store.PipelineInfo(lesson)[1].Hint, StringComparison.Ordinal);
+            Assert.False(store.PipelineInfo(lesson)[1].HintIsProblem);
+
+            File.WriteAllText(Path.Combine(store.Root, "prepare-attempts.json"), $$"""{"{{lesson.Id}}:1": {{HomeworkPreparer.MAX_ATTEMPTS}}}""");
+            Assert.True(store.PipelineInfo(lesson)[1].HintIsProblem);
+            Assert.Contains("не справился", store.PipelineInfo(lesson)[1].Hint, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Clean(folder);
+        }
+    }
+
+    /// <summary>
+    /// Пайплайн на карточке: для одного задания на каждом шаге одна главная кнопка. Найдено: нет (подготовку даёт кнопка занятия), Готово и Проверено: «Посмотреть работу», а после просмотра «Отметить сданным», Сдано вручную: «Вернуть в работу», сдано в LMS: нет
+    /// </summary>
+    [Fact]
+    public void The_card_shows_one_main_button_per_step()
+    {
+        var items = new List<(int, HomeworkItem, bool)>
+        {
+            (1, new HomeworkItem("Найдено", null, string.Empty, string.Empty), false),
+            (2, new HomeworkItem("Готово", null, string.Empty, string.Empty), false),
+            (3, new HomeworkItem("Проверено", null, string.Empty, string.Empty), false),
+            (4, new HomeworkItem("Сдано мной", null, string.Empty, string.Empty, true, Submitted: true), false),
+            (5, new HomeworkItem("Сдано в LMS", null, string.Empty, string.Empty, true), false),
+        };
+        var ready = new ItemAssessment(ItemReadinessEnum.Ready, string.Empty);
+        var info = new Dictionary<int, ItemPipelineInfo>
+        {
+            [1] = new(PipelineStepEnum.Found, string.Empty, ready, false, false, "Работа подготовится сама"),
+            [2] = new(PipelineStepEnum.Ready, @"C:\w\Задание 2.docx", ready, false, false, string.Empty),
+            [3] = new(PipelineStepEnum.Checked, @"C:\w\Задание 3.docx", ready, false, false, string.Empty),
+            [4] = new(PipelineStepEnum.Submitted, @"C:\w\Задание 4.docx", ready, false, false, string.Empty),
+            [5] = new(PipelineStepEnum.Submitted, string.Empty, ready, false, false, string.Empty),
+        };
+        var opened = new List<string>();
+        var model = new HomeworkFormatsViewModel([(Sample, HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = _ => items,
+            PipelineReader = _ => info,
+            PathOpened = opened.Add,
+        };
+        model.Update([(Sample, HomeworkFormatEnum.Word)]);
+        var lesson = model.Lessons.Single();
+
+        Assert.Equal(
+            [(false, string.Empty), (true, "Посмотреть работу"), (true, "Посмотреть работу"), (true, "Вернуть в работу"), (false, string.Empty)],
+            lesson.Items.Select(item => (item.HasMain, item.MainLabel)).ToArray());
+        Assert.Equal([PipelineStepEnum.Found, PipelineStepEnum.Ready, PipelineStepEnum.Checked, PipelineStepEnum.Submitted, PipelineStepEnum.Submitted], lesson.Items.Select(item => item.Step).ToArray());
+        Assert.Equal(["Найдено", "Готово", "Проверено", "Сдано"], lesson.Items[2].Steps.Select(step => step.Title).ToArray());
+        Assert.Equal([false, false, true, false], lesson.Items[2].Steps.Select(step => step.IsCurrent).ToArray());
+        Assert.Equal("Работа подготовится сама", lesson.Items[0].Hint);
+
+        lesson.Items[1].MainCommand.Execute(null);
+
+        Assert.Equal([@"C:\w\Задание 2.docx"], opened);
+        Assert.Equal("Отметить сданным", lesson.Items[1].MainLabel);
+        Assert.Equal("Посмотреть работу", lesson.Items[2].MainLabel);
+
+        // Меню «…»: действия с готовой работой доступны только там, где она есть, указать сданный файл можно только у сданного
+        Assert.False(lesson.Items[0].RecheckCommand.CanExecute(null));
+        Assert.True(lesson.Items[1].RecheckCommand.CanExecute(null));
+        Assert.False(lesson.Items[1].OpenCheckCommand.CanExecute(null));
+        Assert.True(lesson.Items[2].OpenCheckCommand.CanExecute(null));
+        Assert.False(lesson.Items[1].SubmittedFileCommand.CanExecute(null));
+        Assert.True(lesson.Items[3].SubmittedFileCommand.CanExecute(null));
+        Assert.True(lesson.Items[0].AttachWorkCommand.CanExecute(null));
+    }
+
+    /// <summary>
+    /// Задание с низкой уверенностью на шаге «Найдено» показывает вопрос и три кнопки, а задание со средней уверенностью только пометку «проверь формулировку»
+    /// </summary>
+    [Fact]
+    public void A_low_confidence_item_shows_the_question_and_its_buttons()
+    {
+        var items = new List<(int, HomeworkItem, bool)>
+        {
+            (1, new HomeworkItem("Эссе", null, string.Empty, string.Empty, Confidence: "low", Doubt: "не тот предмет"), false),
+            (2, new HomeworkItem("Отчёт", null, string.Empty, string.Empty, Confidence: "medium", Doubt: "срок не назван"), false),
+        };
+        var info = new Dictionary<int, ItemPipelineInfo>
+        {
+            [1] = new(PipelineStepEnum.Found, string.Empty, new ItemAssessment(ItemReadinessEnum.NeedsConfirmation, "Не уверен, что правильно понял задание «Эссе» (не тот предмет)"), false, false, string.Empty),
+            [2] = new(PipelineStepEnum.Ready, @"C:\w\Задание 2.docx", new ItemAssessment(ItemReadinessEnum.ReadyWithNote, "срок не назван"), true, true, string.Empty),
+        };
+        var edits = new List<int>();
+        var model = new HomeworkFormatsViewModel([(Sample, HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = _ => items,
+            PipelineReader = _ => info,
+            ItemConfirmer = (_, _) => { },
+        };
+        model.ConditionEditRequested += (_, item) => edits.Add(item.Number);
+        model.Update([(Sample, HomeworkFormatEnum.Word)]);
+        var question = model.Lessons.Single().Items[0];
+        var note = model.Lessons.Single().Items[1];
+
+        Assert.True(question.NeedsConfirmation);
+        Assert.Contains("не тот предмет", question.Question, StringComparison.Ordinal);
+        Assert.True(question.ConfirmCommand.CanExecute(null));
+        Assert.True(question.FixConditionCommand.CanExecute(null));
+        Assert.True(question.ArchiveCommand.CanExecute(null));
+        Assert.False(question.HasMain);
+        Assert.False(question.HasNote);
+
+        question.FixConditionCommand.Execute(null);
+        Assert.Equal([1], edits);
+
+        Assert.False(note.NeedsConfirmation);
+        Assert.True(note.HasNote);
+        Assert.Equal("Проверь формулировку: срок не назван", note.Note);
+    }
+
+    /// <summary>
+    /// «Подтвердить» записывает подтверждение в фоне, вопрос пропадает, а задание ждёт автоподготовки
+    /// </summary>
+    [Fact]
+    public async Task Confirm_moves_the_item_on_and_the_question_disappears()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "Эссе", "confidence": "low", "doubt": "не тот предмет", "evidence": "напишите эссе"}]""");
+        try
+        {
+            store.SetSubjectState(lesson.Title, LessonStateEnum.Fetch);
+            var model = ModelOver(store);
+            model.ItemConfirmer = store.Confirm;
+            var row = model.Lessons.Single();
+
+            Assert.True(row.Items[0].NeedsConfirmation);
+
+            await model.ConfirmAsync(row, 1);
+
+            Assert.Equal([1], store.ConfirmedNumbers(lesson.Id).ToArray());
+            Assert.False(row.Items[0].NeedsConfirmation);
+            Assert.Equal(PipelineStepEnum.Found, row.Items[0].Step);
+            Assert.Contains("сама", row.Items[0].Hint, StringComparison.Ordinal);
+            Assert.False(row.Failed);
+        }
+        finally
+        {
+            Clean(folder);
+        }
+    }
+
+    /// <summary>
+    /// «Поправить условие» записывает правку и замечание вида «условие» для этого предмета, а сбой записи замечания показывается и не теряет правку
+    /// </summary>
+    [Fact]
+    public async Task Fixing_the_condition_saves_the_override_and_a_condition_remark()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "Эссе", "confidence": "low"}]""");
+        try
+        {
+            var guides = new GuideStore(folder);
+            var remarks = new RemarkStore(Path.Combine(folder, "remarks"));
+            var preparer = new HomeworkPreparer(store, guides, remarks, (_, _, _, _) => Task.FromResult("агент не нужен"));
+            var model = ModelOver(store);
+            model.ConditionFixer = (_, number, title, requirements) => preparer.FixCondition(lesson, number, title, requirements);
+            var row = model.Lessons.Single();
+
+            await model.FixConditionAsync(row, 1, "Эссе по истории игр", "две страницы");
+
+            Assert.Equal(("Эссе по истории игр", "две страницы"), (store.ReadItems(lesson.Id)![0].Title, store.ReadItems(lesson.Id)![0].Requirements));
+            Assert.Equal([1], store.ConfirmedNumbers(lesson.Id).ToArray());
+            var remark = Assert.Single(remarks.Load(lesson.Title));
+            Assert.Equal((RemarkKindEnum.Condition, false, 1), (remark.Kind, remark.Global, remark.Number));
+            Assert.Contains("Эссе по истории игр", remark.Text, StringComparison.Ordinal);
+            Assert.Equal("Эссе по истории игр", row.Items[0].Title);
+            Assert.False(row.Items[0].NeedsConfirmation);
+
+            model.ConditionFixer = (_, _, _, _) => throw new IOException("файл занят");
+            await model.FixConditionAsync(row, 1, "Другое", string.Empty);
+            Assert.True(row.Failed);
+            Assert.Contains("файл занят", row.Status, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Clean(folder);
+        }
+    }
+
+    /// <summary>
+    /// «Отметить сданным» ставит отметку и в фоне делает файл работы образцом предмета; шаг становится «Сдано»
+    /// </summary>
+    [Fact]
+    public async Task Marking_submitted_registers_the_draft_as_a_sample()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "Отчёт"}]""");
+        try
+        {
+            var guides = new GuideStore(folder);
+            var preparer = new HomeworkPreparer(store, guides, new RemarkStore(Path.Combine(folder, "remarks")), (_, _, _, _) => Task.FromResult("агент не нужен"));
+            var work = AddDraft(store, "Задание 1. Отчёт.docx");
+            var model = ModelOver(store);
+            model.ItemSubmitted = store.SetSubmitted;
+            model.SampleRegistrar = (_, number) => preparer.RegisterSubmittedSample(lesson, number);
+            var row = model.Lessons.Single();
+
+            row.Items[0].MainCommand.Execute(null);
+            Assert.Equal("Отметить сданным", row.Items[0].MainLabel);
+
+            await model.MarkSubmittedAsync(row, 1, true);
+
+            Assert.Equal([1], store.SubmittedNumbers(lesson.Id).ToArray());
+            var sample = Assert.Single(guides.Load(), entry => entry.Kind == GuideKindEnum.Example);
+            Assert.Equal(($"sample:{lesson.Id}:1", false), (sample.Id, sample.Manual));
+            Assert.Equal(File.ReadAllText(work), File.ReadAllText(sample.Path));
+            Assert.Equal(PipelineStepEnum.Submitted, row.Items[0].Step);
+            Assert.Equal("Вернуть в работу", row.Items[0].MainLabel);
+            Assert.False(row.Failed);
+        }
+        finally
+        {
+            Clean(folder);
+        }
+    }
+
+    /// <summary>
+    /// «Указать файл сданной работы» делает выбранный файл образцом владельца вместо черновика, а сбой записи показывается в карточке
+    /// </summary>
+    [Fact]
+    public async Task The_submitted_file_replaces_the_sample_as_the_owners()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "Отчёт"}]""");
+        try
+        {
+            var guides = new GuideStore(folder);
+            var preparer = new HomeworkPreparer(store, guides, new RemarkStore(Path.Combine(folder, "remarks")), (_, _, _, _) => Task.FromResult("агент не нужен"));
+            AddDraft(store, "Задание 1. Отчёт.docx");
+            store.SetSubmitted(lesson.Id, 1, true);
+            Assert.Equal(string.Empty, preparer.RegisterSubmittedSample(lesson, 1));
+            var mine = Path.Combine(folder, "моя версия.docx");
+            File.WriteAllText(mine, "моя сданная версия");
+            var model = ModelOver(store);
+            model.SubmittedFileSetter = (_, number, file) => preparer.RegisterSubmittedFile(lesson, number, file);
+            var row = model.Lessons.Single();
+
+            await model.SetSubmittedFileAsync(row, 1, mine);
+
+            var sample = Assert.Single(guides.Load(), entry => entry.Kind == GuideKindEnum.Example);
+            Assert.True(sample.Manual);
+            Assert.Equal("моя сданная версия", File.ReadAllText(sample.Path));
+            Assert.False(row.Failed);
+
+            await model.SetSubmittedFileAsync(row, 1, Path.Combine(folder, "нет такого.docx"));
+            Assert.True(row.Failed);
+        }
+        finally
+        {
+            Clean(folder);
+        }
+    }
+
+    /// <summary>
+    /// Блок «Откуда это задание»: цитата и значок надёжности по цитате и связи с LMS; ненайденная цитата так и называется
+    /// </summary>
+    [Fact]
+    public void The_source_block_names_how_reliable_the_item_is()
+    {
+        var ready = new ItemAssessment(ItemReadinessEnum.Ready, string.Empty);
+        LessonItemViewModel Row(string evidence, bool verified, bool lms) =>
+            new(1, new HomeworkItem("А", null, string.Empty, string.Empty, Evidence: evidence), false, _ => { }, _ => { }, pipeline: new ItemPipelineInfo(PipelineStepEnum.Found, string.Empty, ready, verified, lms, string.Empty));
+
+        Assert.Equal("подтверждено цитатой и LMS", Row("сделайте", true, true).Reliability);
+        Assert.Equal("только расшифровка", Row("сделайте", true, false).Reliability);
+        Assert.Equal("только LMS", Row(string.Empty, false, true).Reliability);
+        Assert.Equal("только расшифровка", Row(string.Empty, false, false).Reliability);
+        Assert.Equal("только LMS", Row("сделайте", false, true).Reliability);
+        Assert.Equal("цитата не найдена в расшифровке", Row("сделайте", false, true).EvidenceStatus);
+        Assert.True(Row("сделайте", true, false).HasEvidence);
+        Assert.Equal("«сделайте»", Row("сделайте", true, false).Quote);
+    }
+
+    /// <summary>
+    /// Занятия в списке идут по заданиям: с несданными сверху, без заданий ниже, всё сданное внизу, внутри группы от свежих к старым; когда задание отметили сданным, строки заданий заменяются и занятие уходит вниз при следующем обновлении
+    /// </summary>
+    [Fact]
+    public void Update_orders_lessons_and_SetItems_follows_the_submitted_mark()
+    {
+        var done = new Lesson("done", "Физика", new DateOnly(2026, 10, 25));
+        var pending = new Lesson("pending", "Физика", new DateOnly(2026, 10, 10));
+        var empty = new Lesson("empty", "Физика", new DateOnly(2026, 10, 20));
+        var submitted = false;
+        var model = new HomeworkFormatsViewModel([(done, HomeworkFormatEnum.Word), (pending, HomeworkFormatEnum.Word), (empty, HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = id => id switch
+            {
+                "done" => [(1, new HomeworkItem("Сдано", null, string.Empty, string.Empty, true), false)],
+                "pending" => [(1, new HomeworkItem("Ждёт", null, string.Empty, string.Empty, submitted, Submitted: submitted), false)],
+                _ => [],
+            },
+        };
+        IReadOnlyList<(Lesson, HomeworkFormatEnum)> all = [(done, HomeworkFormatEnum.Word), (pending, HomeworkFormatEnum.Word), (empty, HomeworkFormatEnum.Word)];
+        model.Update(all);
+
+        Assert.Equal(["pending", "empty", "done"], model.Lessons.Select(row => row.Id).ToArray());
+
+        var row = model.Lessons[0];
+        var before = row.Items;
+        submitted = true;
+        model.Update(all);
+
+        Assert.NotSame(before, row.Items);
+        Assert.True(row.Items[0].Submitted);
+        Assert.True(row.AllSubmitted);
+        Assert.Equal(["empty", "done", "pending"], model.Lessons.Select(lesson => lesson.Id).ToArray());
+    }
+
+    /// <summary>
+    /// «Проверить заново» не запускает агента, пока фоновая подготовка держит блокировку
+    /// </summary>
+    [Fact]
+    public async Task A_recheck_is_refused_while_a_background_prepare_runs()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "Отчёт"}]""");
+        try
+        {
+            AddDraft(store, "Задание 1. Отчёт.docx");
+            var runs = 0;
+            var preparer = new HomeworkPreparer(store, new GuideStore(folder), new RemarkStore(Path.Combine(folder, "remarks")), (_, _, _, _) =>
+            {
+                runs++;
+
+                return Task.FromResult(string.Empty);
+            });
+
+            string error;
+            using (new FileStream(Path.Combine(folder, "prepare.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+                error = await preparer.CheckNowAsync(lesson, CancellationToken.None);
+
+            Assert.Equal(0, runs);
+            Assert.Contains("в фоне", error, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Clean(folder);
+        }
     }
 }

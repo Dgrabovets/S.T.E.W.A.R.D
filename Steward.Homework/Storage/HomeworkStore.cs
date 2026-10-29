@@ -1051,6 +1051,67 @@ public sealed class HomeworkStore(string directory)
         && EvidenceCheck.Verify(ReadTranscript(lesson.Id), items[number - 1].Evidence);
 
     /// <summary>
+    /// Что показывать на карточке о каждом задании занятия: шаг конвейера, файл работы, оценку уверенности, источник и подсказку. Оценка считается теми же входами, что и автоподготовка, поэтому вопрос на карточке совпадает с тем, почему задание не готовится. Отчёт о проверке один на занятие, поэтому «Проверено» бывает только у задания с работой
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>Сведения по номеру задания с единицы; пусто, если задания ещё не искали или ключ занятия недопустим</returns>
+    public IReadOnlyDictionary<int, ItemPipelineInfo> PipelineInfo(Lesson lesson)
+    {
+        try
+        {
+            if (ReadItems(lesson.Id) is not { Count: > 0 } items)
+                return new Dictionary<int, ItemPipelineInfo>();
+
+            var submitted = SubmittedAnywhere(lesson.Id, items);
+            var confirmed = ConfirmedNumbers(lesson.Id);
+            var hasTranscript = HasTranscript(lesson.Id);
+            var transcript = hasTranscript ? ReadTranscript(lesson.Id) : string.Empty;
+            var hasReport = File.Exists(CheckReportPath(lesson.Id));
+            var prepares = PreparesHomework(lesson) && SubjectFormatFor(lesson.Title) != HomeworkFormatEnum.Skip;
+            var ledger = new PrepareLedger(directory);
+            var result = new Dictionary<int, ItemPipelineInfo>();
+            for (var number = 1; number <= items.Count; number++)
+            {
+                var item = items[number - 1];
+                var work = SampleCandidate(lesson.Id, number) ?? string.Empty;
+                var step = PipelineStepper.Of(submitted.Contains(number), work.Length > 0, work.Length > 0 && hasReport);
+                var verified = EvidenceCheck.Verify(transcript, item.Evidence);
+                var assessment = ItemAssessor.Assess(item, verified, hasTranscript, HasAssignmentCondition(item), confirmed.Contains(number));
+                var linked = (item.ActivityId.Length > 0 && item.ActivityId.All(char.IsAsciiDigit)) || item.Link.StartsWith("http", StringComparison.OrdinalIgnoreCase);
+                var (hint, problem) = step == PipelineStepEnum.Found && assessment.Readiness != ItemReadinessEnum.NeedsConfirmation
+                    ? FoundHint(ledger.Attempts($"{lesson.Id}:{number}"), prepares)
+                    : (string.Empty, false);
+                result[number] = new ItemPipelineInfo(step, work, assessment, verified, linked, hint, problem);
+            }
+
+            return result;
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return new Dictionary<int, ItemPipelineInfo>();
+        }
+    }
+
+    /// <summary>
+    /// Подсказка для задания без работы: что будет дальше или почему работа не готовится
+    /// </summary>
+    /// <param name="attempts">Сколько раз подряд агент не справился</param>
+    /// <param name="prepares">Предмет и занятие готовятся сами</param>
+    /// <returns>Текст подсказки и признак ошибки</returns>
+    private static (string Hint, bool Problem) FoundHint(int attempts, bool prepares)
+    {
+        if (attempts >= HomeworkPreparer.MAX_ATTEMPTS)
+            return ($"Агент не справился {HomeworkPreparer.MAX_ATTEMPTS} раза подряд: подготовь работу кнопкой «Подготовить задание»", true);
+
+        if (!prepares)
+            return ("Этот предмет сам не готовится: подготовь работу кнопкой «Подготовить задание»", false);
+
+        return attempts > 0
+            ? ("Прошлая попытка не удалась, повтор при ближайшей выгрузке", true)
+            : ("Работа подготовится сама при ближайшей выгрузке", false);
+    }
+
+    /// <summary>
     /// Проверяет, что ключ можно использовать как имя файла
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>

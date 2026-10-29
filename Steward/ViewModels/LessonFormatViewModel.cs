@@ -251,7 +251,8 @@ public sealed class LessonFormatViewModel : Bindable
     public void SetItems(IReadOnlyList<LessonItemViewModel> items, bool searched)
     {
         ItemsSearched = searched;
-        if (!items.Select(item => (item.Number, item.Title, item.Meta, item.IsDone, item.Submitted)).SequenceEqual(Items.Select(item => (item.Number, item.Title, item.Meta, item.IsDone, item.Submitted))))
+        // Сравнивается всё, что видно на карточке: шаг, вопрос, подсказка, файл работы. Иначе после «Подтвердить» вопрос остался бы на экране
+        if (!items.Select(item => item.StateKey).SequenceEqual(Items.Select(item => item.StateKey), StringComparer.Ordinal))
             Items = items;
     }
 

@@ -486,7 +486,59 @@ public sealed class JobHost : IDisposable
     /// <param name="lesson">Занятие</param>
     /// <param name="cancellationToken">Отменяет запуск</param>
     /// <returns>Пустая строка, если отчёт записан, иначе причина</returns>
-    public Task<string> CheckDraftsAsync(Lesson lesson, CancellationToken cancellationToken) => _preparer.CheckAsync(lesson, cancellationToken);
+    public Task<string> CheckDraftsAsync(Lesson lesson, CancellationToken cancellationToken) => _preparer.CheckNowAsync(lesson, cancellationToken);
+
+    /// <summary>
+    /// Шаг конвейера, файл работы, оценка и источник каждого задания занятия для карточки
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Сведения по номеру задания; пусто, если занятие не найдено или задания ещё не искали</returns>
+    public IReadOnlyDictionary<int, ItemPipelineInfo> ItemPipeline(string lessonId) =>
+        FindLesson(lessonId) is { } lesson ? _homework.PipelineInfo(lesson) : new Dictionary<int, ItemPipelineInfo>();
+
+    /// <summary>
+    /// Подтверждает задание: дальше его подготовит ближайшая выгрузка. Агент здесь не запускается
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии</param>
+    public void ConfirmItem(string lessonId, int number) => _homework.Confirm(lessonId, number);
+
+    /// <summary>
+    /// Записывает правку условия и замечание вида «условие» для предмета. Пишет файлы и может ждать блокировку, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии</param>
+    /// <param name="title">Верное название</param>
+    /// <param name="requirements">Верные требования</param>
+    /// <returns>Пустая строка или предупреждение</returns>
+    public string FixItemCondition(string lessonId, int number, string title, string requirements) =>
+        FindLesson(lessonId) is { } lesson ? _preparer.FixCondition(lesson, number, title, requirements) : "Занятие не найдено";
+
+    /// <summary>
+    /// Делает работу только что сданного задания образцом предмета. Может ждать блокировку списка образцов, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии</param>
+    /// <returns>Пустая строка или предупреждение</returns>
+    public string RegisterSubmittedSample(string lessonId, int number) =>
+        FindLesson(lessonId) is { } lesson ? _preparer.RegisterSubmittedSample(lesson, number) : string.Empty;
+
+    /// <summary>
+    /// Делает выбранный файл образцом сданного задания вместо черновика. Копирует файл и может ждать блокировку, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии</param>
+    /// <param name="file">Путь к сданному файлу</param>
+    /// <returns>Пустая строка или причина неудачи</returns>
+    public string SetSubmittedFile(string lessonId, int number, string file) =>
+        FindLesson(lessonId) is { } lesson ? _preparer.RegisterSubmittedFile(lesson, number, file) : "Занятие не найдено";
+
+    /// <summary>
+    /// Находит занятие по ключу
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Занятие или <see langword="null"/></returns>
+    private Lesson? FindLesson(string lessonId) => _homework.LoadLessons().FirstOrDefault(item => item.Id == lessonId);
 
     /// <summary>
     /// Путь к описанию каждой работы предмета из LMS, которое выгрузила программа
