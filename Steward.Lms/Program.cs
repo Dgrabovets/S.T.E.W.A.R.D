@@ -369,9 +369,6 @@ internal static class Program
         foreach (var line in report.Failed)
             Log($"Подготовка не удалась: {line}");
 
-        foreach (var notice in report.Notices())
-            Log(notice);
-
         var summary = $"Подготовка работ: готово {report.Prepared.Count}, ждут {report.Waiting.Count}, ошибок {report.Failed.Count}";
 
         return report.Prepared.Count > 0 ? summary + "\n" + string.Join("\n", report.Notices()) : summary;
