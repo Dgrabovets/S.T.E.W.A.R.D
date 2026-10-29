@@ -368,14 +368,17 @@ public sealed class HomeworkFormatsViewModel : Bindable
         {
             result = await Task.Run(() => attach(lesson.Id, number, file));
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException)
+        catch (Exception exception)
         {
+            if (exception is not (IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException))
+                System.Diagnostics.Trace.TraceError($"Прикрепление работы {lesson.Id}: {exception}");
+
             result = ("Не удалось прикрепить работу: " + exception.Message, true);
         }
 
         lesson.ShowResult(result.Message, result.Failed);
         RefreshDrafts(lesson);
-        RefreshItems(lesson);
+        await RefreshItemsAsync(lesson);
     }
 
     /// <summary>
@@ -410,9 +413,39 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Читает шаг конвейера, файл работы, оценку и источник каждого задания занятия по его ключу. Пусто: шаг выводится из отметки «сдано»
+    /// Читает шаг конвейера, файл работы, оценку и источник каждого задания занятия. Читает файлы, поэтому вызывается в фоновой задаче, а результат применяется в потоке окна. Пусто: шаг выводится из отметки «сдано»
     /// </summary>
-    public Func<string, IReadOnlyDictionary<int, ItemPipelineInfo>>? PipelineReader { get; set; }
+    public Func<Lesson, IReadOnlyDictionary<int, ItemPipelineInfo>>? PipelineReader { get; set; }
+
+    /// <summary>
+    /// Прочитанные шаги заданий по ключу занятия: пока идёт новое чтение, карточка показывает прежние, поэтому строки не мигают
+    /// </summary>
+    private readonly Dictionary<string, IReadOnlyDictionary<int, ItemPipelineInfo>> _pipeline = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Номер последнего запроса чтения шагов по ключу занятия: устаревший ответ не затирает свежий
+    /// </summary>
+    private readonly Dictionary<string, int> _pipelineVersions = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Защищает кеш шагов: в тестах без потока окна ответы приходят из пула потоков
+    /// </summary>
+    private readonly object _pipelineGate = new();
+
+    /// <summary>
+    /// Идущие чтения шагов
+    /// </summary>
+    private readonly List<Task> _pipelineLoads = [];
+
+    /// <summary>
+    /// Ждёт, пока прочитаются шаги всех заданий, запрошенные к этому моменту
+    /// </summary>
+    /// <returns>Задача, которая завершается, когда все чтения применены</returns>
+    public Task WhenPipelineLoaded()
+    {
+        lock (_pipelineGate)
+            return Task.WhenAll(_pipelineLoads.ToArray());
+    }
 
     /// <summary>
     /// Подтверждает задание: ключ занятия и номер задания. Вызывается в фоновой задаче
@@ -425,9 +458,9 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Func<string, int, string, string, string>? ConditionFixer { get; set; }
 
     /// <summary>
-    /// Делает работу только что сданного задания образцом предмета: ключ занятия и номер. Возвращает предупреждение или пустую строку. Вызывается в фоновой задаче
+    /// Делает работу только что сданного задания образцом предмета: ключ занятия и номер. Возвращает, что стало с образцом. Вызывается в фоновой задаче
     /// </summary>
-    public Func<string, int, string>? SampleRegistrar { get; set; }
+    public Func<string, int, SampleOutcome>? SampleRegistrar { get; set; }
 
     /// <summary>
     /// Делает выбранный файл образцом сданного задания: ключ занятия, номер и путь. Возвращает причину неудачи или пустую строку. Вызывается в фоновой задаче
@@ -463,13 +496,80 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private static string ViewedKey(LessonFormatViewModel lesson, int number) => $"{lesson.Id}:{number}";
 
     /// <summary>
-    /// Обновляет найденные задания занятия вместе с их шагами
+    /// Обновляет найденные задания занятия: сразу с известными шагами, а свежие шаги читаются в фоне и применяются, когда готовы
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    private void RefreshItems(LessonFormatViewModel lesson)
+    private void RefreshItems(LessonFormatViewModel lesson) => _ = RefreshItemsAsync(lesson);
+
+    /// <summary>
+    /// Обновляет найденные задания занятия и ждёт свежих шагов
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>Задача, которая завершается, когда шаги прочитаны и применены</returns>
+    private Task RefreshItemsAsync(LessonFormatViewModel lesson)
+    {
+        var found = BuildItems(lesson);
+        if (found is null || PipelineReader is not { } reader)
+            return Task.CompletedTask;
+
+        Task load;
+        lock (_pipelineGate)
+        {
+            var version = _pipelineVersions.GetValueOrDefault(lesson.Id) + 1;
+            _pipelineVersions[lesson.Id] = version;
+            load = LoadPipelineAsync(lesson, reader, version);
+            _pipelineLoads.RemoveAll(task => task.IsCompleted);
+            _pipelineLoads.Add(load);
+        }
+
+        return load;
+    }
+
+    /// <summary>
+    /// Читает шаги заданий занятия в фоновой задаче и пересобирает строки в потоке окна, если ответ ещё свежий
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="reader">Чтение шагов</param>
+    /// <param name="version">Номер этого запроса</param>
+    /// <returns>Задача чтения; ошибок не выбрасывает</returns>
+    private async Task LoadPipelineAsync(LessonFormatViewModel lesson, Func<Lesson, IReadOnlyDictionary<int, ItemPipelineInfo>> reader, int version)
+    {
+        IReadOnlyDictionary<int, ItemPipelineInfo> info;
+        try
+        {
+            info = await Task.Run(() => reader(lesson.Lesson));
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError($"Шаги заданий {lesson.Id}: {exception}");
+            lesson.ShowResult("Не удалось прочитать состояние заданий: " + exception.Message, failed: true);
+
+            return;
+        }
+
+        lock (_pipelineGate)
+        {
+            if (_pipelineVersions.GetValueOrDefault(lesson.Id) != version)
+                return;
+
+            _pipeline[lesson.Id] = info;
+        }
+
+        BuildItems(lesson);
+    }
+
+    /// <summary>
+    /// Собирает строки заданий из чтения заданий и известных шагов, не трогая файлы шагов
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>Прочитанные задания или <see langword="null"/>, если их ещё не искали</returns>
+    private IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>? BuildItems(LessonFormatViewModel lesson)
     {
         var found = ItemsReader?.Invoke(lesson.Id);
-        var pipeline = found is null ? null : PipelineReader?.Invoke(lesson.Id);
+        IReadOnlyDictionary<int, ItemPipelineInfo>? pipeline;
+        lock (_pipelineGate)
+            pipeline = _pipeline.GetValueOrDefault(lesson.Id);
+
         var actions = CardActions(lesson);
         lesson.SetItems(
             [.. (found ?? []).Select(row => new LessonItemViewModel(
@@ -477,14 +577,34 @@ public sealed class HomeworkFormatsViewModel : Bindable
                 row.Item,
                 row.InSingularity,
                 entry => ArchiveItem(lesson, row.Number),
-                entry => { _ = AddToSingularityAsync(lesson, row.Number); },
+                entry => Forget(AddToSingularityAsync(lesson, row.Number), lesson),
                 entry => OpenItemInLms(lesson, row.Number),
-                entry => { _ = MarkSubmittedAsync(lesson, row.Number, !entry.Submitted); },
+                entry => Forget(MarkSubmittedAsync(lesson, row.Number, !entry.Submitted), lesson),
                 entry => CopyCondition(lesson, row.Number),
                 pipeline is not null && pipeline.TryGetValue(row.Number, out var info) ? info : null,
                 actions,
                 _viewed.Contains(ViewedKey(lesson, row.Number))))],
             found is not null);
+
+        return found;
+    }
+
+    /// <summary>
+    /// Запускает действие карточки без ожидания, но так, что ни одно исключение не теряется: оно пишется в журнал и показывается в карточке
+    /// </summary>
+    /// <param name="task">Действие</param>
+    /// <param name="lesson">Занятие, в карточке которого показать ошибку</param>
+    private static async void Forget(Task task, LessonFormatViewModel lesson)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError($"Действие с заданием {lesson.Id}: {exception}");
+            lesson.ShowResult("Действие не удалось: " + exception.Message, failed: true);
+        }
     }
 
     /// <summary>
@@ -498,9 +618,9 @@ public sealed class HomeworkFormatsViewModel : Bindable
         {
             _viewed.Add(ViewedKey(lesson, item.Number));
             PathOpened?.Invoke(item.WorkPath);
-            RefreshItems(lesson);
+            BuildItems(lesson);
         },
-        Confirm = item => { _ = ConfirmAsync(lesson, item.Number); },
+        Confirm = item => Forget(ConfirmAsync(lesson, item.Number), lesson),
         FixCondition = item => ConditionEditRequested?.Invoke(lesson, item),
         Recheck = _ => Run(lesson.CheckCommand),
         OpenCheck = _ => Run(lesson.OpenCheckCommand),
@@ -532,14 +652,18 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Ловит ожидаемые ошибки файлов и данных из фоновой записи, чтобы показать их в карточке
+    /// Показывает ошибку фоновой записи в карточке занятия; неожиданную ошибку (не файлов и не данных) ещё и пишет в журнал
     /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="prefix">Начало сообщения владельцу</param>
     /// <param name="exception">Исключение</param>
-    /// <returns>
-    /// <see langword="true"/>, если это ошибка записи или данных
-    /// </returns>
-    private static bool Expected(Exception exception) =>
-        exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or System.Text.Json.JsonException;
+    private static void Fail(LessonFormatViewModel lesson, string prefix, Exception exception)
+    {
+        if (exception is not (IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or System.Text.Json.JsonException))
+            System.Diagnostics.Trace.TraceError($"Задание {lesson.Id}: {exception}");
+
+        lesson.ShowResult(prefix + exception.Message, failed: true);
+    }
 
     /// <summary>
     /// Подтверждает задание в фоновой задаче, показывает итог и обновляет карточку: вопрос пропадает, работу подготовит ближайшая выгрузка. Агент здесь не запускается
@@ -562,12 +686,12 @@ public sealed class HomeworkFormatsViewModel : Bindable
             await Task.Run(() => confirm(lesson.Id, number));
             lesson.ShowResult("Подтверждено: работа подготовится при ближайшей выгрузке", failed: false);
         }
-        catch (Exception exception) when (Expected(exception))
+        catch (Exception exception)
         {
-            lesson.ShowResult("Не удалось сохранить подтверждение: " + exception.Message, failed: true);
+            Fail(lesson, "Не удалось сохранить подтверждение: ", exception);
         }
 
-        RefreshItems(lesson);
+        await RefreshItemsAsync(lesson);
     }
 
     /// <summary>
@@ -591,14 +715,15 @@ public sealed class HomeworkFormatsViewModel : Bindable
         try
         {
             var warning = await Task.Run(() => fix(lesson.Id, number, title, requirements));
-            lesson.ShowResult(warning.Length > 0 ? warning : "Условие поправлено: работа подготовится при ближайшей выгрузке", warning.Length > 0);
+            // Предупреждение значит, что правка сохранена и не записалось только замечание: это не ошибка
+            lesson.ShowResult(warning.Length > 0 ? warning : "Условие поправлено: работа подготовится при ближайшей выгрузке", failed: false);
         }
-        catch (Exception exception) when (Expected(exception))
+        catch (Exception exception)
         {
-            lesson.ShowResult("Не удалось сохранить правку условия: " + exception.Message, failed: true);
+            Fail(lesson, "Не удалось сохранить правку условия: ", exception);
         }
 
-        RefreshItems(lesson);
+        await RefreshItemsAsync(lesson);
     }
 
     /// <summary>
@@ -612,24 +737,30 @@ public sealed class HomeworkFormatsViewModel : Bindable
     {
         var mark = ItemSubmitted;
         var register = SampleRegistrar;
-        var hadWork = lesson.Items.FirstOrDefault(item => item.Number == number)?.WorkPath.Length > 0;
         try
         {
-            var warning = await Task.Run(() =>
+            var outcome = await Task.Run(() =>
             {
                 mark?.Invoke(lesson.Id, number, submitted);
 
-                return submitted && register is not null ? register(lesson.Id, number) : string.Empty;
+                return submitted && register is not null ? register(lesson.Id, number) : null;
             });
-            var done = submitted ? hadWork ? "Отмечено сданным, работа стала образцом предмета" : "Отмечено сданным" : "Отметка «сдано» снята";
-            lesson.ShowResult(warning.Length > 0 ? warning : done, warning.Length > 0);
+            if (outcome is { Warning.Length: > 0 })
+                lesson.ShowResult(outcome.Warning, failed: true);
+            else
+                lesson.ShowResult(!submitted ? "Отметка «сдано» снята" : outcome switch
+                {
+                    { Registered: true } => "Отмечено сданным, работа стала образцом предмета",
+                    { KeptOwners: true } => "Отмечено сданным, образцом остаётся указанный тобой файл",
+                    _ => "Отмечено сданным",
+                }, failed: false);
         }
-        catch (Exception exception) when (Expected(exception))
+        catch (Exception exception)
         {
-            lesson.ShowResult("Не удалось сохранить отметку: " + exception.Message, failed: true);
+            Fail(lesson, "Не удалось сохранить отметку: ", exception);
         }
 
-        RefreshItems(lesson);
+        await RefreshItemsAsync(lesson);
     }
 
     /// <summary>
@@ -655,13 +786,13 @@ public sealed class HomeworkFormatsViewModel : Bindable
             var error = await Task.Run(() => set(lesson.Id, number, file));
             lesson.ShowResult(error.Length > 0 ? error : "Файл сданной работы стал образцом предмета", error.Length > 0);
         }
-        catch (Exception exception) when (Expected(exception))
+        catch (Exception exception)
         {
-            lesson.ShowResult("Образец не записался: " + exception.Message, failed: true);
+            Fail(lesson, "Образец не записался: ", exception);
         }
 
         RefreshGuides();
-        RefreshItems(lesson);
+        await RefreshItemsAsync(lesson);
     }
 
     /// <summary>
@@ -1061,7 +1192,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         {
             if (!known.TryGetValue(item.Lesson.Id, out var row))
             {
-                row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => { _ = CheckAndRefreshAsync(lesson); }, CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
+                row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => Forget(CheckAndRefreshAsync(lesson), lesson), CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
                 RefreshDrafts(row);
                 RefreshItems(row);
 
@@ -1085,7 +1216,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     {
         await lesson.RunCheckAsync(DraftChecker ?? (_ => Task.FromResult("Проверка не подключена")));
         RefreshDrafts(lesson);
-        RefreshItems(lesson);
+        await RefreshItemsAsync(lesson);
     }
 
     /// <summary>

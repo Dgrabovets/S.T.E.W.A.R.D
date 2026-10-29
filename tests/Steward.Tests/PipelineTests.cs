@@ -318,20 +318,47 @@ public class PipelineTests
     /// Модель списка с одним занятием, задания и шаги которого читаются из хранилища
     /// </summary>
     /// <param name="store">Хранилище</param>
-    /// <returns>Модель списка</returns>
-    private static HomeworkFormatsViewModel ModelOver(HomeworkStore store)
+    /// <returns>Модель списка с прочитанными шагами</returns>
+    private static async Task<HomeworkFormatsViewModel> ModelOver(HomeworkStore store)
     {
         var model = new HomeworkFormatsViewModel((_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
         {
             ItemsReader = id => store.ReadItems(id) is { } items
                 ? [.. items.Select((item, index) => (index + 1, store.SubmittedNumbers(id).Contains(index + 1) ? item with { Done = true, Submitted = true } : item, false))]
                 : null,
-            PipelineReader = _ => store.PipelineInfo(Sample),
+            PipelineReader = store.PipelineInfo,
             PathOpened = _ => { },
         };
         model.Update([(Sample, HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
 
         return model;
+    }
+
+    /// <summary>
+    /// Агент-заглушка, который считает запуски: подтверждение и правка условия не должны его трогать
+    /// </summary>
+    private sealed class CountingAgent
+    {
+        /// <summary>
+        /// Сколько раз агента запускали
+        /// </summary>
+        public int Runs { get; private set; }
+
+        /// <summary>
+        /// Запуск агента: только считает
+        /// </summary>
+        /// <param name="prompt">Просьба</param>
+        /// <param name="workDirectory">Рабочая папка</param>
+        /// <param name="extraDirectories">Дополнительные папки</param>
+        /// <param name="cancellationToken">Отмена</param>
+        /// <returns>Пустая строка</returns>
+        public Task<string> Run(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, CancellationToken cancellationToken)
+        {
+            Runs++;
+
+            return Task.FromResult(string.Empty);
+        }
     }
 
     /// <summary>
@@ -393,10 +420,10 @@ public class PipelineTests
     }
 
     /// <summary>
-    /// Пайплайн на карточке: для одного задания на каждом шаге одна главная кнопка. Найдено: нет (подготовку даёт кнопка занятия), Готово и Проверено: «Посмотреть работу», а после просмотра «Отметить сданным», Сдано вручную: «Вернуть в работу», сдано в LMS: нет
+    /// Пайплайн на карточке: для одного задания на каждом шаге одна главная кнопка. Найдено: спокойная «Отметить сданным» (сдано мимо Steward), Готово и Проверено: «Посмотреть работу», а после просмотра «Отметить сданным», Сдано вручную: «Вернуть в работу», сдано в LMS: нет. Работу можно открыть из меню в любом шаге, где она есть, отметку «сдано» поставить или снять из меню в любом шаге
     /// </summary>
     [Fact]
-    public void The_card_shows_one_main_button_per_step()
+    public async Task The_card_shows_one_main_button_per_step()
     {
         var items = new List<(int, HomeworkItem, bool)>
         {
@@ -416,18 +443,40 @@ public class PipelineTests
             [5] = new(PipelineStepEnum.Submitted, string.Empty, ready, false, false, string.Empty),
         };
         var opened = new List<string>();
+        var marks = new List<(int, bool)>();
         var model = new HomeworkFormatsViewModel([(Sample, HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
         {
             ItemsReader = _ => items,
             PipelineReader = _ => info,
             PathOpened = opened.Add,
+            ItemSubmitted = (_, number, submitted) => { lock (marks) marks.Add((number, submitted)); },
         };
         model.Update([(Sample, HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
         var lesson = model.Lessons.Single();
 
         Assert.Equal(
-            [(false, string.Empty), (true, "Посмотреть работу"), (true, "Посмотреть работу"), (true, "Вернуть в работу"), (false, string.Empty)],
+            [ItemMainActionEnum.MarkSubmitted, ItemMainActionEnum.ViewWork, ItemMainActionEnum.ViewWork, ItemMainActionEnum.ReturnToWork, ItemMainActionEnum.None],
+            lesson.Items.Select(item => item.MainAction).ToArray());
+        Assert.Equal(
+            [(true, "Отметить сданным"), (true, "Посмотреть работу"), (true, "Посмотреть работу"), (true, "Вернуть в работу"), (false, string.Empty)],
             lesson.Items.Select(item => (item.HasMain, item.MainLabel)).ToArray());
+        Assert.True(lesson.Items[0].MainIsQuiet);
+        Assert.False(lesson.Items[1].MainIsQuiet);
+
+        // Отметка «сдано» из меню есть в каждом шаге, кроме сданного по LMS
+        Assert.Equal([true, true, true, true, false], lesson.Items.Select(item => item.ToggleSubmittedCommand.CanExecute(null)).ToArray());
+        Assert.Equal("Отметить сданным", lesson.Items[0].SubmitLabel);
+        Assert.Equal("Вернуть в работу", lesson.Items[3].SubmitLabel);
+
+        // «Открыть работу» из меню: там, где файл есть, в том числе у сданного
+        Assert.Equal([false, true, true, true, false], lesson.Items.Select(item => item.OpenWorkCommand.CanExecute(null)).ToArray());
+        lesson.Items[3].OpenWorkCommand.Execute(null);
+        Assert.Equal([@"C:\w\Задание 4.docx"], opened);
+        opened.Clear();
+
+        await model.MarkSubmittedAsync(lesson, 1, true);
+        Assert.Equal([(1, true)], marks);
         Assert.Equal([PipelineStepEnum.Found, PipelineStepEnum.Ready, PipelineStepEnum.Checked, PipelineStepEnum.Submitted, PipelineStepEnum.Submitted], lesson.Items.Select(item => item.Step).ToArray());
         Assert.Equal(["Найдено", "Готово", "Проверено", "Сдано"], lesson.Items[2].Steps.Select(step => step.Title).ToArray());
         Assert.Equal([false, false, true, false], lesson.Items[2].Steps.Select(step => step.IsCurrent).ToArray());
@@ -438,6 +487,10 @@ public class PipelineTests
         Assert.Equal([@"C:\w\Задание 2.docx"], opened);
         Assert.Equal("Отметить сданным", lesson.Items[1].MainLabel);
         Assert.Equal("Посмотреть работу", lesson.Items[2].MainLabel);
+
+        // После просмотра работа по-прежнему открывается из меню
+        lesson.Items[1].OpenWorkCommand.Execute(null);
+        Assert.Equal([@"C:\w\Задание 2.docx", @"C:\w\Задание 2.docx"], opened);
 
         // Меню «…»: действия с готовой работой доступны только там, где она есть, указать сданный файл можно только у сданного
         Assert.False(lesson.Items[0].RecheckCommand.CanExecute(null));
@@ -453,7 +506,7 @@ public class PipelineTests
     /// Задание с низкой уверенностью на шаге «Найдено» показывает вопрос и три кнопки, а задание со средней уверенностью только пометку «проверь формулировку»
     /// </summary>
     [Fact]
-    public void A_low_confidence_item_shows_the_question_and_its_buttons()
+    public async Task A_low_confidence_item_shows_the_question_and_its_buttons()
     {
         var items = new List<(int, HomeworkItem, bool)>
         {
@@ -474,6 +527,7 @@ public class PipelineTests
         };
         model.ConditionEditRequested += (_, item) => edits.Add(item.Number);
         model.Update([(Sample, HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
         var question = model.Lessons.Single().Items[0];
         var note = model.Lessons.Single().Items[1];
 
@@ -482,7 +536,8 @@ public class PipelineTests
         Assert.True(question.ConfirmCommand.CanExecute(null));
         Assert.True(question.FixConditionCommand.CanExecute(null));
         Assert.True(question.ArchiveCommand.CanExecute(null));
-        Assert.False(question.HasMain);
+        Assert.Equal(ItemMainActionEnum.MarkSubmitted, question.MainAction);
+        Assert.True(question.MainIsQuiet);
         Assert.False(question.HasNote);
 
         question.FixConditionCommand.Execute(null);
@@ -503,14 +558,17 @@ public class PipelineTests
         try
         {
             store.SetSubjectState(lesson.Title, LessonStateEnum.Fetch);
-            var model = ModelOver(store);
-            model.ItemConfirmer = store.Confirm;
+            var agent = new CountingAgent();
+            var preparer = new HomeworkPreparer(store, new GuideStore(folder), new RemarkStore(Path.Combine(folder, "remarks")), agent.Run);
+            var model = await ModelOver(store);
+            model.ItemConfirmer = (_, number) => preparer.Confirm(lesson, number);
             var row = model.Lessons.Single();
 
             Assert.True(row.Items[0].NeedsConfirmation);
 
             await model.ConfirmAsync(row, 1);
 
+            Assert.Equal(0, agent.Runs);
             Assert.Equal([1], store.ConfirmedNumbers(lesson.Id).ToArray());
             Assert.False(row.Items[0].NeedsConfirmation);
             Assert.Equal(PipelineStepEnum.Found, row.Items[0].Step);
@@ -524,7 +582,7 @@ public class PipelineTests
     }
 
     /// <summary>
-    /// «Поправить условие» записывает правку и замечание вида «условие» для этого предмета, а сбой записи замечания показывается и не теряет правку
+    /// «Поправить условие» записывает правку и замечание вида «условие» для этого предмета, агента не запускает; без изменений замечание не пишется; сбой записи правки показывается ошибкой
     /// </summary>
     [Fact]
     public async Task Fixing_the_condition_saves_the_override_and_a_condition_remark()
@@ -534,13 +592,15 @@ public class PipelineTests
         {
             var guides = new GuideStore(folder);
             var remarks = new RemarkStore(Path.Combine(folder, "remarks"));
-            var preparer = new HomeworkPreparer(store, guides, remarks, (_, _, _, _) => Task.FromResult("агент не нужен"));
-            var model = ModelOver(store);
+            var agent = new CountingAgent();
+            var preparer = new HomeworkPreparer(store, guides, remarks, agent.Run);
+            var model = await ModelOver(store);
             model.ConditionFixer = (_, number, title, requirements) => preparer.FixCondition(lesson, number, title, requirements);
             var row = model.Lessons.Single();
 
             await model.FixConditionAsync(row, 1, "Эссе по истории игр", "две страницы");
 
+            Assert.Equal(0, agent.Runs);
             Assert.Equal(("Эссе по истории игр", "две страницы"), (store.ReadItems(lesson.Id)![0].Title, store.ReadItems(lesson.Id)![0].Requirements));
             Assert.Equal([1], store.ConfirmedNumbers(lesson.Id).ToArray());
             var remark = Assert.Single(remarks.Load(lesson.Title));
@@ -548,6 +608,11 @@ public class PipelineTests
             Assert.Contains("Эссе по истории игр", remark.Text, StringComparison.Ordinal);
             Assert.Equal("Эссе по истории игр", row.Items[0].Title);
             Assert.False(row.Items[0].NeedsConfirmation);
+
+            // То же условие ещё раз: правка не новая, второго замечания нет
+            await model.FixConditionAsync(row, 1, "Эссе по истории игр", "две страницы");
+            Assert.Single(remarks.Load(lesson.Title));
+            Assert.False(row.Failed);
 
             model.ConditionFixer = (_, _, _, _) => throw new IOException("файл занят");
             await model.FixConditionAsync(row, 1, "Другое", string.Empty);
@@ -572,7 +637,7 @@ public class PipelineTests
             var guides = new GuideStore(folder);
             var preparer = new HomeworkPreparer(store, guides, new RemarkStore(Path.Combine(folder, "remarks")), (_, _, _, _) => Task.FromResult("агент не нужен"));
             var work = AddDraft(store, "Задание 1. Отчёт.docx");
-            var model = ModelOver(store);
+            var model = await ModelOver(store);
             model.ItemSubmitted = store.SetSubmitted;
             model.SampleRegistrar = (_, number) => preparer.RegisterSubmittedSample(lesson, number);
             var row = model.Lessons.Single();
@@ -588,7 +653,23 @@ public class PipelineTests
             Assert.Equal(File.ReadAllText(work), File.ReadAllText(sample.Path));
             Assert.Equal(PipelineStepEnum.Submitted, row.Items[0].Step);
             Assert.Equal("Вернуть в работу", row.Items[0].MainLabel);
+            Assert.Contains("стала образцом", row.Status, StringComparison.Ordinal);
             Assert.False(row.Failed);
+
+            // «Вернуть в работу», работу переделали, сдали снова: образец заменяется новой версией, хотя учёт уже знает задание
+            await model.MarkSubmittedAsync(row, 1, false);
+            File.WriteAllText(work, "переделанная работа");
+            await model.MarkSubmittedAsync(row, 1, true);
+            sample = Assert.Single(guides.Load(), entry => entry.Kind == GuideKindEnum.Example);
+            Assert.Equal("переделанная работа", File.ReadAllText(sample.Path));
+
+            // Файл владельца черновиком не заменяется, и сообщение говорит правду
+            var mine = Path.Combine(folder, "моя.docx");
+            File.WriteAllText(mine, "моя версия");
+            Assert.Equal(string.Empty, preparer.RegisterSubmittedFile(lesson, 1, mine));
+            await model.MarkSubmittedAsync(row, 1, true);
+            Assert.Equal("моя версия", File.ReadAllText(Assert.Single(guides.Load(), entry => entry.Kind == GuideKindEnum.Example).Path));
+            Assert.Contains("указанный тобой файл", row.Status, StringComparison.Ordinal);
         }
         finally
         {
@@ -609,10 +690,10 @@ public class PipelineTests
             var preparer = new HomeworkPreparer(store, guides, new RemarkStore(Path.Combine(folder, "remarks")), (_, _, _, _) => Task.FromResult("агент не нужен"));
             AddDraft(store, "Задание 1. Отчёт.docx");
             store.SetSubmitted(lesson.Id, 1, true);
-            Assert.Equal(string.Empty, preparer.RegisterSubmittedSample(lesson, 1));
+            Assert.True(preparer.RegisterSubmittedSample(lesson, 1).Registered);
             var mine = Path.Combine(folder, "моя версия.docx");
             File.WriteAllText(mine, "моя сданная версия");
-            var model = ModelOver(store);
+            var model = await ModelOver(store);
             model.SubmittedFileSetter = (_, number, file) => preparer.RegisterSubmittedFile(lesson, number, file);
             var row = model.Lessons.Single();
 
@@ -625,6 +706,13 @@ public class PipelineTests
 
             await model.SetSubmittedFileAsync(row, 1, Path.Combine(folder, "нет такого.docx"));
             Assert.True(row.Failed);
+
+            // Файл больше предела образцом не становится
+            var huge = Path.Combine(folder, "огромный.docx");
+            using (var stream = new FileStream(huge, FileMode.Create))
+                stream.SetLength(HomeworkStore.OWN_WORK_MAX_BYTES + 1);
+            Assert.Contains("МБ", preparer.RegisterSubmittedFile(lesson, 1, huge), StringComparison.Ordinal);
+            Assert.Equal("моя сданная версия", File.ReadAllText(Assert.Single(guides.Load(), entry => entry.Kind == GuideKindEnum.Example).Path));
         }
         finally
         {
@@ -633,7 +721,7 @@ public class PipelineTests
     }
 
     /// <summary>
-    /// Блок «Откуда это задание»: цитата и значок надёжности по цитате и связи с LMS; ненайденная цитата так и называется
+    /// Блок «Откуда это задание»: значок надёжности по проверенной цитате и работе LMS. Ненайденная цитата предупреждает, старое задание без цитаты и LMS честно так и названо
     /// </summary>
     [Fact]
     public void The_source_block_names_how_reliable_the_item_is()
@@ -642,14 +730,62 @@ public class PipelineTests
         LessonItemViewModel Row(string evidence, bool verified, bool lms) =>
             new(1, new HomeworkItem("А", null, string.Empty, string.Empty, Evidence: evidence), false, _ => { }, _ => { }, pipeline: new ItemPipelineInfo(PipelineStepEnum.Found, string.Empty, ready, verified, lms, string.Empty));
 
-        Assert.Equal("подтверждено цитатой и LMS", Row("сделайте", true, true).Reliability);
-        Assert.Equal("только расшифровка", Row("сделайте", true, false).Reliability);
-        Assert.Equal("только LMS", Row(string.Empty, false, true).Reliability);
-        Assert.Equal("только расшифровка", Row(string.Empty, false, false).Reliability);
-        Assert.Equal("только LMS", Row("сделайте", false, true).Reliability);
-        Assert.Equal("цитата не найдена в расшифровке", Row("сделайте", false, true).EvidenceStatus);
+        Assert.Equal(("подтверждено цитатой и LMS", false), (Row("сделайте", true, true).Reliability, Row("сделайте", true, true).ReliabilityWarning));
+        Assert.Equal(("только расшифровка", false), (Row("сделайте", true, false).Reliability, Row("сделайте", true, false).ReliabilityWarning));
+        Assert.Equal(("только LMS", false), (Row(string.Empty, false, true).Reliability, Row(string.Empty, false, true).ReliabilityWarning));
+        Assert.Equal(("цитата не найдена", true), (Row("сделайте", false, true).Reliability, Row("сделайте", false, true).ReliabilityWarning));
+        Assert.Equal(("цитата не найдена", true), (Row("сделайте", false, false).Reliability, Row("сделайте", false, false).ReliabilityWarning));
+        Assert.Equal(("расшифровка без цитаты", false), (Row(string.Empty, false, false).Reliability, Row(string.Empty, false, false).ReliabilityWarning));
         Assert.True(Row("сделайте", true, false).HasEvidence);
         Assert.Equal("«сделайте»", Row("сделайте", true, false).Quote);
+    }
+
+    /// <summary>
+    /// Работой LMS считается только цифровой номер работы, как в оценке уверенности: ссылка в тексте задания значок «LMS» не даёт
+    /// </summary>
+    [Fact]
+    public void Only_a_numeric_lms_work_counts_as_lms()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "А", "activity": "4211"}, {"title": "Б", "link": "https://example.com/task"}, {"title": "В", "activity": "abc"}]""");
+        try
+        {
+            var info = store.PipelineInfo(lesson);
+
+            Assert.Equal([true, false, false], new[] { info[1].LinkedToLms, info[2].LinkedToLms, info[3].LinkedToLms });
+        }
+        finally
+        {
+            Clean(folder);
+        }
+    }
+
+    /// <summary>
+    /// Отметки владельца из нескольких потоков не затирают друг друга: чтение, изменение и запись идут под общей блокировкой с уникальными временными файлами
+    /// </summary>
+    [Fact]
+    public async Task Parallel_marks_are_not_lost()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "А"}]""");
+        try
+        {
+            await Task.WhenAll(Enumerable.Range(1, 24).Select(number => Task.Run(() =>
+            {
+                if (number % 3 == 0)
+                    store.Confirm(lesson.Id, number);
+                else if (number % 3 == 1)
+                    store.SetSubmitted(lesson.Id, number, true);
+                else
+                    store.SetOverride(lesson.Id, number, $"Задание {number}", string.Empty);
+            })));
+
+            Assert.Equal(8, store.SubmittedNumbers(lesson.Id).Count);
+            Assert.Equal(16, store.ConfirmedNumbers(lesson.Id).Count);
+            Assert.Empty(Directory.EnumerateFiles(folder, "*.tmp"));
+        }
+        finally
+        {
+            Clean(folder);
+        }
     }
 
     /// <summary>

@@ -459,6 +459,9 @@
                                                                             ToolTip="Ещё действия с заданием" AutomationProperties.Name="Ещё действия с заданием">
                                                                         <Button.ContextMenu>
                                                                             <ContextMenu Style="{StaticResource CardMenu}">
+                                                                                <MenuItem Header="Открыть работу" Command="{Binding OpenWorkCommand}" AutomationProperties.Name="Открыть работу"/>
+                                                                                <MenuItem Header="{Binding SubmitLabel}" Command="{Binding ToggleSubmittedCommand}" AutomationProperties.Name="{Binding SubmitLabel}"/>
+                                                                                <Separator Style="{StaticResource CardMenuSeparator}"/>
                                                                                 <MenuItem Header="Открыть в LMS" Command="{Binding OpenInLmsCommand}" AutomationProperties.Name="Открыть в LMS"/>
                                                                                 <MenuItem Header="Скопировать условие" Command="{Binding CopyConditionCommand}" AutomationProperties.Name="Скопировать условие"/>
                                                                                 <Separator Style="{StaticResource CardMenuSeparator}"/>
@@ -512,10 +515,22 @@
                                                                             </DataTemplate>
                                                                         </ItemsControl.ItemTemplate>
                                                                     </ItemsControl>
-                                                                    <Button Grid.Column="1" Content="{Binding MainLabel}" Command="{Binding MainCommand}" Style="{StaticResource OutlineButton}" Margin="8,0,0,0"
-                                                                            BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"
+                                                                    <Button Grid.Column="1" Content="{Binding MainLabel}" Command="{Binding MainCommand}" Margin="8,0,0,0"
                                                                             AutomationProperties.Name="{Binding MainLabel}"
-                                                                            Visibility="{Binding HasMain, Converter={StaticResource BoolToVisibility}}"/>
+                                                                            Visibility="{Binding HasMain, Converter={StaticResource BoolToVisibility}}">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource OutlineButton}">
+                                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                                                                                <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding MainIsQuiet}" Value="True">
+                                                                                        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
+                                                                                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                    </Button>
                                                                 </Grid>
                                                                 <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}">
                                                                     <TextBlock.Style>
@@ -560,13 +575,12 @@
                                                                         </WrapPanel>
                                                                         <TextBlock Text="{Binding Quote}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"
                                                                                    Visibility="{Binding HasEvidence, Converter={StaticResource BoolToVisibility}}"/>
-                                                                        <WrapPanel Margin="-8,2,0,0">
-                                                                            <TextBlock Text="{Binding EvidenceStatus}" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                                                                            <Button Content="Открыть в расшифровке" Command="{Binding OpenTranscriptCommand}" Style="{StaticResource GhostButton}" Padding="8,4" FontSize="{StaticResource FontSizeCaption}"
+                                                                        <WrapPanel Margin="0,6,0,0">
+                                                                            <Button Content="Открыть в расшифровке" Command="{Binding OpenTranscriptCommand}" Style="{StaticResource OutlineButton}" Padding="10,3" Margin="0,0,6,0" FontSize="{StaticResource FontSizeCaption}"
                                                                                     ToolTip="Открыть расшифровку этого занятия" AutomationProperties.Name="Открыть в расшифровке"/>
-                                                                            <Button Content="Страница в LMS" Command="{Binding OpenInLmsCommand}" Style="{StaticResource GhostButton}" Padding="8,4" FontSize="{StaticResource FontSizeCaption}"
-                                                                                    ToolTip="Открыть страницу работы в LMS" AutomationProperties.Name="Открыть страницу работы в LMS"
-                                                                                    Visibility="{Binding LinkedToLms, Converter={StaticResource BoolToVisibility}}"/>
+                                                                            <Button Content="Открыть в LMS" Command="{Binding OpenInLmsCommand}" Style="{StaticResource OutlineButton}" Padding="10,3" FontSize="{StaticResource FontSizeCaption}"
+                                                                                    ToolTip="Открыть страницу работы в LMS" AutomationProperties.Name="Открыть в LMS"
+                                                                                    Visibility="{Binding HasLmsPage, Converter={StaticResource BoolToVisibility}}"/>
                                                                         </WrapPanel>
                                                                     </StackPanel>
                                                                 </Border>
@@ -576,6 +590,10 @@
                                                             <DataTrigger Binding="{Binding IsConfirmedSource}" Value="True">
                                                                 <Setter TargetName="Badge" Property="BorderBrush" Value="{StaticResource OkBrush}"/>
                                                                 <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource OkBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding ReliabilityWarning}" Value="True">
+                                                                <Setter TargetName="Badge" Property="BorderBrush" Value="{StaticResource AttentionBrush}"/>
+                                                                <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource AttentionBrush}"/>
                                                             </DataTrigger>
                                                         </DataTemplate.Triggers>
                                                     </DataTemplate>

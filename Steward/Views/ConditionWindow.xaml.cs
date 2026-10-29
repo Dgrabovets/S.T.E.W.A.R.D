@@ -22,6 +22,14 @@ public partial class ConditionWindow : Window
         Heading.Text = heading;
         TitleBox.Text = title;
         RequirementsBox.Text = requirements;
+        TitleBox.TextChanged += (_, _) =>
+        {
+            if (TitleError.Visibility != Visibility.Visible || TitleBox.Text.Trim().Length == 0)
+                return;
+
+            TitleBox.Style = (Style)FindResource("Field");
+            TitleError.Visibility = Visibility.Collapsed;
+        };
         Loaded += (_, _) =>
         {
             TitleBox.Focus();
@@ -57,6 +65,8 @@ public partial class ConditionWindow : Window
     {
         if (TitleBox.Text.Trim().Length == 0)
         {
+            TitleBox.Style = (Style)FindResource("FieldInvalid");
+            TitleError.Visibility = Visibility.Visible;
             TitleBox.Focus();
 
             return;

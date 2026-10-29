@@ -33,6 +33,8 @@
 
             <TextBlock Text="Что нужно сделать" Style="{StaticResource TextCaption}" Margin="0,16,0,6"/>
             <TextBox x:Name="TitleBox" Style="{StaticResource Field}" Margin="0" AutomationProperties.Name="Что нужно сделать"/>
+            <TextBlock x:Name="TitleError" Style="{StaticResource HintError}" Margin="0,4,0,0" Visibility="Collapsed"
+                       Text="Напиши, что нужно сделать: без формулировки правку не сохранить"/>
             <TextBlock Text="Требования" Style="{StaticResource TextCaption}" Margin="0,12,0,6"/>
             <TextBox x:Name="RequirementsBox" Style="{StaticResource Field}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxHeight="220"
                      VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Margin="0" AutomationProperties.Name="Требования"/>

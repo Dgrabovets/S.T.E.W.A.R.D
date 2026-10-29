@@ -854,7 +854,8 @@ public sealed class HomeworkStore(string directory)
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии, с единицы</param>
     /// <param name="state">Отметка или <see langword="null"/>, чтобы убрать</param>
-    private void SetItemState(string lessonId, int number, string? state)
+    /// <exception cref="IOException">Файл занят другим процессом дольше ожидания или не записался</exception>
+    private void SetItemState(string lessonId, int number, string? state) => Locked(() =>
     {
         var states = new Dictionary<string, string>(Read<Dictionary<string, string>>(ItemStatesFile) ?? [], StringComparer.Ordinal);
         if (state is not null)
@@ -862,11 +863,41 @@ public sealed class HomeworkStore(string directory)
         else
             states.Remove(ItemKey(lessonId, number));
 
-        Directory.CreateDirectory(directory);
+        WriteAtomic(ItemStatesFile, states);
+    });
 
-        var temp = ItemStatesFile + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(states, Json));
-        File.Move(temp, ItemStatesFile, overwrite: true);
+    /// <summary>
+    /// Начало имени мьютекса для отметок владельца: сдано, архив, подтверждение, правка условия
+    /// </summary>
+    private const string LOCK_PREFIX = "Steward.HomeworkMarks.";
+
+    /// <summary>
+    /// Выполняет чтение и запись отметок владельца под общей блокировкой потоков и процессов: окно пишет их из фоновых задач, и записи не должны затирать друг друга
+    /// </summary>
+    /// <param name="action">Чтение, изменение и запись файла</param>
+    /// <exception cref="IOException">Блокировка занята дольше ожидания</exception>
+    private void Locked(Action action) => FileLock.Run(directory, LOCK_PREFIX, action);
+
+    /// <summary>
+    /// Пишет JSON атомарно: во временный файл с уникальным именем, затем переименованием поверх прежнего
+    /// </summary>
+    /// <param name="path">Файл</param>
+    /// <param name="value">Содержимое</param>
+    private static void WriteAtomic(string path, object value)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temp = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            File.WriteAllText(temp, JsonSerializer.Serialize(value, Json));
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            DeleteQuietly(temp);
+
+            throw;
+        }
     }
 
     /// <summary>
@@ -1007,15 +1038,18 @@ public sealed class HomeworkStore(string directory)
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии, с единицы</param>
-    public void Confirm(string lessonId, int number)
+    /// <exception cref="IOException">Файл занят дольше ожидания или не записался</exception>
+    public void Confirm(string lessonId, int number) => Locked(() => ConfirmCore(lessonId, number));
+
+    /// <summary>
+    /// Подтверждение без блокировки: вызывается под ней
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    private void ConfirmCore(string lessonId, int number)
     {
         var keys = new HashSet<string>(Read<List<string>>(ItemConfirmedFile) ?? [], StringComparer.Ordinal) { ItemKey(lessonId, number) };
-
-        Directory.CreateDirectory(directory);
-
-        var temp = ItemConfirmedFile + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(keys.Order(StringComparer.Ordinal), Json));
-        File.Move(temp, ItemConfirmedFile, overwrite: true);
+        WriteAtomic(ItemConfirmedFile, keys.Order(StringComparer.Ordinal).ToList());
     }
 
     /// <summary>
@@ -1025,20 +1059,17 @@ public sealed class HomeworkStore(string directory)
     /// <param name="number">Номер задания в занятии, с единицы</param>
     /// <param name="title">Верное название, пусто значит оставить прежнее</param>
     /// <param name="requirements">Верные требования</param>
-    public void SetOverride(string lessonId, int number, string title, string requirements)
+    /// <exception cref="IOException">Файл занят дольше ожидания или не записался</exception>
+    public void SetOverride(string lessonId, int number, string title, string requirements) => Locked(() =>
     {
         var overrides = new Dictionary<string, ItemOverride>(Read<Dictionary<string, ItemOverride>>(ItemOverridesFile) ?? [], StringComparer.Ordinal)
         {
             [ItemKey(lessonId, number)] = new ItemOverride(title.Trim(), requirements.Trim()),
         };
 
-        Directory.CreateDirectory(directory);
-
-        var temp = ItemOverridesFile + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(overrides, Json));
-        File.Move(temp, ItemOverridesFile, overwrite: true);
-        Confirm(lessonId, number);
-    }
+        WriteAtomic(ItemOverridesFile, overrides);
+        ConfirmCore(lessonId, number);
+    });
 
     /// <summary>
     /// Находится ли цитата задания в расшифровке занятия
@@ -1068,18 +1099,23 @@ public sealed class HomeworkStore(string directory)
             var transcript = hasTranscript ? ReadTranscript(lesson.Id) : string.Empty;
             var hasReport = File.Exists(CheckReportPath(lesson.Id));
             var prepares = PreparesHomework(lesson) && SubjectFormatFor(lesson.Title) != HomeworkFormatEnum.Skip;
-            var ledger = new PrepareLedger(directory);
+            var attempts = new PrepareLedger(directory).AllAttempts();
+
+            // Папка работ читается один раз на занятие: самый свежий файл задания тот же, что вернул бы SampleCandidate
+            var drafts = DraftFiles(lesson.Id);
             var result = new Dictionary<int, ItemPipelineInfo>();
             for (var number = 1; number <= items.Count; number++)
             {
                 var item = items[number - 1];
-                var work = SampleCandidate(lesson.Id, number) ?? string.Empty;
+                var work = drafts.FirstOrDefault(file => IsTaskFile(file, number)) ?? string.Empty;
                 var step = PipelineStepper.Of(submitted.Contains(number), work.Length > 0, work.Length > 0 && hasReport);
                 var verified = EvidenceCheck.Verify(transcript, item.Evidence);
                 var assessment = ItemAssessor.Assess(item, verified, hasTranscript, HasAssignmentCondition(item), confirmed.Contains(number));
-                var linked = (item.ActivityId.Length > 0 && item.ActivityId.All(char.IsAsciiDigit)) || item.Link.StartsWith("http", StringComparison.OrdinalIgnoreCase);
+
+                // Связь с LMS: номер работы LMS, как его понимает оценка уверенности. Просто ссылка в тексте работой LMS не считается
+                var linked = item.ActivityId.Length > 0 && item.ActivityId.All(char.IsAsciiDigit);
                 var (hint, problem) = step == PipelineStepEnum.Found && assessment.Readiness != ItemReadinessEnum.NeedsConfirmation
-                    ? FoundHint(ledger.Attempts($"{lesson.Id}:{number}"), prepares)
+                    ? FoundHint(attempts.GetValueOrDefault($"{lesson.Id}:{number}"), prepares)
                     : (string.Empty, false);
                 result[number] = new ItemPipelineInfo(step, work, assessment, verified, linked, hint, problem);
             }

@@ -491,13 +491,12 @@ public sealed class JobHost : IDisposable
     /// <summary>
     /// Шаг конвейера, файл работы, оценка и источник каждого задания занятия для карточки
     /// </summary>
-    /// <param name="lessonId">Ключ занятия</param>
-    /// <returns>Сведения по номеру задания; пусто, если занятие не найдено или задания ещё не искали</returns>
-    public IReadOnlyDictionary<int, ItemPipelineInfo> ItemPipeline(string lessonId) =>
-        FindLesson(lessonId) is { } lesson ? _homework.PipelineInfo(lesson) : new Dictionary<int, ItemPipelineInfo>();
+    /// <param name="lesson">Занятие: передаётся целиком, чтобы не перечитывать список занятий</param>
+    /// <returns>Сведения по номеру задания; пусто, если задания ещё не искали</returns>
+    public IReadOnlyDictionary<int, ItemPipelineInfo> ItemPipeline(Lesson lesson) => _homework.PipelineInfo(lesson);
 
     /// <summary>
-    /// Подтверждает задание: дальше его подготовит ближайшая выгрузка. Агент здесь не запускается
+    /// Подтверждает задание: дальше его подготовит ближайшая выгрузка. Агент здесь не запускается. Ждёт блокировку отметок, поэтому окно вызывает метод из фоновой задачи
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии</param>
@@ -519,9 +518,9 @@ public sealed class JobHost : IDisposable
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии</param>
-    /// <returns>Пустая строка или предупреждение</returns>
-    public string RegisterSubmittedSample(string lessonId, int number) =>
-        FindLesson(lessonId) is { } lesson ? _preparer.RegisterSubmittedSample(lesson, number) : string.Empty;
+    /// <returns>Что стало с образцом</returns>
+    public SampleOutcome RegisterSubmittedSample(string lessonId, int number) =>
+        FindLesson(lessonId) is { } lesson ? _preparer.RegisterSubmittedSample(lesson, number) : new SampleOutcome(false, false, string.Empty);
 
     /// <summary>
     /// Делает выбранный файл образцом сданного задания вместо черновика. Копирует файл и может ждать блокировку, поэтому окно вызывает метод из фоновой задачи

@@ -288,7 +288,7 @@ public static class SnapshotRenderer
         education.DraftLister = id => id == firstId && info.WorkPath.Length > 0 ? [work] : [];
         education.CheckReader = id => id == firstId && info.Step == PipelineStepEnum.Checked ? work : string.Empty;
         education.ItemsReader = id => id == firstId ? [(1, item, false)] : id == secondId ? [(1, other, false)] : [];
-        education.PipelineReader = id => id == firstId ? new Dictionary<int, ItemPipelineInfo> { [1] = info } : new Dictionary<int, ItemPipelineInfo> { [1] = otherInfo };
+        education.PipelineReader = lesson => lesson.Id == firstId ? new Dictionary<int, ItemPipelineInfo> { [1] = info } : new Dictionary<int, ItemPipelineInfo> { [1] = otherInfo };
         education.ItemConfirmer = (_, _) => { };
         education.GuideFolder = @"D:\data\homework\guides";
         education.GuideLister = _ => [];
@@ -313,8 +313,8 @@ public static class SnapshotRenderer
             ItemContainerStyle = (Style)resources["CardMenuItem"],
             ItemsPanel = new System.Windows.Controls.ItemsPanelTemplate(new FrameworkElementFactory(typeof(System.Windows.Controls.StackPanel))),
         };
-        var disabled = new HashSet<string>(StringComparer.Ordinal) { "Проверить заново", "Результат проверки", "Переделать", "Указать файл сданной работы", "Удалить готовое" };
-        string?[] entries = ["Открыть в LMS", "Скопировать условие", null, "Проверить заново", "Результат проверки", "Переделать", null, "Прикрепить готовую работу", "Указать файл сданной работы", null, "В Singularity", "В архив", "Удалить готовое"];
+        var disabled = new HashSet<string>(StringComparer.Ordinal) { "Открыть работу", "Проверить заново", "Результат проверки", "Переделать", "Указать файл сданной работы", "Удалить готовое" };
+        string?[] entries = ["Открыть работу", "Отметить сданным", null, "Открыть в LMS", "Скопировать условие", null, "Проверить заново", "Результат проверки", "Переделать", null, "Прикрепить готовую работу", "Указать файл сданной работы", null, "В Singularity", "В архив", "Удалить готовое"];
         foreach (var entry in entries)
         {
             if (entry is null)
@@ -337,7 +337,7 @@ public static class SnapshotRenderer
             Child = menu,
         };
 
-        return new Window { Width = 320, Height = 470, WindowStyle = WindowStyle.None, Background = (System.Windows.Media.Brush)resources["WindowBrush"], Content = host };
+        return new Window { Width = 320, Height = 580, WindowStyle = WindowStyle.None, Background = (System.Windows.Media.Brush)resources["WindowBrush"], Content = host };
     }
 
     /// <summary>

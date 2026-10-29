@@ -42,6 +42,12 @@ internal sealed class PrepareLedger(string directory)
     public int Attempts(string key) => Read<Dictionary<string, int>>(AttemptsFile)?.GetValueOrDefault(key) ?? 0;
 
     /// <summary>
+    /// Все попытки одним чтением файла: для карточек всех заданий занятия
+    /// </summary>
+    /// <returns>Число неудач подряд по ключу «занятие:номер»</returns>
+    public IReadOnlyDictionary<string, int> AllAttempts() => Read<Dictionary<string, int>>(AttemptsFile) ?? [];
+
+    /// <summary>
     /// Записывает число попыток задания; 0 убирает запись
     /// </summary>
     /// <param name="key">Ключ «занятие:номер»</param>

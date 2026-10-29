@@ -28,6 +28,14 @@ public sealed record PrepareReport(IReadOnlyList<string> Prepared, IReadOnlyList
 public sealed record AttachResult(string Path, string Message);
 
 /// <summary>
+/// Итог записи образца при сдаче задания
+/// </summary>
+/// <param name="Registered">Работа задания записана образцом предмета (или уже была им с тем же содержимым)</param>
+/// <param name="KeptOwners">Образцом остаётся файл, который указал владелец: черновик его не заменил</param>
+/// <param name="Warning">Причина, почему образец не записался, или пусто</param>
+public sealed record SampleOutcome(bool Registered, bool KeptOwners, string Warning);
+
+/// <summary>
 /// Общая подготовка работ для фоновой задачи и кнопок приложения: выбор заданий, оценка уверенности, формат предмета, работа агента с указаниями, образцами и замечаниями, проверка готовой работы, лимит и повторы после ошибки
 /// </summary>
 /// <param name="store">Папка домашних заданий</param>
@@ -236,12 +244,36 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     }
 
     /// <summary>
-    /// Делает работу задания, которое владелец только что отметил сданным, образцом предмета. Тот же путь, что и в фоновой подготовке: один раз на задание, образец владельца черновиком не заменяется. Вызывается не из потока окна: список образцов может быть занят до 10 секунд
+    /// Подтверждает задание по кнопке «Подтвердить»: агент не запускается, работу подготовит ближайшая выгрузка
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="number">Номер задания в занятии, с единицы</param>
-    /// <returns>Пустая строка или предупреждение, что образец не записался</returns>
-    public string RegisterSubmittedSample(Lesson lesson, int number) => RegisterSample(lesson, number);
+    /// <exception cref="IOException">Подтверждение не записалось</exception>
+    public void Confirm(Lesson lesson, int number) => store.Confirm(lesson.Id, number);
+
+    /// <summary>
+    /// Делает работу задания, которое владелец только что отметил сданным, образцом предмета. В отличие от фоновой регистрации учёт «уже записан» не мешает: если работу после «Вернуть в работу» переделали, образец заменяется новым файлом (тот же файл оставляет прежнюю дату). Образец владельца черновиком не заменяется. Вызывается не из потока окна: список образцов может быть занят до 10 секунд
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns>Что стало с образцом</returns>
+    public SampleOutcome RegisterSubmittedSample(Lesson lesson, int number)
+    {
+        if (store.SampleCandidate(lesson.Id, number) is not { } file)
+            return new SampleOutcome(false, false, string.Empty);
+
+        try
+        {
+            var entry = guides.AddSample(lesson.Title, lesson.Id, number, file, fromUser: false);
+            _ledger.MarkSample($"{lesson.Id}:{number}");
+
+            return entry.Manual ? new SampleOutcome(false, true, string.Empty) : new SampleOutcome(true, false, string.Empty);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
+        {
+            return new SampleOutcome(false, false, "Сдано, но образец предмета не записался, повторю при ближайшей выгрузке: " + exception.Message);
+        }
+    }
 
     /// <summary>
     /// Делает выбранный владельцем файл образцом сданного задания вместо черновика: «Указать файл сданной работы». Файл копируется в образцы предмета, запись помечается как работа владельца
@@ -259,6 +291,9 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
 
             if (string.IsNullOrWhiteSpace(file) || !File.Exists(file))
                 return "Файл не найден: " + file;
+
+            if (new FileInfo(file).Length > HomeworkStore.OWN_WORK_MAX_BYTES)
+                return $"Файл больше {HomeworkStore.OWN_WORK_MAX_BYTES / 1024 / 1024} МБ: образцом его не сделать";
 
             guides.AddSample(lesson.Title, lesson.Id, number, file, fromUser: true);
             _ledger.MarkSample($"{lesson.Id}:{number}");
@@ -282,10 +317,15 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     /// <exception cref="IOException">Правку не удалось записать</exception>
     public string FixCondition(Lesson lesson, int number, string title, string requirements)
     {
+        var before = store.ReadItems(lesson.Id) is { } items && number >= 1 && number <= items.Count ? items[number - 1] : null;
         store.SetOverride(lesson.Id, number, title, requirements);
 
+        // Замечание пишется, только если условие действительно поменялось: иначе это просто подтверждение
+        var changed = before is null
+            || (title.Trim().Length > 0 && !string.Equals(title.Trim(), before.Title.Trim(), StringComparison.Ordinal))
+            || (requirements.Trim().Length > 0 && !string.Equals(requirements.Trim(), before.Requirements.Trim(), StringComparison.Ordinal));
         var text = RemarkStore.Flatten(string.Join(". ", new[] { title.Trim(), requirements.Trim() }.Where(part => part.Length > 0)));
-        if (text.Length == 0)
+        if (!changed || text.Length == 0)
             return string.Empty;
 
         try
@@ -294,7 +334,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
 
             return string.Empty;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
         {
             return "Условие поправлено, но замечание не записалось: " + exception.Message;
         }

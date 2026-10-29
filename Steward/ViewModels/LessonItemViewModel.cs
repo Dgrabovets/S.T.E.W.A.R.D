@@ -52,28 +52,49 @@ public sealed class LessonItemViewModel
         Quote = evidence.Length > 0 ? $"«{evidence}»" : string.Empty;
         var verified = pipeline?.EvidenceVerified ?? false;
         var linked = pipeline?.LinkedToLms ?? false;
-        EvidenceStatus = evidence.Length == 0 ? "цитаты нет" : verified ? "цитата найдена в расшифровке" : "цитата не найдена в расшифровке";
-        Reliability = verified && linked ? "подтверждено цитатой и LMS" : linked ? "только LMS" : "только расшифровка";
+        (Reliability, ReliabilityWarning) = (verified, linked, evidence.Length > 0) switch
+        {
+            (true, true, _) => ("подтверждено цитатой и LMS", false),
+            (true, false, _) => ("только расшифровка", false),
+            (false, _, true) => ("цитата не найдена", true),
+            (false, true, false) => ("только LMS", false),
+            _ => ("расшифровка без цитаты", false),
+        };
         IsConfirmedSource = verified && linked;
         LinkedToLms = linked;
+        HasLmsPage = linked || item.Link.StartsWith("http", StringComparison.OrdinalIgnoreCase);
         var hasWork = WorkPath.Length > 0;
-        var submitted = item.Submitted;
-        MainLabel = Step switch
+        MainAction = Step switch
         {
-            PipelineStepEnum.Ready or PipelineStepEnum.Checked when hasWork && !viewed && act.ViewWork is not null => "Посмотреть работу",
-            PipelineStepEnum.Ready or PipelineStepEnum.Checked when hasWork && toggleSubmitted is not null => "Отметить сданным",
-            PipelineStepEnum.Submitted when submitted && toggleSubmitted is not null => "Вернуть в работу",
+            PipelineStepEnum.Found when toggleSubmitted is not null && !item.Done => ItemMainActionEnum.MarkSubmitted,
+            PipelineStepEnum.Ready or PipelineStepEnum.Checked when hasWork && !viewed && act.ViewWork is not null => ItemMainActionEnum.ViewWork,
+            PipelineStepEnum.Ready or PipelineStepEnum.Checked when toggleSubmitted is not null && !item.Done => ItemMainActionEnum.MarkSubmitted,
+            PipelineStepEnum.Submitted when item.Submitted && toggleSubmitted is not null => ItemMainActionEnum.ReturnToWork,
+            _ => ItemMainActionEnum.None,
+        };
+        MainLabel = MainAction switch
+        {
+            ItemMainActionEnum.ViewWork => "Посмотреть работу",
+            ItemMainActionEnum.MarkSubmitted => "Отметить сданным",
+            ItemMainActionEnum.ReturnToWork => "Вернуть в работу",
             _ => string.Empty,
         };
+        MainIsQuiet = MainAction == ItemMainActionEnum.ReturnToWork || (MainAction == ItemMainActionEnum.MarkSubmitted && Step == PipelineStepEnum.Found);
         MainCommand = new RelayCommand(
             () =>
             {
-                if (MainLabel == "Посмотреть работу")
-                    act.ViewWork?.Invoke(this);
-                else if (MainLabel.Length > 0)
-                    toggleSubmitted?.Invoke(this);
+                switch (MainAction)
+                {
+                    case ItemMainActionEnum.ViewWork:
+                        act.ViewWork?.Invoke(this);
+                        break;
+                    case ItemMainActionEnum.MarkSubmitted or ItemMainActionEnum.ReturnToWork:
+                        toggleSubmitted?.Invoke(this);
+                        break;
+                }
             },
             () => HasMain);
+        OpenWorkCommand = new RelayCommand(() => act.ViewWork?.Invoke(this), () => hasWork && act.ViewWork is not null);
         ConfirmCommand = new RelayCommand(() => act.Confirm?.Invoke(this), () => NeedsConfirmation && act.Confirm is not null);
         FixConditionCommand = new RelayCommand(() => act.FixCondition?.Invoke(this), () => act.FixCondition is not null);
         RecheckCommand = new RelayCommand(() => act.Recheck?.Invoke(this), () => hasWork && act.Recheck is not null);
@@ -283,14 +304,34 @@ public sealed class LessonItemViewModel
     public bool HasEvidence => Quote.Length > 0;
 
     /// <summary>
-    /// Найдена ли цитата в расшифровке: «цитата найдена в расшифровке», «цитата не найдена в расшифровке» или «цитаты нет»
-    /// </summary>
-    public string EvidenceStatus { get; }
-
-    /// <summary>
-    /// Значок надёжности: «подтверждено цитатой и LMS», «только расшифровка» или «только LMS»
+    /// Значок надёжности: «подтверждено цитатой и LMS», «только расшифровка» (цитата найдена, работы LMS нет), «только LMS» (работа LMS, цитаты нет), «цитата не найдена» или «расшифровка без цитаты» (старые данные)
     /// </summary>
     public string Reliability { get; }
+
+    /// <summary>
+    /// Значок предупреждает: цитата названа, но в расшифровке её нет
+    /// </summary>
+    public bool ReliabilityWarning { get; }
+
+    /// <summary>
+    /// Что делает главная кнопка
+    /// </summary>
+    public ItemMainActionEnum MainAction { get; }
+
+    /// <summary>
+    /// Главная кнопка спокойная, без акцента: «Отметить сданным» у задания без работы и «Вернуть в работу»
+    /// </summary>
+    public bool MainIsQuiet { get; }
+
+    /// <summary>
+    /// Открывает готовую работу задания в любом шаге, где она есть: пункт меню «Открыть работу»
+    /// </summary>
+    public RelayCommand OpenWorkCommand { get; }
+
+    /// <summary>
+    /// У задания есть страница в LMS: номер работы или ссылка
+    /// </summary>
+    public bool HasLmsPage { get; }
 
     /// <summary>
     /// Источник подтверждён и цитатой, и LMS: значок зелёный
@@ -298,7 +339,7 @@ public sealed class LessonItemViewModel
     public bool IsConfirmedSource { get; }
 
     /// <summary>
-    /// Задание связано со страницей LMS: в блоке источника есть ссылка на неё
+    /// Задание связано с работой LMS по её номеру
     /// </summary>
     public bool LinkedToLms { get; }
 
@@ -350,5 +391,5 @@ public sealed class LessonItemViewModel
     /// <summary>
     /// Всё, что видно на карточке, одной строкой: по ней список понимает, что строку нужно пересоздать
     /// </summary>
-    public string StateKey => string.Join("|", Number, Title, Meta, Requirements, IsDone, Submitted, InSingularity, Step, WorkPath, Viewed, MainLabel, Hint, Question, Note, Quote, EvidenceStatus, Reliability);
+    public string StateKey => string.Join("|", Number, Title, Meta, Requirements, IsDone, Submitted, InSingularity, Step, WorkPath, Viewed, MainLabel, Hint, Question, Note, Quote, Reliability);
 }
