@@ -1,3 +1,5 @@
+using Steward.Homework.Models;
+
 namespace Steward.Homework.Services;
 
 /// <summary>
@@ -42,7 +44,7 @@ public static class ItemAssessor
     /// <param name="hasCondition">Условие задания есть</param>
     /// <param name="confirmed">Владелец подтвердил задание</param>
     /// <returns>Готовность и вопрос</returns>
-    public static ItemAssessment Assess(Models.HomeworkItem item, bool evidenceVerified, bool hasTranscript, bool hasCondition, bool confirmed)
+    public static ItemAssessment Assess(HomeworkItem item, bool evidenceVerified, bool hasTranscript, bool hasCondition, bool confirmed)
     {
         if (confirmed)
             return new ItemAssessment(ItemReadinessEnum.Ready, string.Empty);

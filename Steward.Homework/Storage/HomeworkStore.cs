@@ -653,7 +653,7 @@ public sealed class HomeworkStore(string directory)
             return items;
 
         return [.. items.Select((item, index) => overrides.TryGetValue(ItemKey(lessonId, index + 1), out var fix)
-            ? item with { Title = fix.Title.Length > 0 ? fix.Title : item.Title, Requirements = fix.Requirements }
+            ? item with { Title = fix.Title.Length > 0 ? fix.Title : item.Title, Requirements = fix.Requirements.Length > 0 ? fix.Requirements : item.Requirements }
             : item)];
     }
 
@@ -666,7 +666,7 @@ public sealed class HomeworkStore(string directory)
     /// Правка условия задания владельцем
     /// </summary>
     /// <param name="Title">Название, пустое значит «не менять»</param>
-    /// <param name="Requirements">Требования</param>
+    /// <param name="Requirements">Требования, пустое значение значит «не менять»</param>
     private sealed record ItemOverride(string Title = "", string Requirements = "");
 
     /// <summary>
@@ -674,14 +674,36 @@ public sealed class HomeworkStore(string directory)
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <returns>Номера заданий с единицы</returns>
-    public IReadOnlySet<int> ConfirmedNumbers(string lessonId) => NumbersWithState(lessonId, "confirmed");
+    public IReadOnlySet<int> ConfirmedNumbers(string lessonId)
+    {
+        var prefix = lessonId + ":";
+
+        return (Read<List<string>>(ItemConfirmedFile) ?? [])
+            .Where(key => key.StartsWith(prefix, StringComparison.Ordinal) && int.TryParse(key.AsSpan(prefix.Length), out _))
+            .Select(key => int.Parse(key.AsSpan(prefix.Length)))
+            .ToHashSet();
+    }
+
+    /// <summary>
+    /// Файл с ключами подтверждённых заданий: он отдельный, чтобы отметки «сдано» и «в архиве» не стирали подтверждение
+    /// </summary>
+    private string ItemConfirmedFile => Path.Combine(directory, "item-confirmed.json");
 
     /// <summary>
     /// Подтверждает задание: дальше оно идёт по конвейеру само
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии, с единицы</param>
-    public void Confirm(string lessonId, int number) => SetItemState(lessonId, number, "confirmed");
+    public void Confirm(string lessonId, int number)
+    {
+        var keys = new HashSet<string>(Read<List<string>>(ItemConfirmedFile) ?? [], StringComparer.Ordinal) { ItemKey(lessonId, number) };
+
+        Directory.CreateDirectory(directory);
+
+        var temp = ItemConfirmedFile + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(keys.Order(StringComparer.Ordinal), Json));
+        File.Move(temp, ItemConfirmedFile, overwrite: true);
+    }
 
     /// <summary>
     /// Записывает правку условия задания и подтверждает его

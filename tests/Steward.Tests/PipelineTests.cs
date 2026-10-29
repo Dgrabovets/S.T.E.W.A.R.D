@@ -199,4 +199,36 @@ public class PipelineTests
                 Directory.Delete(folder, recursive: true);
         }
     }
+
+    /// <summary>
+    /// Подтверждение переживает отметки «в архиве» и «сдано», а правка с пустыми полями оставляет прежние название и требования
+    /// </summary>
+    [Fact]
+    public void Confirmation_survives_archive_and_submit_marks_and_empty_override_keeps_originals()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "steward-pipeline-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new Steward.Homework.Storage.HomeworkStore(folder);
+            Directory.CreateDirectory(Path.Combine(folder, "items"));
+            File.WriteAllText(store.ItemsPath(Sample.Id), """[{"title": "Старое", "requirements": "старые"}]""");
+
+            store.Confirm(Sample.Id, 1);
+            store.SetArchived(Sample.Id, 1, true);
+            store.SetArchived(Sample.Id, 1, false);
+            store.SetSubmitted(Sample.Id, 1, true);
+            store.SetSubmitted(Sample.Id, 1, false);
+
+            Assert.Equal([1], store.ConfirmedNumbers(Sample.Id).Order());
+
+            store.SetOverride(Sample.Id, 1, string.Empty, string.Empty);
+            var item = store.ReadItems(Sample.Id)![0];
+            Assert.Equal(("Старое", "старые"), (item.Title, item.Requirements));
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, recursive: true);
+        }
+    }
 }
