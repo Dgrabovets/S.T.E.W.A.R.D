@@ -58,6 +58,8 @@ public partial class HomeworkFormatsView : UserControl
         if (sender is not System.Windows.Controls.Button { ContextMenu: { } menu } button)
             return;
 
+        // Меню живёт во всплывающем окне: модель задания передаётся явно, чтобы команды пунктов точно её получили
+        menu.DataContext = button.DataContext;
         menu.PlacementTarget = button;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
         menu.IsOpen = true;
