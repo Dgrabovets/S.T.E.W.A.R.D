@@ -1,0 +1,483 @@
+using System.Text.RegularExpressions;
+using Steward.Homework.Models;
+using Steward.Homework.Services;
+using Steward.Homework.Storage;
+
+namespace Steward.Tests;
+
+/// <summary>
+/// Автоподготовка работ в фоновой задаче: отбор заданий, лимит, подтверждение, повторы после ошибки, проверка, замечания и образцы
+/// </summary>
+public partial class PreparerTests : IDisposable
+{
+    /// <summary>
+    /// Предмет занятий в тестах
+    /// </summary>
+    private const string SUBJECT = "Физика";
+
+    /// <summary>
+    /// Папка домашних заданий на время теста
+    /// </summary>
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "steward-prepare-" + Guid.NewGuid().ToString("N"));
+
+    /// <summary>
+    /// Хранилище домашних заданий в папке теста
+    /// </summary>
+    private readonly HomeworkStore _store;
+
+    /// <summary>
+    /// Методические указания и образцы в папке теста
+    /// </summary>
+    private readonly GuideStore _guides;
+
+    /// <summary>
+    /// Замечания владельца в папке теста
+    /// </summary>
+    private readonly RemarkStore _remarks;
+
+    /// <summary>
+    /// Агент-заглушка
+    /// </summary>
+    private readonly StubAgent _agent;
+
+    /// <summary>
+    /// Создаёт хранилища и отмечает предмет «расшифровывать» в формате MD
+    /// </summary>
+    public PreparerTests()
+    {
+        _store = new HomeworkStore(_root);
+        _guides = new GuideStore(_root);
+        _remarks = new RemarkStore(Path.Combine(_root, "remarks"));
+        _agent = new StubAgent();
+        _store.SetSubjectState(SUBJECT, LessonStateEnum.Fetch);
+        _store.SetSubjectFormat(SUBJECT, HomeworkFormatEnum.Text);
+    }
+
+    /// <summary>
+    /// Удаляет папку теста
+    /// </summary>
+    public void Dispose()
+    {
+        if (Directory.Exists(_root))
+            Directory.Delete(_root, recursive: true);
+
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Новый подготовщик: как отдельный запуск фоновой задачи
+    /// </summary>
+    /// <returns>Подготовщик с агентом-заглушкой</returns>
+    private HomeworkPreparer Preparer() => new(_store, _guides, _remarks, _agent.Run);
+
+    /// <summary>
+    /// Записывает занятие и его задания
+    /// </summary>
+    /// <param name="id">Ключ занятия</param>
+    /// <param name="day">День октября 2026</param>
+    /// <param name="itemsJson">Задания в JSON, как их пишет агент</param>
+    /// <param name="subject">Предмет</param>
+    /// <returns>Занятие</returns>
+    private Lesson AddLesson(string id, int day, string itemsJson, string subject = SUBJECT)
+    {
+        var lesson = new Lesson(id, subject, new DateOnly(2026, 10, day));
+        _store.SaveLessons([lesson]);
+        Directory.CreateDirectory(Path.Combine(_root, "items"));
+        File.WriteAllText(_store.ItemsPath(id), itemsJson);
+
+        return lesson;
+    }
+
+    /// <summary>
+    /// Кладёт готовый файл работы в папку занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="name">Имя файла</param>
+    /// <param name="text">Содержимое</param>
+    /// <returns>Путь к файлу</returns>
+    private string AddWork(string lessonId, string name, string text)
+    {
+        var folder = _store.DraftsDirectory(lessonId);
+        Directory.CreateDirectory(folder);
+        var path = Path.Combine(folder, name);
+        File.WriteAllText(path, text);
+
+        return path;
+    }
+
+    /// <summary>
+    /// Готовятся только несданные задания без файла работы, свежие занятия первыми и не больше лимита; файл владельца не трогается
+    /// </summary>
+    [Fact]
+    public async Task Only_pending_items_without_files_are_prepared_up_to_the_limit()
+    {
+        AddLesson("old", 10, """[{"title": "Старое задание"}]""");
+        AddLesson("new", 20, """[{"title": "Первое"}, {"title": "Второе"}, {"title": "Третье"}]""");
+        var own = AddWork("new", "Задание 2.md", "моя работа");
+
+        var report = await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Equal(["Физика, Первое", "Физика, Третье"], report.Prepared);
+        Assert.Equal(2, _agent.WorkPrompts.Count);
+        Assert.NotNull(_store.SampleCandidate("new", 1));
+        Assert.NotNull(_store.SampleCandidate("new", 3));
+        Assert.Null(_store.SampleCandidate("old", 1));
+        Assert.Equal("моя работа", File.ReadAllText(own));
+    }
+
+    /// <summary>
+    /// Сданные (по файлу заданий, по отметке и по LMS), архивные задания и предмет «Не готовить» не тратят агента; занятие с несданным заданием агента вызывает
+    /// </summary>
+    [Fact]
+    public async Task Done_archived_submitted_and_skip_format_subjects_are_ignored()
+    {
+        AddLesson("l1", 20, """[{"title": "Сдано по LMS", "done": true}, {"title": "В архиве"}, {"title": "Отмечено сданным"}, {"title": "Сдано позже", "activity": "77"}]""");
+        _store.SetArchived("l1", 2, true);
+        _store.SetSubmitted("l1", 3, true);
+        File.WriteAllText(Path.Combine(_root, "activities.json"), """[{"subject": "Физика", "name": "Работа", "kind": 0, "done": true, "id": "77"}]""");
+        _store.SetSubjectState("Химия", LessonStateEnum.Fetch);
+        _store.SetSubjectFormat("Химия", HomeworkFormatEnum.Skip);
+        AddLesson("c1", 21, """[{"title": "Не готовить"}]""", "Химия");
+
+        var report = await Preparer().RunAsync(5, CancellationToken.None);
+
+        Assert.Empty(_agent.Prompts);
+        Assert.Empty(report.Prepared);
+        Assert.Empty(report.Failed);
+
+        // Положительная проверка: несданное задание того же занятия готовится
+        File.WriteAllText(_store.ItemsPath("l1"), """[{"title": "Сдано по LMS", "done": true}, {"title": "В архиве"}, {"title": "Отмечено сданным"}, {"title": "Сдано позже", "activity": "77"}, {"title": "Новое"}]""");
+        var second = await Preparer().RunAsync(5, CancellationToken.None);
+
+        Assert.Equal(["Физика, Новое"], second.Prepared);
+        Assert.Single(_agent.WorkPrompts);
+    }
+
+    /// <summary>
+    /// Низкая уверенность, ненайденная цитата и задание без связи с работой LMS ждут подтверждения; подтверждённое и надёжное готовятся
+    /// </summary>
+    [Fact]
+    public async Task Items_needing_confirmation_are_not_prepared_and_listed_as_waiting()
+    {
+        AddLesson("l1", 20, """
+            [
+              {"title": "Низкая", "evidence": "сделайте нормализацию", "confidence": "low", "doubt": "не тот предмет", "activity": "55"},
+              {"title": "Без цитаты", "evidence": "напишите эссе", "confidence": "high", "activity": "55"},
+              {"title": "Без работы LMS", "evidence": "сделайте нормализацию", "confidence": "high"},
+              {"title": "Надёжное", "evidence": "сделайте нормализацию", "confidence": "high", "activity": "55"},
+              {"title": "Подтверждённое", "evidence": "что-то", "confidence": "low"}
+            ]
+            """);
+        Directory.CreateDirectory(Path.Combine(_root, "transcripts"));
+        File.WriteAllText(_store.TranscriptPath("l1"), "Преподаватель: Сделайте  нормализацию до пятницы.");
+        Directory.CreateDirectory(_store.AssignmentDirectory("55"));
+        File.WriteAllText(Path.Combine(_store.AssignmentDirectory("55"), "assignment.md"), "Условие работы");
+        _store.Confirm("l1", 5);
+
+        var report = await Preparer().RunAsync(10, CancellationToken.None);
+
+        Assert.Equal(["Физика, Надёжное", "Физика, Подтверждённое"], report.Prepared);
+        Assert.Equal(3, report.Waiting.Count);
+        Assert.Contains(report.Waiting, line => line.StartsWith("Физика, Низкая: ", StringComparison.Ordinal) && line.Contains("не тот предмет", StringComparison.Ordinal));
+        Assert.Contains(report.Waiting, line => line.StartsWith("Физика, Без цитаты: ", StringComparison.Ordinal));
+        Assert.Contains(report.Waiting, line => line.StartsWith("Физика, Без работы LMS: ", StringComparison.Ordinal) && line.Contains("условие", StringComparison.Ordinal));
+        Assert.Equal(2, _agent.WorkPrompts.Count);
+    }
+
+    /// <summary>
+    /// Падающий агент вызывается не больше трёх раз подряд, даже если каждый запуск идёт новым процессом; дальше задание ждёт
+    /// </summary>
+    [Fact]
+    public async Task A_failing_agent_is_retried_at_most_three_times_in_a_row()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        _agent.Error = "Claude завершился с кодом 1";
+
+        PrepareReport last = null!;
+        for (var run = 0; run < 5; run++)
+            last = await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Equal(3, _agent.WorkPrompts.Count);
+        Assert.Empty(last.Failed);
+        Assert.Contains(last.Waiting, line => line.StartsWith("Физика, Эссе: ", StringComparison.Ordinal));
+        Assert.Null(_store.SampleCandidate("l1", 1));
+        Assert.True(File.Exists(Path.Combine(_root, "prepare-attempts.json")));
+    }
+
+    /// <summary>
+    /// Удачная подготовка сбрасывает счётчик попыток: после двух ошибок и успеха новые ошибки снова получают три попытки
+    /// </summary>
+    [Fact]
+    public async Task A_success_resets_the_attempt_counter()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        _agent.Error = "сбой";
+        await Preparer().RunAsync(2, CancellationToken.None);
+        await Preparer().RunAsync(2, CancellationToken.None);
+        _agent.Error = string.Empty;
+
+        var ok = await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Equal(["Физика, Эссе"], ok.Prepared);
+        Assert.DoesNotContain("l1:1", File.ReadAllText(Path.Combine(_root, "prepare-attempts.json")), StringComparison.Ordinal);
+
+        File.Delete(_store.SampleCandidate("l1", 1)!);
+        _agent.Error = "сбой";
+        for (var run = 0; run < 4; run++)
+            await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Equal(3 + 3, _agent.WorkPrompts.Count);
+    }
+
+    /// <summary>
+    /// Испорченный или пустой файл попыток не роняет запуск и считается пустым
+    /// </summary>
+    [Fact]
+    public async Task A_corrupt_attempts_file_is_tolerated()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        File.WriteAllText(Path.Combine(_root, "prepare-attempts.json"), "{не json");
+
+        var report = await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Equal(["Физика, Эссе"], report.Prepared);
+    }
+
+    /// <summary>
+    /// Если агент оставил недописанный файл и вернул ошибку, файл убирается и «Готово» не наступает
+    /// </summary>
+    [Fact]
+    public async Task A_failed_attempt_leaves_no_work_file()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        _agent.Error = "оборвался";
+        _agent.Leftover = Path.Combine(_store.DraftsDirectory("l1"), "Задание 1. Эссе.md");
+
+        var report = await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Single(report.Failed);
+        Assert.Null(_store.SampleCandidate("l1", 1));
+        Assert.False(File.Exists(_agent.Leftover));
+    }
+
+    /// <summary>
+    /// Недописанный файл прошлого запуска (.partial) не считается готовой работой: агент запускается заново
+    /// </summary>
+    [Fact]
+    public async Task A_stale_partial_file_does_not_count_as_a_finished_work()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        AddWork("l1", "Задание 1. Эссе.md.partial", "хвост");
+
+        var report = await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Equal(["Физика, Эссе"], report.Prepared);
+        Assert.Single(_agent.WorkPrompts);
+        Assert.Equal(Path.Combine(_store.DraftsDirectory("l1"), "Задание 1. Эссе.md"), _store.SampleCandidate("l1", 1));
+    }
+
+    /// <summary>
+    /// Готовая работа сразу получает отчёт проверки
+    /// </summary>
+    [Fact]
+    public async Task A_prepared_work_gets_an_automatic_check_report()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+
+        await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.True(File.Exists(_store.CheckReportPath("l1")));
+        Assert.Single(_agent.CheckPrompts);
+        Assert.Contains("Задание 1. Эссе.md", _agent.CheckPrompts[0], StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Агент получает замечания владельца и образцы предмета в тексте просьбы
+    /// </summary>
+    [Fact]
+    public async Task Remarks_and_samples_reach_the_agent_prompt()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        _remarks.Add(new Remark("r1", new DateOnly(2026, 10, 1), SUBJECT, "l0", 1, "Без воды и вступлений", RemarkKindEnum.Style, Global: false));
+        var source = Path.Combine(_root, "образец.txt");
+        File.WriteAllText(source, "текст образца");
+        var sample = _guides.AddSample(SUBJECT, "l0", 1, source, fromUser: false);
+
+        await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Single(_agent.WorkPrompts);
+        Assert.Contains("Без воды и вступлений", _agent.WorkPrompts[0], StringComparison.Ordinal);
+        Assert.Contains(sample.Path, _agent.WorkPrompts[0], StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Работа сданного задания один раз становится образцом предмета: удалённый владельцем образец не возвращается
+    /// </summary>
+    [Fact]
+    public async Task A_submitted_work_becomes_a_sample_once()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}, {"title": "Доклад"}]""");
+        AddWork("l1", "Задание 1. Эссе.md", "сданная работа");
+        _store.SetSubmitted("l1", 1, true);
+
+        await Preparer().RunAsync(0, CancellationToken.None);
+
+        var sample = Assert.Single(_guides.Load(), entry => entry.Id == "sample:l1:1");
+        Assert.Equal("сданная работа", File.ReadAllText(sample.Path));
+        Assert.DoesNotContain(_guides.Load(), entry => entry.Id == "sample:l1:2");
+
+        _guides.Remove(sample.Id);
+        await Preparer().RunAsync(0, CancellationToken.None);
+
+        Assert.DoesNotContain(_guides.Load(), entry => entry.Id == "sample:l1:1");
+    }
+
+    /// <summary>
+    /// Пока один запуск готовит работу, второй ничего не запускает и сообщает, что подготовка уже идёт
+    /// </summary>
+    [Fact]
+    public async Task Two_runs_at_once_do_not_prepare_the_same_work()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        _agent.Gate = new TaskCompletionSource();
+
+        var first = Preparer().RunAsync(2, CancellationToken.None);
+        await _agent.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var second = await Preparer().RunAsync(2, CancellationToken.None);
+        _agent.Gate.SetResult();
+        var done = await first;
+
+        Assert.True(second.Busy);
+        Assert.Empty(second.Prepared);
+        Assert.Equal(["Физика, Эссе"], done.Prepared);
+        Assert.Single(_agent.WorkPrompts);
+    }
+
+    /// <summary>
+    /// Отмена во время работы агента не засчитывается как попытка и останавливает запуск
+    /// </summary>
+    [Fact]
+    public async Task Cancellation_does_not_count_as_an_attempt()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        using var cancel = new CancellationTokenSource();
+        _agent.OnRun = () =>
+        {
+            cancel.Cancel();
+
+            return "Запуск отменён";
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Preparer().RunAsync(2, cancel.Token));
+
+        var attempts = Path.Combine(_root, "prepare-attempts.json");
+        Assert.True(!File.Exists(attempts) || !File.ReadAllText(attempts).Contains("l1:1", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Строки уведомления о готовой работе пишутся и читаются из вывода в одном виде
+    /// </summary>
+    [Fact]
+    public void Ready_work_notices_are_formatted_and_read_back()
+    {
+        var report = new PrepareReport(["Физика, Эссе"], [], []);
+
+        Assert.Equal(["Готова работа: Физика, Эссе"], report.Notices());
+        Assert.Equal(["Физика, Эссе", "Химия, Доклад"], HomeworkPreparer.ReadyWorks("29.10.2026 10:00:00  Готова работа: Физика, Эссе\nдругая строка\nГотова работа: Химия, Доклад\r\n29.10.2026 10:00:00  Готова работа: Физика, Эссе"));
+        Assert.Empty(HomeworkPreparer.ReadyWorks(null));
+    }
+
+    /// <summary>
+    /// Агент-заглушка: запоминает просьбы, пишет работу и отчёт проверки по путям из просьбы
+    /// </summary>
+    private sealed partial class StubAgent
+    {
+        /// <summary>
+        /// Все просьбы по порядку
+        /// </summary>
+        public List<string> Prompts { get; } = [];
+
+        /// <summary>
+        /// Просьбы подготовить работу
+        /// </summary>
+        public List<string> WorkPrompts => [.. Prompts.Where(prompt => !prompt.StartsWith("Проверь готовую", StringComparison.Ordinal))];
+
+        /// <summary>
+        /// Просьбы проверить работу
+        /// </summary>
+        public List<string> CheckPrompts => [.. Prompts.Where(prompt => prompt.StartsWith("Проверь готовую", StringComparison.Ordinal))];
+
+        /// <summary>
+        /// Ошибка, которую возвращает подготовка, или пусто для успеха
+        /// </summary>
+        public string Error { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Файл, который агент оставляет перед ошибкой, или <see langword="null"/>
+        /// </summary>
+        public string? Leftover { get; set; }
+
+        /// <summary>
+        /// Если задано, подготовка ждёт его завершения
+        /// </summary>
+        public TaskCompletionSource? Gate { get; set; }
+
+        /// <summary>
+        /// Завершается, когда подготовка началась
+        /// </summary>
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>
+        /// Если задано, подготовка возвращает его результат вместо записи работы
+        /// </summary>
+        public Func<string>? OnRun { get; set; }
+
+        /// <summary>
+        /// Запуск агента
+        /// </summary>
+        /// <param name="prompt">Просьба</param>
+        /// <param name="workDirectory">Рабочая папка</param>
+        /// <param name="extraDirectories">Папки для чтения</param>
+        /// <param name="cancellationToken">Токен отмены</param>
+        /// <returns>Пусто при успехе, иначе ошибка</returns>
+        public async Task<string> Run(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, CancellationToken cancellationToken)
+        {
+            lock (Prompts)
+                Prompts.Add(prompt);
+
+            if (prompt.StartsWith("Проверь готовую", StringComparison.Ordinal))
+            {
+                var report = ReportPath().Match(prompt).Groups[1].Value;
+                File.WriteAllText(report, "## Соответствие условию");
+
+                return string.Empty;
+            }
+
+            Entered.TrySetResult();
+            if (Gate is not null)
+                await Gate.Task;
+
+            if (OnRun is not null)
+                return OnRun();
+
+            if (Leftover is not null)
+                File.WriteAllText(Leftover, "половина");
+
+            if (Error.Length > 0)
+                return Error;
+
+            var lines = prompt.Replace("\r", string.Empty).Split('\n');
+            var index = Array.FindIndex(lines, line => line.Contains("путь на следующей строке", StringComparison.Ordinal));
+            File.WriteAllText(lines[index + 1].Trim(), "# Работа\n\nТекст работы.");
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Путь к отчёту в просьбе о проверке
+        /// </summary>
+        /// <returns>Регулярное выражение</returns>
+        [GeneratedRegex(@"в файл (.+?) с четырьмя разделами")]
+        private static partial Regex ReportPath();
+    }
+}

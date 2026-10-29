@@ -341,7 +341,7 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
-    /// Готовый файл задания, который можно взять образцом: <c>Задание N.*</c> в папке готовых файлов занятия
+    /// Готовый файл задания: <c>Задание N.*</c> (так называет файл владелец или агент в формате кода) или <c>Задание N. Название.*</c> (так собирает работу Steward) в папке готовых файлов занятия. Недописанные (<c>.partial</c>, <c>.tmp</c>, <c>~$</c>) не считаются. По нему же решается, готова ли работа и что взять образцом
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии, с единицы</param>
@@ -352,7 +352,8 @@ public sealed class HomeworkStore(string directory)
         {
             var name = $"Задание {number}";
 
-            return DraftFiles(lessonId).FirstOrDefault(file => string.Equals(Path.GetFileNameWithoutExtension(file), name, StringComparison.OrdinalIgnoreCase));
+            return DraftFiles(lessonId).FirstOrDefault(file => string.Equals(Path.GetFileNameWithoutExtension(file), name, StringComparison.OrdinalIgnoreCase)
+                || Path.GetFileName(file).StartsWith(name + ". ", StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
         {

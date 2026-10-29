@@ -61,6 +61,11 @@ public sealed class LmsSettings
     public int MaxAnalyzePerRun { get; init; } = 3;
 
     /// <summary>
+    /// Сколько работ готовить через Claude за один запуск. Остальные ждут следующего запуска, чтобы не расходовать лимит подписки разом
+    /// </summary>
+    public int MaxPreparePerRun { get; init; } = 2;
+
+    /// <summary>
     /// Записи короче этого числа минут считаются пробными запусками и сразу получают отметку «не забирать»
     /// </summary>
     public int MinLessonMinutes { get; init; } = 10;

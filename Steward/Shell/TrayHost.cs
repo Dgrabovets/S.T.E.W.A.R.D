@@ -159,6 +159,7 @@ public sealed class TrayHost : IDisposable
         _ = RefreshAsync();
 
         _jobs.Changed += (_, _) => ApplyAll();
+        _jobs.WorksReady += (_, works) => NotifyWorksReady(works);
         _jobs.Start();
     }
 
@@ -308,6 +309,21 @@ public sealed class TrayHost : IDisposable
                 tip = tip[..BALLOON_TEXT_LIMIT];
             _icon.ShowBalloonTip(BALLOON_MS, row.Title, tip, ToolTipIcon.None);
         }
+    }
+
+    /// <summary>
+    /// Сообщает о работах, которые фоновая задача подготовила сама
+    /// </summary>
+    /// <param name="works">Готовые работы: «предмет, задание»</param>
+    private void NotifyWorksReady(IReadOnlyList<string> works)
+    {
+        if (_exiting || works.Count == 0)
+            return;
+
+        var text = string.Join("\n", works);
+        if (text.Length > BALLOON_TEXT_LIMIT)
+            text = text[..BALLOON_TEXT_LIMIT];
+        _icon.ShowBalloonTip(BALLOON_MS, works.Count == 1 ? "Готова работа" : "Готовы работы", text, ToolTipIcon.None);
     }
 
     /// <summary>

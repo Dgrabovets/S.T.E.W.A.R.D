@@ -130,7 +130,8 @@ public static partial class DraftBuilder
             if (items[index].Done)
                 continue;
 
-            var existing = Directory.EnumerateFiles(folder, $"Задание {number}.*").FirstOrDefault();
+            // Недописанный файл прошлого запуска (.partial, .tmp) готовой работой не считается
+            var existing = store.SampleCandidate(lesson.Id, number);
             if (existing is not null)
             {
                 files.Add(existing);
@@ -151,7 +152,7 @@ public static partial class DraftBuilder
             string? produced;
             try
             {
-                produced = isCode ? Directory.EnumerateFiles(folder, $"Задание {number}.*").FirstOrDefault() : Convert(folder, number, items[index].Title, format, resultPath);
+                produced = isCode ? store.SampleCandidate(lesson.Id, number) : Convert(folder, number, items[index].Title, format, resultPath);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or System.Xml.XmlException or DocumentFormat.OpenXml.Packaging.OpenXmlPackageException)
             {

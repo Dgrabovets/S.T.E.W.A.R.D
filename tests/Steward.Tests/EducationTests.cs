@@ -305,6 +305,8 @@ public class EducationTests
         Assert.Contains("Edit(//d/data/homework/item-states.json)", rules);
         Assert.Contains("Edit(//d/data/homework/item-confirmed.json)", rules);
         Assert.Contains("Edit(//d/data/homework/item-overrides.json)", rules);
+        Assert.Contains("Edit(//d/data/homework/prepare-attempts.json)", rules);
+        Assert.Contains("Edit(//d/data/homework/sample-registered.json)", rules);
     }
 
     /// <summary>

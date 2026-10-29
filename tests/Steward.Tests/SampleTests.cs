@@ -209,6 +209,7 @@ public class SampleTests : IDisposable
         File.WriteAllText(Path.Combine(folder, "Задание 22.docx"), "не то");
 
         Assert.Equal(Path.Combine(folder, "Задание 2.docx"), homework.SampleCandidate("l1", 2));
+        Assert.Equal(Path.Combine(folder, "Задание 1. Эссе.docx"), homework.SampleCandidate("l1", 1));
         Assert.Null(homework.SampleCandidate("l1", 3));
         Assert.Null(homework.SampleCandidate("нет такого", 1));
     }

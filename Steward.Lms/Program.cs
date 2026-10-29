@@ -69,6 +69,10 @@ internal static class Program
                     Log(await ExtractAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
 
                     return 0;
+                case "prepare":
+                    Log(await PrepareAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
+
+                    return 0;
                 case "task":
                     if (args.Length < 3 || !int.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
                     {
@@ -125,6 +129,7 @@ internal static class Program
                     summary += "\n" + await TasksAsync(settings, store, dryRun: !settings.CreateTasks);
                     summary += "\n" + await AnalyzeAsync(settings, store);
                     summary += "\n" + await ExtractAsync(settings, store);
+                    summary += "\n" + await PrepareAsync(settings, store);
                     summary += "\n" + await PublishAsync(settings, store);
                     Log(summary);
                     Report(statusStore, ProcessStateEnum.Ok, summary, null);
@@ -343,6 +348,33 @@ internal static class Program
         }
 
         return $"Поиск заданий: {done} из {todo.Length}";
+    }
+
+    /// <summary>
+    /// Готовит работы по найденным несданным заданиям, не больше <see cref="LmsSettings.MaxPreparePerRun"/> за запуск, и сразу их проверяет. По каждой готовой работе пишет строку «Готова работа: предмет, задание»: по ней приложение в трее показывает уведомление
+    /// </summary>
+    /// <param name="settings">Настройки: сколько работ готовить за запуск</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <returns>Строка итога для статуса со строками уведомления о готовых работах</returns>
+    private static async Task<string> PrepareAsync(LmsSettings settings, HomeworkStore store)
+    {
+        var preparer = new HomeworkPreparer(store, new GuideStore(store.Root), new RemarkStore(Path.Combine(store.Root, "remarks")), ClaudeAgent.RunAsync);
+        var report = await preparer.RunAsync(settings.MaxPreparePerRun, CancellationToken.None);
+        if (report.Busy)
+            return "Подготовка работ: уже идёт в другом запуске";
+
+        foreach (var line in report.Waiting)
+            Log($"Ждёт владельца: {line}");
+
+        foreach (var line in report.Failed)
+            Log($"Подготовка не удалась: {line}");
+
+        foreach (var notice in report.Notices())
+            Log(notice);
+
+        var summary = $"Подготовка работ: готово {report.Prepared.Count}, ждут {report.Waiting.Count}, ошибок {report.Failed.Count}";
+
+        return report.Prepared.Count > 0 ? summary + "\n" + string.Join("\n", report.Notices()) : summary;
     }
 
     /// <summary>
