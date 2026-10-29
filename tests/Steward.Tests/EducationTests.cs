@@ -303,6 +303,8 @@ public class EducationTests
         var rules = ClaudeAgent.Arguments("п", @"D:\data\homework", [@"D:\g"]);
         Assert.Contains("Edit(//d/g/**)", rules);
         Assert.Contains("Edit(//d/data/homework/item-states.json)", rules);
+        Assert.Contains("Edit(//d/data/homework/item-confirmed.json)", rules);
+        Assert.Contains("Edit(//d/data/homework/item-overrides.json)", rules);
     }
 
     /// <summary>

@@ -57,7 +57,7 @@ public static class ClaudeAgent
     /// <returns>Аргументы <c>--disallowedTools</c> с правилами запрета правки</returns>
     private static IReadOnlyList<string> ReadOnlyRules(string workDirectory, IReadOnlyList<string> extraDirectories)
     {
-        string[] stateFiles = ["lesson-states.json", "item-states.json", "created.json"];
+        string[] stateFiles = ["lesson-states.json", "item-states.json", "item-confirmed.json", "item-overrides.json", "created.json"];
         var rules = extraDirectories.Select(directory => DenyEdit(directory, true))
             .Concat(stateFiles.Select(file => DenyEdit(Path.Combine(workDirectory, file), false)));
 
