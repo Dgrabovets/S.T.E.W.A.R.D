@@ -370,6 +370,224 @@ public sealed class HomeworkStore(string directory)
         Path.GetFileName(file).StartsWith($"Задание {number}.", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Наибольший размер своей готовой работы, байты: 50 МБ
+    /// </summary>
+    public const long OWN_WORK_MAX_BYTES = 50L * 1024 * 1024;
+
+    /// <summary>
+    /// Наибольшая длина расширения своей работы вместе с точкой
+    /// </summary>
+    private const int OWN_WORK_EXTENSION_MAX = 11;
+
+    /// <summary>
+    /// Прикрепляет готовую работу владельца: копирует файл как <c>Задание N.&lt;расширение&gt;</c> в папку занятия, и шаг задания становится «Готово» без запуска агента. Копия пишется в <c>.partial</c> и переименовывается целиком, поэтому недописанный файл готовой работой не считается. Прежние файлы этого задания переносятся в <c>.previous</c> (с новым именем, если там такой файл уже есть), ничего не затирается. Тот же файл, прикреплённый повторно, ничего не меняет. Вызывающий обязан держать блокировку подготовки: прерванная фоновая попытка удалила бы новый файл
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="file">Путь к файлу владельца</param>
+    /// <returns>Путь к файлу работы в папке занятия</returns>
+    /// <exception cref="ArgumentException">Ключ занятия недопустим для имени папки</exception>
+    /// <exception cref="InvalidDataException">Номер, файл или расширение не подходят; текст ошибки можно показать владельцу</exception>
+    /// <exception cref="IOException">Файл не удалось скопировать или заменить прежний</exception>
+    public string AttachOwnWork(string lessonId, int number, string file)
+    {
+        var folder = DraftsDirectory(lessonId);
+        if (number < 1)
+            throw new InvalidDataException("Неверный номер задания: он начинается с единицы");
+
+        var info = OwnWorkSource(file);
+        var extension = OwnWorkExtension(info.Extension);
+        var name = $"Задание {number}{extension}";
+        var target = Path.Combine(folder, name);
+        if (!string.Equals(Path.GetDirectoryName(Path.GetFullPath(target)), Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Имя работы выходит за пределы папки занятия");
+
+        var existing = DraftFiles(lessonId).Where(draft => IsTaskFile(draft, number)).ToList();
+        if (existing.FirstOrDefault(draft => string.Equals(Path.GetExtension(draft), extension, StringComparison.OrdinalIgnoreCase) && (string.Equals(Path.GetFullPath(draft), info.FullName, StringComparison.OrdinalIgnoreCase) || SameContent(draft, info))) is { } same)
+            return same;
+
+        Directory.CreateDirectory(folder);
+        var partial = target + ".partial";
+        try
+        {
+            CopyLimited(info.FullName, partial);
+        }
+        catch
+        {
+            DeleteQuietly(partial);
+
+            throw;
+        }
+
+        var moved = new List<(string From, string To)>();
+        try
+        {
+            var previous = Path.Combine(folder, ".previous");
+            foreach (var draft in existing)
+            {
+                Directory.CreateDirectory(previous);
+
+                var destination = UniquePath(previous, Path.GetFileName(draft));
+                File.Move(draft, destination);
+                moved.Add((draft, destination));
+            }
+
+            File.Move(partial, target);
+        }
+        catch
+        {
+            foreach (var (from, to) in Enumerable.Reverse(moved))
+            {
+                try
+                {
+                    File.Move(to, from);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // Прежний файл остаётся в .previous: он не потерян
+                }
+            }
+
+            DeleteQuietly(partial);
+
+            throw;
+        }
+
+        return target;
+    }
+
+    /// <summary>
+    /// Проверяет исходный файл своей работы: он есть, это файл (не папка и не ссылка) и не больше предела
+    /// </summary>
+    /// <param name="file">Путь к файлу владельца</param>
+    /// <returns>Сведения о файле с полным путём</returns>
+    /// <exception cref="InvalidDataException">Файл не подходит</exception>
+    private static FileInfo OwnWorkSource(string file)
+    {
+        FileInfo info;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(file))
+                throw new InvalidDataException("Файл не выбран");
+
+            info = new FileInfo(Path.GetFullPath(file.Trim().Trim('"')));
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new InvalidDataException("Путь к файлу недопустим");
+        }
+
+        if (Directory.Exists(info.FullName))
+            throw new InvalidDataException("Это не файл, а папка: выбери файл работы");
+
+        if (!info.Exists)
+            throw new InvalidDataException("Файл не найден: " + info.FullName);
+
+        if (info.Attributes.HasFlag(FileAttributes.ReparsePoint))
+            throw new InvalidDataException("Это ссылка, а не сам файл: выбери файл работы");
+
+        if (info.Length > OWN_WORK_MAX_BYTES)
+            throw new InvalidDataException($"Файл больше {OWN_WORK_MAX_BYTES / 1024 / 1024} МБ: прикрепи работу поменьше");
+
+        return info;
+    }
+
+    /// <summary>
+    /// Приводит расширение к безопасному виду: нижний регистр, точка и до десяти латинских букв или цифр
+    /// </summary>
+    /// <param name="extension">Расширение файла с точкой</param>
+    /// <returns>Расширение с точкой</returns>
+    /// <exception cref="InvalidDataException">Расширения нет, оно длинное, содержит другие знаки или совпадает со служебным</exception>
+    private static string OwnWorkExtension(string extension)
+    {
+        var lower = extension.ToLowerInvariant();
+        if (lower.Length < 2 || lower.Length > OWN_WORK_EXTENSION_MAX || lower[0] != '.' || !lower.Skip(1).All(char.IsAsciiLetterOrDigit) || lower is ".tmp" or ".partial")
+            throw new InvalidDataException("У файла нет допустимого расширения (латиница и цифры, до 10 знаков): переименуй его, например в .docx");
+
+        return lower;
+    }
+
+    /// <summary>
+    /// Копирует файл целиком во временный и проверяет, что он не вырос выше предела за время копирования
+    /// </summary>
+    /// <param name="source">Исходный файл</param>
+    /// <param name="partial">Недописанный файл назначения</param>
+    /// <exception cref="InvalidDataException">Файл вырос выше предела</exception>
+    private static void CopyLimited(string source, string partial)
+    {
+        using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None);
+        input.CopyTo(output);
+        if (output.Length > OWN_WORK_MAX_BYTES)
+            throw new InvalidDataException($"Файл больше {OWN_WORK_MAX_BYTES / 1024 / 1024} МБ: прикрепи работу поменьше");
+    }
+
+    /// <summary>
+    /// Совпадает ли содержимое готовой работы с выбранным файлом
+    /// </summary>
+    /// <param name="draft">Файл в папке занятия</param>
+    /// <param name="source">Файл владельца</param>
+    /// <returns>
+    /// <see langword="true"/>, если размер и все байты совпадают; при ошибке чтения <see langword="false"/>
+    /// </returns>
+    private static bool SameContent(string draft, FileInfo source)
+    {
+        try
+        {
+            if (new FileInfo(draft).Length != source.Length)
+                return false;
+
+            using var left = new FileStream(draft, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var right = new FileStream(source.FullName, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var first = new byte[81920];
+            var second = new byte[81920];
+            int read;
+            while ((read = left.ReadAtLeast(first, first.Length, throwOnEndOfStream: false)) > 0)
+            {
+                if (right.ReadAtLeast(second, read, throwOnEndOfStream: false) < read || !first.AsSpan(0, read).SequenceEqual(second.AsSpan(0, read)))
+                    return false;
+            }
+
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Свободный путь в папке: если имя занято, добавляется « (2)», « (3)» и так далее перед расширением
+    /// </summary>
+    /// <param name="folder">Папка</param>
+    /// <param name="name">Желаемое имя файла</param>
+    /// <returns>Путь к несуществующему файлу</returns>
+    private static string UniquePath(string folder, string name)
+    {
+        var path = Path.Combine(folder, name);
+        for (var index = 2; File.Exists(path); index++)
+            path = Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(name)} ({index}){Path.GetExtension(name)}");
+
+        return path;
+    }
+
+    /// <summary>
+    /// Удаляет файл, не падая, если он занят или его уже нет
+    /// </summary>
+    /// <param name="path">Файл</param>
+    private static void DeleteQuietly(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Недописанный файл всё равно не считается готовой работой
+        }
+    }
+
+    /// <summary>
     /// Папка с описанием и файлами задания из LMS
     /// </summary>
     /// <param name="activityId">Номер работы в LMS</param>

@@ -21,6 +21,13 @@ public sealed record PrepareReport(IReadOnlyList<string> Prepared, IReadOnlyList
 }
 
 /// <summary>
+/// Итог прикрепления своей работы
+/// </summary>
+/// <param name="Path">Путь к файлу работы в папке занятия или пустая строка, если прикрепить не удалось</param>
+/// <param name="Message">Причина неудачи или предупреждение при удаче; пустая строка, если всё прошло гладко</param>
+public sealed record AttachResult(string Path, string Message);
+
+/// <summary>
 /// Общая подготовка работ для фоновой задачи и кнопок приложения: выбор заданий, оценка уверенности, формат предмета, работа агента с указаниями, образцами и замечаниями, проверка готовой работы, лимит и повторы после ошибки
 /// </summary>
 /// <param name="store">Папка домашних заданий</param>
@@ -33,6 +40,11 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     /// Начало строки уведомления о готовой работе в выводе фоновой задачи
     /// </summary>
     public const string NOTICE = "Готова работа: ";
+
+    /// <summary>
+    /// Сообщение владельцу, когда файл нельзя прикрепить из-за идущей фоновой подготовки
+    /// </summary>
+    public const string BUSY_MESSAGE = "Идёт подготовка работ в фоне, прикрепи файл позже";
 
     /// <summary>
     /// Сколько раз подряд агент может не справиться с заданием, дальше задание ждёт владельца
@@ -140,6 +152,67 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
             await CheckAsync(lesson, cancellationToken);
 
         return string.Empty;
+    }
+
+    /// <summary>
+    /// Прикрепляет готовую работу владельца к заданию. Занимает ту же блокировку, что и подготовка, но не ждёт её: пока идёт фоновая подготовка, прерванная попытка удалила бы новый файл «Задание N.*», поэтому файл не прикрепляется. Прикреплённая работа считается готовой, автоподготовка её не трогает. Если задание уже сдано, работа сразу становится образцом предмета, написанным владельцем
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="file">Путь к файлу владельца</param>
+    /// <returns>Путь к файлу работы (пусто при неудаче) и сообщение для владельца: причина неудачи или предупреждение</returns>
+    public AttachResult AttachOwnWork(Lesson lesson, int number, string file)
+    {
+        using var hold = TryHold();
+        if (hold is null)
+            return new AttachResult(string.Empty, BUSY_MESSAGE);
+
+        try
+        {
+            if (store.ReadItems(lesson.Id) is not { Count: > 0 } items)
+                return new AttachResult(string.Empty, "Задания этого занятия ещё не найдены: прикреплять работу некуда");
+
+            if (number < 1 || number > items.Count)
+                return new AttachResult(string.Empty, $"Задания с номером {number} в этом занятии нет");
+
+            var path = store.AttachOwnWork(lesson.Id, number, file);
+
+            return new AttachResult(path, RegisterOwnSample(lesson, items, number, path));
+        }
+        catch (InvalidDataException exception)
+        {
+            return new AttachResult(string.Empty, exception.Message);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
+        {
+            return new AttachResult(string.Empty, "Не удалось прикрепить работу: " + exception.Message);
+        }
+    }
+
+    /// <summary>
+    /// Если задание уже сдано, регистрирует прикреплённую работу образцом предмета (образец владельца заменяет прежний). Ошибка записи образца работу не отменяет
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="items">Задания занятия</param>
+    /// <param name="number">Номер задания, с единицы</param>
+    /// <param name="path">Прикреплённый файл в папке занятия</param>
+    /// <returns>Пустая строка или предупреждение, что образец не записался</returns>
+    private string RegisterOwnSample(Lesson lesson, IReadOnlyList<HomeworkItem> items, int number, string path)
+    {
+        if (store.ArchivedNumbers(lesson.Id).Contains(number) || !store.SubmittedAnywhere(lesson.Id, items).Contains(number))
+            return string.Empty;
+
+        try
+        {
+            guides.AddSample(lesson.Title, lesson.Id, number, path, fromUser: true);
+            _ledger.MarkSample($"{lesson.Id}:{number}");
+
+            return string.Empty;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return "Работа прикреплена, но образец предмета не записался: " + exception.Message;
+        }
     }
 
     /// <summary>

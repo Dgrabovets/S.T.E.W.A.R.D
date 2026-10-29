@@ -576,6 +576,23 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
+    /// Прикрепляет готовую работу владельца к заданию: файл копируется как «Задание N.расширение», шаг становится «Готово». Пока идёт фоновая подготовка, файл не прикрепляется. Копирует файл на вызывающем потоке, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии</param>
+    /// <param name="file">Путь к файлу владельца</param>
+    /// <returns>Сообщение для владельца и признак неудачи</returns>
+    public (string Message, bool Failed) AttachWork(string lessonId, int number, string file)
+    {
+        if (_homework.LoadLessons().FirstOrDefault(item => item.Id == lessonId) is not { } lesson)
+            return ("Занятие не найдено", true);
+
+        var result = _preparer.AttachOwnWork(lesson, number, file);
+
+        return result.Path.Length == 0 ? (result.Message, true) : (result.Message.Length > 0 ? result.Message : "Готовая работа прикреплена", false);
+    }
+
+    /// <summary>
     /// Удаляет готовые файлы занятия вместе с прежними версиями: кнопка «Подготовить задание» вернётся
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>

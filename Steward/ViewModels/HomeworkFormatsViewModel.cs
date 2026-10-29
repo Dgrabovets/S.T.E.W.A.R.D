@@ -337,6 +337,44 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Action<string>? DraftsDeleted { get; set; }
 
     /// <summary>
+    /// Прикрепляет готовую работу владельца: ключ занятия, номер задания и путь к файлу. Возвращает итог и признак неудачи. Вызывается в фоновой задаче, потому что копирует файл
+    /// </summary>
+    public Func<string, int, string, (string Message, bool Failed)>? WorkAttacher { get; set; }
+
+    /// <summary>
+    /// Прикрепляет готовую работу владельца к заданию, не блокируя окно: файл копируется в фоновой задаче. Итог показывается в карточке занятия, списки файлов и заданий обновляются
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания в занятии</param>
+    /// <param name="file">Путь к файлу владельца</param>
+    /// <returns>Задача, которая завершается, когда файл скопирован и итог показан</returns>
+    public async Task AttachWorkAsync(LessonFormatViewModel lesson, int number, string file)
+    {
+        var attach = WorkAttacher;
+        if (attach is null)
+        {
+            lesson.ShowResult("Прикрепление работы не подключено", failed: true);
+
+            return;
+        }
+
+        lesson.ShowResult("Копирую работу…", failed: false);
+        (string Message, bool Failed) result;
+        try
+        {
+            result = await Task.Run(() => attach(lesson.Id, number, file));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException)
+        {
+            result = ("Не удалось прикрепить работу: " + exception.Message, true);
+        }
+
+        lesson.ShowResult(result.Message, result.Failed);
+        RefreshDrafts(lesson);
+        RefreshItems(lesson);
+    }
+
+    /// <summary>
     /// Нужно открыть окно «Переделать» для занятия
     /// </summary>
     public event Action<LessonFormatViewModel>? RedoDialogRequested;

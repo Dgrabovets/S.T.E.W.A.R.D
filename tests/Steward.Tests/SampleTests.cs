@@ -1,6 +1,7 @@
 using Steward.Homework.Models;
 using Steward.Homework.Services;
 using Steward.Homework.Storage;
+using Steward.ViewModels;
 
 namespace Steward.Tests;
 
@@ -298,5 +299,334 @@ public class SampleTests : IDisposable
         var entries = new GuideStore(_root).Load();
         Assert.Equal(count, entries.Count);
         Assert.Equal(count, entries.Select(entry => entry.Id).Distinct().Count());
+    }
+
+    /// <summary>
+    /// Хранилище домашних заданий в папке теста
+    /// </summary>
+    /// <returns>Хранилище</returns>
+    private HomeworkStore Homework() => new(_root);
+
+    /// <summary>
+    /// Записывает занятие с двумя заданиями
+    /// </summary>
+    /// <returns>Занятие</returns>
+    private Lesson AddLesson()
+    {
+        var lesson = new Lesson("l1", "Физика", new DateOnly(2026, 10, 20));
+        var store = Homework();
+        store.SaveLessons([lesson]);
+        Directory.CreateDirectory(Path.Combine(_root, "items"));
+        File.WriteAllText(store.ItemsPath("l1"), """[{"title": "Первое"}, {"title": "Второе"}]""");
+
+        return lesson;
+    }
+
+    /// <summary>
+    /// Подготовщик, агент которого не должен вызываться: он записывает вызовы
+    /// </summary>
+    /// <param name="prompts">Сюда пишутся запросы к агенту</param>
+    /// <returns>Подготовщик</returns>
+    private HomeworkPreparer Preparer(List<string> prompts) => new(Homework(), new GuideStore(_root), new RemarkStore(Path.Combine(_root, "remarks")), (prompt, _, _, _) =>
+    {
+        prompts.Add(prompt);
+
+        return Task.FromResult("агент не должен вызываться");
+    });
+
+    /// <summary>
+    /// Своя работа копируется как «Задание N.расширение» в папку занятия, расширение приводится к нижнему регистру, недописанных файлов не остаётся, а шаг становится «Готово»
+    /// </summary>
+    [Fact]
+    public void Own_work_is_copied_as_the_task_file_and_marks_the_step_Ready()
+    {
+        var store = Homework();
+
+        var path = store.AttachOwnWork("l1", 2, Source("Моя работа.DOCX", "текст"));
+
+        Assert.Equal(Path.Combine(store.DraftsDirectory("l1"), "Задание 2.docx"), path);
+        Assert.Equal("текст", File.ReadAllText(path));
+        Assert.Equal(path, store.SampleCandidate("l1", 2));
+        Assert.Equal([path], store.DraftFiles("l1"));
+        Assert.Empty(Directory.GetFiles(store.DraftsDirectory("l1"), "*.partial"));
+    }
+
+    /// <summary>
+    /// Прежние файлы этого задания уходят в <c>.previous</c> с содержимым, файлы других заданий (в том числе «Задание 10») остаются, а повторная замена не затирает прежнюю копию
+    /// </summary>
+    [Fact]
+    public void An_existing_draft_moves_to_previous()
+    {
+        var store = Homework();
+        var folder = store.DraftsDirectory("l1");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "Задание 1.docx"), "агент");
+        File.WriteAllText(Path.Combine(folder, "Задание 1. Название.pptx"), "презентация");
+        File.WriteAllText(Path.Combine(folder, "Задание 10.docx"), "чужое десятое");
+        File.WriteAllText(Path.Combine(folder, "Задание 2.docx"), "чужое второе");
+
+        var first = store.AttachOwnWork("l1", 1, Source("a.docx", "моя первая"));
+        var second = store.AttachOwnWork("l1", 1, Source("b.docx", "моя вторая"));
+
+        var previous = Path.Combine(folder, ".previous");
+        Assert.Equal("моя вторая", File.ReadAllText(second));
+        Assert.Equal(first, second);
+        Assert.Equal("чужое десятое", File.ReadAllText(Path.Combine(folder, "Задание 10.docx")));
+        Assert.Equal("чужое второе", File.ReadAllText(Path.Combine(folder, "Задание 2.docx")));
+        Assert.Equal("презентация", File.ReadAllText(Path.Combine(previous, "Задание 1. Название.pptx")));
+        Assert.Equal(["агент", "моя первая"], Directory.GetFiles(previous, "Задание 1*.docx").Select(File.ReadAllText).Order().ToArray());
+        Assert.DoesNotContain(store.DraftFiles("l1"), file => file.Contains(".previous", StringComparison.Ordinal));
+        Assert.Single(store.DraftFiles("l1"), file => HomeworkStore.IsTaskFile(file, 1));
+    }
+
+    /// <summary>
+    /// Нет файла, папка вместо файла, слишком большой файл, пустое или чужое расширение, неверный номер и недопустимый ключ занятия отклоняются понятным сообщением, а ничего в папке занятия не появляется
+    /// </summary>
+    [Fact]
+    public void A_missing_or_huge_file_is_rejected_with_a_message()
+    {
+        var store = Homework();
+
+        var missing = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 1, Path.Combine(_outside, "нет.docx")));
+        var directory = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 1, _outside));
+        var huge = Path.Combine(_outside, "огромный.docx");
+        using (var stream = new FileStream(huge, FileMode.Create))
+            stream.SetLength(HomeworkStore.OWN_WORK_MAX_BYTES + 1);
+
+        var tooBig = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 1, huge));
+        var noExtension = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 1, Source("README", "текст")));
+        var foreign = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 1, Source("работа.тхт", "текст")));
+        var longExtension = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 1, Source("a.extension12345", "текст")));
+        var service = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 1, Source("x.tmp", "текст")));
+        var badNumber = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 0, Source("ok.txt", "текст")));
+        Assert.Throws<ArgumentException>(() => store.AttachOwnWork("../evil", 1, Source("ok2.txt", "текст")));
+
+        Assert.Contains("не найден", missing.Message);
+        Assert.Contains("не файл", directory.Message);
+        Assert.Contains("50", tooBig.Message);
+        Assert.Contains("расширен", noExtension.Message);
+        Assert.Contains("расширен", foreign.Message);
+        Assert.Contains("расширен", longExtension.Message);
+        Assert.Contains("расширен", service.Message);
+        Assert.Contains("номер", badNumber.Message);
+        Assert.False(Directory.Exists(store.DraftsDirectory("l1")) && Directory.EnumerateFileSystemEntries(store.DraftsDirectory("l1")).Any());
+        Assert.False(Directory.Exists(Path.Combine(_root, "evil")));
+    }
+
+    /// <summary>
+    /// Файл ровно предельного размера принимается
+    /// </summary>
+    [Fact]
+    public void A_file_of_exactly_the_limit_is_accepted()
+    {
+        var exact = Path.Combine(_outside, "ровно.bin");
+        using (var stream = new FileStream(exact, FileMode.Create))
+            stream.SetLength(HomeworkStore.OWN_WORK_MAX_BYTES);
+
+        var path = Homework().AttachOwnWork("l1", 1, exact);
+
+        Assert.Equal(HomeworkStore.OWN_WORK_MAX_BYTES, new FileInfo(path).Length);
+    }
+
+    /// <summary>
+    /// Повторное прикрепление того же файла (и самого файла из папки занятия) ничего не дублирует и не уводит в <c>.previous</c>
+    /// </summary>
+    [Fact]
+    public void Attaching_the_same_file_again_creates_no_duplicates()
+    {
+        var store = Homework();
+        var source = Source("a.docx", "одно и то же");
+        var path = store.AttachOwnWork("l1", 1, source);
+
+        var again = store.AttachOwnWork("l1", 1, source);
+        var itself = store.AttachOwnWork("l1", 1, path);
+
+        Assert.Equal(path, again);
+        Assert.Equal(path, itself);
+        Assert.Equal("одно и то же", File.ReadAllText(path));
+        Assert.False(Directory.Exists(Path.Combine(store.DraftsDirectory("l1"), ".previous")));
+        Assert.Single(Directory.GetFiles(store.DraftsDirectory("l1")));
+    }
+
+    /// <summary>
+    /// Если копирование сорвалось (файл занят), недописанного файла нет, а прежняя работа остаётся на месте
+    /// </summary>
+    [Fact]
+    public void A_failed_copy_leaves_no_partial_file_and_keeps_the_previous_work()
+    {
+        var store = Homework();
+        var existing = store.AttachOwnWork("l1", 1, Source("a.docx", "прежняя"));
+        var source = Source("b.docx", "новая");
+
+        using (new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.None))
+            Assert.ThrowsAny<IOException>(() => store.AttachOwnWork("l1", 1, source));
+
+        Assert.Equal("прежняя", File.ReadAllText(existing));
+        Assert.Equal([existing], Directory.GetFiles(store.DraftsDirectory("l1")));
+        Assert.False(Directory.Exists(Path.Combine(store.DraftsDirectory("l1"), ".previous")));
+    }
+
+    /// <summary>
+    /// Пока идёт фоновая подготовка (файл блокировки занят), файл не прикрепляется: прерванная попытка удалила бы его как новый
+    /// </summary>
+    [Fact]
+    public void Attaching_is_refused_while_a_background_prepare_is_running()
+    {
+        var lesson = AddLesson();
+        var preparer = Preparer([]);
+        using var hold = new FileStream(Path.Combine(_root, "prepare.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+
+        var result = preparer.AttachOwnWork(lesson, 1, Source("a.docx", "текст"));
+
+        Assert.Equal(string.Empty, result.Path);
+        Assert.Equal("Идёт подготовка работ в фоне, прикрепи файл позже", result.Message);
+        Assert.Null(Homework().SampleCandidate("l1", 1));
+    }
+
+    /// <summary>
+    /// Блокировка снимается после прикрепления: следующий запуск подготовки не считается занятым
+    /// </summary>
+    [Fact]
+    public async Task The_prepare_lock_is_released_after_attaching()
+    {
+        var lesson = AddLesson();
+        var preparer = Preparer([]);
+
+        var result = preparer.AttachOwnWork(lesson, 1, Source("a.docx", "текст"));
+
+        Assert.NotEqual(string.Empty, result.Path);
+        Assert.False((await preparer.RunAsync(1, CancellationToken.None)).Busy);
+    }
+
+    /// <summary>
+    /// Прикреплённая работа не готовится заново и не удаляется автоподготовкой, даже если агент не справляется
+    /// </summary>
+    [Fact]
+    public async Task Automatic_preparation_never_touches_an_attached_work()
+    {
+        var lesson = AddLesson();
+        var store = Homework();
+        store.SetSubjectState("Физика", LessonStateEnum.Fetch);
+        store.SetSubjectFormat("Физика", HomeworkFormatEnum.Text);
+        var prompts = new List<string>();
+        var preparer = Preparer(prompts);
+        var path = preparer.AttachOwnWork(lesson, 1, Source("a.docx", "моя работа")).Path;
+
+        var report = await preparer.RunAsync(5, CancellationToken.None);
+
+        Assert.Equal("моя работа", File.ReadAllText(path));
+        Assert.DoesNotContain(prompts, prompt => prompt.Contains("Первое", StringComparison.Ordinal));
+        Assert.DoesNotContain(report.Prepared, work => work.Contains("Первое", StringComparison.Ordinal));
+        Assert.DoesNotContain(report.Failed, work => work.Contains("Первое", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Работа сданного задания сразу становится образцом, написанным владельцем; у несданного образца нет
+    /// </summary>
+    [Fact]
+    public void An_attached_work_of_a_submitted_item_becomes_a_manual_sample()
+    {
+        var lesson = AddLesson();
+        var preparer = Preparer([]);
+        var guides = new GuideStore(_root);
+        preparer.AttachOwnWork(lesson, 2, Source("b.docx", "не сдано"));
+        Assert.Empty(guides.Load());
+
+        Homework().SetSubmitted("l1", 1, true);
+        var result = preparer.AttachOwnWork(lesson, 1, Source("a.docx", "сдано"));
+
+        var sample = Assert.Single(guides.Load());
+        Assert.Equal("sample:l1:1", sample.Id);
+        Assert.True(sample.Manual);
+        Assert.Equal("сдано", File.ReadAllText(sample.Path));
+        Assert.NotEqual(string.Empty, result.Path);
+    }
+
+    /// <summary>
+    /// Если образец не записался (IOException), работа всё равно прикреплена, а в сообщении предупреждение
+    /// </summary>
+    [Fact]
+    public void A_sample_failure_does_not_undo_the_attachment()
+    {
+        var lesson = AddLesson();
+        Homework().SetSubmitted("l1", 1, true);
+        Directory.CreateDirectory(Path.Combine(_root, "samples"));
+        File.WriteAllText(Path.Combine(_root, "samples", "Физика"), "файл вместо папки образцов");
+
+        var result = Preparer([]).AttachOwnWork(lesson, 1, Source("a.docx", "сдано"));
+
+        Assert.NotEqual(string.Empty, result.Path);
+        Assert.True(File.Exists(result.Path));
+        Assert.Contains("образец", result.Message);
+    }
+
+    /// <summary>
+    /// Неверный номер задания и занятие без найденных заданий отклоняются сообщением
+    /// </summary>
+    [Fact]
+    public void Attaching_to_an_unknown_item_is_refused_with_a_message()
+    {
+        var lesson = AddLesson();
+        var preparer = Preparer([]);
+
+        var outOfRange = preparer.AttachOwnWork(lesson, 3, Source("a.docx", "текст"));
+        var noItems = preparer.AttachOwnWork(new Lesson("l2", "Физика", new DateOnly(2026, 10, 21)), 1, Source("b.docx", "текст"));
+
+        Assert.Equal(string.Empty, outOfRange.Path);
+        Assert.Contains("нет", outOfRange.Message);
+        Assert.Equal(string.Empty, noItems.Path);
+        Assert.Contains("не найдены", noItems.Message);
+        Assert.Null(Homework().SampleCandidate("l1", 3));
+    }
+
+    /// <summary>
+    /// Модель окна копирует файл не в потоке окна, показывает итог в карточке занятия и обновляет список готовых файлов
+    /// </summary>
+    [Fact]
+    public async Task The_view_model_attaches_off_the_ui_thread_and_shows_the_result()
+    {
+        var callerThread = Environment.CurrentManagedThreadId;
+        var copyThread = -1;
+        var drafts = new List<string>();
+        var model = new HomeworkFormatsViewModel([(new Lesson("l1", "Физика", new DateOnly(2026, 10, 20)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            DraftLister = _ => drafts,
+            WorkAttacher = (id, number, file) =>
+            {
+                copyThread = Environment.CurrentManagedThreadId;
+                drafts.Add(file);
+
+                return ("Готовая работа прикреплена", false);
+            },
+        };
+        var lesson = model.Lessons[0];
+
+        await model.AttachWorkAsync(lesson, 1, "C:\\работа.docx");
+
+        Assert.NotEqual(callerThread, copyThread);
+        Assert.Equal("Готовая работа прикреплена", lesson.Status);
+        Assert.False(lesson.Failed);
+        Assert.Equal(["C:\\работа.docx"], lesson.Drafts.Select(draft => draft.Path));
+    }
+
+    /// <summary>
+    /// Ошибка прикрепления, в том числе исключение ввода-вывода, показывается в карточке как неудача
+    /// </summary>
+    [Fact]
+    public async Task The_view_model_shows_a_failure_and_survives_an_exception()
+    {
+        var model = new HomeworkFormatsViewModel([(new Lesson("l1", "Физика", new DateOnly(2026, 10, 20)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            WorkAttacher = (_, number, _) => number == 1 ? ("Файл слишком большой", true) : throw new IOException("диск занят"),
+        };
+        var lesson = model.Lessons[0];
+
+        await model.AttachWorkAsync(lesson, 1, "a.docx");
+        Assert.True(lesson.Failed);
+        Assert.Equal("Файл слишком большой", lesson.Status);
+
+        await model.AttachWorkAsync(lesson, 2, "a.docx");
+        Assert.True(lesson.Failed);
+        Assert.Contains("диск занят", lesson.Status);
     }
 }
