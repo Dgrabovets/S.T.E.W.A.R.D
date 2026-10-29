@@ -50,7 +50,7 @@ public static class ClaudeAgent
     ];
 
     /// <summary>
-    /// Запрещает агенту запись в дополнительные папки (указания, образцы, условия заданий) и в файлы состояния Steward в рабочей папке. Читать их можно по-прежнему
+    /// Запрещает агенту запись в дополнительные папки (указания, образцы, условия заданий), в файлы состояния Steward и в папку замечаний владельца в рабочей папке. Читать их можно по-прежнему
     /// </summary>
     /// <param name="workDirectory">Рабочая папка агента</param>
     /// <param name="extraDirectories">Дополнительные папки только для чтения</param>
@@ -59,7 +59,8 @@ public static class ClaudeAgent
     {
         string[] stateFiles = ["lesson-states.json", "item-states.json", "item-confirmed.json", "item-overrides.json", "created.json"];
         var rules = extraDirectories.Select(directory => DenyEdit(directory, true))
-            .Concat(stateFiles.Select(file => DenyEdit(Path.Combine(workDirectory, file), false)));
+            .Concat(stateFiles.Select(file => DenyEdit(Path.Combine(workDirectory, file), false)))
+            .Append(DenyEdit(Path.Combine(workDirectory, "remarks"), true));
 
         return ["--disallowedTools", .. rules];
     }
