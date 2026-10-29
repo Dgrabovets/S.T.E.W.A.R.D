@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows.Input;
 using Steward.Homework.Models;
+using Steward.Homework.Services;
 using Steward.Models;
 using Steward.Mvvm;
 
@@ -183,6 +184,7 @@ public sealed class LessonFormatViewModel : Bindable
 
             Raise(nameof(HasItems));
             Raise(nameof(PendingCount));
+            Raise(nameof(AllSubmitted));
             Raise(nameof(CanPrepare));
             Raise(nameof(ItemsHint));
             Raise(nameof(HasItemsHint));
@@ -198,6 +200,11 @@ public sealed class LessonFormatViewModel : Bindable
     /// Сколько заданий ещё нужно сделать: не сданы и не в архиве
     /// </summary>
     public int PendingCount => Items.Count(item => !item.IsDone);
+
+    /// <summary>
+    /// Все задания занятия сданы или в архиве: строку списка приглушают
+    /// </summary>
+    public bool AllSubmitted => PipelineStepper.LessonGroup(Items.Count, PendingCount) == 2;
 
     /// <summary>
     /// Поиск заданий в расшифровке уже прошёл
@@ -244,7 +251,7 @@ public sealed class LessonFormatViewModel : Bindable
     public void SetItems(IReadOnlyList<LessonItemViewModel> items, bool searched)
     {
         ItemsSearched = searched;
-        if (!items.Select(item => (item.Number, item.Title, item.Meta)).SequenceEqual(Items.Select(item => (item.Number, item.Title, item.Meta))))
+        if (!items.Select(item => (item.Number, item.Title, item.Meta, item.IsDone, item.Submitted)).SequenceEqual(Items.Select(item => (item.Number, item.Title, item.Meta, item.IsDone, item.Submitted))))
             Items = items;
     }
 

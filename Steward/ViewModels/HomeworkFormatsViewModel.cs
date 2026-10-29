@@ -1,5 +1,6 @@
 using System.IO;
 using Steward.Homework.Models;
+using Steward.Homework.Services;
 using Steward.Models;
 using Steward.Mvvm;
 using Steward.Preview;
@@ -772,29 +773,34 @@ public sealed class HomeworkFormatsViewModel : Bindable
         _formatByTitle = lessons.GroupBy(item => item.Lesson.Title, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First().Format, StringComparer.Ordinal);
         var known = Lessons.ToDictionary(row => row.Id, StringComparer.Ordinal);
         var rows = lessons
-            .Select(item =>
-            {
-                if (!known.TryGetValue(item.Lesson.Id, out var row))
-                {
-                    row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => { _ = lesson.RunCheckAsync(DraftChecker ?? (_ => Task.FromResult("Проверка не подключена"))); }, CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
-                    RefreshDrafts(row);
-                    RefreshItems(row);
-
-                    return row;
-                }
-
-                row.HasTranscript = _hasTranscript(item.Lesson);
-                RefreshDrafts(row);
-                RefreshItems(row);
-
-                return row;
-            })
+            .Select(item => (item.Lesson.Date, Row: BuildRow(item)))
+            .OrderBy(entry => PipelineStepper.LessonGroup(entry.Row.Items.Count, entry.Row.PendingCount))
+            .ThenByDescending(entry => entry.Date)
+            .Select(entry => entry.Row)
             .ToList();
 
         if (!rows.SequenceEqual(Lessons))
             Lessons = rows;
 
         UpdateSubjects();
+
+        LessonFormatViewModel BuildRow((Lesson Lesson, HomeworkFormatEnum Format) item)
+        {
+            if (!known.TryGetValue(item.Lesson.Id, out var row))
+            {
+                row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => { _ = lesson.RunCheckAsync(DraftChecker ?? (_ => Task.FromResult("Проверка не подключена"))); }, CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
+                RefreshDrafts(row);
+                RefreshItems(row);
+
+                return row;
+            }
+
+            row.HasTranscript = _hasTranscript(item.Lesson);
+            RefreshDrafts(row);
+            RefreshItems(row);
+
+            return row;
+        }
     }
 
     /// <summary>

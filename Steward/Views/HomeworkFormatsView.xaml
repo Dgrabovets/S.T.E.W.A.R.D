@@ -200,6 +200,9 @@
                                     <DataTrigger Binding="{Binding IsOpen}" Value="True">
                                         <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding AllSubmitted}" Value="True">
+                                        <Setter TargetName="Row" Property="Opacity" Value="0.6"/>
+                                    </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

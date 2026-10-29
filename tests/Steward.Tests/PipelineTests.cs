@@ -231,4 +231,43 @@ public class PipelineTests
                 Directory.Delete(folder, recursive: true);
         }
     }
+
+    /// <summary>
+    /// Шаг берётся из файлов и отметок: сдано главнее всего, затем проверка, затем готовая работа
+    /// </summary>
+    [Theory]
+    [InlineData(false, false, false, PipelineStepEnum.Found)]
+    [InlineData(false, true, false, PipelineStepEnum.Ready)]
+    [InlineData(false, false, true, PipelineStepEnum.Checked)]
+    [InlineData(false, true, true, PipelineStepEnum.Checked)]
+    [InlineData(true, false, false, PipelineStepEnum.Submitted)]
+    [InlineData(true, true, false, PipelineStepEnum.Submitted)]
+    [InlineData(true, false, true, PipelineStepEnum.Submitted)]
+    [InlineData(true, true, true, PipelineStepEnum.Submitted)]
+    public void The_step_follows_the_files_and_marks(bool submitted, bool hasDraft, bool hasCheck, PipelineStepEnum expected) =>
+        Assert.Equal(expected, PipelineStepper.Of(submitted, hasDraft, hasCheck));
+
+    /// <summary>
+    /// Занятия с несданными заданиями идут первыми, без заданий следом, полностью сданные в конце; внутри группы по дате от свежих к старым
+    /// </summary>
+    [Fact]
+    public void Lessons_with_pending_work_come_first_and_fully_submitted_go_last_by_date()
+    {
+        Assert.Equal(0, PipelineStepper.LessonGroup(3, 1));
+        Assert.Equal(0, PipelineStepper.LessonGroup(2, 2));
+        Assert.Equal(1, PipelineStepper.LessonGroup(0, 0));
+        Assert.Equal(2, PipelineStepper.LessonGroup(2, 0));
+
+        var lessons = new (string Id, DateOnly Date, int Items, int Pending)[]
+        {
+            ("a", new DateOnly(2026, 10, 25), 2, 0),
+            ("b", new DateOnly(2026, 10, 10), 1, 1),
+            ("c", new DateOnly(2026, 10, 20), 0, 0),
+            ("d", new DateOnly(2026, 10, 15), 3, 2),
+            ("e", new DateOnly(2026, 10, 12), 1, 0),
+        };
+        var order = lessons.OrderBy(item => PipelineStepper.LessonGroup(item.Items, item.Pending)).ThenByDescending(item => item.Date).Select(item => item.Id);
+
+        Assert.Equal(["d", "b", "c", "a", "e"], order);
+    }
 }
