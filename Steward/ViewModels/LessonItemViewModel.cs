@@ -31,7 +31,7 @@ public sealed class LessonItemViewModel
     /// <param name="openInLms">Открывает страницу задания в LMS</param>
     /// <param name="toggleSubmitted">Отмечает задание сданным или снимает отметку</param>
     /// <param name="copyCondition">Копирует условие задания в буфер обмена</param>
-    /// <param name="pipeline">Шаг конвейера, файл работы, оценка и источник задания; <see langword="null"/>, если их не читали: тогда шаг выводится из отметки «сдано»</param>
+    /// <param name="pipeline">Шаг конвейера, файл работы, оценка и источник задания; <see langword="null"/>, пока их не прочитали или если чтение не удалось: тогда карточка нейтральная (без выделенного шага, значка и подсказки), а главная кнопка выбирается по отметке «сдано»</param>
     /// <param name="actions">Действия главной кнопки, вопроса, блока источника и меню «…»; <see langword="null"/>, если их нет</param>
     /// <param name="viewed">Работу уже открывали: главная кнопка предлагает отметить сданным</param>
     public LessonItemViewModel(int number, HomeworkItem item, bool inSingularity, Action<LessonItemViewModel> archive, Action<LessonItemViewModel> addToSingularity, Action<LessonItemViewModel>? openInLms = null, Action<LessonItemViewModel>? toggleSubmitted = null, Action<LessonItemViewModel>? copyCondition = null, ItemPipelineInfo? pipeline = null, ItemCardActions? actions = null, bool viewed = false)
@@ -227,7 +227,7 @@ public sealed class LessonItemViewModel
     public string FullRequirements { get; }
 
     /// <summary>
-    /// Шаг конвейера задания
+    /// Шаг конвейера задания. Пока шаги не прочитаны (<see cref="PipelineKnown"/> ложно), это лишь предположение по отметке «сдано» для выбора главной кнопки; на экране шаг тогда не выделяется
     /// </summary>
     public PipelineStepEnum Step { get; }
 

@@ -814,9 +814,10 @@ public class PipelineTests
         TaskScheduler.UnobservedTaskException += Count;
         try
         {
+            var broken = true;
             var model = new HomeworkFormatsViewModel((_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
             {
-                ItemsReader = _ => throw new InvalidOperationException("файл заданий сломан"),
+                ItemsReader = _ => broken ? throw new InvalidOperationException("файл заданий сломан") : [(1, new HomeworkItem("А", null, string.Empty, string.Empty), false)],
             };
             model.Update([(Sample, HomeworkFormatEnum.Word)]);
             await model.WhenPipelineLoaded();
@@ -824,6 +825,14 @@ public class PipelineTests
             var row = model.Lessons.Single();
             Assert.True(row.Failed);
             Assert.Contains("файл заданий сломан", row.Status, StringComparison.Ordinal);
+
+            // Удачное чтение убирает сообщение об ошибке
+            broken = false;
+            model.Update([(Sample, HomeworkFormatEnum.Word)]);
+            await model.WhenPipelineLoaded();
+            Assert.False(row.Failed);
+            Assert.Equal(string.Empty, row.Status);
+            Assert.Single(row.Items);
 
             GC.Collect();
             GC.WaitForPendingFinalizers();
@@ -833,6 +842,71 @@ public class PipelineTests
         {
             TaskScheduler.UnobservedTaskException -= Count;
         }
+    }
+
+    /// <summary>
+    /// Ошибка чтения шагов не теряет задания: они показываются в нейтральной карточке
+    /// </summary>
+    [Fact]
+    public async Task A_pipeline_failure_keeps_the_items_neutral()
+    {
+        var model = new HomeworkFormatsViewModel((_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = _ => [(1, new HomeworkItem("А", null, string.Empty, string.Empty, Evidence: "сделайте"), false)],
+            PipelineReader = _ => throw new IOException("файл занят"),
+        };
+        model.Update([(Sample, HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
+
+        var item = Assert.Single(model.Lessons.Single().Items);
+        Assert.False(item.PipelineKnown);
+        Assert.False(item.HasReliability);
+    }
+
+    /// <summary>
+    /// Действие владельца не переставляет занятия под курсором: занятие уходит вниз только при следующем обновлении списка
+    /// </summary>
+    [Fact]
+    public async Task A_user_action_does_not_reorder_but_Update_does()
+    {
+        var fresh = new Lesson("fresh", "Физика", new DateOnly(2026, 10, 25));
+        var old = new Lesson("old", "Физика", new DateOnly(2026, 10, 10));
+        var submitted = new HashSet<string>();
+        var model = new HomeworkFormatsViewModel((_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = id =>
+            {
+                bool done;
+                lock (submitted)
+                    done = submitted.Contains(id);
+
+                return [(1, new HomeworkItem("Задание", null, string.Empty, string.Empty, done, Submitted: done), false)];
+            },
+            ItemSubmitted = (id, _, value) =>
+            {
+                lock (submitted)
+                {
+                    if (value)
+                        submitted.Add(id);
+                    else
+                        submitted.Remove(id);
+                }
+            },
+        };
+        IReadOnlyList<(Lesson, HomeworkFormatEnum)> all = [(fresh, HomeworkFormatEnum.Word), (old, HomeworkFormatEnum.Word)];
+        model.Update(all);
+        await model.WhenPipelineLoaded();
+        Assert.Equal(["fresh", "old"], model.Lessons.Select(row => row.Id).ToArray());
+
+        await model.MarkSubmittedAsync(model.Lessons[0], 1, true);
+        await model.WhenPipelineLoaded();
+
+        Assert.True(model.Lessons[0].AllSubmitted);
+        Assert.Equal(["fresh", "old"], model.Lessons.Select(row => row.Id).ToArray());
+
+        model.Update(all);
+        await model.WhenPipelineLoaded();
+        Assert.Equal(["old", "fresh"], model.Lessons.Select(row => row.Id).ToArray());
     }
 
     /// <summary>

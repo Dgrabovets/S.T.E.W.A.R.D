@@ -413,7 +413,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Читает шаг конвейера, файл работы, оценку и источник каждого задания занятия. Читает файлы, поэтому вызывается в фоновой задаче, а результат применяется в потоке окна. Пусто: шаг выводится из отметки «сдано»
+    /// Читает шаг конвейера, файл работы, оценку и источник каждого задания занятия. Читает файлы, поэтому вызывается в фоновой задаче, а результат применяется в потоке окна. Пусто или ошибка чтения: карточки заданий нейтральные, без выделенного шага и значка
     /// </summary>
     public Func<Lesson, IReadOnlyDictionary<int, ItemPipelineInfo>>? PipelineReader { get; set; }
 
@@ -515,24 +515,41 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <returns>Задача, которая завершается, когда снимок прочитан и применён; ошибок не выбрасывает</returns>
     private Task RefreshItemsAsync(LessonFormatViewModel lesson)
     {
+        bool cached;
         Task load;
         lock (_pipelineGate)
         {
-            if (_data.ContainsKey(lesson.Id))
-                BuildItems(lesson);
-
+            cached = _data.ContainsKey(lesson.Id);
             var version = _pipelineVersions.GetValueOrDefault(lesson.Id) + 1;
             _pipelineVersions[lesson.Id] = version;
             load = LoadLessonAsync(lesson, ItemsReader, PipelineReader, version);
-            _pipelineLoads.RemoveAll(task => task.IsCompleted);
-            _pipelineLoads.Add(load);
+            Track(load);
         }
+
+        // Строки собираются и объявляются вне блокировки: подписчики изменений не должны выполняться под ней
+        if (cached)
+            BuildItems(lesson);
 
         return load;
     }
 
     /// <summary>
-    /// Читает задания и шаги занятия одной фоновой задачей и применяет их вместе в потоке окна, если ответ ещё свежий; после этого занятия пересортировываются. Любая ошибка, в том числе при сборке строк, показывается в карточке занятия
+    /// Запоминает идущее чтение, чтобы <see cref="WhenPipelineLoaded"/> его дождался; вызывается под блокировкой кеша
+    /// </summary>
+    /// <param name="task">Задача чтения или пересортировки</param>
+    private void Track(Task task)
+    {
+        _pipelineLoads.RemoveAll(item => item.IsCompleted);
+        _pipelineLoads.Add(task);
+    }
+
+    /// <summary>
+    /// Занятия, у которых последнее чтение закончилось ошибкой и карточка показывает «Не удалось прочитать задания»: удачное чтение это сообщение убирает
+    /// </summary>
+    private readonly HashSet<string> _loadFailed = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Читает задания и шаги занятия одной фоновой задачей и применяет их вместе в потоке окна, если ответ ещё свежий. Занятия здесь не пересортировываются: порядок меняет только <see cref="Update"/>, чтобы занятие не уезжало из-под курсора после действия владельца. Ошибка шагов оставляет прочитанные задания с нейтральной карточкой; ошибка заданий или сборки строк показывается в карточке, только если ответ ещё свежий
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="items">Чтение заданий</param>
@@ -546,24 +563,68 @@ public sealed class HomeworkFormatsViewModel : Bindable
             var data = await Task.Run(() =>
             {
                 var found = items?.Invoke(lesson.Id);
+                if (found is null || pipeline is null)
+                    return new LessonData(found, null);
 
-                return new LessonData(found, found is null ? null : pipeline?.Invoke(lesson.Lesson));
+                try
+                {
+                    return new LessonData(found, pipeline(lesson.Lesson));
+                }
+                catch (Exception exception)
+                {
+                    // Задания уже прочитаны: карточка покажет их без шагов, в нейтральном виде
+                    System.Diagnostics.Trace.TraceError($"Шаги заданий {lesson.Id}: {exception}");
+
+                    return new LessonData(found, null);
+                }
             });
 
+            bool clearError;
             lock (_pipelineGate)
             {
                 if (_pipelineVersions.GetValueOrDefault(lesson.Id) != version)
                     return;
 
                 _data[lesson.Id] = data;
-                BuildItems(lesson);
-                Reorder();
+                clearError = _loadFailed.Remove(lesson.Id);
             }
+
+            if (clearError)
+                lesson.ShowResult(string.Empty, failed: false);
+
+            BuildItems(lesson);
         }
         catch (Exception exception)
         {
             System.Diagnostics.Trace.TraceError($"Задания занятия {lesson.Id}: {exception}");
+            lock (_pipelineGate)
+            {
+                // Устаревшее неудачное чтение не перекрывает более свежее удачное
+                if (_pipelineVersions.GetValueOrDefault(lesson.Id) != version)
+                    return;
+
+                _loadFailed.Add(lesson.Id);
+            }
+
             lesson.ShowResult("Не удалось прочитать задания занятия: " + exception.Message, failed: true);
+        }
+    }
+
+    /// <summary>
+    /// Пересортировывает занятия, когда все чтения одного <see cref="Update"/> применены: при запуске порядок меняется один раз, а не после каждого занятия
+    /// </summary>
+    /// <param name="loads">Чтения этого обновления; ошибок не выбрасывают</param>
+    /// <returns>Задача пересортировки; ошибок не выбрасывает</returns>
+    private async Task ReorderAfterAsync(IReadOnlyList<Task> loads)
+    {
+        try
+        {
+            await Task.WhenAll(loads);
+            Reorder();
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError($"Порядок занятий: {exception}");
         }
     }
 
@@ -1196,6 +1257,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     {
         _formatByTitle = lessons.GroupBy(item => item.Lesson.Title, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First().Format, StringComparer.Ordinal);
         var known = Lessons.ToDictionary(row => row.Id, StringComparer.Ordinal);
+        var loads = new List<Task>();
         var rows = lessons
             .Select(item => (item.Lesson.Date, Row: BuildRow(item)))
             .OrderBy(entry => PipelineStepper.LessonGroup(entry.Row.Items.Count, entry.Row.PendingCount))
@@ -1208,20 +1270,24 @@ public sealed class HomeworkFormatsViewModel : Bindable
 
         UpdateSubjects();
 
+        // Свежий порядок применяется один раз, когда прочитаны все занятия этого обновления
+        lock (_pipelineGate)
+            Track(ReorderAfterAsync(loads));
+
         LessonFormatViewModel BuildRow((Lesson Lesson, HomeworkFormatEnum Format) item)
         {
             if (!known.TryGetValue(item.Lesson.Id, out var row))
             {
                 row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => Forget(CheckAndRefreshAsync(lesson), lesson), CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
                 RefreshDrafts(row);
-                RefreshItems(row);
+                loads.Add(RefreshItemsAsync(row));
 
                 return row;
             }
 
             row.HasTranscript = _hasTranscript(item.Lesson);
             RefreshDrafts(row);
-            RefreshItems(row);
+            loads.Add(RefreshItemsAsync(row));
 
             return row;
         }
