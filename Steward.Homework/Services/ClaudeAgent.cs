@@ -44,9 +44,39 @@ public static class ClaudeAgent
         "--permission-mode", "acceptEdits",
         "--add-dir", workDirectory,
         .. (extraDirectories ?? []).SelectMany(directory => new[] { "--add-dir", directory }),
+        .. ReadOnlyRules(workDirectory, extraDirectories ?? []),
         "--no-session-persistence",
         "--max-budget-usd", MAX_BUDGET_USD,
     ];
+
+    /// <summary>
+    /// Запрещает агенту запись в дополнительные папки (указания, образцы, условия заданий) и в файлы состояния Steward в рабочей папке. Читать их можно по-прежнему
+    /// </summary>
+    /// <param name="workDirectory">Рабочая папка агента</param>
+    /// <param name="extraDirectories">Дополнительные папки только для чтения</param>
+    /// <returns>Аргументы <c>--disallowedTools</c> с правилами запрета правки</returns>
+    private static IReadOnlyList<string> ReadOnlyRules(string workDirectory, IReadOnlyList<string> extraDirectories)
+    {
+        string[] stateFiles = ["lesson-states.json", "item-states.json", "created.json"];
+        var rules = extraDirectories.Select(directory => DenyEdit(directory, true))
+            .Concat(stateFiles.Select(file => DenyEdit(Path.Combine(workDirectory, file), false)));
+
+        return ["--disallowedTools", .. rules];
+    }
+
+    /// <summary>
+    /// Собирает правило запрета правки в записи Claude Code: путь от корня диска с косыми чертами и строчной буквой диска
+    /// </summary>
+    /// <param name="path">Папка или файл</param>
+    /// <param name="folder">Это папка: правило покрывает всё внутри</param>
+    /// <returns>Правило вида <c>Edit(//d/dir/**)</c></returns>
+    private static string DenyEdit(string path, bool folder)
+    {
+        var full = Path.GetFullPath(path).Replace(Path.DirectorySeparatorChar, '/').TrimEnd('/');
+        var rooted = full.Length > 1 && full[1] == ':' ? char.ToLowerInvariant(full[0]) + full[2..] : full;
+
+        return $"Edit(//{rooted.TrimStart('/')}{(folder ? "/**" : string.Empty)})";
+    }
 
     /// <summary>
     /// Ищет программу Claude Code: сначала в PATH, потом среди версий, которые ставит приложение Claude

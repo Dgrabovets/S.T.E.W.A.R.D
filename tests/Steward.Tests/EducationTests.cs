@@ -300,6 +300,9 @@ public class EducationTests
         Assert.DoesNotContain("Методические указания по предмету", without, StringComparison.Ordinal);
         Assert.Contains("--add-dir", ClaudeAgent.Arguments("п", "w", [@"D:\g"]));
         Assert.Equal(2, ClaudeAgent.Arguments("п", "w", [@"D:\g"]).Count(argument => argument == "--add-dir"));
+        var rules = ClaudeAgent.Arguments("п", @"D:\data\homework", [@"D:\g"]);
+        Assert.Contains("Edit(//d/g/**)", rules);
+        Assert.Contains("Edit(//d/data/homework/item-states.json)", rules);
     }
 
     /// <summary>

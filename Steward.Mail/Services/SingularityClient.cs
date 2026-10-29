@@ -158,10 +158,10 @@ public sealed class SingularityClient : ISingularityClient, IDisposable
     }
 
     /// <summary>
-    /// Заменяет заметку задачи запросом PATCH /v2/task/{id}
+    /// Дописывает текст в конец заметки задачи: читает задачу, склеивает заметки и отправляет PATCH /v2/task/{id}. Написанное пользователем не теряется
     /// </summary>
     /// <param name="taskId">Номер задачи в SingularityApp</param>
-    /// <param name="note">Новая заметка в формате Quill Delta</param>
+    /// <param name="note">Дописываемый текст в формате Quill Delta</param>
     /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Задача, которая завершается, когда SingularityApp принимает запрос</returns>
     /// <exception cref="HttpRequestException">
@@ -169,12 +169,61 @@ public sealed class SingularityClient : ISingularityClient, IDisposable
     /// </exception>
     public async Task UpdateNoteAsync(string taskId, string note, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Patch, $"v2/task/{Uri.EscapeDataString(taskId)}") { Content = JsonContent.Create(new { note }) };
+        string current = string.Empty;
+        using (var read = await _http.GetAsync($"v2/task/{Uri.EscapeDataString(taskId)}", cancellationToken))
+        {
+            var text = await read.Content.ReadAsStringAsync(cancellationToken);
+            if (!read.IsSuccessStatusCode)
+                throw new HttpRequestException($"SingularityApp ответил {(int)read.StatusCode}: {text}");
+
+            using var document = JsonDocument.Parse(text);
+            if (document.RootElement.TryGetProperty("note", out var existing) && existing.ValueKind == JsonValueKind.String)
+                current = existing.GetString() ?? string.Empty;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"v2/task/{Uri.EscapeDataString(taskId)}") { Content = JsonContent.Create(new { note = MergeNote(current, note) }) };
         using var response = await _http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new HttpRequestException($"SingularityApp ответил {(int)response.StatusCode}: {body}");
+        }
+    }
+
+    /// <summary>
+    /// Склеивает две заметки в формате Quill Delta: старая остаётся как есть, новая идёт после пустой строки. Если старая пуста или не читается, берётся новая. Если все части новой уже есть в старой, заметка не меняется
+    /// </summary>
+    /// <param name="current">Заметка задачи сейчас</param>
+    /// <param name="addition">Дописываемая заметка</param>
+    /// <returns>Итоговая заметка в формате Quill Delta</returns>
+    public static string MergeNote(string current, string addition)
+    {
+        if (string.IsNullOrWhiteSpace(current))
+            return addition;
+
+        try
+        {
+            var old = System.Text.Json.Nodes.JsonNode.Parse(current) as System.Text.Json.Nodes.JsonArray;
+            var added = System.Text.Json.Nodes.JsonNode.Parse(addition) as System.Text.Json.Nodes.JsonArray;
+            if (old is null || added is null)
+                return addition;
+
+            if (added.All(op => old.Any(existing => System.Text.Json.Nodes.JsonNode.DeepEquals(existing, op))))
+                return current;
+
+            var merged = new System.Text.Json.Nodes.JsonArray();
+            foreach (var op in old)
+                merged.Add(op?.DeepClone());
+
+            merged.Add(new System.Text.Json.Nodes.JsonObject { ["insert"] = "\n" });
+            foreach (var op in added)
+                merged.Add(op?.DeepClone());
+
+            return merged.ToJsonString(new System.Text.Json.JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+        }
+        catch (JsonException)
+        {
+            return addition;
         }
     }
 
