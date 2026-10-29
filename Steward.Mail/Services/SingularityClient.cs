@@ -11,7 +11,7 @@ namespace Steward.Mail.Services;
 /// <summary>
 /// Создание задач через REST API SingularityApp
 /// </summary>
-public sealed class SingularityClient : ISingularityClient, IDisposable
+public sealed class SingularityClient : ISingularityClient, ISingularityNotes, IDisposable
 {
     /// <summary>
     /// Клиент, у которого базовый адрес — API SingularityApp, а в заголовке токен

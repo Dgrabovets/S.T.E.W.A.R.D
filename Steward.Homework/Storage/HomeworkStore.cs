@@ -516,6 +516,16 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
+    /// Выгружено ли условие задания из LMS: у задания есть номер работы и файл <c>assignment.md</c>
+    /// </summary>
+    /// <param name="item">Задание</param>
+    /// <returns>
+    /// <see langword="true"/>, если условие выгружено
+    /// </returns>
+    public bool HasAssignmentCondition(HomeworkItem item) =>
+        item.ActivityId.Length > 0 && item.ActivityId.All(char.IsAsciiDigit) && File.Exists(Path.Combine(AssignmentDirectory(item.ActivityId), "assignment.md"));
+
+    /// <summary>
     /// Номера заданий занятия, которые студент отметил сданными сам
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>

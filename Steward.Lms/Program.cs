@@ -457,33 +457,12 @@ internal static class Program
             written++;
         }
 
-        if (settings.CreateTasks)
-            await new HomeworkTaskCreator(store, singularity, configured.ProjectId, TimeProvider.System, Log).RunAsync(CancellationToken.None);
-
-        var homework = (await singularity.ListTasksAsync(from, "hw:", CancellationToken.None)).GroupBy(task => task.ExternalId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-        foreach (var lesson in lessons.Where(store.PreparesHomework))
-        {
-            var items = store.ReadItems(lesson.Id);
-            if (items is null || !Directory.Exists(store.DraftsDirectory(lesson.Id)))
-                continue;
-
-            for (var index = 0; index < items.Count; index++)
-            {
-                var files = Directory.EnumerateFiles(store.DraftsDirectory(lesson.Id), $"Задание {index + 1}.*").Order(StringComparer.Ordinal).ToArray();
-                var mark = $"draft:{lesson.Id}:{index + 1}:{string.Join('|', files.Select(Path.GetFileName))}";
-                if (files.Length == 0 || published.Contains(mark) || !homework.TryGetValue(HomeworkTaskBuilder.ExternalId(lesson, index + 1), out var task))
-                    continue;
-
-                Log($"{(settings.CreateTasks ? "Добавляю" : "Добавил бы")} ссылку на готовую работу в задачу: {items[index].Title}");
-                if (!settings.CreateTasks)
-                    continue;
-
-                await singularity.UpdateNoteAsync(task.Id, HomeworkTaskBuilder.Build(lesson, items[index], index + 1, store.FormatFor(lesson.Id), configured.ProjectId, offset, files).Note, CancellationToken.None);
-                store.MarkCreated([mark]);
-                published.Add(mark);
-                written++;
-            }
-        }
+        // Сетевые вызовы ограничены по времени; при выключенной записи (CreateTasks=false) клиент не вызывается, в журнал идут строки «Завёл бы»
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        var dryRun = !settings.CreateTasks;
+        var (created, _) = await new HomeworkTaskCreator(store, singularity, configured.ProjectId, TimeProvider.System, Log, dryRun).RunAsync(timeout.Token);
+        written += created;
+        written += await new HomeworkWorkLinker(store, singularity, TimeProvider.System, Log, dryRun).RunAsync(timeout.Token);
 
         return settings.CreateTasks ? $"Заметки и работы в Singularity: записано {written}" : "Заметки и работы: запись в Singularity выключена";
     }

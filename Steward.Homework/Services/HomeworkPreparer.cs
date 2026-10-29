@@ -397,7 +397,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     /// <see langword="true"/>, если описание работы лежит в <c>assignments/&lt;номер&gt;/assignment.md</c>
     /// </returns>
     private bool HasCondition(HomeworkItem item) =>
-        item.ActivityId.Length > 0 && item.ActivityId.All(char.IsAsciiDigit) && File.Exists(Path.Combine(store.AssignmentDirectory(item.ActivityId), "assignment.md"));
+        store.HasAssignmentCondition(item);
 
     /// <summary>
     /// Все файлы задания в папке занятия, включая недописанные
