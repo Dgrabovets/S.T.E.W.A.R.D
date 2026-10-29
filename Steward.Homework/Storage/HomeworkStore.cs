@@ -642,8 +642,78 @@ public sealed class HomeworkStore(string directory)
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <returns>Задания или <see langword="null"/>, если агент ещё не записал файл</returns>
-    public IReadOnlyList<HomeworkItem>? ReadItems(string lessonId) =>
-        File.Exists(ItemsPath(lessonId)) ? HomeworkItemParser.Parse(File.ReadAllText(ItemsPath(lessonId))) : null;
+    public IReadOnlyList<HomeworkItem>? ReadItems(string lessonId)
+    {
+        if (!File.Exists(ItemsPath(lessonId)))
+            return null;
+
+        var items = HomeworkItemParser.Parse(File.ReadAllText(ItemsPath(lessonId)));
+        var overrides = Read<Dictionary<string, ItemOverride>>(ItemOverridesFile);
+        if (overrides is not { Count: > 0 })
+            return items;
+
+        return [.. items.Select((item, index) => overrides.TryGetValue(ItemKey(lessonId, index + 1), out var fix)
+            ? item with { Title = fix.Title.Length > 0 ? fix.Title : item.Title, Requirements = fix.Requirements }
+            : item)];
+    }
+
+    /// <summary>
+    /// Файл с правками условий заданий, которые внёс владелец
+    /// </summary>
+    private string ItemOverridesFile => Path.Combine(directory, "item-overrides.json");
+
+    /// <summary>
+    /// Правка условия задания владельцем
+    /// </summary>
+    /// <param name="Title">Название, пустое значит «не менять»</param>
+    /// <param name="Requirements">Требования</param>
+    private sealed record ItemOverride(string Title = "", string Requirements = "");
+
+    /// <summary>
+    /// Номера заданий занятия, которые владелец подтвердил
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Номера заданий с единицы</returns>
+    public IReadOnlySet<int> ConfirmedNumbers(string lessonId) => NumbersWithState(lessonId, "confirmed");
+
+    /// <summary>
+    /// Подтверждает задание: дальше оно идёт по конвейеру само
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    public void Confirm(string lessonId, int number) => SetItemState(lessonId, number, "confirmed");
+
+    /// <summary>
+    /// Записывает правку условия задания и подтверждает его
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="title">Верное название, пусто значит оставить прежнее</param>
+    /// <param name="requirements">Верные требования</param>
+    public void SetOverride(string lessonId, int number, string title, string requirements)
+    {
+        var overrides = new Dictionary<string, ItemOverride>(Read<Dictionary<string, ItemOverride>>(ItemOverridesFile) ?? [], StringComparer.Ordinal)
+        {
+            [ItemKey(lessonId, number)] = new ItemOverride(title.Trim(), requirements.Trim()),
+        };
+
+        Directory.CreateDirectory(directory);
+
+        var temp = ItemOverridesFile + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(overrides, Json));
+        File.Move(temp, ItemOverridesFile, overwrite: true);
+        Confirm(lessonId, number);
+    }
+
+    /// <summary>
+    /// Находится ли цитата задания в расшифровке занятия
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns><see langword="true"/>, если цитата непустая и найдена в расшифровке</returns>
+    public bool EvidenceVerified(Lesson lesson, int number) =>
+        ReadItems(lesson.Id) is { } items && number >= 1 && number <= items.Count
+        && EvidenceCheck.Verify(ReadTranscript(lesson.Id), items[number - 1].Evidence);
 
     /// <summary>
     /// Проверяет, что ключ можно использовать как имя файла
