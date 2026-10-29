@@ -457,6 +457,27 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
+    /// Переносит все готовые файлы занятия в <c>.previous</c> для переделки. Если там уже лежит файл с таким именем, новый получает имя « (2)» и так далее: прежние версии не затираются
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Новые пути перенесённых файлов</returns>
+    public IReadOnlyList<string> MoveDraftsToPrevious(string lessonId)
+    {
+        var moved = new List<string>();
+        var previous = Path.Combine(DraftsDirectory(lessonId), ".previous");
+        foreach (var file in DraftFiles(lessonId))
+        {
+            Directory.CreateDirectory(previous);
+
+            var target = UniquePath(previous, Path.GetFileName(file));
+            File.Move(file, target);
+            moved.Add(target);
+        }
+
+        return moved;
+    }
+
+    /// <summary>
     /// Проверяет исходный файл своей работы: он есть, это файл (не папка и не ссылка) и не больше предела
     /// </summary>
     /// <param name="file">Путь к файлу владельца</param>
@@ -483,7 +504,8 @@ public sealed class HomeworkStore(string directory)
         if (!info.Exists)
             throw new InvalidDataException("Файл не найден: " + info.FullName);
 
-        if (info.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        // Заглушки OneDrive и Dropbox тоже помечены как точки повторной обработки, поэтому ссылкой считается только настоящая символьная ссылка или соединение
+        if (info.LinkTarget is not null)
             throw new InvalidDataException("Это ссылка, а не сам файл: выбери файл работы");
 
         if (info.Length > OWN_WORK_MAX_BYTES)
@@ -517,9 +539,19 @@ public sealed class HomeworkStore(string directory)
     {
         using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
         using var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None);
-        input.CopyTo(output);
-        if (output.Length > OWN_WORK_MAX_BYTES)
-            throw new InvalidDataException($"Файл больше {OWN_WORK_MAX_BYTES / 1024 / 1024} МБ: прикрепи работу поменьше");
+        var buffer = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            total += read;
+
+            // Файл мог вырасти после проверки размера: копирование останавливается, как только предел превышен
+            if (total > OWN_WORK_MAX_BYTES)
+                throw new InvalidDataException($"Файл больше {OWN_WORK_MAX_BYTES / 1024 / 1024} МБ: прикрепи работу поменьше");
+
+            output.Write(buffer, 0, read);
+        }
     }
 
     /// <summary>
@@ -562,7 +594,7 @@ public sealed class HomeworkStore(string directory)
     /// <param name="folder">Папка</param>
     /// <param name="name">Желаемое имя файла</param>
     /// <returns>Путь к несуществующему файлу</returns>
-    private static string UniquePath(string folder, string name)
+    public static string UniquePath(string folder, string name)
     {
         var path = Path.Combine(folder, name);
         for (var index = 2; File.Exists(path); index++)

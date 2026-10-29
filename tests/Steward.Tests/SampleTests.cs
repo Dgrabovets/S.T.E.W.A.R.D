@@ -561,6 +561,82 @@ public class SampleTests : IDisposable
     }
 
     /// <summary>
+    /// Испорченный файл образцов не превращает прикрепление в неудачу: работа на месте (хранилища сами сбрасывают испорченный JSON, а случайный JsonException в RegisterOwnSample тоже даёт предупреждение)
+    /// </summary>
+    [Fact]
+    public void A_corrupt_sample_list_does_not_fail_the_attachment()
+    {
+        var lesson = AddLesson();
+        Homework().SetSubmitted("l1", 1, true);
+        File.WriteAllText(Path.Combine(_root, "guides.json"), "{ не json");
+
+        var result = Preparer([]).AttachOwnWork(lesson, 1, Source("a.docx", "сдано"));
+
+        Assert.True(File.Exists(result.Path));
+        Assert.NotEqual(string.Empty, result.Path);
+    }
+
+    /// <summary>
+    /// Символьная ссылка отклоняется как ссылка (тест пропускается, если ссылку нельзя создать без прав), а обычный файл принимается
+    /// </summary>
+    [Fact]
+    public void A_symlink_is_refused_but_an_ordinary_file_is_accepted()
+    {
+        var real = Source("real.docx", "настоящий");
+        var link = Path.Combine(_outside, "link.docx");
+        var store = Homework();
+
+        Assert.Equal("настоящий", File.ReadAllText(store.AttachOwnWork("l1", 1, real)));
+
+        try
+        {
+            File.CreateSymbolicLink(link, real);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        var refused = Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 2, link));
+        Assert.Contains("ссылка", refused.Message);
+    }
+
+    /// <summary>
+    /// Перенос в <c>.previous</c> при переделке не затирает одноимённый файл, который там уже лежит
+    /// </summary>
+    [Fact]
+    public void Moving_to_previous_keeps_a_same_named_earlier_version()
+    {
+        var store = Homework();
+        var folder = store.DraftsDirectory("l1");
+        Directory.CreateDirectory(Path.Combine(folder, ".previous"));
+        File.WriteAllText(Path.Combine(folder, ".previous", "Задание 1.docx"), "очень старая");
+        File.WriteAllText(Path.Combine(folder, "Задание 1.docx"), "прошлая");
+
+        var moved = store.MoveDraftsToPrevious("l1");
+
+        Assert.Single(moved);
+        Assert.Equal("прошлая", File.ReadAllText(moved[0]));
+        Assert.Equal("очень старая", File.ReadAllText(Path.Combine(folder, ".previous", "Задание 1.docx")));
+        Assert.Empty(store.DraftFiles("l1"));
+    }
+
+    /// <summary>
+    /// Файл, выросший во время копирования выше предела, не остаётся даже недописанным: копирование прерывается
+    /// </summary>
+    [Fact]
+    public void Copy_stops_when_a_file_exceeds_the_limit()
+    {
+        var huge = Path.Combine(_outside, "x.bin");
+        using (var stream = new FileStream(huge, FileMode.Create))
+            stream.SetLength(HomeworkStore.OWN_WORK_MAX_BYTES + 1);
+
+        var store = Homework();
+        Assert.Throws<InvalidDataException>(() => store.AttachOwnWork("l1", 1, huge));
+        Assert.False(Directory.Exists(store.DraftsDirectory("l1")) && Directory.EnumerateFileSystemEntries(store.DraftsDirectory("l1")).Any());
+    }
+
+    /// <summary>
     /// Неверный номер задания и занятие без найденных заданий отклоняются сообщением
     /// </summary>
     [Fact]

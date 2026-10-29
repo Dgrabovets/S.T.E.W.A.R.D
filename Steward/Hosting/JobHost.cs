@@ -548,14 +548,8 @@ public sealed class JobHost : IDisposable
     private List<string> MoveToPrevious(string lessonId)
     {
         var readable = new List<string>();
-        var folder = _homework.DraftsDirectory(lessonId);
-        var previous = Path.Combine(folder, ".previous");
-        foreach (var file in _homework.DraftFiles(lessonId))
+        foreach (var target in _homework.MoveDraftsToPrevious(lessonId))
         {
-            Directory.CreateDirectory(previous);
-
-            var target = Path.Combine(previous, Path.GetFileName(file));
-            File.Move(file, target, overwrite: true);
             var extension = Path.GetExtension(target);
             try
             {
@@ -584,10 +578,18 @@ public sealed class JobHost : IDisposable
     /// <returns>Сообщение для владельца и признак неудачи</returns>
     public (string Message, bool Failed) AttachWork(string lessonId, int number, string file)
     {
-        if (_homework.LoadLessons().FirstOrDefault(item => item.Id == lessonId) is not { } lesson)
-            return ("Занятие не найдено", true);
+        AttachResult result;
+        try
+        {
+            if (_homework.LoadLessons().FirstOrDefault(item => item.Id == lessonId) is not { } lesson)
+                return ("Занятие не найдено", true);
 
-        var result = _preparer.AttachOwnWork(lesson, number, file);
+            result = _preparer.AttachOwnWork(lesson, number, file);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return ("Не удалось прикрепить работу: " + exception.Message, true);
+        }
 
         return result.Path.Length == 0 ? (result.Message, true) : (result.Message.Length > 0 ? result.Message : "Готовая работа прикреплена", false);
     }

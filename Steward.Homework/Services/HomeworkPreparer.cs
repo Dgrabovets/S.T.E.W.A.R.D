@@ -190,7 +190,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     }
 
     /// <summary>
-    /// Если задание уже сдано, регистрирует прикреплённую работу образцом предмета (образец владельца заменяет прежний). Ошибка записи образца работу не отменяет
+    /// Если задание уже сдано, регистрирует прикреплённую работу образцом предмета: это работа владельца, она заменяет образец-черновик агента, всегда берётся в материалы и не перезаписывается последующей автоматической регистрацией черновика. Ошибка записи образца (в том числе испорченный список образцов или учёт) работу не отменяет: возвращается предупреждение
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="items">Задания занятия</param>
@@ -209,7 +209,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
 
             return string.Empty;
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
         {
             return "Работа прикреплена, но образец предмета не записался: " + exception.Message;
         }
