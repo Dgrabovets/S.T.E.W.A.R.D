@@ -144,12 +144,30 @@ public sealed partial class GuideStore(string directory)
     /// <exception cref="FileNotFoundException">Файла нет</exception>
     public GuideEntry AddSample(string subject, string lessonId, int number, string file, bool fromUser)
     {
+        GuideEntry result = null!;
+        Locked(() => result = AddSampleCore(subject, lessonId, number, file, fromUser));
+
+        return result;
+    }
+
+    /// <summary>
+    /// Регистрация образца без блокировки: вызывается под ней
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="file">Файл работы</param>
+    /// <param name="fromUser">Работу принёс владелец</param>
+    /// <returns>Запись образца</returns>
+    private GuideEntry AddSampleCore(string subject, string lessonId, int number, string file, bool fromUser)
+    {
         if (!File.Exists(file))
             throw new FileNotFoundException("Файл не найден", file);
 
         var id = SampleId(lessonId, number);
         var previous = Load().FirstOrDefault(entry => entry.Id == id);
-        if (previous is { Manual: true } && !fromUser)
+        var previousExists = previous is { Path.Length: > 0 } && File.Exists(previous.Path);
+        if (previous is { Manual: true } && previousExists && !fromUser)
             return previous;
 
         var folder = Path.Combine(SamplesFolder, RemarkStore.SafeName(subject));
@@ -157,6 +175,9 @@ public sealed partial class GuideStore(string directory)
         var target = Path.GetFullPath(Path.Combine(folder, $"{RemarkStore.SafeName(lessonId)}-{number}{extension}"));
         if (!IsInside(target, SamplesFolder))
             throw new ArgumentException("Имя образца выходит за пределы папки образцов", nameof(lessonId));
+
+        // Файл не менялся, если у прежней записи тот же размер и тот же хеш содержимого: тогда дата добавления остаётся прежней
+        var unchanged = previous is not null && previousExists && SameContent(previous.Path, file);
 
         Directory.CreateDirectory(folder);
         var partial = target + ".partial";
@@ -172,7 +193,7 @@ public sealed partial class GuideStore(string directory)
             throw;
         }
 
-        var entry = new GuideEntry(id, subject, GuideKindEnum.Example, Path.GetFileName(target), target, string.Empty, string.Empty, Manual: fromUser, Added: DateTime.UtcNow);
+        var entry = new GuideEntry(id, subject, GuideKindEnum.Example, Path.GetFileName(target), target, string.Empty, string.Empty, Enabled: previous?.Enabled ?? true, Manual: fromUser, Added: unchanged ? previous!.Added : DateTime.UtcNow);
         Write([.. Load().Where(item => item.Id != id), entry]);
 
         // Прежний файл с другим расширением больше не нужен
@@ -276,13 +297,13 @@ public sealed partial class GuideStore(string directory)
     /// </summary>
     /// <param name="id">Ключ записи</param>
     /// <param name="enabled">Учитывать материал</param>
-    public void SetEnabled(string id, bool enabled) => Write([.. Load().Select(item => item.Id == id ? item with { Enabled = enabled } : item)]);
+    public void SetEnabled(string id, bool enabled) => Locked(() => Write([.. Load().Select(item => item.Id == id ? item with { Enabled = enabled } : item)]));
 
     /// <summary>
     /// Убирает материал из списка. Файл, который приложение скопировало к себе, удаляется, оригиналы по ссылке не трогаются
     /// </summary>
     /// <param name="id">Ключ записи</param>
-    public void Remove(string id)
+    public void Remove(string id) => Locked(() =>
     {
         var all = Load();
         var entry = all.FirstOrDefault(item => item.Id == id);
@@ -292,6 +313,39 @@ public sealed partial class GuideStore(string directory)
         Write([.. all.Where(item => item.Id != id)]);
         if (entry.Path.Length > 0 && File.Exists(entry.Path) && (IsInside(entry.Path, Folder) || IsInside(entry.Path, SamplesFolder)))
             File.Delete(entry.Path);
+    });
+
+    /// <summary>
+    /// Выполняет изменение списка под блокировкой: общей для потоков процесса и именованным мьютексом для процессов (приложение и Steward.Lms)
+    /// </summary>
+    /// <param name="action">Действие, которое читает и пишет список материалов</param>
+    /// <exception cref="IOException">Список занят другим процессом</exception>
+    private void Locked(Action action) => FileLock.Run(directory, "Steward.Guides.", action);
+
+    /// <summary>
+    /// Совпадает ли содержимое двух файлов: сначала сравнивается размер, потом хеш
+    /// </summary>
+    /// <param name="first">Первый файл</param>
+    /// <param name="second">Второй файл</param>
+    /// <returns>
+    /// <see langword="true"/>, если файлы читаются и содержимое одинаково
+    /// </returns>
+    private static bool SameContent(string first, string second)
+    {
+        try
+        {
+            if (new FileInfo(first).Length != new FileInfo(second).Length)
+                return false;
+
+            using var one = File.OpenRead(first);
+            using var two = File.OpenRead(second);
+
+            return SHA256.HashData(one).AsSpan().SequenceEqual(SHA256.HashData(two));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -485,7 +539,7 @@ public sealed partial class GuideStore(string directory)
     /// <returns>Та же запись</returns>
     private GuideEntry Save(GuideEntry entry)
     {
-        Write([.. Load(), entry]);
+        Locked(() => Write([.. Load(), entry]));
 
         return entry;
     }
@@ -497,7 +551,7 @@ public sealed partial class GuideStore(string directory)
     /// <returns>Та же запись</returns>
     private GuideEntry Replace(GuideEntry entry)
     {
-        Write([.. Load().Select(item => item.Id == entry.Id ? entry : item)]);
+        Locked(() => Write([.. Load().Select(item => item.Id == entry.Id ? entry : item)]));
 
         return entry;
     }
@@ -510,9 +564,18 @@ public sealed partial class GuideStore(string directory)
     {
         Directory.CreateDirectory(Folder);
 
-        var temp = ListFile + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(entries, Json));
-        File.Move(temp, ListFile, overwrite: true);
+        var temp = ListFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temp, JsonSerializer.Serialize(entries, Json));
+            File.Move(temp, ListFile, overwrite: true);
+        }
+        catch
+        {
+            File.Delete(temp);
+
+            throw;
+        }
     }
 
     [GeneratedRegex(@"drive\.google\.com/file/d/([\w-]+)")]

@@ -224,4 +224,74 @@ public class SampleTests : IDisposable
         Assert.Contains("Edit(//d/data/homework/samples/**)", rules);
         Assert.Contains("Edit(//d/data/homework/guides/**)", rules);
     }
+
+    /// <summary>
+    /// Выключенный владельцем автоматический образец остаётся выключенным после повторной регистрации
+    /// </summary>
+    [Fact]
+    public void A_disabled_sample_stays_disabled_when_registered_again()
+    {
+        var store = new GuideStore(_root);
+        var first = store.AddSample("Физика", "l1", 1, Source("a.txt", "один"), fromUser: false);
+        store.SetEnabled(first.Id, false);
+
+        var again = store.AddSample("Физика", "l1", 1, Source("a2.txt", "другой текст"), fromUser: false);
+
+        Assert.False(again.Enabled);
+        Assert.False(Assert.Single(store.Load()).Enabled);
+    }
+
+    /// <summary>
+    /// Повтор того же файла не обновляет дату и не двигает образец вперёд, изменённый файл обновляет
+    /// </summary>
+    [Fact]
+    public void Re_adding_an_identical_file_keeps_the_added_date_but_a_changed_file_refreshes_it()
+    {
+        var store = new GuideStore(_root);
+        var old = store.AddSample("Физика", "l1", 1, Source("a.txt", "старый"), fromUser: false);
+        store.AddSample("Физика", "l2", 1, Source("b.txt", "два"), fromUser: false);
+        store.AddSample("Физика", "l3", 1, Source("c.txt", "три"), fromUser: false);
+
+        var same = store.AddSample("Физика", "l1", 1, Source("a2.txt", "старый"), fromUser: false);
+
+        Assert.Equal(old.Added, same.Added);
+        Assert.Equal(["два", "три"], store.Materials("Физика").Examples.Select(File.ReadAllText).Order().ToArray());
+
+        var changed = store.AddSample("Физика", "l1", 1, Source("a3.txt", "новый"), fromUser: false);
+
+        Assert.True(changed.Added > old.Added);
+        Assert.Equal(["новый", "три"], store.Materials("Физика").Examples.Select(File.ReadAllText).Order().ToArray());
+    }
+
+    /// <summary>
+    /// Если файла прежнего ручного образца уже нет, черновик всё равно регистрируется
+    /// </summary>
+    [Fact]
+    public void A_draft_registers_when_the_manual_sample_file_is_gone()
+    {
+        var store = new GuideStore(_root);
+        var manual = store.AddSample("Физика", "l1", 1, Source("m.txt", "мой"), fromUser: true);
+        File.Delete(manual.Path);
+
+        var draft = store.AddSample("Физика", "l1", 1, Source("d.txt", "черновик"), fromUser: false);
+
+        Assert.False(draft.Manual);
+        Assert.Equal("черновик", File.ReadAllText(Assert.Single(store.Load()).Path));
+    }
+
+    /// <summary>
+    /// Параллельная регистрация образцов через разные экземпляры хранилища над одной папкой ничего не теряет
+    /// </summary>
+    [Fact]
+    public void Parallel_registrations_lose_nothing()
+    {
+        const int count = 30;
+        var sources = Enumerable.Range(0, count).Select(index => Source($"s{index}.txt", "текст " + index)).ToArray();
+
+        Parallel.For(0, count, new ParallelOptions { MaxDegreeOfParallelism = 16 }, index => new GuideStore(_root).AddSample("Физика", "l" + index, 1, sources[index], fromUser: false));
+
+        var entries = new GuideStore(_root).Load();
+        Assert.Equal(count, entries.Count);
+        Assert.Equal(count, entries.Select(entry => entry.Id).Distinct().Count());
+    }
 }

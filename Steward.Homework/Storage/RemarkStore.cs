@@ -43,11 +43,6 @@ public sealed partial class RemarkStore
     private static readonly string[] Reserved = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
 
     /// <summary>
-    /// Блокировки по папкам для потоков одного процесса
-    /// </summary>
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> Locks = new();
-
-    /// <summary>
     /// Папка замечаний
     /// </summary>
     private readonly string _directory;
@@ -211,37 +206,8 @@ public sealed partial class RemarkStore
     /// Выполняет действие под блокировкой: общей для потоков процесса и именованным мьютексом для процессов
     /// </summary>
     /// <param name="action">Действие над файлами замечаний</param>
-    private void Locked(Action action)
-    {
-        var key = Path.GetFullPath(_directory).ToLowerInvariant();
-        lock (Locks.GetOrAdd(key, _ => new object()))
-        {
-            using var mutex = new Mutex(false, @"Local\Steward.Remarks." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..32]);
-            var owned = false;
-            try
-            {
-                try
-                {
-                    owned = mutex.WaitOne(TimeSpan.FromSeconds(10));
-                }
-                catch (AbandonedMutexException)
-                {
-                    // Другой процесс завершился, не отпустив мьютекс: файлы целы благодаря атомарной записи
-                    owned = true;
-                }
-
-                if (!owned)
-                    throw new IOException("Файлы замечаний заняты другим процессом");
-
-                action();
-            }
-            finally
-            {
-                if (owned)
-                    mutex.ReleaseMutex();
-            }
-        }
-    }
+    /// <exception cref="IOException">Файлы замечаний заняты другим процессом</exception>
+    private void Locked(Action action) => FileLock.Run(_directory, "Steward.Remarks.", action);
 
     /// <summary>
     /// Добавление замечания без блокировки: вызывается под ней
