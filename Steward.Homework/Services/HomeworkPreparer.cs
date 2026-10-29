@@ -45,6 +45,16 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     private const string LOCK_FILE = "prepare.lock";
 
     /// <summary>
+    /// Сколько раз пробовать удалить занятый файл прерванной попытки
+    /// </summary>
+    private const int DELETE_ATTEMPTS = 10;
+
+    /// <summary>
+    /// Пауза между попытками удаления, миллисекунды
+    /// </summary>
+    private const int DELETE_RETRY_MS = 200;
+
+    /// <summary>
     /// Учёт попыток и зарегистрированных образцов
     /// </summary>
     private readonly PrepareLedger _ledger = new(store.Root);
@@ -322,7 +332,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         var (_, error) = await DraftBuilder.BuildAsync(store, lesson, single, format, agent, cancellationToken, materials, string.Empty, assignments, owner);
         if (cancellationToken.IsCancellationRequested)
         {
-            RemoveNew(folder, number, before);
+            await RemoveNewAsync(folder, number, before);
             TrySetAttempts(key, attempts);
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -335,7 +345,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
             return string.Empty;
         }
 
-        RemoveNew(folder, number, before);
+        await RemoveNewAsync(folder, number, before);
 
         return error.Length > 0 ? error : "агент не записал файл";
     }
@@ -400,22 +410,34 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         : [];
 
     /// <summary>
-    /// Удаляет файлы задания, которые появились во время неудачной попытки
+    /// Удаляет файлы задания, которые появились во время неудачной или прерванной попытки. Занятый файл (его ещё держит останавливаемый агент) удаляется с несколькими повторами
     /// </summary>
     /// <param name="folder">Папка готовых файлов занятия</param>
     /// <param name="number">Номер задания</param>
     /// <param name="before">Файлы задания до попытки</param>
-    private static void RemoveNew(string folder, int number, IReadOnlySet<string> before)
+    /// <returns>Задача очистки</returns>
+    private static async Task RemoveNewAsync(string folder, int number, IReadOnlySet<string> before)
     {
         foreach (var file in TaskFiles(folder, number).Where(file => !before.Contains(file)))
         {
-            try
+            for (var attempt = 1; ; attempt++)
             {
-                File.Delete(file);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                // Файл занят: он не будет считаться готовой работой, только если это недописанный файл; остальное покажет следующий запуск
+                try
+                {
+                    File.Delete(file);
+
+                    break;
+                }
+                catch (Exception exception) when ((exception is IOException or UnauthorizedAccessException) && attempt < DELETE_ATTEMPTS)
+                {
+                    // Отмена уже наступила, поэтому пауза без токена
+                    await Task.Delay(DELETE_RETRY_MS, CancellationToken.None);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // Файл так и не отпустили: следующий запуск увидит его готовой работой только если процесс дописал его целиком
+                    break;
+                }
             }
         }
     }

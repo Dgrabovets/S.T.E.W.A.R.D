@@ -463,6 +463,26 @@ public partial class PreparerTests : IDisposable
     }
 
     /// <summary>
+    /// Файл, который остановленный агент ещё держит открытым после отмены, удаляется повтором, как только его отпустят
+    /// </summary>
+    [Fact]
+    public async Task A_code_file_still_held_after_the_deadline_is_removed_once_released()
+    {
+        _store.SetSubjectFormat(SUBJECT, HomeworkFormatEnum.Code);
+        AddLesson("l1", 20, """[{"title": "Скрипт"}]""");
+        Directory.CreateDirectory(_store.DraftsDirectory("l1"));
+        _agent.HangOnWork = 1;
+        _agent.HangLeftover = Path.Combine(_store.DraftsDirectory("l1"), "Задание 1.py");
+        _agent.HoldAfterCancelMs = 500;
+
+        var report = await Preparer().RunWithBudgetAsync(2, TimeSpan.FromMilliseconds(300), null, CancellationToken.None);
+
+        Assert.True(report.Cancelled);
+        Assert.False(File.Exists(_agent.HangLeftover));
+        Assert.Null(_store.SampleCandidate("l1", 1));
+    }
+
+    /// <summary>
     /// Сбой записи учёта после удачной работы не теряет работу из отчёта и не возвращает лимит
     /// </summary>
     [Fact]
@@ -542,6 +562,11 @@ public partial class PreparerTests : IDisposable
         public string? HangLeftover { get; set; }
 
         /// <summary>
+        /// Сколько миллисекунд зависший агент ещё держит файл после отмены
+        /// </summary>
+        public int HoldAfterCancelMs { get; set; }
+
+        /// <summary>
         /// Вызывается после удачно записанной работы
         /// </summary>
         public Action? AfterWork { get; set; }
@@ -575,8 +600,10 @@ public partial class PreparerTests : IDisposable
             Entered.TrySetResult();
             if (++_works == HangOnWork)
             {
-                if (HangLeftover is not null)
-                    File.WriteAllText(HangLeftover, "print(");
+                // Как умирающий процесс: файл открыт без права удаления и отпускается чуть позже отмены
+                var held = HangLeftover is null ? null : new FileStream(HangLeftover, FileMode.Create, FileAccess.Write, FileShare.Read);
+                held?.Write("print("u8);
+                held?.Flush();
 
                 try
                 {
@@ -584,6 +611,9 @@ public partial class PreparerTests : IDisposable
                 }
                 catch (OperationCanceledException)
                 {
+                    if (held is not null)
+                        _ = Task.Delay(HoldAfterCancelMs, CancellationToken.None).ContinueWith(_ => held.Dispose(), TaskScheduler.Default);
+
                     return "Запуск отменён";
                 }
             }

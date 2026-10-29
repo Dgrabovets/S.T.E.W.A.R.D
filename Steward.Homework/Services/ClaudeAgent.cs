@@ -30,6 +30,11 @@ public static class ClaudeAgent
     private const int ERROR_LIMIT = 400;
 
     /// <summary>
+    /// Сколько секунд ждать выхода остановленного процесса
+    /// </summary>
+    private const int EXIT_WAIT_SECONDS = 10;
+
+    /// <summary>
     /// Собирает аргументы запуска: только чтение и запись файлов, правки без вопросов внутри рабочей папки, без сохранения сессии
     /// </summary>
     /// <param name="prompt">Просьба</param>
@@ -158,6 +163,17 @@ public static class ClaudeAgent
             catch (OperationCanceledException)
             {
                 process.Kill(entireProcessTree: true);
+
+                // Ждём, пока процесс действительно завершится и отпустит файлы, но не бесконечно
+                using var exit = new CancellationTokenSource(TimeSpan.FromSeconds(EXIT_WAIT_SECONDS));
+                try
+                {
+                    await process.WaitForExitAsync(exit.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Процесс не вышел за отведённое время: файлы удалит повтор очистки или следующий запуск
+                }
 
                 return cancellationToken.IsCancellationRequested ? "Запуск отменён" : $"Claude не ответил за {TIMEOUT_MINUTES} минут";
             }
