@@ -67,7 +67,10 @@ public static class HomeworkItemParser
             Text(element, "requirements"),
             Text(element, "link"),
             element.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.True,
-            Text(element, "activity"));
+            Text(element, "activity"),
+            Evidence: Text(element, "evidence"),
+            Confidence: Text(element, "confidence").ToLowerInvariant(),
+            Doubt: Text(element, "doubt"));
     }
 
     /// <summary>
