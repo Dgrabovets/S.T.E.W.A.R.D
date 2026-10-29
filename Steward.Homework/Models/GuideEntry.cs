@@ -27,4 +27,6 @@ public enum GuideKindEnum
 /// <param name="Url">Не используется: раньше здесь хранилась ссылка в интернете. Поле оставлено, чтобы старые записи читались</param>
 /// <param name="Note">Пояснение для списка</param>
 /// <param name="Enabled">Материал учитывается при подготовке заданий. Выключенный остаётся в списке</param>
-public sealed record GuideEntry(string Id, string Subject, GuideKindEnum Kind, string Title, string Path, string Url, string Note, bool Enabled = true);
+/// <param name="Manual">Образец принёс владелец сам, а не взят из готового черновика. Необязательное поле: в старых записях его нет</param>
+/// <param name="Added">Когда запись добавлена или заменена (UTC). Нужно, чтобы выбрать последние образцы. Необязательное поле: в старых записях его нет</param>
+public sealed record GuideEntry(string Id, string Subject, GuideKindEnum Kind, string Title, string Path, string Url, string Note, bool Enabled = true, bool Manual = false, DateTime? Added = null);

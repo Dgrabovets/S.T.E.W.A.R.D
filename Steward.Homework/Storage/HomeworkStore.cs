@@ -341,6 +341,26 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
+    /// Готовый файл задания, который можно взять образцом: <c>Задание N.*</c> в папке готовых файлов занятия
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns>Путь к самому свежему файлу или <see langword="null"/>, если файла нет или ключ занятия недопустим</returns>
+    public string? SampleCandidate(string lessonId, int number)
+    {
+        try
+        {
+            var name = $"Задание {number}";
+
+            return DraftFiles(lessonId).FirstOrDefault(file => string.Equals(Path.GetFileNameWithoutExtension(file), name, StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Папка с описанием и файлами задания из LMS
     /// </summary>
     /// <param name="activityId">Номер работы в LMS</param>

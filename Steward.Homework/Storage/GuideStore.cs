@@ -21,6 +21,16 @@ public sealed partial class GuideStore(string directory)
     private const int FOLDER_LIMIT = 30;
 
     /// <summary>
+    /// Начало ключа записи образца из сданной работы
+    /// </summary>
+    private const string SAMPLE_PREFIX = "sample:";
+
+    /// <summary>
+    /// Сколько последних автоматических образцов предмета берётся в материалы
+    /// </summary>
+    private const int SAMPLE_LIMIT = 2;
+
+    /// <summary>
     /// Самый большой файл, который скачивается по ссылке, в байтах
     /// </summary>
     private const long MAX_DOWNLOAD_BYTES = 100L * 1024 * 1024;
@@ -46,6 +56,11 @@ public sealed partial class GuideStore(string directory)
     /// Папка материалов
     /// </summary>
     public string Folder => Path.Combine(directory, "guides");
+
+    /// <summary>
+    /// Папка образцов из сданных работ: <c>samples</c> рядом с <c>guides</c>
+    /// </summary>
+    public string SamplesFolder => Path.Combine(directory, "samples");
 
     /// <summary>
     /// Файл со списком материалов
@@ -115,6 +130,65 @@ public sealed partial class GuideStore(string directory)
             return Save(new GuideEntry(NewId(), subject, kind, Path.GetFileName(text.TrimEnd('\\', '/')) is { Length: > 0 } name ? name : text, Path.GetFullPath(text), string.Empty, string.Empty));
 
         throw new ArgumentException("Это не путь к существующему файлу или папке и не адрес в интернете", nameof(pathOrUrl));
+    }
+
+    /// <summary>
+    /// Копирует сданную работу в <c>samples/&lt;безопасное имя предмета&gt;</c> и регистрирует её образцом предмета с ключом <c>sample:&lt;занятие&gt;:&lt;номер&gt;</c>. Повтор для того же задания заменяет запись и файл. Файл владельца не заменяется черновиком
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <param name="file">Файл работы</param>
+    /// <param name="fromUser">Работу принёс владелец, а не взят готовый черновик</param>
+    /// <returns>Запись образца. Если у задания уже образец владельца, а пришёл черновик, возвращается прежняя запись</returns>
+    /// <exception cref="FileNotFoundException">Файла нет</exception>
+    public GuideEntry AddSample(string subject, string lessonId, int number, string file, bool fromUser)
+    {
+        if (!File.Exists(file))
+            throw new FileNotFoundException("Файл не найден", file);
+
+        var id = SampleId(lessonId, number);
+        var previous = Load().FirstOrDefault(entry => entry.Id == id);
+        if (previous is { Manual: true } && !fromUser)
+            return previous;
+
+        var folder = Path.Combine(SamplesFolder, RemarkStore.SafeName(subject));
+        var extension = new string([.. Path.GetExtension(file).Where(symbol => char.IsAsciiLetterOrDigit(symbol) || symbol == '.').Take(16)]);
+        var target = Path.GetFullPath(Path.Combine(folder, $"{RemarkStore.SafeName(lessonId)}-{number}{extension}"));
+        if (!IsInside(target, SamplesFolder))
+            throw new ArgumentException("Имя образца выходит за пределы папки образцов", nameof(lessonId));
+
+        Directory.CreateDirectory(folder);
+        var partial = target + ".partial";
+        try
+        {
+            File.Copy(file, partial, overwrite: true);
+            File.Move(partial, target, overwrite: true);
+        }
+        catch
+        {
+            File.Delete(partial);
+
+            throw;
+        }
+
+        var entry = new GuideEntry(id, subject, GuideKindEnum.Example, Path.GetFileName(target), target, string.Empty, string.Empty, Manual: fromUser, Added: DateTime.UtcNow);
+        Write([.. Load().Where(item => item.Id != id), entry]);
+
+        // Прежний файл с другим расширением больше не нужен
+        if (previous is not null && previous.Path.Length > 0 && !string.Equals(Path.GetFullPath(previous.Path), target, StringComparison.OrdinalIgnoreCase) && IsInside(previous.Path, SamplesFolder) && File.Exists(previous.Path))
+        {
+            try
+            {
+                File.Delete(previous.Path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Запись уже заменена: лишний файл останется на диске, но образцом не станет
+            }
+        }
+
+        return entry;
     }
 
     /// <summary>
@@ -216,9 +290,28 @@ public sealed partial class GuideStore(string directory)
             return;
 
         Write([.. all.Where(item => item.Id != id)]);
-        if (entry.Path.Length > 0 && File.Exists(entry.Path) && Path.GetFullPath(entry.Path).StartsWith(Path.GetFullPath(Folder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        if (entry.Path.Length > 0 && File.Exists(entry.Path) && (IsInside(entry.Path, Folder) || IsInside(entry.Path, SamplesFolder)))
             File.Delete(entry.Path);
     }
+
+    /// <summary>
+    /// Лежит ли путь внутри папки (сама папка не считается)
+    /// </summary>
+    /// <param name="path">Проверяемый путь</param>
+    /// <param name="folder">Папка</param>
+    /// <returns>
+    /// <see langword="true"/>, если путь строго внутри папки
+    /// </returns>
+    private static bool IsInside(string path, string folder) =>
+        Path.GetFullPath(path).StartsWith(Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Ключ записи образца
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <returns>Строка вида <c>sample:&lt;занятие&gt;:&lt;номер&gt;</c></returns>
+    private static string SampleId(string lessonId, int number) => $"{SAMPLE_PREFIX}{lessonId}:{number}";
 
     /// <summary>
     /// Собирает материалы предмета для агента: читаемые файлы указаний и образцов и папки, к которым агенту нужен доступ
@@ -228,10 +321,19 @@ public sealed partial class GuideStore(string directory)
     /// <returns>Файлы по видам и папки</returns>
     public GuideMaterials Materials(string subject, IReadOnlySet<string>? ids = null)
     {
-        var entries = ForSubject(subject)
+        var chosen = ForSubject(subject)
             .Where(entry => ids is not null ? ids.Contains(entry.Id) : entry.Enabled)
             .Where(entry => entry.Path.Length > 0 && (File.Exists(entry.Path) || Directory.Exists(entry.Path)))
             .ToArray();
+
+        // Образцы из сданных работ только этого предмета: все ручные и два последних автоматических (при явном выборе берутся все выбранные)
+        var samples = chosen.Where(entry => entry.Id.StartsWith(SAMPLE_PREFIX, StringComparison.Ordinal) && string.Equals(entry.Subject, subject, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var latest = samples.Where(entry => !entry.Manual)
+            .Select((entry, index) => (entry, index))
+            .OrderByDescending(pair => pair.entry.Added ?? DateTime.MinValue).ThenByDescending(pair => pair.index)
+            .Select(pair => pair.entry)
+            .Take(ids is null ? SAMPLE_LIMIT : int.MaxValue);
+        var entries = chosen.Where(entry => !entry.Id.StartsWith(SAMPLE_PREFIX, StringComparison.Ordinal)).Concat(samples.Where(entry => entry.Manual)).Concat(latest).ToArray();
         var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         List<string> Files(GuideKindEnum kind)
         {
