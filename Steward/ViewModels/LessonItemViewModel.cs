@@ -37,6 +37,7 @@ public sealed class LessonItemViewModel
     public LessonItemViewModel(int number, HomeworkItem item, bool inSingularity, Action<LessonItemViewModel> archive, Action<LessonItemViewModel> addToSingularity, Action<LessonItemViewModel>? openInLms = null, Action<LessonItemViewModel>? toggleSubmitted = null, Action<LessonItemViewModel>? copyCondition = null, ItemPipelineInfo? pipeline = null, ItemCardActions? actions = null, bool viewed = false)
     {
         var act = actions ?? new ItemCardActions();
+        FullRequirements = item.Requirements;
         Step = pipeline?.Step ?? (item.Done ? PipelineStepEnum.Submitted : PipelineStepEnum.Found);
         WorkPath = pipeline?.WorkPath ?? string.Empty;
         Viewed = viewed;
@@ -54,6 +55,7 @@ public sealed class LessonItemViewModel
         EvidenceStatus = evidence.Length == 0 ? "цитаты нет" : verified ? "цитата найдена в расшифровке" : "цитата не найдена в расшифровке";
         Reliability = verified && linked ? "подтверждено цитатой и LMS" : linked ? "только LMS" : "только расшифровка";
         IsConfirmedSource = verified && linked;
+        LinkedToLms = linked;
         var hasWork = WorkPath.Length > 0;
         var submitted = item.Submitted;
         MainLabel = Step switch
@@ -196,6 +198,11 @@ public sealed class LessonItemViewModel
         doubt.Trim().Length == 0 || doubt.StartsWith(NOTE_PREFIX, StringComparison.OrdinalIgnoreCase) ? NOTE_PREFIX : $"{NOTE_PREFIX}: {doubt.Trim()}";
 
     /// <summary>
+    /// Требования к работе целиком: ими заполняется окно «Поправить условие»
+    /// </summary>
+    public string FullRequirements { get; }
+
+    /// <summary>
     /// Шаг конвейера задания
     /// </summary>
     public PipelineStepEnum Step { get; }
@@ -289,6 +296,11 @@ public sealed class LessonItemViewModel
     /// Источник подтверждён и цитатой, и LMS: значок зелёный
     /// </summary>
     public bool IsConfirmedSource { get; }
+
+    /// <summary>
+    /// Задание связано со страницей LMS: в блоке источника есть ссылка на неё
+    /// </summary>
+    public bool LinkedToLms { get; }
 
     /// <summary>
     /// Подтверждает задание

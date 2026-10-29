@@ -158,8 +158,21 @@ public sealed class LessonFormatViewModel : Bindable
 
             Raise(nameof(HasDrafts));
             Raise(nameof(CanPrepare));
+            Raise(nameof(HasDraftsWithoutItems));
+            Raise(nameof(OtherDrafts));
         }
     }
+
+    /// <summary>
+    /// Готовые файлы, которые не относятся ни к одному заданию: их кнопки «Посмотреть задание» остаются в шапке занятия, а работы заданий открываются главной кнопкой карточки
+    /// </summary>
+    public IReadOnlyList<DraftFileViewModel> OtherDrafts =>
+        [.. Drafts.Where(draft => !Items.Any(item => string.Equals(item.WorkPath, draft.Path, StringComparison.OrdinalIgnoreCase)))];
+
+    /// <summary>
+    /// Готовые файлы есть, а найденных заданий нет: тогда проверка, переделка и удаление показываются кнопками занятия, ведь меню «…» у заданий нет
+    /// </summary>
+    public bool HasDraftsWithoutItems => HasDrafts && !HasItems;
 
     /// <summary>
     /// У занятия есть готовые файлы
@@ -183,6 +196,8 @@ public sealed class LessonFormatViewModel : Bindable
                 return;
 
             Raise(nameof(HasItems));
+            Raise(nameof(HasDraftsWithoutItems));
+            Raise(nameof(OtherDrafts));
             Raise(nameof(PendingCount));
             Raise(nameof(AllSubmitted));
             Raise(nameof(CanPrepare));

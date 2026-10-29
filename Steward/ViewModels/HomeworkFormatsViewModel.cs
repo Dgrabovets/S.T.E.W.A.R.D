@@ -110,6 +110,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="prepare">Ищет задания в расшифровке занятия: возвращает их число и текст ошибки</param>
     /// <param name="stateChosen">Запоминает отметку предмета: ключ — название предмета. Пусто: выбор отметок не показывается</param>
     /// <param name="stateOf">Читает отметку предмета по названию</param>
+    /// <param name="fetchRequested">Просит забрать расшифровку занятия независимо от отметки предмета. Пусто: кнопки «Расшифровать» нет</param>
+    /// <param name="subjectFormatChosen">Запоминает формат заданий по умолчанию для предмета. Пусто: выбор формата в карточке не показывается</param>
     public HomeworkFormatsViewModel(
         Action<string, HomeworkFormatEnum> chosen,
         Func<Lesson, bool> hasTranscript,
@@ -142,6 +144,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="prepare">Ищет задания в расшифровке занятия: возвращает их число и текст ошибки</param>
     /// <param name="stateChosen">Запоминает отметку предмета: ключ — название предмета. Пусто: выбор отметок не показывается</param>
     /// <param name="stateOf">Читает отметку предмета по названию</param>
+    /// <param name="fetchRequested">Просит забрать расшифровку занятия независимо от отметки предмета. Пусто: кнопки «Расшифровать» нет</param>
+    /// <param name="subjectFormatChosen">Запоминает формат заданий по умолчанию для предмета. Пусто: выбор формата в карточке не показывается</param>
     public HomeworkFormatsViewModel(
         IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> lessons,
         Action<string, HomeworkFormatEnum> chosen,
@@ -169,9 +173,6 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Занятий пока нет
-    /// </summary>
-    /// <summary>
     /// Карточки предметов: в них те же занятия, но по одной отметке на предмет
     /// </summary>
     public IReadOnlyList<SubjectViewModel> Subjects
@@ -189,6 +190,9 @@ public sealed class HomeworkFormatsViewModel : Bindable
         private set => Set(ref _selectedSubject, value);
     }
 
+    /// <summary>
+    /// Занятий пока нет
+    /// </summary>
     public bool IsEmpty => Lessons.Count == 0;
 
     /// <summary>

@@ -31,6 +31,9 @@ public partial class HomeworkFormatsView : UserControl
             old.PrepareDialogRequested -= ShowPrepare;
             old.RedoDialogRequested -= ShowRedo;
             old.DeleteConfirmRequested -= ConfirmDelete;
+            old.AttachFileRequested -= AttachWork;
+            old.SubmittedFileRequested -= ChooseSubmittedFile;
+            old.ConditionEditRequested -= EditCondition;
         }
 
         if (e.NewValue is HomeworkFormatsViewModel current)
@@ -39,7 +42,75 @@ public partial class HomeworkFormatsView : UserControl
             current.PrepareDialogRequested += ShowPrepare;
             current.RedoDialogRequested += ShowRedo;
             current.DeleteConfirmRequested += ConfirmDelete;
+            current.AttachFileRequested += AttachWork;
+            current.SubmittedFileRequested += ChooseSubmittedFile;
+            current.ConditionEditRequested += EditCondition;
         }
+    }
+
+    /// <summary>
+    /// Раскрывает меню «…» задания под кнопкой: так оно открывается и мышью, и с клавиатуры (Enter или пробел)
+    /// </summary>
+    /// <param name="sender">Кнопка «…»</param>
+    /// <param name="e">Событие</param>
+    private void ItemMenu_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button { ContextMenu: { } menu } button)
+            return;
+
+        menu.PlacementTarget = button;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    /// <summary>
+    /// Спрашивает файл своей готовой работы и прикрепляет его к заданию
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="item">Задание</param>
+    private async void AttachWork(LessonFormatViewModel lesson, LessonItemViewModel item)
+    {
+        if (DataContext is HomeworkFormatsViewModel model && PickFile($"Своя готовая работа: задание {item.Number}") is { } file)
+            await model.AttachWorkAsync(lesson, item.Number, file);
+    }
+
+    /// <summary>
+    /// Спрашивает файл сданной работы и делает его образцом предмета вместо черновика
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="item">Задание</param>
+    private async void ChooseSubmittedFile(LessonFormatViewModel lesson, LessonItemViewModel item)
+    {
+        if (DataContext is HomeworkFormatsViewModel model && PickFile($"Файл сданной работы: задание {item.Number}") is { } file)
+            await model.SetSubmittedFileAsync(lesson, item.Number, file);
+    }
+
+    /// <summary>
+    /// Открывает окно «Поправить условие» и сохраняет правку
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="item">Задание</param>
+    private async void EditCondition(LessonFormatViewModel lesson, LessonItemViewModel item)
+    {
+        if (DataContext is HomeworkFormatsViewModel model && ConditionWindow.Ask(Window.GetWindow(this), lesson.Meta, item.Title, item.FullRequirements) is { } answer)
+            await model.FixConditionAsync(lesson, item.Number, answer.Title, answer.Requirements);
+    }
+
+    /// <summary>
+    /// Показывает окно выбора одного файла
+    /// </summary>
+    /// <param name="title">Заголовок окна</param>
+    /// <returns>Путь к файлу или <see langword="null"/>, если выбор отменён</returns>
+    private string? PickFile(string title)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = title,
+            Filter = "Работы|*.docx;*.pptx;*.pdf;*.md;*.txt;*.zip;*.py;*.cs;*.ipynb|Все файлы|*.*",
+            FilterIndex = 2,
+        };
+
+        return Window.GetWindow(this) is { } owner ? dialog.ShowDialog(owner) == true ? dialog.FileName : null : dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
     /// <summary>
@@ -74,7 +145,7 @@ public partial class HomeworkFormatsView : UserControl
     /// <param name="lesson">Занятие</param>
     private void ConfirmDelete(LessonFormatViewModel lesson)
     {
-        if (DataContext is HomeworkFormatsViewModel model && ConfirmWindow.Ask("Удалить готовое задание?", $"{lesson.Meta}: файлы будут удалены, и задание можно будет подготовить заново.", "Удалить", "Отмена"))
+        if (DataContext is HomeworkFormatsViewModel model && ConfirmWindow.Ask("Удалить готовое по занятию?", $"{lesson.Meta}: будут удалены все готовые работы этого занятия, их прежние версии и отчёт проверки. Задания можно будет подготовить заново.", "Удалить", "Отмена"))
             model.DeleteDrafts(lesson);
     }
 

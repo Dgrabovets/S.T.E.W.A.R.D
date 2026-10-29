@@ -3,6 +3,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media;
 using System.Windows;
 using Steward.Homework.Models;
+using Steward.Homework.Services;
 using Steward.Ideas.Models;
 using Steward.Models;
 using Steward.Monitoring.Models;
@@ -18,7 +19,7 @@ namespace Steward.DevTools;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>dotnet run --project Steward.DevTools -- snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal]]</c>
+/// Запуск: <c>dotnet run --project Steward.DevTools -- snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal] | card:found|confirm|ready|checked|submitted]</c>
 /// </summary>
 public static class SnapshotRenderer
 {
@@ -95,6 +96,10 @@ public static class SnapshotRenderer
                 model.ShowExamplesCommand.Execute(null);
 
             window = new GuidesWindow(model) { WindowStartupLocation = WindowStartupLocation.Manual };
+        }
+        else if (string.Equals(parts[0], "menu", StringComparison.OrdinalIgnoreCase))
+        {
+            window = CardMenuSheet();
         }
         else if (string.Equals(parts[0], "redo", StringComparison.OrdinalIgnoreCase))
         {
@@ -173,6 +178,15 @@ public static class SnapshotRenderer
                 settleSeconds = 1.0;
             }
 
+            // «card:found|confirm|ready|checked|submitted»: карточка задания на вкладке «Домашние задания» в одном шаге конвейера
+            if (string.Equals(parts[0], "card", StringComparison.OrdinalIgnoreCase) && main.Model.Formats is { } cards)
+            {
+                ShowCard(cards, parts.Length > 1 ? parts[1].ToLowerInvariant() : "found");
+                main.Model.Page = AppPageEnum.Transcripts;
+                main.Height = 1250;
+                settleSeconds = 1.0;
+            }
+
             // «main:done»: задача «telegram» только что закончилась, на её карточке рисуется галочка
             if (parts.Length > 1 && string.Equals(parts[1], "done", StringComparison.OrdinalIgnoreCase))
             {
@@ -234,6 +248,96 @@ public static class SnapshotRenderer
 
         window.Close();
         return true;
+    }
+
+    /// <summary>
+    /// Готовит вкладку «Домашние задания» с карточкой задания в нужном шаге: у первого занятия «Гейм-дизайна» одно задание в этом шаге, у второго задание без вопроса
+    /// </summary>
+    /// <param name="education">Модель вкладки</param>
+    /// <param name="state">Шаг: <c>found</c> (средняя уверенность), <c>confirm</c> (нужно подтвердить), <c>ready</c>, <c>checked</c> или <c>submitted</c></param>
+    private static void ShowCard(HomeworkFormatsViewModel education, string state)
+    {
+        var drafts = SampleDrafts();
+        var work = drafts[0];
+        var lessons = SampleLessons();
+        var firstId = lessons[0].Lesson.Id;
+        var secondId = lessons[1].Lesson.Id;
+        const string quote = "к следующему занятию выберите любую игру и напишите по ней аналитический отчёт на одну-две страницы";
+        var ready = new ItemAssessment(ItemReadinessEnum.Ready, string.Empty);
+        var (item, info) = state switch
+        {
+            "confirm" => (
+                new HomeworkItem("Сделать прототип меню в Figma", null, "Три экрана: главное меню, настройки, пауза.", string.Empty, Evidence: "покажите прототип меню", Confidence: "low", Doubt: "говорили про курс по UX, а не про Гейм-дизайн"),
+                new ItemPipelineInfo(PipelineStepEnum.Found, string.Empty, new ItemAssessment(ItemReadinessEnum.NeedsConfirmation, "Не уверен, что правильно понял задание «Сделать прототип меню в Figma» (говорили про курс по UX, а не про Гейм-дизайн)"), false, false, string.Empty)),
+            "ready" => (
+                new HomeworkItem("Выбрать игру и написать по ней аналитический отчёт", new DateOnly(2026, 11, 2), "Объём 1-2 страницы. Разобрать правила, конфликт, агентность и обратную связь.", string.Empty, ActivityId: "4211", Evidence: quote, Confidence: "high"),
+                new ItemPipelineInfo(PipelineStepEnum.Ready, work, ready, true, true, string.Empty)),
+            "checked" => (
+                new HomeworkItem("Выбрать игру и написать по ней аналитический отчёт", new DateOnly(2026, 11, 2), "Объём 1-2 страницы. Разобрать правила, конфликт, агентность и обратную связь.", string.Empty, ActivityId: "4211", Evidence: quote, Confidence: "high"),
+                new ItemPipelineInfo(PipelineStepEnum.Checked, work, ready, true, true, string.Empty)),
+            "submitted" => (
+                new HomeworkItem("Выбрать игру и написать по ней аналитический отчёт", new DateOnly(2026, 11, 2), "Объём 1-2 страницы. Разобрать правила, конфликт, агентность и обратную связь.", string.Empty, true, "4211", Submitted: true, Evidence: quote, Confidence: "high"),
+                new ItemPipelineInfo(PipelineStepEnum.Submitted, work, ready, true, true, string.Empty)),
+            _ => (
+                new HomeworkItem("Выбрать игру и написать по ней аналитический отчёт", new DateOnly(2026, 11, 2), "Объём 1-2 страницы. Разобрать правила, конфликт, агентность и обратную связь.", string.Empty, Evidence: quote, Confidence: "medium", Doubt: "срок назван устно, в LMS его нет"),
+                new ItemPipelineInfo(PipelineStepEnum.Found, string.Empty, new ItemAssessment(ItemReadinessEnum.ReadyWithNote, "срок назван устно, в LMS его нет"), true, false, "Работа подготовится сама при ближайшей выгрузке")),
+        };
+        var other = new HomeworkItem("Собрать главное меню в Unity", new DateOnly(2026, 11, 5), "Первый этап практики: меню с кнопками и окном настроек звука.", string.Empty);
+        var otherInfo = new ItemPipelineInfo(PipelineStepEnum.Found, string.Empty, ready, false, false, "Работа подготовится сама при ближайшей выгрузке");
+
+        education.DraftLister = id => id == firstId && info.WorkPath.Length > 0 ? [work] : [];
+        education.CheckReader = id => id == firstId && info.Step == PipelineStepEnum.Checked ? work : string.Empty;
+        education.ItemsReader = id => id == firstId ? [(1, item, false)] : id == secondId ? [(1, other, false)] : [];
+        education.PipelineReader = id => id == firstId ? new Dictionary<int, ItemPipelineInfo> { [1] = info } : new Dictionary<int, ItemPipelineInfo> { [1] = otherInfo };
+        education.ItemConfirmer = (_, _) => { };
+        education.GuideFolder = @"D:\data\homework\guides";
+        education.GuideLister = _ => [];
+        education.Update(lessons);
+        var chosen = education.Subjects.First(subject => subject.Title == "Гейм-дизайн");
+        chosen.SelectCommand.Execute(null);
+        education.ShowHomeworkCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Собирает лист с меню «…» карточки задания: всплывающее окно меню на снимок не попадает, поэтому меню рисуется прямо в окне. Пункты без готовой работы недоступны, как у задания на шаге «Найдено»
+    /// </summary>
+    /// <returns>Окно с меню</returns>
+    private static Window CardMenuSheet()
+    {
+        var resources = System.Windows.Application.Current.Resources;
+
+        // Контекстное меню не может стоять в окне, поэтому его рамка повторена вокруг обычного меню с теми же пунктами
+        var menu = new System.Windows.Controls.Menu
+        {
+            Background = System.Windows.Media.Brushes.Transparent,
+            ItemContainerStyle = (Style)resources["CardMenuItem"],
+            ItemsPanel = new System.Windows.Controls.ItemsPanelTemplate(new FrameworkElementFactory(typeof(System.Windows.Controls.StackPanel))),
+        };
+        var disabled = new HashSet<string>(StringComparer.Ordinal) { "Проверить заново", "Результат проверки", "Переделать", "Указать файл сданной работы", "Удалить готовое" };
+        string?[] entries = ["Открыть в LMS", "Скопировать условие", null, "Проверить заново", "Результат проверки", "Переделать", null, "Прикрепить готовую работу", "Указать файл сданной работы", null, "В Singularity", "В архив", "Удалить готовое"];
+        foreach (var entry in entries)
+        {
+            if (entry is null)
+                menu.Items.Add(new System.Windows.Controls.Separator { Style = (Style)resources["CardMenuSeparator"] });
+            else
+                menu.Items.Add(new System.Windows.Controls.MenuItem { Header = entry, IsEnabled = !disabled.Contains(entry) });
+        }
+
+        var host = new System.Windows.Controls.Border
+        {
+            Margin = new Thickness(24),
+            Padding = new Thickness(4),
+            MinWidth = 220,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Background = (System.Windows.Media.Brush)resources["RaisedBrush"],
+            BorderBrush = (System.Windows.Media.Brush)resources["LineStrongBrush"],
+            BorderThickness = new Thickness(1),
+            CornerRadius = (CornerRadius)resources["RadiusSmall"],
+            Child = menu,
+        };
+
+        return new Window { Width = 320, Height = 470, WindowStyle = WindowStyle.None, Background = (System.Windows.Media.Brush)resources["WindowBrush"], Content = host };
     }
 
     /// <summary>

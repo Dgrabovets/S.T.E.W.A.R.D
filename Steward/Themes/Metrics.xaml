@@ -24,4 +24,7 @@
     <Thickness x:Key="PadField">12,8,12,8</Thickness>
     <Thickness x:Key="GapCard">0,0,0,12</Thickness>
 
+    <!-- Прозрачность приглушённой записи: занятие, где всё сдано -->
+    <sys:Double x:Key="OpacityDone">0.6</sys:Double>
+
 </ResourceDictionary>

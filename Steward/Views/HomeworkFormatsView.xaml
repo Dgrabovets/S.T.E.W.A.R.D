@@ -201,7 +201,7 @@
                                         <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding AllSubmitted}" Value="True">
-                                        <Setter TargetName="Row" Property="Opacity" Value="0.6"/>
+                                        <Setter TargetName="Row" Property="Opacity" Value="{StaticResource OpacityDone}"/>
                                     </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
@@ -412,7 +412,7 @@
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
                                             <Button Content="Подготовить задание" Command="{Binding PrepareCommand}" Style="{StaticResource PrimaryButton}"
                                                     Visibility="{Binding CanPrepare, Converter={StaticResource BoolToVisibility}}"/>
-                                            <ItemsControl ItemsSource="{Binding Drafts}">
+                                            <ItemsControl ItemsSource="{Binding OtherDrafts}">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
                                                         <StackPanel/>
@@ -425,7 +425,7 @@
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,2,0,0"
-                                                        Visibility="{Binding HasDrafts, Converter={StaticResource BoolToVisibility}}">
+                                                        Visibility="{Binding HasDraftsWithoutItems, Converter={StaticResource BoolToVisibility}}">
                                                 <Button Content="Проверить" Command="{Binding CheckCommand}" Style="{StaticResource GhostButton}" ToolTip="Сверить работу с условием и методичкой и найти факты без опоры. Работа не меняется"/>
                                                 <Button Content="Результат проверки" Command="{Binding OpenCheckCommand}" Style="{StaticResource GhostButton}" ToolTip="Открыть отчёт о проверке"
                                                         Visibility="{Binding HasCheck, Converter={StaticResource BoolToVisibility}}"/>
@@ -443,25 +443,141 @@
                                             <ItemsControl ItemsSource="{Binding Items}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,4">
+                                                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,6">
                                                             <StackPanel>
-                                                                <StackPanel>
-                                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                                <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                                                <!-- Название, срок и меню «…» -->
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                                        <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                                                    </StackPanel>
+                                                                    <Button Grid.Column="1" Content="•••" Click="ItemMenu_OnClick" Style="{StaticResource GhostButton}" Padding="10,4" Margin="8,-4,0,0" VerticalAlignment="Top"
+                                                                            ToolTip="Ещё действия с заданием" AutomationProperties.Name="Ещё действия с заданием">
+                                                                        <Button.ContextMenu>
+                                                                            <ContextMenu Style="{StaticResource CardMenu}">
+                                                                                <MenuItem Header="Открыть в LMS" Command="{Binding OpenInLmsCommand}" AutomationProperties.Name="Открыть в LMS"/>
+                                                                                <MenuItem Header="Скопировать условие" Command="{Binding CopyConditionCommand}" AutomationProperties.Name="Скопировать условие"/>
+                                                                                <Separator Style="{StaticResource CardMenuSeparator}"/>
+                                                                                <MenuItem Header="Проверить заново" Command="{Binding RecheckCommand}" AutomationProperties.Name="Проверить заново"/>
+                                                                                <MenuItem Header="Результат проверки" Command="{Binding OpenCheckCommand}" AutomationProperties.Name="Результат проверки"/>
+                                                                                <MenuItem Header="Переделать" Command="{Binding RedoCommand}" AutomationProperties.Name="Переделать"/>
+                                                                                <Separator Style="{StaticResource CardMenuSeparator}"/>
+                                                                                <MenuItem Header="Прикрепить готовую работу" Command="{Binding AttachWorkCommand}" AutomationProperties.Name="Прикрепить готовую работу"/>
+                                                                                <MenuItem Header="Указать файл сданной работы" Command="{Binding SubmittedFileCommand}" AutomationProperties.Name="Указать файл сданной работы"/>
+                                                                                <Separator Style="{StaticResource CardMenuSeparator}"/>
+                                                                                <MenuItem Header="В Singularity" Command="{Binding AddToSingularityCommand}" AutomationProperties.Name="В Singularity"/>
+                                                                                <MenuItem Header="В архив" Command="{Binding ArchiveCommand}" AutomationProperties.Name="В архив"/>
+                                                                                <MenuItem Header="Удалить готовое" Command="{Binding DeleteDraftsCommand}" AutomationProperties.Name="Удалить готовое"/>
+                                                                            </ContextMenu>
+                                                                        </Button.ContextMenu>
+                                                                    </Button>
+                                                                </Grid>
                                                                 <TextBlock Text="{Binding Requirements}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"
                                                                            Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
-                                                            </StackPanel>
-                                                                <WrapPanel Margin="0,4,0,0">
-                                                                    <Button Content="В архив" Command="{Binding ArchiveCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Убрать задание из списка: оно не будет готовиться"/>
-                                                                    <Button Content="В Singularity" Command="{Binding AddToSingularityCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Завести задачу по заданию в Singularity"/>
-                                                                    <Button Content="Открыть в LMS" Command="{Binding OpenInLmsCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Открыть страницу задания в LMS"/>
-                                                                    <Button Content="{Binding SubmitLabel}" Command="{Binding ToggleSubmittedCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Сданное задание не готовится. Отметку можно снять"
-                                                                            Visibility="{Binding CanToggleSubmitted, Converter={StaticResource BoolToVisibility}}"/>
-                                                                    <Button Content="Скопировать условие" Command="{Binding CopyConditionCommand}" Style="{StaticResource GhostButton}" Margin="0,0,4,0" ToolTip="Положить условие задания в буфер обмена"/>
-                                                                
-                                                                </WrapPanel>
+
+                                                                <!-- Строка шагов и одна главная кнопка -->
+                                                                <Grid Margin="0,8,0,0">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <ItemsControl ItemsSource="{Binding Steps}" VerticalAlignment="Center" Focusable="False" AutomationProperties.Name="Шаги задания">
+                                                                        <ItemsControl.ItemsPanel>
+                                                                            <ItemsPanelTemplate>
+                                                                                <WrapPanel/>
+                                                                            </ItemsPanelTemplate>
+                                                                        </ItemsControl.ItemsPanel>
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate>
+                                                                                <StackPanel Orientation="Horizontal" AutomationProperties.Name="{Binding AccessibleName}">
+                                                                                    <TextBlock x:Name="Arrow" Text="›" Style="{StaticResource TextCaption}" Margin="6,0,6,0"/>
+                                                                                    <TextBlock x:Name="Step" Text="{Binding Title}" Style="{StaticResource TextCaption}"/>
+                                                                                </StackPanel>
+                                                                                <DataTemplate.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsFirst}" Value="True">
+                                                                                        <Setter TargetName="Arrow" Property="Visibility" Value="Collapsed"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                                                        <Setter TargetName="Step" Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                                                        <Setter TargetName="Step" Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                                                                                        <Setter TargetName="Step" Property="FontWeight" Value="SemiBold"/>
+                                                                                    </DataTrigger>
+                                                                                </DataTemplate.Triggers>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                                    <Button Grid.Column="1" Content="{Binding MainLabel}" Command="{Binding MainCommand}" Style="{StaticResource OutlineButton}" Margin="8,0,0,0"
+                                                                            BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"
+                                                                            AutomationProperties.Name="{Binding MainLabel}"
+                                                                            Visibility="{Binding HasMain, Converter={StaticResource BoolToVisibility}}"/>
+                                                                </Grid>
+                                                                <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource TextCaption}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding HintIsProblem}" Value="True">
+                                                                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding Note}" Style="{StaticResource TextCaption}" Foreground="{StaticResource AttentionBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                                           Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
+
+                                                                <!-- Вопрос «Нужно подтвердить» -->
+                                                                <Border Style="{StaticResource ReasonBlock}" Background="{StaticResource AttentionSurfaceBrush}" BorderBrush="{StaticResource AttentionBrush}" Margin="0,8,0,0"
+                                                                        Visibility="{Binding NeedsConfirmation, Converter={StaticResource BoolToVisibility}}">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="Нужно подтвердить" Style="{StaticResource TextCaption}" Foreground="{StaticResource AttentionBrush}" FontWeight="SemiBold"/>
+                                                                        <TextBlock Text="{Binding Question}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                                        <WrapPanel Margin="0,6,0,0">
+                                                                            <Button Content="Подтвердить" Command="{Binding ConfirmCommand}" Style="{StaticResource OutlineButton}" Margin="0,0,6,0" Padding="12,5"
+                                                                                    BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"
+                                                                                    ToolTip="Задание верное: работа подготовится при ближайшей выгрузке" AutomationProperties.Name="Подтвердить задание"/>
+                                                                            <Button Content="Поправить условие" Command="{Binding FixConditionCommand}" Style="{StaticResource GhostButton}" Margin="0,0,6,0" Padding="12,5"
+                                                                                    ToolTip="Ввести верную формулировку задания" AutomationProperties.Name="Поправить условие"/>
+                                                                            <Button Content="В архив" Command="{Binding ArchiveCommand}" Style="{StaticResource GhostButton}" Padding="12,5"
+                                                                                    ToolTip="Это не задание: убрать из списка" AutomationProperties.Name="Убрать задание в архив"/>
+                                                                        </WrapPanel>
+                                                                    </StackPanel>
+                                                                </Border>
+
+                                                                <!-- Откуда это задание -->
+                                                                <Border BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="2,0,0,0" Padding="10,2,0,2" Margin="0,8,0,0">
+                                                                    <StackPanel>
+                                                                        <WrapPanel>
+                                                                            <TextBlock Text="Откуда это задание" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                            <Border x:Name="Badge" Style="{StaticResource Chip}" VerticalAlignment="Center">
+                                                                                <TextBlock x:Name="BadgeText" Text="{Binding Reliability}" Style="{StaticResource TextCaption}"/>
+                                                                            </Border>
+                                                                        </WrapPanel>
+                                                                        <TextBlock Text="{Binding Quote}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                                                   Visibility="{Binding HasEvidence, Converter={StaticResource BoolToVisibility}}"/>
+                                                                        <WrapPanel Margin="-8,2,0,0">
+                                                                            <TextBlock Text="{Binding EvidenceStatus}" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                                                                            <Button Content="Открыть в расшифровке" Command="{Binding OpenTranscriptCommand}" Style="{StaticResource GhostButton}" Padding="8,4" FontSize="{StaticResource FontSizeCaption}"
+                                                                                    ToolTip="Открыть расшифровку этого занятия" AutomationProperties.Name="Открыть в расшифровке"/>
+                                                                            <Button Content="Страница в LMS" Command="{Binding OpenInLmsCommand}" Style="{StaticResource GhostButton}" Padding="8,4" FontSize="{StaticResource FontSizeCaption}"
+                                                                                    ToolTip="Открыть страницу работы в LMS" AutomationProperties.Name="Открыть страницу работы в LMS"
+                                                                                    Visibility="{Binding LinkedToLms, Converter={StaticResource BoolToVisibility}}"/>
+                                                                        </WrapPanel>
+                                                                    </StackPanel>
+                                                                </Border>
                                                             </StackPanel>
                                                         </Border>
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding IsConfirmedSource}" Value="True">
+                                                                <Setter TargetName="Badge" Property="BorderBrush" Value="{StaticResource OkBrush}"/>
+                                                                <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource OkBrush}"/>
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
