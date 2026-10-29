@@ -131,6 +131,7 @@ public static class ClaudeAgent
             WorkingDirectory = workDirectory,
             UseShellExecute = false,
             CreateNoWindow = true,
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
@@ -143,6 +144,7 @@ public static class ClaudeAgent
         try
         {
             using var process = Process.Start(start) ?? throw new InvalidOperationException("Процесс не запустился");
+            process.StandardInput.Close();
             var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
             var errors = process.StandardError.ReadToEndAsync(CancellationToken.None);
 

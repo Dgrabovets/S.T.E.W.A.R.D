@@ -493,6 +493,8 @@ public class EducationTests
 
             store.SetArchived("e1", 1, archived: true);
             Assert.True(store.IsArchived("e1", 1));
+            Assert.Equal([1], store.ArchivedNumbers("e1").ToArray());
+            Assert.Empty(store.ArchivedNumbers("e10"));
             Assert.False(store.IsArchived("e1", 2));
             Assert.Equal(["Два"], store.LoadRows().Select(row => row.Item.Title).ToArray());
 

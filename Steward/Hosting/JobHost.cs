@@ -408,7 +408,8 @@ public sealed class JobHost : IDisposable
             return (0, "Claude не записал файл заданий");
 
         // Сданные и убранные в архив задания не готовятся
-        var items = found.Select((item, index) => item with { Done = item.Done || _homework.IsArchived(lesson.Id, index + 1) }).ToArray();
+        var archivedNumbers = _homework.ArchivedNumbers(lesson.Id);
+        var items = found.Select((item, index) => item with { Done = item.Done || archivedNumbers.Contains(index + 1) }).ToArray();
         var format = request.Format;
         var pending = items.Count(item => !item.Done);
         if (items.Length > 0 && pending == 0)
@@ -498,8 +499,9 @@ public sealed class JobHost : IDisposable
 
         var lesson = _homework.LoadLessons().FirstOrDefault(item => item.Id == lessonId);
         var created = _homework.LoadCreated();
+        var archived = _homework.ArchivedNumbers(lessonId);
 
-        return [.. items.Select((item, index) => (Number: index + 1, Item: item, InSingularity: lesson is not null && created.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1)))).Where(row => !_homework.IsArchived(lessonId, row.Number))];
+        return [.. items.Select((item, index) => (Number: index + 1, Item: item, InSingularity: lesson is not null && created.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1)))).Where(row => !archived.Contains(row.Number))];
     }
 
     /// <summary>

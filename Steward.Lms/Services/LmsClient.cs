@@ -157,10 +157,34 @@ public sealed partial class LmsClient : IDisposable
         if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > maxBytes || response.Content.Headers.ContentType?.MediaType is "text/html")
             return false;
 
-        await using var output = File.Create(path);
-        await response.Content.CopyToAsync(output, cancellationToken);
+        var complete = false;
+        try
+        {
+            await using (var output = File.Create(path))
+            {
+                await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
+                var buffer = new byte[81920];
+                long total = 0;
+                int read;
+                while ((read = await body.ReadAsync(buffer, cancellationToken)) > 0)
+                {
+                    total += read;
+                    if (total > maxBytes)
+                        return false;
 
-        return true;
+                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                }
+            }
+
+            complete = true;
+
+            return true;
+        }
+        finally
+        {
+            if (!complete)
+                File.Delete(path);
+        }
     }
 
     /// <summary>

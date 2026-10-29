@@ -51,7 +51,7 @@ public static class HomeworkTaskBuilder
         {
             note.Text("\nГотовая работа:\n");
             foreach (var draft in drafts)
-                note.Link(Path.GetFileName(draft), new Uri(draft).AbsoluteUri).Text("\n");
+                note.Link(Path.GetFileName(draft), new Uri(Path.GetFullPath(draft)).AbsoluteUri).Text("\n");
         }
 
         return new SingularityTaskRequest

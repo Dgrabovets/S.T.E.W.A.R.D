@@ -51,6 +51,13 @@ internal static class Program
 
                     return 0;
                 case "page":
+                    if (args.Length < 3 || !Uri.TryCreate(args[1], UriKind.Absolute, out var pageUrl) || !string.Equals(pageUrl.Host, new Uri(settings.BaseUrl).Host, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log("Использование: page <адрес страницы на сайте LMS> <файл>");
+
+                        return 2;
+                    }
+
                     using (var lms = new LmsClient(settings))
                     {
                         await lms.LoginAsync(CancellationToken.None);
@@ -63,6 +70,13 @@ internal static class Program
 
                     return 0;
                 case "task":
+                    if (args.Length < 3 || !int.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                    {
+                        Log("Использование: task <ключ занятия> <номер задания>");
+
+                        return 2;
+                    }
+
                     Log(await AddTaskAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")), args[1], int.Parse(args[2], CultureInfo.InvariantCulture)));
 
                     return 0;
@@ -75,11 +89,25 @@ internal static class Program
 
                     return 0;
                 case "probe":
+                    if (args.Length < 2)
+                    {
+                        Log("Использование: probe <адрес>");
+
+                        return 2;
+                    }
+
                     foreach (var line in await browser.ProbeAsync(args[1], CancellationToken.None))
                         Log(line);
 
                     return 0;
                 case "get":
+                    if (args.Length < 2)
+                    {
+                        Log("Использование: get <адрес> [параметры]");
+
+                        return 2;
+                    }
+
                     foreach (var line in await browser.GetAsync(args[1], args.Skip(2), CancellationToken.None))
                         Log(line);
 
@@ -369,7 +397,7 @@ internal static class Program
         using var singularity = new Steward.Mail.Services.SingularityClient(configured);
         var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
         var from = new DateTimeOffset(lessons.Min(lesson => lesson.Date).AddDays(-1).ToDateTime(TimeOnly.MinValue), offset);
-        var published = store.LoadCreated();
+        var published = store.LoadCreated().ToHashSet(StringComparer.Ordinal);
         var written = 0;
 
         var notes = (await singularity.ListTasksAsync(from, AnalysisNote.KEY_PREFIX, CancellationToken.None)).GroupBy(task => task.ExternalId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
@@ -406,7 +434,7 @@ internal static class Program
             {
                 var files = Directory.EnumerateFiles(store.DraftsDirectory(lesson.Id), $"Задание {index + 1}.*").Order(StringComparer.Ordinal).ToArray();
                 var mark = $"draft:{lesson.Id}:{index + 1}:{string.Join('|', files.Select(Path.GetFileName))}";
-                if (files.Length == 0 || store.LoadCreated().Contains(mark) || !homework.TryGetValue(HomeworkTaskBuilder.ExternalId(lesson, index + 1), out var task))
+                if (files.Length == 0 || published.Contains(mark) || !homework.TryGetValue(HomeworkTaskBuilder.ExternalId(lesson, index + 1), out var task))
                     continue;
 
                 Log($"{(settings.CreateTasks ? "Добавляю" : "Добавил бы")} ссылку на готовую работу в задачу: {items[index].Title}");
@@ -415,6 +443,7 @@ internal static class Program
 
                 await singularity.UpdateNoteAsync(task.Id, HomeworkTaskBuilder.Build(lesson, items[index], index + 1, store.FormatFor(lesson.Id), configured.ProjectId, offset, files).Note, CancellationToken.None);
                 store.MarkCreated([mark]);
+                published.Add(mark);
                 written++;
             }
         }

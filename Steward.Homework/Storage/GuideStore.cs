@@ -21,6 +21,11 @@ public sealed partial class GuideStore(string directory)
     private const int FOLDER_LIMIT = 30;
 
     /// <summary>
+    /// Самый большой файл, который скачивается по ссылке, в байтах
+    /// </summary>
+    private const long MAX_DOWNLOAD_BYTES = 100L * 1024 * 1024;
+
+    /// <summary>
     /// Читает и пишет JSON в camelCase с отступами, кириллица остаётся буквами
     /// </summary>
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
@@ -137,16 +142,59 @@ public sealed partial class GuideStore(string directory)
             var folder = SubjectFolder(entry.Subject);
             Directory.CreateDirectory(folder);
 
+            if (response.Content.Headers.ContentLength > MAX_DOWNLOAD_BYTES)
+                return Replace(entry with { Note = "Не скачалось: файл больше 100 МБ" });
+
             var target = UniquePath(folder, name);
-            await using (var output = File.Create(target))
-                await response.Content.CopyToAsync(output, cancellationToken);
+            try
+            {
+                await using (var output = File.Create(target))
+                {
+                    await using var body = await response.Content.ReadAsStreamAsync(cancellationToken);
+                    var copied = await CopyLimitedAsync(body, output, cancellationToken);
+                    if (!copied)
+                        throw new IOException("файл больше 100 МБ");
+                }
+            }
+            catch
+            {
+                File.Delete(target);
+
+                throw;
+            }
 
             return Replace(entry with { Title = Path.GetFileName(target), Path = target, Note = string.Empty });
         }
-        catch (Exception exception) when (exception is HttpRequestException or IOException or TaskCanceledException)
+        catch (Exception exception) when (exception is HttpRequestException or IOException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
             return Replace(entry with { Note = "Не скачалось: " + exception.Message });
         }
+    }
+
+    /// <summary>
+    /// Копирует поток в файл, пока не набралось больше предела размера
+    /// </summary>
+    /// <param name="source">Откуда читать</param>
+    /// <param name="target">Куда писать</param>
+    /// <param name="cancellationToken">Отменяет копирование</param>
+    /// <returns>
+    /// <see langword="false"/>, если данных оказалось больше предела
+    /// </returns>
+    private static async Task<bool> CopyLimitedAsync(Stream source, Stream target, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            total += read;
+            if (total > MAX_DOWNLOAD_BYTES)
+                return false;
+
+            await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        return true;
     }
 
     /// <summary>

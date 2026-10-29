@@ -12,6 +12,11 @@ namespace Steward.Homework.Storage;
 public sealed class HomeworkStore(string directory)
 {
     /// <summary>
+    /// Код вида работы «тест» в файле <c>activities.json</c>: так его пишет выгрузка LMS
+    /// </summary>
+    private const int QUIZ_KIND = 1;
+
+    /// <summary>
     /// Читает и пишет JSON в camelCase с отступами, кириллица остаётся буквами
     /// </summary>
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
@@ -291,8 +296,9 @@ public sealed class HomeworkStore(string directory)
             .. LoadLessons().SelectMany(lesson =>
             {
                 var items = ReadItems(lesson.Id) ?? [];
+                var archived = ArchivedNumbers(lesson.Id);
 
-                return items.Select((item, index) => new HomeworkRow(lesson, FormatFor(lesson.Id), item, index + 1, created.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1)))).Where(row => !IsArchived(lesson.Id, row.Number));
+                return items.Select((item, index) => new HomeworkRow(lesson, FormatFor(lesson.Id), item, index + 1, created.Contains(HomeworkTaskBuilder.ExternalId(lesson, index + 1)))).Where(row => !archived.Contains(row.Number));
             })
         ];
     }
@@ -396,6 +402,21 @@ public sealed class HomeworkStore(string directory)
         (Read<Dictionary<string, string>>(ItemStatesFile) ?? []).TryGetValue(ItemKey(lessonId, number), out var state) && state == "archived";
 
     /// <summary>
+    /// Номера заданий занятия, убранных в архив. Файл отметок читается один раз на весь список
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Номера заданий с единицы</returns>
+    public IReadOnlySet<int> ArchivedNumbers(string lessonId)
+    {
+        var prefix = lessonId + ":";
+
+        return (Read<Dictionary<string, string>>(ItemStatesFile) ?? [])
+            .Where(pair => pair.Value == "archived" && pair.Key.StartsWith(prefix, StringComparison.Ordinal) && int.TryParse(pair.Key.AsSpan(prefix.Length), out _))
+            .Select(pair => int.Parse(pair.Key.AsSpan(prefix.Length)))
+            .ToHashSet();
+    }
+
+    /// <summary>
     /// Убирает задание в архив или возвращает его
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
@@ -443,7 +464,7 @@ public sealed class HomeworkStore(string directory)
                 .. document.RootElement.EnumerateArray().Select(item => new ActivityInfo(
                     item.TryGetProperty("subject", out var subject) ? subject.GetString() ?? string.Empty : string.Empty,
                     item.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
-                    item.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.Number && kind.GetInt32() == 1,
+                    item.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.Number && kind.GetInt32() == QUIZ_KIND,
                     item.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.True,
                     item.TryGetProperty("section", out var section) ? section.GetString() ?? string.Empty : string.Empty,
                     item.TryGetProperty("due", out var due) && due.ValueKind == JsonValueKind.String && DateTime.TryParse(due.GetString(), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dueDate) ? DateOnly.FromDateTime(dueDate) : null,
