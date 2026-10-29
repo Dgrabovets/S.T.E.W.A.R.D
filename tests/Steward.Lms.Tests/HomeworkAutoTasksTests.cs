@@ -167,6 +167,29 @@ public sealed class HomeworkAutoTasksTests : IDisposable
     }
 
     /// <summary>
+    /// Работа, которую LMS показывает сданной, не получает ни задачи, ни ссылки; задание с несданной работой ведёт себя как раньше
+    /// </summary>
+    [Fact]
+    public async Task A_work_done_in_LMS_gets_no_task_and_no_link()
+    {
+        WriteItems("""[{"title":"Сдано в LMS","activity":"101"},{"title":"Ещё не сдано","activity":"102"}]""");
+        File.WriteAllText(Path.Combine(_directory.FullName, "activities.json"), """[{"id":"101","subject":"БД","name":"А","done":true},{"id":"102","subject":"БД","name":"Б","done":false}]""");
+        WriteDraft("Задание 1.docx");
+        WriteDraft("Задание 2.docx");
+        var singularity = new StubSingularity();
+        singularity.Tasks.Add(new SingularityTaskInfo("t1", "hw:db-1022:1", 0));
+        singularity.Tasks.Add(new SingularityTaskInfo("t2", "hw:db-1022:2", 0));
+
+        var linked = await new HomeworkWorkLinker(_store, singularity, TimeProvider.System, _ => { }, dryRun: false).RunAsync(CancellationToken.None);
+        var fresh = new StubSingularity();
+        await new HomeworkTaskCreator(_store, fresh, null, TimeProvider.System, _ => { }).RunAsync(CancellationToken.None);
+
+        Assert.Equal(1, linked);
+        Assert.Equal("t2", Assert.Single(singularity.Updates).TaskId);
+        Assert.Equal(["hw:db-1022:2"], fresh.Created.Select(task => task.ExternalId!).ToArray());
+    }
+
+    /// <summary>
     /// Клиент-заглушка: считает вызовы и ничего не отправляет в сеть
     /// </summary>
     private sealed class StubSingularity : ISingularityClient, ISingularityNotes

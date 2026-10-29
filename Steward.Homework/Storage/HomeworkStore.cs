@@ -526,6 +526,30 @@ public sealed class HomeworkStore(string directory)
         item.ActivityId.Length > 0 && item.ActivityId.All(char.IsAsciiDigit) && File.Exists(Path.Combine(AssignmentDirectory(item.ActivityId), "assignment.md"));
 
     /// <summary>
+    /// Номера работ LMS, которые LMS показывает сданными
+    /// </summary>
+    /// <returns>Номера работ из снимка <c>activities.json</c></returns>
+    public IReadOnlySet<string> DoneWorkIds() =>
+        LoadActivities().Where(work => work.Done && work.Id.Length > 0).Select(work => work.Id).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Номера заданий занятия, которые сданы по любому признаку: отметка в файле заданий, отметка владельца или работа сдана в LMS
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="items">Задания занятия</param>
+    /// <param name="doneWorks">Номера сданных в LMS работ; <see langword="null"/>, чтобы прочитать их из снимка</param>
+    /// <returns>Номера заданий с единицы</returns>
+    public IReadOnlySet<int> SubmittedAnywhere(string lessonId, IReadOnlyList<HomeworkItem> items, IReadOnlySet<string>? doneWorks = null)
+    {
+        var submitted = SubmittedNumbers(lessonId);
+        var done = doneWorks ?? DoneWorkIds();
+
+        return Enumerable.Range(1, items.Count)
+            .Where(number => items[number - 1].Done || submitted.Contains(number) || (items[number - 1].ActivityId.Length > 0 && done.Contains(items[number - 1].ActivityId)))
+            .ToHashSet();
+    }
+
+    /// <summary>
     /// Номера заданий занятия, которые студент отметил сданными сам
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>

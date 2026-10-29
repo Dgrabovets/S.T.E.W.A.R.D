@@ -34,13 +34,14 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
             ? new HashSet<string>(StringComparer.Ordinal)
             : await singularity.ListExternalIdsAsync(new DateTimeOffset(ready.Min(lesson => lesson.Date).AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), cancellationToken);
 
+        var doneWorks = store.DoneWorkIds();
         var created = 0;
         var existing = 0;
         var handled = new List<string>();
         foreach (var lesson in ready)
         {
             var items = store.ReadItems(lesson.Id)!;
-            foreach (var number in WantedNumbers(lesson, items))
+            foreach (var number in WantedNumbers(lesson, items, doneWorks))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -90,10 +91,11 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="items">Задания занятия</param>
+    /// <param name="doneWorks">Номера работ, сданных в LMS</param>
     /// <returns>Номера с единицы по порядку</returns>
-    private List<int> WantedNumbers(Lesson lesson, IReadOnlyList<HomeworkItem> items)
+    private List<int> WantedNumbers(Lesson lesson, IReadOnlyList<HomeworkItem> items, IReadOnlySet<string> doneWorks)
     {
-        var submitted = store.SubmittedNumbers(lesson.Id);
+        var submitted = store.SubmittedAnywhere(lesson.Id, items, doneWorks);
         var archived = store.ArchivedNumbers(lesson.Id);
         var confirmed = store.ConfirmedNumbers(lesson.Id);
         var hasTranscript = store.HasTranscript(lesson.Id);
@@ -103,7 +105,7 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
         for (var number = 1; number <= items.Count; number++)
         {
             var item = items[number - 1];
-            if (item.Done || item.Submitted || submitted.Contains(number) || archived.Contains(number))
+            if (submitted.Contains(number) || archived.Contains(number))
                 continue;
 
             var assessment = ItemAssessor.Assess(item, EvidenceCheck.Verify(transcript, item.Evidence), hasTranscript, store.HasAssignmentCondition(item), confirmed.Contains(number));

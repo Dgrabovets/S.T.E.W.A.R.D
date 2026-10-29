@@ -77,7 +77,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         var run = new RunState(Math.Max(maxWorks, 0), ready);
         try
         {
-            var doneWorks = store.LoadActivities().Where(work => work.Done && work.Id.Length > 0).Select(work => work.Id).ToHashSet(StringComparer.Ordinal);
+            var doneWorks = store.DoneWorkIds();
             foreach (var lesson in store.LoadLessons())
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -231,12 +231,12 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
             return;
 
         var archived = store.ArchivedNumbers(lesson.Id);
-        var submitted = store.SubmittedNumbers(lesson.Id);
+        var submitted = store.SubmittedAnywhere(lesson.Id, items, doneWorks);
 
         /// <summary>
         /// Задание сдано: по файлу заданий, по отметке владельца или по LMS
         /// </summary>
-        bool IsSubmitted(int number) => items[number - 1].Done || submitted.Contains(number) || (items[number - 1].ActivityId.Length > 0 && doneWorks.Contains(items[number - 1].ActivityId));
+        bool IsSubmitted(int number) => submitted.Contains(number);
 
         for (var number = 1; number <= items.Count; number++)
         {

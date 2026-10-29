@@ -85,17 +85,18 @@ public sealed class HomeworkWorkLinker(HomeworkStore store, ISingularityNotes no
     {
         var pending = new List<(Lesson Lesson, HomeworkItem Item, int Number, string File, string Mark)>();
         var remembered = store.LoadCreated();
+        var doneWorks = store.DoneWorkIds();
 
         foreach (var lesson in store.LoadLessons())
         {
             if (store.ReadItems(lesson.Id) is not { } items)
                 continue;
 
-            var submitted = store.SubmittedNumbers(lesson.Id);
+            var submitted = store.SubmittedAnywhere(lesson.Id, items, doneWorks);
             var archived = store.ArchivedNumbers(lesson.Id);
             for (var number = 1; number <= items.Count; number++)
             {
-                if (items[number - 1].Done || submitted.Contains(number) || archived.Contains(number) || store.SampleCandidate(lesson.Id, number) is not { } file)
+                if (submitted.Contains(number) || archived.Contains(number) || store.SampleCandidate(lesson.Id, number) is not { } file)
                     continue;
 
                 var mark = $"draft:{lesson.Id}:{number}:{Path.GetFileName(file)}";
