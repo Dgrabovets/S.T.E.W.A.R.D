@@ -846,7 +846,7 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
-    /// Находит в сводке и выводе запуска LMS строки «Готова работа: …» и переправляет их в поток окна
+    /// Находит в сводке запуска LMS строки «Готова работа: …» и переправляет их в поток окна. Читается только сводка: в неё строки кладёт шаг подготовки, а вывод других шагов (с названиями заданий из расшифровок) уведомлением стать не может
     /// </summary>
     /// <param name="record">Запись о законченном запуске</param>
     private void RaiseWorksReady(RunRecord record)
@@ -854,7 +854,7 @@ public sealed class JobHost : IDisposable
         if (record.JobId != LMS_ID || _dispatcher.HasShutdownStarted)
             return;
 
-        var works = HomeworkPreparer.ReadyWorks(record.Summary + "\n" + record.Output);
+        var works = HomeworkPreparer.ReadyWorks(record.Summary);
         if (works.Count > 0)
             _dispatcher.BeginInvoke(() => WorksReady?.Invoke(this, works));
     }

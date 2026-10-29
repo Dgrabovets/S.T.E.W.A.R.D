@@ -10,7 +10,8 @@ namespace Steward.Homework.Services;
 /// <param name="Waiting">Задания, которые ждут владельца: «предмет, задание: вопрос или причина»</param>
 /// <param name="Failed">Ошибки: «предмет, задание: причина»</param>
 /// <param name="Busy">Подготовка уже идёт в другом запуске, этот ничего не делал</param>
-public sealed record PrepareReport(IReadOnlyList<string> Prepared, IReadOnlyList<string> Waiting, IReadOnlyList<string> Failed, bool Busy = false)
+/// <param name="Cancelled">Запуск остановлен отменой или по сроку; в отчёте то, что успели до остановки</param>
+public sealed record PrepareReport(IReadOnlyList<string> Prepared, IReadOnlyList<string> Waiting, IReadOnlyList<string> Failed, bool Busy = false, bool Cancelled = false)
 {
     /// <summary>
     /// Строки уведомления о готовых работах для вывода фоновой задачи
@@ -26,7 +27,7 @@ public sealed record PrepareReport(IReadOnlyList<string> Prepared, IReadOnlyList
 /// <param name="guides">Методические указания и образцы</param>
 /// <param name="remarks">Замечания владельца (папка <c>remarks</c> внутри папки домашних заданий)</param>
 /// <param name="agent">Запуск агента</param>
-public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, RemarkStore remarks, DraftBuilder.AgentRun agent)
+public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore guides, RemarkStore remarks, DraftBuilder.AgentRun agent)
 {
     /// <summary>
     /// Начало строки уведомления о готовой работе в выводе фоновой задачи
@@ -50,38 +51,58 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
 
     /// <summary>
     /// Готовит работы по найденным заданиям: от свежих занятий к старым, только несданные, не в архиве, без файла работы, у предметов, которые готовятся, и не больше лимита за запуск.
-    /// Задание, в котором Steward не уверен, ждёт подтверждения. После ошибки агента повтор на следующем запуске, не больше трёх раз подряд. Каждая новая работа сразу проверяется. Работа сданного задания один раз становится образцом предмета
+    /// Задание, в котором Steward не уверен, ждёт подтверждения. После ошибки агента повтор на следующем запуске, не больше трёх раз подряд. Каждая новая работа сразу проверяется. Работа сданного задания один раз становится образцом предмета.
+    /// При отмене агент останавливается, прерванная попытка не засчитывается, а отчёт возвращается с тем, что успели
     /// </summary>
     /// <param name="maxWorks">Сколько работ готовить за запуск, с удачными и неудачными попытками</param>
     /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <param name="ready">Вызывается сразу после каждой готовой работы со строкой «предмет, задание», или <see langword="null"/></param>
     /// <returns>Готовые, ждущие и неудачные задания</returns>
-    /// <exception cref="OperationCanceledException">Запуск отменён</exception>
-    public async Task<PrepareReport> RunAsync(int maxWorks, CancellationToken cancellationToken)
+    public async Task<PrepareReport> RunAsync(int maxWorks, CancellationToken cancellationToken, Action<string>? ready = null)
     {
         using var hold = TryHold();
         if (hold is null)
             return new PrepareReport([], [], [], Busy: true);
 
-        var prepared = new List<string>();
-        var waiting = new List<string>();
-        var failed = new List<string>();
-        var budget = Math.Max(maxWorks, 0);
-        var doneWorks = store.LoadActivities().Where(work => work.Done && work.Id.Length > 0).Select(work => work.Id).ToHashSet(StringComparer.Ordinal);
-
-        foreach (var lesson in store.LoadLessons())
+        var run = new RunState(Math.Max(maxWorks, 0), ready);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
+            var doneWorks = store.LoadActivities().Where(work => work.Done && work.Id.Length > 0).Select(work => work.Id).ToHashSet(StringComparer.Ordinal);
+            foreach (var lesson in store.LoadLessons())
             {
-                budget = await RunLessonAsync(lesson, doneWorks, budget, prepared, waiting, failed, cancellationToken);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or System.Text.Json.JsonException)
-            {
-                failed.Add($"{lesson.Title}: {exception.Message}");
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    await RunLessonAsync(lesson, doneWorks, run, cancellationToken);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or System.Text.Json.JsonException)
+                {
+                    run.Failed.Add(Flat($"{lesson.Title}: {exception.Message}"));
+                }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return new PrepareReport(run.Prepared, run.Waiting, run.Failed, Cancelled: true);
+        }
 
-        return new PrepareReport(prepared, waiting, failed);
+        return new PrepareReport(run.Prepared, run.Waiting, run.Failed);
+    }
+
+    /// <summary>
+    /// Готовит работы, но не дольше срока: по его истечении агент останавливается, а отчёт возвращается с тем, что успели. Так шаг укладывается в таймаут фоновой задачи и запуск продолжается
+    /// </summary>
+    /// <param name="maxWorks">Сколько работ готовить за запуск</param>
+    /// <param name="budget">Сколько времени дано шагу</param>
+    /// <param name="ready">Вызывается сразу после каждой готовой работы, или <see langword="null"/></param>
+    /// <param name="cancellationToken">Отменяет запуск раньше срока</param>
+    /// <returns>Отчёт; <see cref="PrepareReport.Cancelled"/>, если срок вышел</returns>
+    public async Task<PrepareReport> RunWithBudgetAsync(int maxWorks, TimeSpan budget, Action<string>? ready, CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(budget);
+
+        return await RunAsync(maxWorks, deadline.Token, ready);
     }
 
     /// <summary>
@@ -159,34 +180,45 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
     }
 
     /// <summary>
-    /// Достаёт из вывода фоновой задачи готовые работы по строкам уведомления
+    /// Достаёт готовые работы из строк уведомления: строка должна начинаться с «Готова работа: » (можно после метки времени журнала), упоминание в середине строки не считается
     /// </summary>
-    /// <param name="text">Вывод или сводка задачи; строки могут начинаться со времени</param>
+    /// <param name="text">Сводка или вывод задачи</param>
     /// <returns>«Предмет, задание» без повторов в порядке появления</returns>
     public static IReadOnlyList<string> ReadyWorks(string? text) => text is null
         ? []
         : [.. text.Split('\n')
-            .Select(line => line.Trim())
-            .Where(line => line.Contains(NOTICE, StringComparison.Ordinal))
-            .Select(line => line[(line.IndexOf(NOTICE, StringComparison.Ordinal) + NOTICE.Length)..].Trim())
+            .Select(line => NoticeLine().Match(line.Trim()))
+            .Where(match => match.Success)
+            .Select(match => match.Groups[1].Value.Trim())
             .Where(work => work.Length > 0)
             .Distinct(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// Строка уведомления: необязательная метка времени журнала «дд.мм.гггг чч:мм:сс», затем «Готова работа: » и работа
+    /// </summary>
+    /// <returns>Регулярное выражение</returns>
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(?:\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}\s+)?Готова работа: (.+)$")]
+    private static partial System.Text.RegularExpressions.Regex NoticeLine();
+
+    /// <summary>
+    /// Сводит строку отчёта к одной строке: перевод строки в названии предмета или задания не может создать поддельную строку уведомления
+    /// </summary>
+    /// <param name="text">Строка отчёта</param>
+    /// <returns>Одна строка</returns>
+    private static string Flat(string text) => RemarkStore.Flatten(text);
 
     /// <summary>
     /// Обрабатывает одно занятие: регистрирует образцы сданных работ и готовит несданные задания
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="doneWorks">Номера работ LMS, которые LMS показывает сданными</param>
-    /// <param name="budget">Сколько работ ещё можно готовить в этом запуске</param>
-    /// <param name="prepared">Куда добавить готовые работы</param>
-    /// <param name="waiting">Куда добавить ждущие задания</param>
-    /// <param name="failed">Куда добавить ошибки</param>
+    /// <param name="run">Состояние запуска: остаток лимита и списки отчёта. Лимит, потраченный до ошибки, не возвращается</param>
     /// <param name="cancellationToken">Отменяет запуск</param>
-    /// <returns>Остаток лимита</returns>
-    private async Task<int> RunLessonAsync(Lesson lesson, IReadOnlySet<string> doneWorks, int budget, List<string> prepared, List<string> waiting, List<string> failed, CancellationToken cancellationToken)
+    /// <returns>Задача обработки занятия</returns>
+    private async Task RunLessonAsync(Lesson lesson, IReadOnlySet<string> doneWorks, RunState run, CancellationToken cancellationToken)
     {
         if (store.ReadItems(lesson.Id) is not { Count: > 0 } items)
-            return budget;
+            return;
 
         var archived = store.ArchivedNumbers(lesson.Id);
         var submitted = store.SubmittedNumbers(lesson.Id);
@@ -204,7 +236,7 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
 
         // Предмет и занятие, которые не готовятся («Не готовить», не «Расшифровывать»), агента не тратят
         if (!store.PreparesHomework(lesson) || store.SubjectFormatFor(lesson.Title) == HomeworkFormatEnum.Skip)
-            return budget;
+            return;
 
         var format = store.FormatFor(lesson.Id);
         var hasTranscript = store.HasTranscript(lesson.Id);
@@ -218,11 +250,11 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
             if (archived.Contains(number) || IsSubmitted(number) || store.SampleCandidate(lesson.Id, number) is not null)
                 continue;
 
-            var label = $"{lesson.Title}, {item.Title}";
+            var label = Flat($"{lesson.Title}, {item.Title}");
             var assessment = ItemAssessor.Assess(item, EvidenceCheck.Verify(transcript, item.Evidence), hasTranscript, HasCondition(item), confirmed.Contains(number));
             if (assessment.Readiness == ItemReadinessEnum.NeedsConfirmation)
             {
-                waiting.Add($"{label}: {assessment.Question}");
+                run.Waiting.Add(Flat($"{label}: {assessment.Question}"));
 
                 continue;
             }
@@ -231,24 +263,25 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
             var attempts = _ledger.Attempts(key);
             if (attempts >= MAX_ATTEMPTS)
             {
-                waiting.Add($"{label}: агент не справился {MAX_ATTEMPTS} раза подряд, подготовь работу кнопкой");
+                run.Waiting.Add($"{label}: агент не справился {MAX_ATTEMPTS} раза подряд, подготовь работу кнопкой");
 
                 continue;
             }
 
-            if (budget <= 0)
+            if (run.Budget <= 0)
                 continue;
 
-            budget--;
+            run.Budget--;
             var error = await BuildOneAsync(lesson, items, number, format, key, attempts, cancellationToken);
             if (error.Length > 0)
             {
-                failed.Add($"{label}: {error}");
+                run.Failed.Add(Flat($"{label}: {error}"));
 
                 continue;
             }
 
-            prepared.Add(label);
+            run.Prepared.Add(label);
+            run.Ready?.Invoke(label);
             produced = true;
         }
 
@@ -257,10 +290,8 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
             var checkError = await CheckAsync(lesson, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (checkError.Length > 0)
-                failed.Add($"{lesson.Title}: проверка не удалась: {checkError}");
+                run.Failed.Add(Flat($"{lesson.Title}: проверка не удалась: {checkError}"));
         }
-
-        return budget;
     }
 
     /// <summary>
@@ -279,21 +310,27 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
     {
         var folder = store.DraftsDirectory(lesson.Id);
         var before = TaskFiles(folder, number);
-        _ledger.SetAttempts(key, attempts + 1);
+
+        // Всё, что может упасть до агента, считается до засчёта попытки
+        var materials = guides.Materials(lesson.Title);
+        var assignments = store.AssignmentFiles(lesson.Title);
+        var owner = remarks.ForPrepare(lesson.Title);
 
         // Остальные задания отмечены сданными: агент выполняет только это, нумерация сохраняется
         var single = items.Select((item, index) => item with { Done = index != number - 1 }).ToArray();
-        var (_, error) = await DraftBuilder.BuildAsync(store, lesson, single, format, agent, cancellationToken, guides.Materials(lesson.Title), string.Empty, store.AssignmentFiles(lesson.Title), remarks.ForPrepare(lesson.Title));
+        _ledger.SetAttempts(key, attempts + 1);
+        var (_, error) = await DraftBuilder.BuildAsync(store, lesson, single, format, agent, cancellationToken, materials, string.Empty, assignments, owner);
         if (cancellationToken.IsCancellationRequested)
         {
             RemoveNew(folder, number, before);
-            _ledger.SetAttempts(key, attempts);
+            TrySetAttempts(key, attempts);
             cancellationToken.ThrowIfCancellationRequested();
         }
 
         if (error.Length == 0 && store.SampleCandidate(lesson.Id, number) is not null)
         {
-            _ledger.SetAttempts(key, 0);
+            // Работа уже готова: сбой записи учёта её не отменяет, задание с файлом больше не готовится
+            TrySetAttempts(key, 0);
 
             return string.Empty;
         }
@@ -301,6 +338,23 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
         RemoveNew(folder, number, before);
 
         return error.Length > 0 ? error : "агент не записал файл";
+    }
+
+    /// <summary>
+    /// Записывает число попыток, не роняя запуск, если файл учёта занят: прежнее значение тогда остаётся
+    /// </summary>
+    /// <param name="key">Ключ «занятие:номер»</param>
+    /// <param name="count">Число попыток</param>
+    private void TrySetAttempts(string key, int count)
+    {
+        try
+        {
+            _ledger.SetAttempts(key, count);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Учёт занят другим процессом: значение поправит следующий запуск
+        }
     }
 
     /// <summary>
@@ -342,24 +396,8 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
     /// <param name="number">Номер задания</param>
     /// <returns>Пути к файлам</returns>
     private static HashSet<string> TaskFiles(string folder, int number) => Directory.Exists(folder)
-        ? Directory.EnumerateFiles(folder, $"Задание {number}*").Where(file => IsTaskFile(file, number)).ToHashSet(StringComparer.OrdinalIgnoreCase)
+        ? Directory.EnumerateFiles(folder, $"Задание {number}*").Where(file => HomeworkStore.IsTaskFile(file, number)).ToHashSet(StringComparer.OrdinalIgnoreCase)
         : [];
-
-    /// <summary>
-    /// Относится ли файл к заданию: «Задание N.*» или «Задание N. Название.*», но не «Задание N1.*»
-    /// </summary>
-    /// <param name="file">Путь к файлу</param>
-    /// <param name="number">Номер задания</param>
-    /// <returns>
-    /// <see langword="true"/>, если файл этого задания
-    /// </returns>
-    private static bool IsTaskFile(string file, int number)
-    {
-        var name = Path.GetFileName(file);
-        var prefix = $"Задание {number}";
-
-        return name.StartsWith(prefix + ".", StringComparison.OrdinalIgnoreCase);
-    }
 
     /// <summary>
     /// Удаляет файлы задания, которые появились во время неудачной попытки
@@ -398,5 +436,38 @@ public sealed class HomeworkPreparer(HomeworkStore store, GuideStore guides, Rem
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Состояние одного запуска: остаток лимита и списки отчёта. Общее для всех занятий, поэтому ошибка в занятии не возвращает потраченный лимит и не теряет готовые работы
+    /// </summary>
+    /// <param name="budget">Сколько работ можно готовить</param>
+    /// <param name="ready">Сообщение о готовой работе или <see langword="null"/></param>
+    private sealed class RunState(int budget, Action<string>? ready)
+    {
+        /// <summary>
+        /// Сколько работ ещё можно готовить
+        /// </summary>
+        public int Budget { get; set; } = budget;
+
+        /// <summary>
+        /// Сообщение о готовой работе
+        /// </summary>
+        public Action<string>? Ready { get; } = ready;
+
+        /// <summary>
+        /// Готовые работы
+        /// </summary>
+        public List<string> Prepared { get; } = [];
+
+        /// <summary>
+        /// Задания, которые ждут владельца
+        /// </summary>
+        public List<string> Waiting { get; } = [];
+
+        /// <summary>
+        /// Ошибки
+        /// </summary>
+        public List<string> Failed { get; } = [];
     }
 }

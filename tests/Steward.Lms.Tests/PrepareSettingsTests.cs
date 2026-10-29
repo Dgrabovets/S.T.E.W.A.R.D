@@ -21,5 +21,6 @@ public class PrepareSettingsTests
 
         Assert.Equal(2, old.MaxPreparePerRun);
         Assert.Equal(5, set.MaxPreparePerRun);
+        Assert.Equal(20, old.PrepareBudgetMinutes);
     }
 }

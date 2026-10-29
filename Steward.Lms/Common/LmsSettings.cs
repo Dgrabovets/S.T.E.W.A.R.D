@@ -66,6 +66,11 @@ public sealed class LmsSettings
     public int MaxPreparePerRun { get; init; } = 2;
 
     /// <summary>
+    /// Сколько минут даётся шагу подготовки работ за запуск. По истечении агент останавливается, готовые работы сохраняются, а запуск продолжается публикацией. Должно быть заметно меньше таймаута задачи <c>lms</c> в <c>config/jobs.json</c> (30 минут)
+    /// </summary>
+    public int PrepareBudgetMinutes { get; init; } = 20;
+
+    /// <summary>
     /// Записи короче этого числа минут считаются пробными запусками и сразу получают отметку «не забирать»
     /// </summary>
     public int MinLessonMinutes { get; init; } = 10;

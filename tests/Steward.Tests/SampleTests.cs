@@ -207,10 +207,14 @@ public class SampleTests : IDisposable
         File.WriteAllText(Path.Combine(folder, "Задание 2.docx"), "два");
         File.WriteAllText(Path.Combine(folder, "Задание 2.docx.partial"), "хвост");
         File.WriteAllText(Path.Combine(folder, "Задание 22.docx"), "не то");
+        File.WriteAllText(Path.Combine(folder, "Задание 4.tar.gz"), "архив");
+        File.WriteAllText(Path.Combine(folder, "Задание 5.tar.gz.partial"), "хвост");
 
         Assert.Equal(Path.Combine(folder, "Задание 2.docx"), homework.SampleCandidate("l1", 2));
         Assert.Equal(Path.Combine(folder, "Задание 1. Эссе.docx"), homework.SampleCandidate("l1", 1));
         Assert.Null(homework.SampleCandidate("l1", 3));
+        Assert.Equal(Path.Combine(folder, "Задание 4.tar.gz"), homework.SampleCandidate("l1", 4));
+        Assert.Null(homework.SampleCandidate("l1", 5));
         Assert.Null(homework.SampleCandidate("нет такого", 1));
     }
 

@@ -350,16 +350,24 @@ public sealed class HomeworkStore(string directory)
     {
         try
         {
-            var name = $"Задание {number}";
-
-            return DraftFiles(lessonId).FirstOrDefault(file => string.Equals(Path.GetFileNameWithoutExtension(file), name, StringComparison.OrdinalIgnoreCase)
-                || Path.GetFileName(file).StartsWith(name + ". ", StringComparison.OrdinalIgnoreCase));
+            return DraftFiles(lessonId).FirstOrDefault(file => IsTaskFile(file, number));
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
         {
             return null;
         }
     }
+
+    /// <summary>
+    /// Относится ли файл к заданию: имя начинается с «Задание N.» — это «Задание N.docx», «Задание N.tar.gz» и «Задание N. Название.docx», но не «Задание N1.docx»
+    /// </summary>
+    /// <param name="file">Путь или имя файла</param>
+    /// <param name="number">Номер задания, с единицы</param>
+    /// <returns>
+    /// <see langword="true"/>, если файл этого задания
+    /// </returns>
+    public static bool IsTaskFile(string file, int number) =>
+        Path.GetFileName(file).StartsWith($"Задание {number}.", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Папка с описанием и файлами задания из LMS

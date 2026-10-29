@@ -70,7 +70,7 @@ internal static class Program
 
                     return 0;
                 case "prepare":
-                    Log(await PrepareAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
+                    Log((await PrepareAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")))).Summary);
 
                     return 0;
                 case "task":
@@ -129,10 +129,13 @@ internal static class Program
                     summary += "\n" + await TasksAsync(settings, store, dryRun: !settings.CreateTasks);
                     summary += "\n" + await AnalyzeAsync(settings, store);
                     summary += "\n" + await ExtractAsync(settings, store);
-                    summary += "\n" + await PrepareAsync(settings, store);
+                    var (prepareSummary, notices) = await PrepareAsync(settings, store);
+                    summary += "\n" + prepareSummary;
                     summary += "\n" + await PublishAsync(settings, store);
                     Log(summary);
-                    Report(statusStore, ProcessStateEnum.Ok, summary, null);
+
+                    // Строки «Готова работа: …» уже напечатаны по мере готовности; в сводку статуса они идут для уведомления в трее
+                    Report(statusStore, ProcessStateEnum.Ok, notices.Count > 0 ? summary + "\n" + string.Join("\n", notices) : summary, null);
 
                     return 0;
             }
@@ -351,17 +354,19 @@ internal static class Program
     }
 
     /// <summary>
-    /// Готовит работы по найденным несданным заданиям, не больше <see cref="LmsSettings.MaxPreparePerRun"/> за запуск, и сразу их проверяет. По каждой готовой работе пишет строку «Готова работа: предмет, задание»: по ней приложение в трее показывает уведомление
+    /// Готовит работы по найденным несданным заданиям, не больше <see cref="LmsSettings.MaxPreparePerRun"/> за запуск и не дольше <see cref="LmsSettings.PrepareBudgetMinutes"/>, и сразу их проверяет.
+    /// По каждой готовой работе сразу пишет строку «Готова работа: предмет, задание». Если срок вышел, агент останавливается, готовое сохраняется, а запуск идёт дальше как обычный
     /// </summary>
-    /// <param name="settings">Настройки: сколько работ готовить за запуск</param>
+    /// <param name="settings">Настройки: сколько работ готовить и сколько минут даётся шагу</param>
     /// <param name="store">Папка домашних заданий</param>
-    /// <returns>Строка итога для статуса со строками уведомления о готовых работах</returns>
-    private static async Task<string> PrepareAsync(LmsSettings settings, HomeworkStore store)
+    /// <returns>Строка итога для статуса и строки уведомления о готовых работах для сводки статуса</returns>
+    private static async Task<(string Summary, IReadOnlyList<string> Notices)> PrepareAsync(LmsSettings settings, HomeworkStore store)
     {
         var preparer = new HomeworkPreparer(store, new GuideStore(store.Root), new RemarkStore(Path.Combine(store.Root, "remarks")), ClaudeAgent.RunAsync);
-        var report = await preparer.RunAsync(settings.MaxPreparePerRun, CancellationToken.None);
+        var budget = TimeSpan.FromMinutes(Math.Max(settings.PrepareBudgetMinutes, 1));
+        var report = await preparer.RunWithBudgetAsync(settings.MaxPreparePerRun, budget, work => Log(HomeworkPreparer.NOTICE + work), CancellationToken.None);
         if (report.Busy)
-            return "Подготовка работ: уже идёт в другом запуске";
+            return ("Подготовка работ: уже идёт в другом запуске", []);
 
         foreach (var line in report.Waiting)
             Log($"Ждёт владельца: {line}");
@@ -369,9 +374,12 @@ internal static class Program
         foreach (var line in report.Failed)
             Log($"Подготовка не удалась: {line}");
 
-        var summary = $"Подготовка работ: готово {report.Prepared.Count}, ждут {report.Waiting.Count}, ошибок {report.Failed.Count}";
+        if (report.Cancelled)
+            Log($"Подготовка работ остановлена: вышло время шага ({budget.TotalMinutes:0} мин), остальное в следующем запуске");
 
-        return report.Prepared.Count > 0 ? summary + "\n" + string.Join("\n", report.Notices()) : summary;
+        var summary = $"Подготовка работ: готово {report.Prepared.Count}, ждут {report.Waiting.Count}, ошибок {report.Failed.Count}{(report.Cancelled ? ", остановлена по сроку" : string.Empty)}";
+
+        return (summary, report.Notices());
     }
 
     /// <summary>

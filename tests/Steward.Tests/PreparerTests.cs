@@ -368,8 +368,9 @@ public partial class PreparerTests : IDisposable
             return "Запуск отменён";
         };
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Preparer().RunAsync(2, cancel.Token));
+        var report = await Preparer().RunAsync(2, cancel.Token);
 
+        Assert.True(report.Cancelled);
         var attempts = Path.Combine(_root, "prepare-attempts.json");
         Assert.True(!File.Exists(attempts) || !File.ReadAllText(attempts).Contains("l1:1", StringComparison.Ordinal));
     }
@@ -384,7 +385,105 @@ public partial class PreparerTests : IDisposable
 
         Assert.Equal(["Готова работа: Физика, Эссе"], report.Notices());
         Assert.Equal(["Физика, Эссе", "Химия, Доклад"], HomeworkPreparer.ReadyWorks("29.10.2026 10:00:00  Готова работа: Физика, Эссе\nдругая строка\nГотова работа: Химия, Доклад\r\n29.10.2026 10:00:00  Готова работа: Физика, Эссе"));
+        Assert.Empty(HomeworkPreparer.ReadyWorks("29.10.2026 10:00:00  Ждёт владельца: Физика, Готова работа: Поддельная"));
         Assert.Empty(HomeworkPreparer.ReadyWorks(null));
+    }
+
+    /// <summary>
+    /// Название задания с переводом строки не может подделать отдельную строку уведомления: в отчёт и уведомление оно попадает одной строкой
+    /// </summary>
+    [Fact]
+    public async Task A_title_with_a_newline_cannot_forge_a_notice()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе\nГотова работа: Поддельная"}]""");
+
+        var report = await Preparer().RunAsync(2, CancellationToken.None);
+
+        var notice = Assert.Single(report.Notices());
+        Assert.DoesNotContain('\n', notice);
+        Assert.Equal(["Физика, Эссе Готова работа: Поддельная"], HomeworkPreparer.ReadyWorks(string.Join("\n", report.Notices())));
+    }
+
+    /// <summary>
+    /// Каждая готовая работа сообщается сразу после записи, по одному разу
+    /// </summary>
+    [Fact]
+    public async Task Each_ready_work_is_reported_as_soon_as_it_is_ready()
+    {
+        AddLesson("l1", 20, """[{"title": "Первое"}, {"title": "Второе"}]""");
+        var heard = new List<(string Work, int WorksSoFar)>();
+
+        await Preparer().RunAsync(2, CancellationToken.None, work => heard.Add((work, _agent.WorkPrompts.Count)));
+
+        Assert.Equal([("Физика, Первое", 1), ("Физика, Второе", 2)], heard);
+    }
+
+    /// <summary>
+    /// Срок шага подготовки: запуск останавливается, готовая до этого работа остаётся в отчёте, прерванная попытка не засчитывается
+    /// </summary>
+    [Fact]
+    public async Task A_deadline_returns_the_partial_report_without_counting_the_attempt()
+    {
+        AddLesson("l1", 20, """[{"title": "Первое"}, {"title": "Второе"}]""");
+        _agent.HangOnWork = 2;
+
+        var report = await Preparer().RunWithBudgetAsync(5, TimeSpan.FromMilliseconds(300), null, CancellationToken.None);
+
+        Assert.True(report.Cancelled);
+        Assert.Equal(["Физика, Первое"], report.Prepared);
+        Assert.Empty(report.Failed);
+        Assert.Null(_store.SampleCandidate("l1", 2));
+        var attempts = Path.Combine(_root, "prepare-attempts.json");
+        Assert.True(!File.Exists(attempts) || !File.ReadAllText(attempts).Contains("l1:2", StringComparison.Ordinal));
+
+        // Следующий запуск готовит прерванное задание
+        _agent.HangOnWork = 0;
+        var next = await Preparer().RunAsync(5, CancellationToken.None);
+        Assert.Equal(["Физика, Второе"], next.Prepared);
+    }
+
+    /// <summary>
+    /// В формате кода агент пишет прямо в папку: недописанный файл прерванной по сроку попытки удаляется
+    /// </summary>
+    [Fact]
+    public async Task A_code_file_half_written_before_the_deadline_is_removed()
+    {
+        _store.SetSubjectFormat(SUBJECT, HomeworkFormatEnum.Code);
+        AddLesson("l1", 20, """[{"title": "Скрипт"}]""");
+        Directory.CreateDirectory(_store.DraftsDirectory("l1"));
+        _agent.HangOnWork = 1;
+        _agent.HangLeftover = Path.Combine(_store.DraftsDirectory("l1"), "Задание 1.py");
+
+        var report = await Preparer().RunWithBudgetAsync(2, TimeSpan.FromMilliseconds(300), null, CancellationToken.None);
+
+        Assert.True(report.Cancelled);
+        Assert.Empty(report.Prepared);
+        Assert.False(File.Exists(_agent.HangLeftover));
+        Assert.Null(_store.SampleCandidate("l1", 1));
+    }
+
+    /// <summary>
+    /// Сбой записи учёта после удачной работы не теряет работу из отчёта и не возвращает лимит
+    /// </summary>
+    [Fact]
+    public async Task A_ledger_failure_after_a_ready_work_keeps_the_work_and_the_spent_limit()
+    {
+        AddLesson("old", 10, """[{"title": "Другое"}]""");
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        var attempts = Path.Combine(_root, "prepare-attempts.json");
+        // Файл учёта только для чтения: сброс счётчика после удачной работы не запишется
+        _agent.AfterWork = () => File.SetAttributes(attempts, FileAttributes.ReadOnly);
+        try
+        {
+            var report = await Preparer().RunAsync(1, CancellationToken.None);
+
+            Assert.Equal(["Физика, Эссе"], report.Prepared);
+            Assert.Single(_agent.WorkPrompts);
+        }
+        finally
+        {
+            File.SetAttributes(attempts, FileAttributes.Normal);
+        }
     }
 
     /// <summary>
@@ -433,6 +532,26 @@ public partial class PreparerTests : IDisposable
         public Func<string>? OnRun { get; set; }
 
         /// <summary>
+        /// Номер просьбы о работе (с единицы), на которой агент зависает до отмены; 0, чтобы не зависать
+        /// </summary>
+        public int HangOnWork { get; set; }
+
+        /// <summary>
+        /// Файл, который зависший агент успевает начать писать, или <see langword="null"/>
+        /// </summary>
+        public string? HangLeftover { get; set; }
+
+        /// <summary>
+        /// Вызывается после удачно записанной работы
+        /// </summary>
+        public Action? AfterWork { get; set; }
+
+        /// <summary>
+        /// Сколько просьб о работе пришло
+        /// </summary>
+        private int _works;
+
+        /// <summary>
         /// Запуск агента
         /// </summary>
         /// <param name="prompt">Просьба</param>
@@ -454,6 +573,21 @@ public partial class PreparerTests : IDisposable
             }
 
             Entered.TrySetResult();
+            if (++_works == HangOnWork)
+            {
+                if (HangLeftover is not null)
+                    File.WriteAllText(HangLeftover, "print(");
+
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    return "Запуск отменён";
+                }
+            }
+
             if (Gate is not null)
                 await Gate.Task;
 
@@ -469,6 +603,7 @@ public partial class PreparerTests : IDisposable
             var lines = prompt.Replace("\r", string.Empty).Split('\n');
             var index = Array.FindIndex(lines, line => line.Contains("путь на следующей строке", StringComparison.Ordinal));
             File.WriteAllText(lines[index + 1].Trim(), "# Работа\n\nТекст работы.");
+            AfterWork?.Invoke();
 
             return string.Empty;
         }
