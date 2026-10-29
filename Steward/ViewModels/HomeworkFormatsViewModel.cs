@@ -418,9 +418,16 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Func<Lesson, IReadOnlyDictionary<int, ItemPipelineInfo>>? PipelineReader { get; set; }
 
     /// <summary>
-    /// Прочитанные шаги заданий по ключу занятия: пока идёт новое чтение, карточка показывает прежние, поэтому строки не мигают
+    /// Прочитанные задания занятия и их шаги, одним снимком
     /// </summary>
-    private readonly Dictionary<string, IReadOnlyDictionary<int, ItemPipelineInfo>> _pipeline = new(StringComparer.Ordinal);
+    /// <param name="Items">Задания или <see langword="null"/>, если их ещё не искали</param>
+    /// <param name="Pipeline">Шаги заданий или <see langword="null"/>, если чтение шагов не подключено</param>
+    private sealed record LessonData(IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>? Items, IReadOnlyDictionary<int, ItemPipelineInfo>? Pipeline);
+
+    /// <summary>
+    /// Прочитанные задания и шаги по ключу занятия: пока идёт новое чтение, карточка показывает прежние, поэтому строки не мигают
+    /// </summary>
+    private readonly Dictionary<string, LessonData> _data = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Номер последнего запроса чтения шагов по ключу занятия: устаревший ответ не затирает свежий
@@ -428,7 +435,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private readonly Dictionary<string, int> _pipelineVersions = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// Защищает кеш шагов: в тестах без потока окна ответы приходят из пула потоков
+    /// Защищает кеш и применение прочитанного: в тестах без потока окна ответы приходят из пула потоков
     /// </summary>
     private readonly object _pipelineGate = new();
 
@@ -438,7 +445,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private readonly List<Task> _pipelineLoads = [];
 
     /// <summary>
-    /// Ждёт, пока прочитаются шаги всех заданий, запрошенные к этому моменту
+    /// Ждёт, пока прочитаются задания и шаги всех занятий, запрошенные к этому моменту
     /// </summary>
     /// <returns>Задача, которая завершается, когда все чтения применены</returns>
     public Task WhenPipelineLoaded()
@@ -496,28 +503,27 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private static string ViewedKey(LessonFormatViewModel lesson, int number) => $"{lesson.Id}:{number}";
 
     /// <summary>
-    /// Обновляет найденные задания занятия: сразу с известными шагами, а свежие шаги читаются в фоне и применяются, когда готовы
+    /// Обновляет найденные задания занятия: сразу из прежнего снимка, а свежие задания и шаги читаются в фоне и применяются, когда готовы
     /// </summary>
     /// <param name="lesson">Занятие</param>
     private void RefreshItems(LessonFormatViewModel lesson) => _ = RefreshItemsAsync(lesson);
 
     /// <summary>
-    /// Обновляет найденные задания занятия и ждёт свежих шагов
+    /// Обновляет найденные задания занятия и ждёт свежего снимка. Файлы не читаются в потоке окна: задания и шаги читаются одной фоновой задачей
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    /// <returns>Задача, которая завершается, когда шаги прочитаны и применены</returns>
+    /// <returns>Задача, которая завершается, когда снимок прочитан и применён; ошибок не выбрасывает</returns>
     private Task RefreshItemsAsync(LessonFormatViewModel lesson)
     {
-        var found = BuildItems(lesson);
-        if (found is null || PipelineReader is not { } reader)
-            return Task.CompletedTask;
-
         Task load;
         lock (_pipelineGate)
         {
+            if (_data.ContainsKey(lesson.Id))
+                BuildItems(lesson);
+
             var version = _pipelineVersions.GetValueOrDefault(lesson.Id) + 1;
             _pipelineVersions[lesson.Id] = version;
-            load = LoadPipelineAsync(lesson, reader, version);
+            load = LoadLessonAsync(lesson, ItemsReader, PipelineReader, version);
             _pipelineLoads.RemoveAll(task => task.IsCompleted);
             _pipelineLoads.Add(load);
         }
@@ -526,50 +532,66 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Читает шаги заданий занятия в фоновой задаче и пересобирает строки в потоке окна, если ответ ещё свежий
+    /// Читает задания и шаги занятия одной фоновой задачей и применяет их вместе в потоке окна, если ответ ещё свежий; после этого занятия пересортировываются. Любая ошибка, в том числе при сборке строк, показывается в карточке занятия
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    /// <param name="reader">Чтение шагов</param>
+    /// <param name="items">Чтение заданий</param>
+    /// <param name="pipeline">Чтение шагов</param>
     /// <param name="version">Номер этого запроса</param>
     /// <returns>Задача чтения; ошибок не выбрасывает</returns>
-    private async Task LoadPipelineAsync(LessonFormatViewModel lesson, Func<Lesson, IReadOnlyDictionary<int, ItemPipelineInfo>> reader, int version)
+    private async Task LoadLessonAsync(LessonFormatViewModel lesson, Func<string, IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>?>? items, Func<Lesson, IReadOnlyDictionary<int, ItemPipelineInfo>>? pipeline, int version)
     {
-        IReadOnlyDictionary<int, ItemPipelineInfo> info;
         try
         {
-            info = await Task.Run(() => reader(lesson.Lesson));
+            var data = await Task.Run(() =>
+            {
+                var found = items?.Invoke(lesson.Id);
+
+                return new LessonData(found, found is null ? null : pipeline?.Invoke(lesson.Lesson));
+            });
+
+            lock (_pipelineGate)
+            {
+                if (_pipelineVersions.GetValueOrDefault(lesson.Id) != version)
+                    return;
+
+                _data[lesson.Id] = data;
+                BuildItems(lesson);
+                Reorder();
+            }
         }
         catch (Exception exception)
         {
-            System.Diagnostics.Trace.TraceError($"Шаги заданий {lesson.Id}: {exception}");
-            lesson.ShowResult("Не удалось прочитать состояние заданий: " + exception.Message, failed: true);
-
-            return;
+            System.Diagnostics.Trace.TraceError($"Задания занятия {lesson.Id}: {exception}");
+            lesson.ShowResult("Не удалось прочитать задания занятия: " + exception.Message, failed: true);
         }
-
-        lock (_pipelineGate)
-        {
-            if (_pipelineVersions.GetValueOrDefault(lesson.Id) != version)
-                return;
-
-            _pipeline[lesson.Id] = info;
-        }
-
-        BuildItems(lesson);
     }
 
     /// <summary>
-    /// Собирает строки заданий из чтения заданий и известных шагов, не трогая файлы шагов
+    /// Ставит занятия в порядок по свежим заданиям: с несданными сверху, без заданий ниже, всё сданное внизу, внутри группы от свежих к старым
+    /// </summary>
+    private void Reorder()
+    {
+        var rows = Lessons.OrderBy(row => PipelineStepper.LessonGroup(row.Items.Count, row.PendingCount)).ThenByDescending(row => row.Lesson.Date).ToList();
+        if (rows.SequenceEqual(Lessons))
+            return;
+
+        Lessons = rows;
+        UpdateSubjects();
+    }
+
+    /// <summary>
+    /// Собирает строки заданий из последнего прочитанного снимка, не трогая файлы
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    /// <returns>Прочитанные задания или <see langword="null"/>, если их ещё не искали</returns>
-    private IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>? BuildItems(LessonFormatViewModel lesson)
+    private void BuildItems(LessonFormatViewModel lesson)
     {
-        var found = ItemsReader?.Invoke(lesson.Id);
-        IReadOnlyDictionary<int, ItemPipelineInfo>? pipeline;
+        LessonData? data;
         lock (_pipelineGate)
-            pipeline = _pipeline.GetValueOrDefault(lesson.Id);
+            data = _data.GetValueOrDefault(lesson.Id);
 
+        var found = data?.Items;
+        var pipeline = data?.Pipeline;
         var actions = CardActions(lesson);
         lesson.SetItems(
             [.. (found ?? []).Select(row => new LessonItemViewModel(
@@ -585,8 +607,6 @@ public sealed class HomeworkFormatsViewModel : Bindable
                 actions,
                 _viewed.Contains(ViewedKey(lesson, row.Number))))],
             found is not null);
-
-        return found;
     }
 
     /// <summary>

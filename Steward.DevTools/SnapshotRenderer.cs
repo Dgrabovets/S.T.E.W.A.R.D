@@ -153,6 +153,10 @@ public static class SnapshotRenderer
                 education.ItemsReader = id => id == firstId
                     ? [(1, new HomeworkItem("Выбрать игру и написать по ней аналитический отчёт", new DateOnly(2026, 11, 2), "Объём 1-2 страницы. Разобрать правила, конфликт, агентность, обратную связь и место игры в истории.", string.Empty), false)]
                     : [(1, new HomeworkItem("Собрать главное меню в Unity", new DateOnly(2026, 11, 5), "Первый этап практики: меню с кнопками и окном настроек звука.", string.Empty), false), (2, new HomeworkItem("Сделать второй этап: привязать UI к коду", null, string.Empty, string.Empty, true), true)];
+                var sure = new ItemAssessment(ItemReadinessEnum.Ready, string.Empty);
+                education.PipelineReader = lesson => lesson.Id == firstId
+                    ? new Dictionary<int, ItemPipelineInfo> { [1] = new(PipelineStepEnum.Ready, drafts[0], sure, false, false, string.Empty) }
+                    : new Dictionary<int, ItemPipelineInfo> { [1] = new(PipelineStepEnum.Found, string.Empty, sure, false, false, "Работа подготовится сама при ближайшей выгрузке"), [2] = new(PipelineStepEnum.Submitted, string.Empty, sure, false, false, string.Empty) };
                 education.GuideFolder = @"D:\data\homework\guides";
                 education.GuideLister = _ =>
                 [

@@ -741,6 +741,101 @@ public class PipelineTests
     }
 
     /// <summary>
+    /// Пока шаги не прочитаны (первый показ или ошибка чтения), карточка нейтральная: без значка «цитата не найдена» и без выделенного шага
+    /// </summary>
+    [Fact]
+    public void Before_the_pipeline_is_read_the_card_is_neutral()
+    {
+        var row = new LessonItemViewModel(1, new HomeworkItem("А", null, string.Empty, string.Empty, Evidence: "сделайте"), false, _ => { }, _ => { });
+
+        Assert.False(row.PipelineKnown);
+        Assert.Equal((string.Empty, false, false), (row.Reliability, row.ReliabilityWarning, row.HasReliability));
+        Assert.DoesNotContain(row.Steps, step => step.IsCurrent || step.IsPassed);
+        Assert.Equal(string.Empty, row.Hint);
+    }
+
+    /// <summary>
+    /// Задания читаются не в потоке окна и один раз на обновление: обновление списка не ждёт чтения, а результат приходит вместе с шагами
+    /// </summary>
+    [Fact]
+    public async Task Items_are_read_off_the_ui_thread_once_per_refresh()
+    {
+        using var gate = new ManualResetEventSlim();
+        var calls = 0;
+        var released = new List<bool>();
+        var contexts = new List<SynchronizationContext?>();
+        var model = new HomeworkFormatsViewModel((_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = _ =>
+            {
+                Interlocked.Increment(ref calls);
+                lock (released)
+                {
+                    released.Add(gate.Wait(TimeSpan.FromSeconds(5)));
+                    contexts.Add(SynchronizationContext.Current);
+                }
+
+                return [(1, new HomeworkItem("А", null, string.Empty, string.Empty), false)];
+            },
+            PipelineReader = _ => new Dictionary<int, ItemPipelineInfo> { [1] = new(PipelineStepEnum.Found, string.Empty, new ItemAssessment(ItemReadinessEnum.Ready, string.Empty), false, false, string.Empty) },
+        };
+
+        // Поток окна изображает контекст синхронизации: чтение не должно идти в нём
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+        try
+        {
+            model.Update([(Sample, HomeworkFormatEnum.Word)]);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+
+        Assert.Empty(model.Lessons.Single().Items);
+        gate.Set();
+        await model.WhenPipelineLoaded();
+
+        Assert.Equal(1, calls);
+        Assert.All(released, Assert.True);
+        Assert.All(contexts, Assert.Null);
+        var item = Assert.Single(model.Lessons.Single().Items);
+        Assert.True(item.PipelineKnown);
+    }
+
+    /// <summary>
+    /// Ошибка чтения заданий заканчивается сообщением в карточке занятия, а не потерянным исключением
+    /// </summary>
+    [Fact]
+    public async Task An_items_reader_failure_ends_as_a_message()
+    {
+        var unobserved = 0;
+        void Count(object? sender, UnobservedTaskExceptionEventArgs e) => Interlocked.Increment(ref unobserved);
+        TaskScheduler.UnobservedTaskException += Count;
+        try
+        {
+            var model = new HomeworkFormatsViewModel((_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+            {
+                ItemsReader = _ => throw new InvalidOperationException("файл заданий сломан"),
+            };
+            model.Update([(Sample, HomeworkFormatEnum.Word)]);
+            await model.WhenPipelineLoaded();
+
+            var row = model.Lessons.Single();
+            Assert.True(row.Failed);
+            Assert.Contains("файл заданий сломан", row.Status, StringComparison.Ordinal);
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            Assert.Equal(0, unobserved);
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= Count;
+        }
+    }
+
+    /// <summary>
     /// Работой LMS считается только цифровой номер работы, как в оценке уверенности: ссылка в тексте задания значок «LMS» не даёт
     /// </summary>
     [Fact]
@@ -792,7 +887,7 @@ public class PipelineTests
     /// Занятия в списке идут по заданиям: с несданными сверху, без заданий ниже, всё сданное внизу, внутри группы от свежих к старым; когда задание отметили сданным, строки заданий заменяются и занятие уходит вниз при следующем обновлении
     /// </summary>
     [Fact]
-    public void Update_orders_lessons_and_SetItems_follows_the_submitted_mark()
+    public async Task Update_orders_lessons_and_SetItems_follows_the_submitted_mark()
     {
         var done = new Lesson("done", "Физика", new DateOnly(2026, 10, 25));
         var pending = new Lesson("pending", "Физика", new DateOnly(2026, 10, 10));
@@ -809,6 +904,7 @@ public class PipelineTests
         };
         IReadOnlyList<(Lesson, HomeworkFormatEnum)> all = [(done, HomeworkFormatEnum.Word), (pending, HomeworkFormatEnum.Word), (empty, HomeworkFormatEnum.Word)];
         model.Update(all);
+        await model.WhenPipelineLoaded();
 
         Assert.Equal(["pending", "empty", "done"], model.Lessons.Select(row => row.Id).ToArray());
 
@@ -816,6 +912,7 @@ public class PipelineTests
         var before = row.Items;
         submitted = true;
         model.Update(all);
+        await model.WhenPipelineLoaded();
 
         Assert.NotSame(before, row.Items);
         Assert.True(row.Items[0].Submitted);

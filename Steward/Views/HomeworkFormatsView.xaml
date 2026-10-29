@@ -524,8 +524,8 @@
                                                                                 <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
                                                                                 <Style.Triggers>
                                                                                     <DataTrigger Binding="{Binding MainIsQuiet}" Value="True">
-                                                                                        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
-                                                                                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                                                                        <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
+                                                                                        <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
                                                                                     </DataTrigger>
                                                                                 </Style.Triggers>
                                                                             </Style>
@@ -569,7 +569,8 @@
                                                                     <StackPanel>
                                                                         <WrapPanel>
                                                                             <TextBlock Text="Откуда это задание" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                                            <Border x:Name="Badge" Style="{StaticResource Chip}" VerticalAlignment="Center">
+                                                                            <Border x:Name="Badge" Style="{StaticResource Chip}" VerticalAlignment="Center"
+                                                                                    Visibility="{Binding HasReliability, Converter={StaticResource BoolToVisibility}}">
                                                                                 <TextBlock x:Name="BadgeText" Text="{Binding Reliability}" Style="{StaticResource TextCaption}"/>
                                                                             </Border>
                                                                         </WrapPanel>

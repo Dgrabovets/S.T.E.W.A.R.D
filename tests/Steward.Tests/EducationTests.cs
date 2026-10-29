@@ -541,7 +541,7 @@ public class EducationTests
     /// Кнопка подготовки есть, только если нашлись несданные задания и готовых файлов ещё нет, а задания, архив и отметка поиска обновляются из чтения
     /// </summary>
     [Fact]
-    public void The_prepare_button_needs_pending_items_and_no_ready_files()
+    public async Task The_prepare_button_needs_pending_items_and_no_ready_files()
     {
         var found = new List<(int Number, HomeworkItem Item, bool InSingularity)>();
         var searched = false;
@@ -552,6 +552,7 @@ public class EducationTests
             ItemArchived = (id, number) => archived.Add((id, number)),
         };
         var lesson = model.Lessons.Single();
+        await model.WhenPipelineLoaded();
 
         Assert.False(lesson.CanPrepare);
         Assert.Contains("ищутся", lesson.ItemsHint, StringComparison.Ordinal);
@@ -559,23 +560,27 @@ public class EducationTests
         searched = true;
         found.Add((1, new HomeworkItem("Отчёт", null, string.Empty, string.Empty), false));
         model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
 
         Assert.True(lesson.CanPrepare);
         Assert.Single(lesson.Items);
 
         found[0] = (1, new HomeworkItem("Отчёт", null, string.Empty, string.Empty, true), false);
         model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
         Assert.False(lesson.CanPrepare);
 
         found.Clear();
         found.Add((1, new HomeworkItem("Отчёт", null, string.Empty, string.Empty), false));
         model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
         lesson.Items[0].ArchiveCommand.Execute(null);
 
         Assert.Equal([("a", 1)], archived);
 
         found.Clear();
         model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
         Assert.Contains("заданий нет", lesson.ItemsHint, StringComparison.Ordinal);
     }
 

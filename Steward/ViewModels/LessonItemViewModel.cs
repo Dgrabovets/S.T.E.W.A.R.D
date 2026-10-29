@@ -41,7 +41,9 @@ public sealed class LessonItemViewModel
         Step = pipeline?.Step ?? (item.Done ? PipelineStepEnum.Submitted : PipelineStepEnum.Found);
         WorkPath = pipeline?.WorkPath ?? string.Empty;
         Viewed = viewed;
-        Steps = [.. StepTitles.Select((title, index) => new PipelineStepViewModel(title, index == (int)Step, index < (int)Step, index == 0))];
+        // Пока шаги не прочитаны, строка шагов нейтральная: ни один шаг не выделен, чтобы не показать неверный
+        PipelineKnown = pipeline is not null;
+        Steps = [.. StepTitles.Select((title, index) => new PipelineStepViewModel(title, PipelineKnown && index == (int)Step, PipelineKnown && index < (int)Step, index == 0))];
         Hint = pipeline?.Hint ?? string.Empty;
         HintIsProblem = pipeline?.HintIsProblem ?? false;
         var assessment = pipeline?.Assessment;
@@ -54,6 +56,7 @@ public sealed class LessonItemViewModel
         var linked = pipeline?.LinkedToLms ?? false;
         (Reliability, ReliabilityWarning) = (verified, linked, evidence.Length > 0) switch
         {
+            _ when !PipelineKnown => (string.Empty, false),
             (true, true, _) => ("подтверждено цитатой и LMS", false),
             (true, false, _) => ("только расшифровка", false),
             (false, _, true) => ("цитата не найдена", true),
@@ -314,6 +317,16 @@ public sealed class LessonItemViewModel
     public bool ReliabilityWarning { get; }
 
     /// <summary>
+    /// Значок надёжности известен: шаги и проверка цитаты уже прочитаны
+    /// </summary>
+    public bool HasReliability => Reliability.Length > 0;
+
+    /// <summary>
+    /// Шаг конвейера, проверка цитаты и связь с LMS прочитаны. Пока нет, карточка нейтральная: без выделенного шага и значка
+    /// </summary>
+    public bool PipelineKnown { get; }
+
+    /// <summary>
     /// Что делает главная кнопка
     /// </summary>
     public ItemMainActionEnum MainAction { get; }
@@ -391,5 +404,5 @@ public sealed class LessonItemViewModel
     /// <summary>
     /// Всё, что видно на карточке, одной строкой: по ней список понимает, что строку нужно пересоздать
     /// </summary>
-    public string StateKey => string.Join("|", Number, Title, Meta, Requirements, IsDone, Submitted, InSingularity, Step, WorkPath, Viewed, MainLabel, Hint, Question, Note, Quote, Reliability);
+    public string StateKey => string.Join("|", Number, Title, Meta, Requirements, IsDone, Submitted, InSingularity, Step, WorkPath, Viewed, MainLabel, Hint, Question, Note, Quote, Reliability, PipelineKnown);
 }
