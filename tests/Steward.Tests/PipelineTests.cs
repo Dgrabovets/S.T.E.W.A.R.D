@@ -1013,6 +1013,27 @@ public class PipelineTests
     }
 
     /// <summary>
+    /// «В архив» при занятом файле отметок не роняет окно: причина показывается в карточке
+    /// </summary>
+    [Fact]
+    public async Task A_failed_archive_is_shown_in_the_card()
+    {
+        var lesson = new Lesson("l1", "Физика", new DateOnly(2026, 10, 10));
+        var model = new HomeworkFormatsViewModel([(lesson, HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = _ => [(1, new HomeworkItem("Эссе", null, string.Empty, string.Empty, false), false)],
+            ItemArchived = (_, _) => throw new IOException("файл занят"),
+        };
+        model.Update([(lesson, HomeworkFormatEnum.Word)]);
+        await model.WhenPipelineLoaded();
+
+        model.Lessons[0].Items[0].ArchiveCommand.Execute(null);
+
+        Assert.True(model.Lessons[0].Failed);
+        Assert.Contains("файл занят", model.Lessons[0].Status, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Сборка строк из прежнего снимка не перекрывает свежий снимок: после многих обновлений подряд строки всегда показывают последнее прочитанное
     /// </summary>
     [Fact]

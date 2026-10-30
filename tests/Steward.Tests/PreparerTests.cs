@@ -617,6 +617,11 @@ public partial class PreparerTests : IDisposable
         /// </summary>
         /// <returns>Заданное время</returns>
         public override DateTimeOffset GetUtcNow() => now.ToUniversalTime();
+
+        /// <summary>
+        /// Часовой пояс: UTC, чтобы граница срока не зависела от пояса машины
+        /// </summary>
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
     }
 
     /// <summary>

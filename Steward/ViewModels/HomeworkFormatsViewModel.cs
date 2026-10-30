@@ -996,13 +996,24 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Убирает задание в архив и обновляет список
+    /// Убирает задание в архив и обновляет список. Если файл отметок занят или не читается, отметка не записывается, прежние отметки целы, а причина видна в карточке
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="number">Номер задания</param>
     private void ArchiveItem(LessonFormatViewModel lesson, int number)
     {
-        ItemArchived?.Invoke(lesson.Id, number);
+        try
+        {
+            ItemArchived?.Invoke(lesson.Id, number);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Trace.TraceError($"В архив {lesson.Id}:{number}: {exception}");
+            lesson.ShowResult("Не удалось убрать в архив, повтори позже: " + exception.Message, failed: true);
+
+            return;
+        }
+
         RefreshItems(lesson);
     }
 
