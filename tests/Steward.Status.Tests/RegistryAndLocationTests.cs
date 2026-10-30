@@ -119,6 +119,6 @@ public class RegistryAndLocationTests
         var result = JobRegistry.Load(Path.Combine(root, "config", "jobs.json"), root);
 
         Assert.Empty(result.Errors);
-        Assert.Equal(["homework", "lms", "mail", "reels"], result.Jobs.Select(job => job.Id).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(["lms", "mail", "reels"], result.Jobs.Select(job => job.Id).Order(StringComparer.Ordinal).ToArray());
     }
 }

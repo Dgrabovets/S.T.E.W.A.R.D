@@ -9,11 +9,10 @@ public static class ActivityKinds
     /// Вид движения для выполняющейся задачи из реестра
     /// </summary>
     /// <param name="jobId">Идентификатор задачи из config/jobs.json</param>
-    /// <returns>Связь для почты и бота, сборка для домашних заданий, остальным ровное вращение</returns>
+    /// <returns>Связь для почты и бота, остальным ровное вращение</returns>
     public static ActivityKindEnum For(string jobId) => jobId switch
     {
         "mail" or "reels" or "telegram" => ActivityKindEnum.Connecting,
-        "homework" => ActivityKindEnum.Composing,
         _ => ActivityKindEnum.Working,
     };
 

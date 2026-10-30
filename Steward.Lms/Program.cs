@@ -541,7 +541,7 @@ internal static class Program
     {
         try
         {
-            store.Report(STATUS_ID, "Занятия LMS", state, DateTimeOffset.Now, summary, error, success: state != ProcessStateEnum.Failed);
+            store.Report(STATUS_ID, "Автоматизация образования", state, DateTimeOffset.Now, summary, error, success: state != ProcessStateEnum.Failed);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

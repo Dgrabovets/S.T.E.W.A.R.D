@@ -29,7 +29,7 @@ public class OrbKindTests
     public void A_running_task_gets_its_own_motion_and_a_muted_one_is_dormant()
     {
         Assert.Equal(ActivityKindEnum.Connecting, ActivityKinds.Of(new TaskStatusRow("mail", "Почта", "Выполняется", "", PanelToneEnum.Running, Working: true)));
-        Assert.Equal(ActivityKindEnum.Composing, ActivityKinds.Of(new TaskStatusRow("homework", "ДЗ", "Выполняется", "", PanelToneEnum.Running, Working: true)));
+        Assert.Equal(ActivityKindEnum.Working, ActivityKinds.Of(new TaskStatusRow("lms", "Автоматизация образования", "Выполняется", "", PanelToneEnum.Running, Working: true)));
         Assert.Equal(ActivityKindEnum.Dormant, ActivityKinds.Of(new TaskStatusRow("mail", "Почта", "Отключена", "", PanelToneEnum.Idle, Muted: true)));
     }
 
