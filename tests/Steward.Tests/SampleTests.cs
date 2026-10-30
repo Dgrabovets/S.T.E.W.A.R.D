@@ -672,7 +672,7 @@ public class SampleTests : IDisposable
 
         var moved = store.MoveDraftsToPrevious("l1", new HashSet<int> { 2 });
 
-        Assert.Equal(["Задание 3. Эссе.docx"], moved.Select(Path.GetFileName).ToArray());
+        Assert.Equal(["Задание 3. Эссе.docx"], moved.Select(path => Path.GetFileName(path)!).ToArray());
         Assert.Equal("моя работа", File.ReadAllText(attached));
         Assert.Equal("сданная", File.ReadAllText(Path.Combine(folder, "Задание 2. Доклад.docx")));
         Assert.Equal(["Задание 1.docx"], store.AttachedWorks("l1").ToArray());
