@@ -73,7 +73,7 @@
 
 - [ ] **Шаг 1: тесты:** `High_confidence_with_verified_evidence_is_ready`; `Medium_confidence_is_ready_with_the_doubt_as_note`; `Low_confidence_missing_evidence_or_missing_inputs_need_confirmation_with_a_question` (отдельные проверки: low, цитата не найдена, нет расшифровки, нет условия; вопрос непустой и называет причину); `A_confirmed_item_is_ready`; `An_old_item_without_new_fields_is_ready` (Confidence пусто и Evidence пусто, расшифровка есть: `Ready`); `Confirm_and_override_are_stored_and_applied_by_ReadItems`.
 - [ ] **Шаг 2: запустить, FAIL.**
-- [ ] **Шаг 3: реализовать** `ItemAssessor.Assess` по таблице спецификации (раздел «Уверенность и подтверждение»); подтверждение хранить в `item-states.json` значением `confirmed` (как `submitted`), правки условия в `item-overrides.json` (ключ `занятие:номер`, поля `title`, `requirements`); `ReadItems` подменяет название и требования из правок.
+- [ ] **Шаг 3: реализовать** `ItemAssessor.Assess` по таблице спецификации (раздел «Уверенность и подтверждение»); подтверждение хранить в отдельном `item-confirmed.json` (список ключей `занятие:номер`, `item-states.json` не трогать), правки условия в `item-overrides.json` (ключ `занятие:номер`, поля `title`, `requirements`); `ReadItems` подменяет название и требования из правок.
 - [ ] **Шаг 4: тесты проходят**, коммит «Оценка уверенности и подтверждение заданий».
 
 ### Задача 3: Замечания владельца

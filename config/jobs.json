@@ -47,7 +47,7 @@
         { "type": "daily", "at": "08:00" },
         { "type": "daily", "at": "22:30" }
       ],
-      "timeoutMinutes": 30,
+      "timeoutMinutes": 90,
       "staleAfterMinutes": 1500
     },
     {
