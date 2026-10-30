@@ -232,6 +232,43 @@ public class SampleTests : IDisposable
     }
 
     /// <summary>
+    /// Подготовке и проверке работы закрыты найденные задания, расшифровки, разборы, файлы состояния, прежние версии, отложенные неудачные попытки и отметка прикреплённых работ, но не папка работы занятия с <c>.src</c> и <c>.check</c>
+    /// </summary>
+    [Fact]
+    public void The_draft_agent_cannot_edit_owner_state_items_or_previous_versions()
+    {
+        var rules = ClaudeAgent.Arguments("п", @"D:\data\homework", []);
+
+        foreach (var file in new[] { "formats.json", "subject-formats.json", "subject-states.json", "lessons.json", "activities.json", "lesson-states.json" })
+            Assert.Contains($"Edit(//d/data/homework/{file})", rules);
+
+        foreach (var folder in new[] { "items", "transcripts", "analysis", "assignments", "remarks" })
+            Assert.Contains($"Edit(//d/data/homework/{folder}/**)", rules);
+
+        Assert.Contains("Edit(//d/data/homework/drafts/*/.previous/**)", rules);
+        Assert.Contains("Edit(//d/data/homework/drafts/*/.failed/**)", rules);
+        Assert.Contains("Edit(//d/data/homework/drafts/*/.owner/**)", rules);
+        Assert.DoesNotContain(rules, rule => rule.StartsWith("Edit(//d/data/homework/drafts/**", StringComparison.Ordinal) || rule.Contains(".src", StringComparison.Ordinal) || rule.Contains(".check", StringComparison.Ordinal));
+        Assert.Equal(rules, ClaudeAgent.Arguments("п", @"D:\data\homework", [], AgentAccessEnum.Draft));
+    }
+
+    /// <summary>
+    /// Разбору и поиску заданий можно писать в <c>items</c> и <c>analysis</c>, но закрыты папки работ, расшифровки и файлы состояния
+    /// </summary>
+    [Fact]
+    public void The_lesson_agent_may_write_items_and_analysis_but_not_drafts()
+    {
+        var rules = ClaudeAgent.Arguments("п", @"D:\data\homework", [], AgentAccessEnum.Lesson);
+
+        Assert.DoesNotContain("Edit(//d/data/homework/items/**)", rules);
+        Assert.DoesNotContain("Edit(//d/data/homework/analysis/**)", rules);
+        Assert.Contains("Edit(//d/data/homework/drafts/**)", rules);
+        Assert.Contains("Edit(//d/data/homework/transcripts/**)", rules);
+        Assert.Contains("Edit(//d/data/homework/formats.json)", rules);
+        Assert.Contains("Edit(//d/data/homework/item-states.json)", rules);
+    }
+
+    /// <summary>
     /// Выключенный владельцем автоматический образец остаётся выключенным после повторной регистрации
     /// </summary>
     [Fact]
@@ -613,12 +650,48 @@ public class SampleTests : IDisposable
         File.WriteAllText(Path.Combine(folder, ".previous", "Задание 1.docx"), "очень старая");
         File.WriteAllText(Path.Combine(folder, "Задание 1.docx"), "прошлая");
 
-        var moved = store.MoveDraftsToPrevious("l1");
+        var moved = store.MoveDraftsToPrevious("l1", new HashSet<int>());
 
         Assert.Single(moved);
         Assert.Equal("прошлая", File.ReadAllText(moved[0]));
         Assert.Equal("очень старая", File.ReadAllText(Path.Combine(folder, ".previous", "Задание 1.docx")));
         Assert.Empty(store.DraftFiles("l1"));
+    }
+
+    /// <summary>
+    /// Переделка переносит в <c>.previous</c> только работы переделываемых заданий: прикреплённая владельцем работа и работа сданного задания остаются на месте, а отметка прикреплённых работ лежит в <c>.owner</c> и готовым файлом не считается
+    /// </summary>
+    [Fact]
+    public void Redo_keeps_attached_and_submitted_works_and_moves_the_rest()
+    {
+        var store = Homework();
+        var folder = store.DraftsDirectory("l1");
+        var attached = store.AttachOwnWork("l1", 1, Source("моя.docx", "моя работа"));
+        File.WriteAllText(Path.Combine(folder, "Задание 2. Доклад.docx"), "сданная");
+        File.WriteAllText(Path.Combine(folder, "Задание 3. Эссе.docx"), "черновик агента");
+
+        var moved = store.MoveDraftsToPrevious("l1", new HashSet<int> { 2 });
+
+        Assert.Equal(["Задание 3. Эссе.docx"], moved.Select(Path.GetFileName).ToArray());
+        Assert.Equal("моя работа", File.ReadAllText(attached));
+        Assert.Equal("сданная", File.ReadAllText(Path.Combine(folder, "Задание 2. Доклад.docx")));
+        Assert.Equal(["Задание 1.docx"], store.AttachedWorks("l1").ToArray());
+        Assert.True(File.Exists(Path.Combine(folder, HomeworkStore.OWNER_FOLDER, "attached.json")));
+        Assert.DoesNotContain(store.DraftFiles("l1"), file => file.Contains(HomeworkStore.OWNER_FOLDER, StringComparison.Ordinal));
+        Assert.Equal(2, store.DraftFiles("l1").Count);
+    }
+
+    /// <summary>
+    /// Работа владельца, заменённая другой прикреплённой, уходит из отметки: в отметке только файлы, которые лежат в папке занятия
+    /// </summary>
+    [Fact]
+    public void A_replaced_attached_work_leaves_the_marker()
+    {
+        var store = Homework();
+        store.AttachOwnWork("l1", 1, Source("a.docx", "первая"));
+        store.AttachOwnWork("l1", 1, Source("b.txt", "вторая"));
+
+        Assert.Equal(["Задание 1.txt"], store.AttachedWorks("l1").ToArray());
     }
 
     /// <summary>

@@ -171,6 +171,43 @@ public class RemarkTests : IDisposable
     }
 
     /// <summary>
+    /// Просьба на поиск заданий, которую собирают приложение и фоновая задача, берёт замечания вида «условие» предмета из папки <c>remarks</c> хранилища
+    /// </summary>
+    [Fact]
+    public void The_production_extraction_prompt_reads_condition_remarks_from_the_store()
+    {
+        var store = new HomeworkStore(_root);
+        var remarks = new RemarkStore(Path.Combine(_root, "remarks"));
+        remarks.Add(Make("Физика", "Верное условие задания: только письменные", kind: RemarkKindEnum.Condition));
+        remarks.Add(Make("Физика", "Пиши короче", kind: RemarkKindEnum.Style));
+        var lesson = new Lesson("l1", "Физика", new DateOnly(2026, 10, 29));
+
+        var text = HomeworkExtractionPrompt.ForLesson(store, lesson, [], new Dictionary<string, string>(), string.Empty);
+
+        Assert.Contains("Верное условие задания: только письменные", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Пиши короче", text, StringComparison.Ordinal);
+        Assert.Contains(store.ItemsPath("l1"), text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Нечитаемые замечания не мешают поиску заданий: просьба собирается без них
+    /// </summary>
+    [Fact]
+    public void The_extraction_prompt_is_built_without_remarks_when_they_cannot_be_read()
+    {
+        var store = new HomeworkStore(_root);
+        var path = Path.Combine(_root, "remarks", "Физика.json");
+        new RemarkStore(Path.Combine(_root, "remarks")).Add(Make("Физика", "Верное условие задания: устно", kind: RemarkKindEnum.Condition));
+
+        string text;
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+            text = HomeworkExtractionPrompt.ForLesson(store, new Lesson("l1", "Физика", new DateOnly(2026, 10, 29)), [], new Dictionary<string, string>(), string.Empty);
+
+        Assert.Contains("Найди домашние задания", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Верное условие задания: устно", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Агенту запрещена правка папки замечаний
     /// </summary>
     [Fact]

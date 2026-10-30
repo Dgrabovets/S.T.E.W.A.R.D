@@ -404,7 +404,11 @@ public sealed class HomeworkStore(string directory)
 
         var existing = DraftFiles(lessonId).Where(draft => IsTaskFile(draft, number)).ToList();
         if (existing.FirstOrDefault(draft => string.Equals(Path.GetExtension(draft), extension, StringComparison.OrdinalIgnoreCase) && (string.Equals(Path.GetFullPath(draft), info.FullName, StringComparison.OrdinalIgnoreCase) || SameContent(draft, info))) is { } same)
+        {
+            RememberAttached(lessonId, Path.GetFileName(same), []);
+
             return same;
+        }
 
         Directory.CreateDirectory(folder);
         var partial = target + ".partial";
@@ -422,7 +426,7 @@ public sealed class HomeworkStore(string directory)
         var moved = new List<(string From, string To)>();
         try
         {
-            var previous = Path.Combine(folder, ".previous");
+            var previous = Path.Combine(folder, PREVIOUS_FOLDER);
             foreach (var draft in existing)
             {
                 Directory.CreateDirectory(previous);
@@ -453,20 +457,74 @@ public sealed class HomeworkStore(string directory)
             throw;
         }
 
+        RememberAttached(lessonId, name, existing.Select(Path.GetFileName).OfType<string>());
+
         return target;
     }
 
     /// <summary>
-    /// Переносит все готовые файлы занятия в <c>.previous</c> для переделки. Если там уже лежит файл с таким именем, новый получает имя « (2)» и так далее: прежние версии не затираются
+    /// Папка прежних версий работ внутри папки занятия
+    /// </summary>
+    public const string PREVIOUS_FOLDER = ".previous";
+
+    /// <summary>
+    /// Папка внутри папки занятия, куда откладываются файлы неудачной или прерванной попытки агента: они не считаются готовой работой, но и не удаляются
+    /// </summary>
+    public const string FAILED_FOLDER = ".failed";
+
+    /// <summary>
+    /// Папка служебных отметок владельца внутри папки занятия: агенту закрыта, в готовые файлы не попадает
+    /// </summary>
+    public const string OWNER_FOLDER = ".owner";
+
+    /// <summary>
+    /// Отметка прикреплённых работ: имена файлов в папке занятия, которые прикрепил владелец. Лежит в <c>.owner</c>, поэтому сама готовой работой не считается
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Путь к <c>drafts/&lt;ключ&gt;/.owner/attached.json</c></returns>
+    private string AttachedFile(string lessonId) => Path.Combine(DraftsDirectory(lessonId), OWNER_FOLDER, "attached.json");
+
+    /// <summary>
+    /// Имена файлов в папке занятия, которые прикрепил владелец: переделка их не трогает
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Имена файлов без учёта регистра; пусто, если отметки нет или она не читается</returns>
+    public IReadOnlySet<string> AttachedWorks(string lessonId) =>
+        (Read<List<string>>(AttachedFile(lessonId)) ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Дописывает прикреплённый файл в отметку и убирает из неё файлы, которые он заменил. Пишется атомарно; испорченная отметка откладывается в <c>.bad</c>. Вызывающий держит блокировку подготовки
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="name">Имя прикреплённого файла</param>
+    /// <param name="replaced">Имена файлов, которые ушли в <c>.previous</c></param>
+    /// <exception cref="IOException">Отметку не удалось прочитать или записать</exception>
+    private void RememberAttached(string lessonId, string name, IEnumerable<string> replaced)
+    {
+        var path = AttachedFile(lessonId);
+        var names = new SortedSet<string>(JsonFiles.ReadForWrite<List<string>>(path, Json) ?? [], StringComparer.OrdinalIgnoreCase);
+        var removed = names.RemoveWhere(new HashSet<string>(replaced, StringComparer.OrdinalIgnoreCase).Contains) > 0;
+        var added = names.Add(name);
+        if (removed || added)
+            WriteAtomic(path, names.ToList());
+    }
+
+    /// <summary>
+    /// Переносит в <c>.previous</c> готовые файлы занятия, которые переделываются. Остаются на месте файлы прикреплённых владельцем работ (по отметке в <c>.owner</c>) и файлы заданий из <paramref name="kept"/> (сданные и в архиве): они остаются образцами и готовой работой. Если в <c>.previous</c> уже лежит файл с таким именем, новый получает имя « (2)» и так далее: прежние версии не затираются
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="kept">Номера заданий, которые не переделываются</param>
     /// <returns>Новые пути перенесённых файлов</returns>
-    public IReadOnlyList<string> MoveDraftsToPrevious(string lessonId)
+    public IReadOnlyList<string> MoveDraftsToPrevious(string lessonId, IReadOnlySet<int> kept)
     {
         var moved = new List<string>();
-        var previous = Path.Combine(DraftsDirectory(lessonId), ".previous");
+        var previous = Path.Combine(DraftsDirectory(lessonId), PREVIOUS_FOLDER);
+        var attached = AttachedWorks(lessonId);
         foreach (var file in DraftFiles(lessonId))
         {
+            if (attached.Contains(Path.GetFileName(file)) || kept.Any(number => IsTaskFile(file, number)))
+                continue;
+
             Directory.CreateDirectory(previous);
 
             var target = UniquePath(previous, Path.GetFileName(file));

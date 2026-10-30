@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using Steward.Homework.Models;
+using Steward.Homework.Storage;
 
 namespace Steward.Homework.Services;
 
@@ -40,8 +42,9 @@ public static class ClaudeAgent
     /// <param name="prompt">Просьба</param>
     /// <param name="workDirectory">Папка, где агенту разрешено читать и писать</param>
     /// <param name="extraDirectories">Другие папки, к которым агенту нужен доступ: методические указания и образцы по ссылкам на диск</param>
+    /// <param name="access">Что агенту можно писать: подготовка и проверка работы или разбор занятия и поиск заданий</param>
     /// <returns>Аргументы командной строки по одному</returns>
-    public static IReadOnlyList<string> Arguments(string prompt, string workDirectory, IReadOnlyList<string>? extraDirectories = null) =>
+    public static IReadOnlyList<string> Arguments(string prompt, string workDirectory, IReadOnlyList<string>? extraDirectories = null, AgentAccessEnum access = AgentAccessEnum.Draft) =>
     [
         "-p", prompt,
         "--model", MODEL,
@@ -49,25 +52,29 @@ public static class ClaudeAgent
         "--permission-mode", "acceptEdits",
         "--add-dir", workDirectory,
         .. (extraDirectories ?? []).SelectMany(directory => new[] { "--add-dir", directory }),
-        .. ReadOnlyRules(workDirectory, extraDirectories ?? []),
+        .. ReadOnlyRules(workDirectory, extraDirectories ?? [], access),
         "--no-session-persistence",
         "--max-budget-usd", MAX_BUDGET_USD,
     ];
 
     /// <summary>
-    /// Запрещает агенту запись в дополнительные папки (указания, образцы, условия заданий), в файлы состояния Steward и в папки замечаний, образцов и указаний владельца в рабочей папке. Читать их можно по-прежнему
+    /// Запрещает агенту запись в дополнительные папки (указания, образцы, условия заданий), в файлы состояния Steward, в папки замечаний, образцов, указаний и условий из LMS и в расшифровки. Подготовке и проверке работы закрыты ещё найденные задания и разборы, а в папках работ занятий — прежние версии (<c>.previous</c>), отложенные файлы неудачных попыток (<c>.failed</c>) и отметка прикреплённых работ (<c>.owner</c>). Разбору и поиску заданий закрыты все папки работ. Читать всё это можно по-прежнему.
+    /// Папки работ лежат ровно на один уровень ниже <c>drafts</c>, поэтому правило вида <c>drafts/*/.previous/**</c> однозначно
     /// </summary>
     /// <param name="workDirectory">Рабочая папка агента</param>
     /// <param name="extraDirectories">Дополнительные папки только для чтения</param>
+    /// <param name="access">Что агенту можно писать</param>
     /// <returns>Аргументы <c>--disallowedTools</c> с правилами запрета правки</returns>
-    private static IReadOnlyList<string> ReadOnlyRules(string workDirectory, IReadOnlyList<string> extraDirectories)
+    private static IReadOnlyList<string> ReadOnlyRules(string workDirectory, IReadOnlyList<string> extraDirectories, AgentAccessEnum access)
     {
-        string[] stateFiles = ["lesson-states.json", "item-states.json", "item-confirmed.json", "item-overrides.json", "created.json", "prepare-attempts.json", "sample-registered.json"];
+        string[] stateFiles = ["lesson-states.json", "item-states.json", "item-confirmed.json", "item-overrides.json", "created.json", "prepare-attempts.json", "sample-registered.json", "formats.json", "subject-formats.json", "subject-states.json", "lessons.json", "activities.json"];
+        string[] ownerFolders = ["remarks", "samples", "guides", "assignments", "transcripts"];
+        string[] lessonFolders = access == AgentAccessEnum.Draft ? ["items", "analysis"] : ["drafts"];
+        string[] draftFolders = access == AgentAccessEnum.Draft ? [HomeworkStore.PREVIOUS_FOLDER, HomeworkStore.FAILED_FOLDER, HomeworkStore.OWNER_FOLDER] : [];
         var rules = extraDirectories.Select(directory => DenyEdit(directory, true))
             .Concat(stateFiles.Select(file => DenyEdit(Path.Combine(workDirectory, file), false)))
-            .Append(DenyEdit(Path.Combine(workDirectory, "remarks"), true))
-            .Append(DenyEdit(Path.Combine(workDirectory, "samples"), true))
-            .Append(DenyEdit(Path.Combine(workDirectory, "guides"), true));
+            .Concat(ownerFolders.Concat(lessonFolders).Select(folder => DenyEdit(Path.Combine(workDirectory, folder), true)))
+            .Concat(draftFolders.Select(folder => DenyEdit(Path.Combine(workDirectory, "drafts", "*", folder), true)));
 
         return ["--disallowedTools", .. rules];
     }
@@ -119,14 +126,37 @@ public static class ClaudeAgent
     public static Task<string> RunAsync(string prompt, string workDirectory, CancellationToken cancellationToken) => RunAsync(prompt, workDirectory, [], cancellationToken);
 
     /// <summary>
-    /// Запускает Claude с просьбой и дополнительными папками для чтения
+    /// Запускает Claude для подготовки или проверки работы: писать можно только в папки работ занятий. Совпадает с <see cref="DraftBuilder.AgentRun"/>
     /// </summary>
     /// <param name="prompt">Просьба</param>
     /// <param name="workDirectory">Рабочая папка агента</param>
     /// <param name="extraDirectories">Другие папки, к которым агенту нужен доступ</param>
     /// <param name="cancellationToken">Отменяет запуск</param>
     /// <returns>Пустая строка, если Claude отработал без ошибки, иначе причина</returns>
-    public static async Task<string> RunAsync(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, CancellationToken cancellationToken)
+    public static Task<string> RunAsync(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, CancellationToken cancellationToken) =>
+        RunCoreAsync(prompt, workDirectory, extraDirectories, AgentAccessEnum.Draft, cancellationToken);
+
+    /// <summary>
+    /// Запускает Claude для разбора занятия или поиска заданий: писать можно в <c>items</c> и <c>analysis</c>, папки работ закрыты
+    /// </summary>
+    /// <param name="prompt">Просьба</param>
+    /// <param name="workDirectory">Рабочая папка агента</param>
+    /// <param name="extraDirectories">Другие папки, к которым агенту нужен доступ</param>
+    /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <returns>Пустая строка, если Claude отработал без ошибки, иначе причина</returns>
+    public static Task<string> RunLessonAsync(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, CancellationToken cancellationToken) =>
+        RunCoreAsync(prompt, workDirectory, extraDirectories, AgentAccessEnum.Lesson, cancellationToken);
+
+    /// <summary>
+    /// Запускает Claude с просьбой, дополнительными папками для чтения и правилами записи
+    /// </summary>
+    /// <param name="prompt">Просьба</param>
+    /// <param name="workDirectory">Рабочая папка агента</param>
+    /// <param name="extraDirectories">Другие папки, к которым агенту нужен доступ</param>
+    /// <param name="access">Что агенту можно писать</param>
+    /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <returns>Пустая строка, если Claude отработал без ошибки, иначе причина</returns>
+    private static async Task<string> RunCoreAsync(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, AgentAccessEnum access, CancellationToken cancellationToken)
     {
         var executable = FindExecutable();
         if (executable is null)
@@ -143,7 +173,7 @@ public static class ClaudeAgent
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        foreach (var argument in Arguments(prompt, workDirectory, extraDirectories))
+        foreach (var argument in Arguments(prompt, workDirectory, extraDirectories, access))
             start.ArgumentList.Add(argument);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

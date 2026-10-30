@@ -291,7 +291,7 @@ internal static class Program
             var path = store.AnalysisPath(lesson.Id);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-            var error = await ClaudeAgent.RunAsync(LessonAnalysisPrompt.Build(lesson, store.TranscriptPath(lesson.Id), path, settings.StudentName), store.Root, CancellationToken.None);
+            var error = await ClaudeAgent.RunLessonAsync(LessonAnalysisPrompt.Build(lesson, store.TranscriptPath(lesson.Id), path, settings.StudentName), store.Root, [], CancellationToken.None);
             if (error.Length == 0 && store.ReadAnalysis(lesson.Id) is null)
                 error = "Claude записал разбор в неверном формате";
 
@@ -334,7 +334,7 @@ internal static class Program
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
             var works = activities.Where(work => string.Equals(work.Subject, lesson.Title, StringComparison.OrdinalIgnoreCase)).ToArray();
-            var error = await ClaudeAgent.RunAsync(HomeworkExtractionPrompt.Build(lesson, store.TranscriptPath(lesson.Id), path, works, descriptions, settings.StudentName), store.Root, [.. descriptions.Values.Select(file => Path.GetDirectoryName(file)!).Distinct()], CancellationToken.None);
+            var error = await ClaudeAgent.RunLessonAsync(HomeworkExtractionPrompt.ForLesson(store, lesson, works, descriptions, settings.StudentName), store.Root, [.. descriptions.Values.Select(file => Path.GetDirectoryName(file)!).Distinct()], CancellationToken.None);
             if (error.Length == 0 && store.ReadItems(lesson.Id) is null)
                 error = "Claude не записал файл заданий";
 

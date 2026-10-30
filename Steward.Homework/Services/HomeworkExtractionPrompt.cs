@@ -35,6 +35,31 @@ public static class HomeworkExtractionPrompt
         """;
 
     /// <summary>
+    /// Собирает просьбу для занятия из хранилища: пути к расшифровке и файлу заданий и замечания владельца вида «условие» по предмету из <c>&lt;папка&gt;/remarks</c>. Так поиск заданий в приложении и в фоновой задаче получает одни и те же правки условий. Если замечания не читаются, просьба собирается без них
+    /// </summary>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="works">Работы предмета из LMS</param>
+    /// <param name="descriptions">Файлы с описанием работ из LMS по номеру работы</param>
+    /// <param name="studentName">Как студента называют в расшифровке</param>
+    /// <returns>Текст просьбы</returns>
+    public static string ForLesson(HomeworkStore store, Lesson lesson, IReadOnlyList<ActivityInfo> works, IReadOnlyDictionary<string, string> descriptions, string studentName)
+    {
+        IReadOnlyList<Remark> remarks;
+        try
+        {
+            remarks = new RemarkStore(Path.Combine(store.Root, "remarks")).ForPrepare(lesson.Title, RemarkKindEnum.Condition);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // Замечания недоступны: задания ищутся и без них
+            remarks = [];
+        }
+
+        return Build(lesson, store.TranscriptPath(lesson.Id), store.ItemsPath(lesson.Id), works, descriptions, studentName, remarks);
+    }
+
+    /// <summary>
     /// Раздел просьбы с замечаниями владельца про условия заданий: берутся только замечания вида «условие»
     /// </summary>
     /// <param name="remarks">Замечания или <see langword="null"/></param>
