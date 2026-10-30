@@ -19,10 +19,36 @@ namespace Steward.DevTools;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>dotnet run --project Steward.DevTools -- snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal] | card:found|confirm|ready|checked|submitted | guides[:examples|remarks] | redo]</c>
+/// Запуск: <c>dotnet run --project Steward.DevTools -- snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal] | maximized:1920x1080[@125][:страница] | card:found|confirm|ready|checked|submitted | guides[:examples|remarks] | redo]</c>
 /// </summary>
 public static class SnapshotRenderer
 {
+    /// <summary>
+    /// Высота панели задач Windows 11 в пикселях при масштабе 100 %
+    /// </summary>
+    private const int TASKBAR_PIXELS = 48;
+
+    /// <summary>
+    /// На сколько пикселей при 100 % Windows выносит развёрнутое окно без рамки за каждый край: толщина рамки изменения размера
+    /// </summary>
+    private const int FRAME_PIXELS = 8;
+
+    /// <summary>
+    /// Разбирает размер монитора вида <c>1920x1080</c> или <c>1366x768@125</c>
+    /// </summary>
+    /// <param name="spec">Ширина и высота в пикселях и, после @, масштаб в процентах</param>
+    /// <returns>Ширина, высота и масштаб (1.25 при 125 %)</returns>
+    private static (int Width, int Height, double Scale) ParseMonitor(string spec)
+    {
+        var atParts = spec.Split('@');
+        var size = atParts[0].Split('x', 'X', '×');
+        var width = size.Length == 2 && int.TryParse(size[0], out var w) ? w : 1920;
+        var height = size.Length == 2 && int.TryParse(size[1], out var h) ? h : 1080;
+        var scale = atParts.Length > 1 && int.TryParse(atParts[1], out var percent) && percent > 0 ? percent / 100.0 : 1.0;
+
+        return (width, height, scale);
+    }
+
     /// <summary>
     /// Рисует окно и сохраняет картинку
     /// </summary>
@@ -58,6 +84,8 @@ public static class SnapshotRenderer
 
         var now = DateTimeOffset.Now;
         var settleSeconds = 0.0;
+        Rect? crop = null;
+        System.Windows.Size? target = null;
         Action? afterShow = null;
         var snapshot = SampleSnapshot(now);
         var jobs = SampleJobs();
@@ -223,6 +251,38 @@ public static class SnapshotRenderer
                 settleSeconds = 1.2;
             }
 
+            // «maximized:1920x1080[@125][:страница]»: развёрнутое окно на мониторе такого размера и масштаба с панелью задач внизу.
+            // Окно ставится так, как Windows ставит развёрнутое окно без рамки без поправки (шире рабочей области на рамку с каждой стороны),
+            // содержимое отступает на рассчитанные отступы, а на снимок попадает только рабочая область, то есть то, что видно на экране
+            if (string.Equals(parts[0], "maximized", StringComparison.OrdinalIgnoreCase))
+            {
+                var (monitorWidth, monitorHeight, scale) = ParseMonitor(parts.Length > 1 ? parts[1] : "1920x1080");
+                if (parts.Length > 2 && Enum.TryParse<AppPageEnum>(parts[2], ignoreCase: true, out var shown))
+                    main.Model.Page = shown;
+
+                // «…:transcripts:settings»: открыты настройки процесса на выдуманных файлах во временной папке, без настоящих секретов
+                if (parts.Length > 3 && parts[3].Equals("settings", StringComparison.OrdinalIgnoreCase))
+                {
+                    var root = Path.Combine(Path.GetTempPath(), "steward-sample-settings");
+                    Directory.CreateDirectory(Path.GetDirectoryName(Steward.Hosting.SettingsProbe.LmsFile(root))!);
+                    File.WriteAllText(Steward.Hosting.SettingsProbe.LmsFile(root), """{"Login": "student@example.com", "Password": "<пароль от LMS>", "StudentName": "Иванов Иван", "MaxFetchPerRun": 6, "CreateTasks": false}""");
+                    main.Model.AttachSettings(root, () => { });
+                    main.Model.IsSettingsOpen = true;
+                }
+
+                var work = new Int32Rect(0, 0, monitorWidth, monitorHeight - (int)Math.Round(TASKBAR_PIXELS * scale));
+                var border = (int)Math.Round(FRAME_PIXELS * scale);
+                var placed = new Int32Rect(-border, -border, work.Width + (2 * border), work.Height + (2 * border));
+                var insets = WindowFit.MaximizedInsets(placed, work, scale, scale);
+                main.WorkAreaOverride = new Rect(0, 0, work.Width / scale, work.Height / scale);
+                main.ApplyFrame(true, insets);
+                main.Width = placed.Width / scale;
+                main.Height = placed.Height / scale;
+                target = new System.Windows.Size(placed.Width / scale, placed.Height / scale);
+                crop = new Rect(insets.Left, insets.Top, work.Width / scale, work.Height / scale);
+                settleSeconds = 1.0;
+            }
+
             window = main;
         }
 
@@ -260,6 +320,17 @@ public static class SnapshotRenderer
             height = (int)Math.Ceiling(content.DesiredSize.Height);
         }
 
+        // Развёрнутое окно на мониторе больше настоящего: Windows не даёт окну вырасти больше экрана, поэтому содержимое раскладывается по нужному размеру само
+        if (target is { } maximizedSize && window is MainWindow { Content: FrameworkElement frame })
+        {
+            width = (int)Math.Ceiling(maximizedSize.Width);
+            height = (int)Math.Ceiling(maximizedSize.Height);
+            frame.Measure(new System.Windows.Size(width, height));
+            frame.Arrange(new Rect(0, 0, width, height));
+            frame.UpdateLayout();
+            source = frame;
+        }
+
         var visual = new DrawingVisual();
         using (var context = visual.RenderOpen())
         {
@@ -269,8 +340,16 @@ public static class SnapshotRenderer
 
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(visual);
+        BitmapSource image = bitmap;
+        if (crop is { } part)
+        {
+            var x = Math.Clamp((int)Math.Round(part.X), 0, width - 1);
+            var y = Math.Clamp((int)Math.Round(part.Y), 0, height - 1);
+            image = new CroppedBitmap(bitmap, new Int32Rect(x, y, Math.Min((int)Math.Round(part.Width), width - x), Math.Min((int)Math.Round(part.Height), height - y)));
+        }
+
         var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        encoder.Frames.Add(BitmapFrame.Create(image));
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         using (var stream = File.Create(path))
             encoder.Save(stream);

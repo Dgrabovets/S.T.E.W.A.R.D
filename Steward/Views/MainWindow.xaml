@@ -175,7 +175,7 @@
         </Style>
     </Window.Resources>
 
-    <Border Style="{StaticResource WindowChrome}" CornerRadius="{StaticResource RadiusSystemWindow}">
+    <Border x:Name="Frame" Style="{StaticResource WindowChrome}" CornerRadius="{StaticResource RadiusSystemWindow}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

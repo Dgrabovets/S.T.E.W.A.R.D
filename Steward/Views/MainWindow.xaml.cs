@@ -16,13 +16,28 @@ namespace Steward.Views;
 public partial class MainWindow : Window
 {
     /// <summary>
-    /// Приложение завершается, окно можно закрыть по-настоящему
-    /// </summary>
-    /// <summary>
     /// Какую долю рабочей области экрана занимает окно по умолчанию
     /// </summary>
     private const double WINDOW_SHARE = 0.9;
 
+    /// <summary>
+    /// Наименьший размер окна из разметки. На экране меньше него окно получает наименьший размер по рабочей области, иначе низ обрезался бы
+    /// </summary>
+    private readonly System.Windows.Size _designedMinimum;
+
+    /// <summary>
+    /// Скругление рамки обычного окна: у развёрнутого его нет
+    /// </summary>
+    private readonly CornerRadius _frameRadius;
+
+    /// <summary>
+    /// Толщина рамки обычного окна: у развёрнутого её нет
+    /// </summary>
+    private readonly Thickness _frameBorder;
+
+    /// <summary>
+    /// Приложение завершается, окно можно закрыть по-настоящему
+    /// </summary>
     private bool _closing;
 
     /// <summary>
@@ -31,12 +46,69 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        SourceInitialized += (_, _) => Steward.Shell.WindowCorners.Round(this);
+        _designedMinimum = new System.Windows.Size(MinWidth, MinHeight);
+        _frameRadius = Frame.CornerRadius;
+        _frameBorder = Frame.BorderThickness;
+        Steward.Shell.WindowMaximizer.Attach(this);
+        SourceInitialized += (_, _) =>
+        {
+            Steward.Shell.WindowCorners.Round(this);
+            FitMinimum();
+        };
         Steward.Shell.WindowDragging.Attach(this, TitleBar);
         Model = new MainViewModel();
         DataContext = Model;
-        StateChanged += (_, _) => UpdateMaximizeButton();
+        StateChanged += (_, _) => ApplyWindowState();
+        SizeChanged += (_, _) =>
+        {
+            if (WindowState == WindowState.Maximized)
+                ApplyFrame(true, Steward.Shell.WindowMaximizer.Insets(this));
+        };
+        LocationChanged += (_, _) => FitMinimum();
+        DpiChanged += (_, _) => FitMinimum();
         Fit();
+    }
+
+    /// <summary>
+    /// Рисует рамку окна для его состояния. У развёрнутого окна нет скругления и линии по краю, а содержимое отступает на столько, на сколько окно вылезло за рабочую область (обычно ноль). Снимки DevTools вызывают его, чтобы показать развёрнутое окно
+    /// </summary>
+    /// <param name="maximized">Окно развёрнуто</param>
+    /// <param name="insets">На сколько окно вылезло за рабочую область с каждой стороны</param>
+    internal void ApplyFrame(bool maximized, Thickness insets)
+    {
+        Frame.Margin = maximized ? insets : new Thickness(0);
+        Frame.CornerRadius = maximized ? new CornerRadius(0) : _frameRadius;
+        Frame.BorderThickness = maximized ? new Thickness(0) : _frameBorder;
+    }
+
+    /// <summary>
+    /// Обновляет кнопку «Развернуть» и рамку после смены состояния окна
+    /// </summary>
+    private void ApplyWindowState()
+    {
+        UpdateMaximizeButton();
+        ApplyFrame(WindowState == WindowState.Maximized, WindowState == WindowState.Maximized ? Steward.Shell.WindowMaximizer.Insets(this) : new Thickness(0));
+    }
+
+    /// <summary>
+    /// Рабочая область, которую снимки DevTools подставляют вместо настоящего монитора, чтобы нарисовать окно на экране другого размера. <see langword="null"/>: берётся монитор, на котором стоит окно
+    /// </summary>
+    internal Rect? WorkAreaOverride { get; set; }
+
+    /// <summary>
+    /// Рабочая область монитора окна в единицах WPF
+    /// </summary>
+    /// <returns>Подставленная для снимка область или настоящая</returns>
+    private Rect CurrentWorkArea() => WorkAreaOverride ?? Steward.Shell.WindowMaximizer.WorkArea(this);
+
+    /// <summary>
+    /// Ограничивает наименьший размер окна рабочей областью монитора, на котором оно стоит
+    /// </summary>
+    private void FitMinimum()
+    {
+        var minimum = Steward.Shell.WindowFit.MinimumSize(_designedMinimum, CurrentWorkArea().Size);
+        MinWidth = minimum.Width;
+        MinHeight = minimum.Height;
     }
 
     /// <summary>
@@ -77,15 +149,16 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Делает окно размером с 90% рабочей области экрана и ставит его по центру. Для развёрнутого окна ничего не меняет
+    /// Делает окно размером с 90% рабочей области монитора и ставит его по центру. Окно не бывает больше рабочей области, даже если наименьший размер из разметки больше экрана
     /// </summary>
     private void Fit()
     {
-        var area = SystemParameters.WorkArea;
-        Width = Math.Max(MinWidth, area.Width * WINDOW_SHARE);
-        Height = Math.Max(MinHeight, area.Height * WINDOW_SHARE);
-        Left = area.Left + ((area.Width - Width) / 2);
-        Top = area.Top + ((area.Height - Height) / 2);
+        FitMinimum();
+        var bounds = Steward.Shell.WindowFit.Fitted(CurrentWorkArea(), _designedMinimum, WINDOW_SHARE);
+        Width = bounds.Width;
+        Height = bounds.Height;
+        Left = bounds.Left;
+        Top = bounds.Top;
     }
 
     /// <summary>
