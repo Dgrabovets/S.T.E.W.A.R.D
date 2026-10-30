@@ -1024,4 +1024,70 @@ public class PipelineTests
             Clean(folder);
         }
     }
+
+    /// <summary>
+    /// Замечание из окна «Переделать» запоминается с выбранными областью и видом: без «Для всех предметов» в файл предмета, с ним в <c>_all.json</c>; повтор не дублируется; переделка идёт и тогда, когда замечание записать не удалось, а владелец видит предупреждение
+    /// </summary>
+    [Fact]
+    public async Task The_redo_remark_is_saved_with_the_chosen_scope_and_kind()
+    {
+        var (store, lesson, folder) = NewStore("""[{"title": "Отчёт"}]""");
+        try
+        {
+            var remarksFolder = Path.Combine(folder, "remarks");
+            var remarks = new RemarkStore(remarksFolder);
+            var preparer = new HomeworkPreparer(store, new GuideStore(folder), remarks, new CountingAgent().Run);
+            var requests = new List<PrepareRequest>();
+            var model = new HomeworkFormatsViewModel((_, _) => { }, _ => true, (_, request) =>
+            {
+                requests.Add(request);
+
+                return Task.FromResult((1, string.Empty));
+            })
+            {
+                RemarkSaver = (target, text, kind, global) => preparer.SaveRedoRemark(target, text, kind, global),
+            };
+            model.Update([(lesson, HomeworkFormatEnum.Word)]);
+            await model.WhenPipelineLoaded();
+            var row = model.Lessons.Single();
+
+            // Только этот предмет
+            await model.RedoAsync(row, HomeworkFormatEnum.Word, "Слишком много воды", [], RemarkKindEnum.Content, global: false);
+            var own = Assert.Single(remarks.Load(lesson.Title));
+            Assert.Equal(("Слишком много воды", RemarkKindEnum.Content, false, lesson.Id, 0), (own.Text, own.Kind, own.Global, own.LessonId, own.Number));
+            Assert.False(File.Exists(Path.Combine(remarksFolder, "_all.json")));
+            var request = Assert.Single(requests);
+            Assert.True(request.Redo);
+            Assert.Equal("Слишком много воды", request.Extra);
+
+            // Повтор того же текста не дублируется
+            await model.RedoAsync(row, HomeworkFormatEnum.Word, "  слишком   много воды ", [], RemarkKindEnum.Content, global: false);
+            Assert.Single(remarks.Load(lesson.Title));
+
+            // Для всех предметов: в общем файле, не в файле предмета
+            await model.RedoAsync(row, HomeworkFormatEnum.Word, "Без канцелярита", [], RemarkKindEnum.Style, global: true);
+            Assert.True(File.Exists(Path.Combine(remarksFolder, "_all.json")));
+            Assert.Single(remarks.Load(lesson.Title));
+            var shared = Assert.Single(remarks.LoadAll(), remark => remark.Global);
+            Assert.Equal(("Без канцелярита", RemarkKindEnum.Style), (shared.Text, shared.Kind));
+
+            // Только файлы: замечания нет, переделка идёт
+            await model.RedoAsync(row, HomeworkFormatEnum.Word, string.Empty, [@"C:\замечания.docx"], RemarkKindEnum.General, global: false);
+            Assert.Equal(2, remarks.LoadAll().Count);
+            Assert.Equal(4, requests.Count);
+
+            // Файл предмета занят: переделка всё равно идёт, владелец видит предупреждение
+            var subjectFile = Path.Combine(remarksFolder, RemarkStore.SafeName(lesson.Title) + ".json");
+            using (new FileStream(subjectFile, FileMode.Open, FileAccess.Read, FileShare.None))
+                await model.RedoAsync(row, HomeworkFormatEnum.Word, "Добавить таблицу", [], RemarkKindEnum.Format, global: false);
+
+            Assert.Equal(5, requests.Count);
+            Assert.Contains("Замечание не запомнилось", row.Status, StringComparison.Ordinal);
+            Assert.DoesNotContain(remarks.Load(lesson.Title), remark => remark.Text == "Добавить таблицу");
+        }
+        finally
+        {
+            Clean(folder);
+        }
+    }
 }

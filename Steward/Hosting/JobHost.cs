@@ -91,6 +91,11 @@ public sealed class JobHost : IDisposable
     /// </summary>
     private readonly HomeworkPreparer _preparer;
 
+    /// <summary>
+    /// Замечания владельца: предметные и общие
+    /// </summary>
+    private readonly RemarkStore _remarks;
+
 
     /// <summary>
     /// Папка идей из рилсов
@@ -122,7 +127,8 @@ public sealed class JobHost : IDisposable
         _homework = new HomeworkStore(Path.Combine(dataDirectory, "homework"));
         _guides = new GuideStore(Path.Combine(dataDirectory, "homework"));
         _ideas = new IdeaStore(Path.Combine(dataDirectory, "ideas"));
-        _preparer = new HomeworkPreparer(_homework, _guides, new RemarkStore(Path.Combine(_homework.Root, "remarks")), ClaudeAgent.RunAsync);
+        _remarks = new RemarkStore(Path.Combine(_homework.Root, "remarks"));
+        _preparer = new HomeworkPreparer(_homework, _guides, _remarks, ClaudeAgent.RunAsync);
 
         var registry = JobRegistry.Load(DataLocation.JobsFile(), DataLocation.FindRepoRoot());
         _jobs = registry.Jobs;
@@ -531,6 +537,36 @@ public sealed class JobHost : IDisposable
     /// <returns>Пустая строка или причина неудачи</returns>
     public string SetSubmittedFile(string lessonId, int number, string file) =>
         FindLesson(lessonId) is { } lesson ? _preparer.RegisterSubmittedFile(lesson, number, file) : "Занятие не найдено";
+
+    /// <summary>
+    /// Запоминает замечание из окна «Переделать». Может ждать блокировку файла замечаний, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="text">Что не понравилось</param>
+    /// <param name="kind">Вид замечания</param>
+    /// <param name="global">Для всех предметов</param>
+    /// <returns>Пустая строка или предупреждение</returns>
+    public string SaveRedoRemark(Lesson lesson, string text, RemarkKindEnum kind, bool global) => _preparer.SaveRedoRemark(lesson, text, kind, global);
+
+    /// <summary>
+    /// Все замечания владельца: общие и всех предметов. Читает файлы, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <returns>Замечания</returns>
+    public IReadOnlyList<Remark> AllRemarks() => _remarks.LoadAll();
+
+    /// <summary>
+    /// Заменяет замечание, при смене области переносит его в другой файл. Может ждать блокировку, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="remark">Новое содержимое</param>
+    /// <exception cref="IOException">Файл замечаний занят или недоступен</exception>
+    public void UpdateRemark(Remark remark) => _remarks.Update(remark);
+
+    /// <summary>
+    /// Удаляет замечание. Может ждать блокировку, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="id">Ключ замечания</param>
+    /// <exception cref="IOException">Файл замечаний занят или недоступен</exception>
+    public void RemoveRemark(string id) => _remarks.Remove(id);
 
     /// <summary>
     /// Находит занятие по ключу

@@ -341,6 +341,32 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     }
 
     /// <summary>
+    /// Запоминает замечание из окна «Переделать», чтобы его учитывали следующие работы. Переделка относится ко всему занятию, поэтому номер задания 0. Пустой текст (переделка только по файлам) ничего не записывает, повтор того же текста в том же файле не добавляется. Вызывается не из потока окна: файл замечаний может быть занят до 10 секунд
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="text">Что не понравилось</param>
+    /// <param name="kind">Вид замечания</param>
+    /// <param name="global">Для всех предметов: замечание ляжет в <c>_all.json</c></param>
+    /// <returns>Пустая строка или предупреждение, что замечание не записалось</returns>
+    public string SaveRedoRemark(Lesson lesson, string text, RemarkKindEnum kind, bool global)
+    {
+        var flat = RemarkStore.Flatten(text);
+        if (flat.Length == 0)
+            return string.Empty;
+
+        try
+        {
+            remarks.Add(new Remark(Guid.NewGuid().ToString("N"), DateOnly.FromDateTime(DateTime.Now), lesson.Title, lesson.Id, 0, flat, kind, global));
+
+            return string.Empty;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
+        {
+            return "Замечание не запомнилось: " + exception.Message;
+        }
+    }
+
+    /// <summary>
     /// Просит агента проверить готовые работы занятия: сверить с условием и методическими указаниями и найти факты без опоры. Работы при этом не меняются
     /// </summary>
     /// <param name="lesson">Занятие</param>

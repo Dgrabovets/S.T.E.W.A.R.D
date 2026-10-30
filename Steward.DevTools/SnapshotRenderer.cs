@@ -19,7 +19,7 @@ namespace Steward.DevTools;
 
 /// <summary>
 /// Рисует окна приложения в PNG на примере выдуманных данных. Нужен, чтобы проверить вид, не открывая окно на рабочем столе
-/// Запуск: <c>dotnet run --project Steward.DevTools -- snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal] | card:found|confirm|ready|checked|submitted]</c>
+/// Запуск: <c>dotnet run --project Steward.DevTools -- snapshot файл.png [appicon | logo | social | settings | tray | design | main[:status|ideas|homework|journal] | card:found|confirm|ready|checked|submitted | guides[:examples|remarks] | redo]</c>
 /// </summary>
 public static class SnapshotRenderer
 {
@@ -90,12 +90,35 @@ public static class SnapshotRenderer
                 new("g2", "Гейм-дизайн", GuideKindEnum.Guide, "Требования к оформлению", @"E:\Учёба\Требования", string.Empty, string.Empty, false),
                 new("g3", "Гейм-дизайн", GuideKindEnum.Guide, "drive.google.com/file/d/abc", string.Empty, "https://drive.google.com/file/d/abc/view", "Ссылка ведёт на страницу, а не на файл. Скачай файл и добавь его кнопкой «Обзор»"),
                 new("e1", "Гейм-дизайн", GuideKindEnum.Example, "Мой образец отчёта.docx", folder + @"\Мой образец отчёта.docx", string.Empty, string.Empty),
+                new("sample:gd-1015:1", "Гейм-дизайн", GuideKindEnum.Example, "gd-1015-1.docx", @"D:\data\homework\samples\Гейм-дизайн\gd-1015-1.docx", string.Empty, string.Empty),
+                new("sample:db-1022:2", "Базы данных", GuideKindEnum.Example, "db-1022-2.pptx", @"D:\data\homework\samples\Базы данных\db-1022-2.pptx", string.Empty, string.Empty, false, Manual: true),
             };
-            var model = new GuidesDialogViewModel("Гейм-дизайн", _ => entries, folder, _ => { }, _ => { }, (_, _) => { }, (_, _, _) => string.Empty, (_, _, _) => string.Empty, (_, _, _) => Task.FromResult(string.Empty));
+
+            // Замечания: два предмета, общее, выключенное и одно длинное, чтобы проверить перенос
+            var remarks = new List<Remark>
+            {
+                new("r1", new DateOnly(2026, 10, 18), "Гейм-дизайн", "gd-1015", 1, "Больше примеров из настоящих игр, а не общих слов", RemarkKindEnum.Content, false),
+                new("r2", new DateOnly(2026, 10, 22), "Базы данных", "db-1022", 0, "Шрифт Times New Roman 14, поля по ГОСТ", RemarkKindEnum.Format, false, Enabled: false),
+                new("r3", new DateOnly(2026, 10, 25), "Гейм-дизайн", "gd-1025", 0, "Без канцелярита и вводных фраз вроде «в современном мире»: пиши коротко и по делу, как в хорошем аналитическом отчёте", RemarkKindEnum.Style, true),
+                new("r4", new DateOnly(2026, 10, 27), "Базы данных", "db-1027", 2, "Верное условие задания: нормализовать схему до 3НФ и показать шаги", RemarkKindEnum.Condition, false),
+            };
+            var model = new GuidesDialogViewModel("Гейм-дизайн", _ => entries, folder, _ => { }, _ => { }, (_, _) => { }, (_, _, _) => string.Empty, (_, _, _) => string.Empty, (_, _, _) => Task.FromResult(string.Empty),
+                new RemarkHooks(() => remarks, _ => { }, _ => { }));
             if (parts.Length > 1 && parts[1].Equals("examples", StringComparison.OrdinalIgnoreCase))
                 model.ShowExamplesCommand.Execute(null);
 
+            if (parts.Length > 1 && parts[1].Equals("remarks", StringComparison.OrdinalIgnoreCase))
+            {
+                // Замечания читаются в фоне: окно ждёт их, прокачивая очередь, а не блокируя поток
+                model.ShowRemarksCommand.Execute(null);
+                settleSeconds = 1.0;
+            }
+
             window = new GuidesWindow(model) { WindowStartupLocation = WindowStartupLocation.Manual };
+
+            // На снимке замечаний окно выше, чтобы были видны все строки, в том числе выключенная
+            if (parts.Length > 1 && parts[1].Equals("remarks", StringComparison.OrdinalIgnoreCase))
+                window.Height = 860;
         }
         else if (string.Equals(parts[0], "menu", StringComparison.OrdinalIgnoreCase))
         {

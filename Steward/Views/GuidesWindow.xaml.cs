@@ -103,7 +103,7 @@ public partial class GuidesWindow : Window
     }
 
     /// <summary>
-    /// Закрывает окно по Esc
+    /// Закрывает окно по Esc. Ctrl+V вне поля ввода берёт ссылку из буфера обмена, кроме закладки «Замечания»: туда файлы не добавляются
     /// </summary>
     /// <param name="sender">Окно</param>
     /// <param name="e">Нажатие клавиши</param>
@@ -111,7 +111,7 @@ public partial class GuidesWindow : Window
     {
         if (e.Key == Key.Escape)
             Close();
-        else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control && Keyboard.FocusedElement is not System.Windows.Controls.TextBox)
+        else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control && Keyboard.FocusedElement is not System.Windows.Controls.TextBox && DataContext is GuidesDialogViewModel { CanAddFiles: true })
             _ = PasteLinkAsync();
     }
 }

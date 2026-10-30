@@ -1,12 +1,14 @@
 using System.Windows;
 using System.Windows.Input;
+using Steward.Homework.Models;
+using Steward.ViewModels;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
 
 namespace Steward.Views;
 
 /// <summary>
-/// Окно «Переделать задание»: короткое поле, куда пишут, что не понравилось, и кнопка, которой прикладывают файлы с замечаниями преподавателя. Открывается поверх окна приложения и по его центру
+/// Окно «Переделать задание»: короткое поле, куда пишут, что не понравилось, вид замечания, переключатель «Для всех предметов» и кнопка, которой прикладывают файлы с замечаниями преподавателя. Открывается поверх окна приложения и по его центру
 /// </summary>
 public partial class RedoWindow : Window
 {
@@ -18,8 +20,31 @@ public partial class RedoWindow : Window
     {
         InitializeComponent();
         Heading.Text = heading;
+        Kind.ItemsSource = KindOptions;
+        Kind.SelectedIndex = 0;
         Loaded += (_, _) => Remarks.Focus();
     }
+
+    /// <summary>
+    /// Вид замечания и его название в списке
+    /// </summary>
+    /// <param name="Value">Вид</param>
+    /// <param name="Title">Название</param>
+    public sealed record KindOption(RemarkKindEnum Value, string Title);
+
+    /// <summary>
+    /// Что ответили в окне
+    /// </summary>
+    /// <param name="Text">Что не понравилось</param>
+    /// <param name="Files">Файлы с замечаниями преподавателя</param>
+    /// <param name="Kind">Вид замечания</param>
+    /// <param name="Global">Замечание для всех предметов</param>
+    public sealed record Answer(string Text, IReadOnlyList<string> Files, RemarkKindEnum Kind, bool Global);
+
+    /// <summary>
+    /// Виды замечаний в списке: первым «общее», оно выбрано по умолчанию
+    /// </summary>
+    private static readonly IReadOnlyList<KindOption> KindOptions = [.. new[] { RemarkKindEnum.General, RemarkKindEnum.Condition, RemarkKindEnum.Format, RemarkKindEnum.Content, RemarkKindEnum.Style }.Select(kind => new KindOption(kind, RemarkViewModel.KindName(kind)))];
 
     /// <summary>
     /// Прикреплённые файлы с замечаниями
@@ -36,8 +61,8 @@ public partial class RedoWindow : Window
     /// </summary>
     /// <param name="owner">Окно приложения</param>
     /// <param name="heading">Занятие, работа по которому переделывается</param>
-    /// <returns>Замечания и файлы или <see langword="null"/>, если окно закрыли без переделки</returns>
-    public static (string Text, IReadOnlyList<string> Files)? Ask(Window? owner, string heading)
+    /// <returns>Замечания, файлы, вид и область или <see langword="null"/>, если окно закрыли без переделки</returns>
+    public static Answer? Ask(Window? owner, string heading)
     {
         var window = new RedoWindow(heading);
         if (owner is { IsVisible: true })
@@ -45,7 +70,9 @@ public partial class RedoWindow : Window
         else
             window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        return window.ShowDialog() == true ? (window.Text, window._files) : null;
+        return window.ShowDialog() == true
+            ? new Answer(window.Text, window._files, (window.Kind.SelectedItem as KindOption)?.Value ?? RemarkKindEnum.General, window.ForAll.IsChecked == true)
+            : null;
     }
 
     /// <summary>

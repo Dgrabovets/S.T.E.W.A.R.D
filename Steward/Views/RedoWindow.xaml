@@ -31,10 +31,33 @@
                 </Button>
             </Grid>
 
+            <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,14,0,0"
+                       Text="Claude заново подготовит все несданные задания этого занятия. Нынешние работы, в том числе прикреплённая тобой, перейдут в папку .previous и останутся там как прежняя версия."/>
+
             <TextBlock Text="Что не понравилось" Style="{StaticResource TextCaption}" Margin="0,16,0,6"/>
             <TextBox x:Name="Remarks" Style="{StaticResource Field}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="120" MaxHeight="240"
                      VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Margin="0"
+                     AutomationProperties.Name="Что не понравилось"
                      ToolTip="Например: слишком много воды, переписать вывод, добавить таблицу"/>
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Вид замечания" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="Kind" Grid.Column="1" Style="{StaticResource FieldChoice}" Width="160" Margin="0"
+                          AutomationProperties.Name="Вид замечания" ToolTip="К чему относится замечание: так его проще найти и поправить во вкладке «Замечания»">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title}"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <CheckBox x:Name="ForAll" Grid.Column="2" Content="Для всех предметов" HorizontalAlignment="Right" VerticalAlignment="Center"
+                          AutomationProperties.Name="Для всех предметов"
+                          ToolTip="Без галочки замечание учитывается только в этом предмете. Область можно сменить позже во вкладке «Замечания» окна указаний"/>
+            </Grid>
             <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -45,7 +68,7 @@
                 <TextBlock x:Name="Attached" Grid.Column="1" Style="{StaticResource TextCaption}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="12,0,0,0"/>
             </Grid>
             <TextBlock Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,8,0,0"
-                       Text="Claude получит прежнюю версию, твои замечания и файлы и сделает работу заново. Продиктовать можно голосом: нажми Win+H и говори."/>
+                       Text="Claude получит прежнюю версию, твои замечания и файлы и сделает работу заново. Замечание запомнится и будет учтено в следующих работах. Продиктовать можно голосом: нажми Win+H и говори."/>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
                 <Button Content="Отмена" Click="Cancel_OnClick" IsCancel="True" Style="{StaticResource GhostButton}"/>

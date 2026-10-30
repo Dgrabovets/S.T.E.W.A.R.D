@@ -34,6 +34,8 @@ public sealed class GuideViewModel : Bindable
         OpenCommand = new RelayCommand(() => open(entry.Path.Length > 0 ? entry.Path : entry.Url));
         RemoveCommand = new RelayCommand(() => remove(this));
         EnabledChanged = enabledChanged;
+        Mark = !entry.Id.StartsWith("sample:", StringComparison.Ordinal) ? string.Empty
+            : "Сдано · " + entry.Subject + (entry.Manual ? " · файл указан вручную" : string.Empty);
     }
 
     /// <summary>
@@ -70,6 +72,16 @@ public sealed class GuideViewModel : Bindable
     /// У записи есть пояснение
     /// </summary>
     public bool HasNote => Note.Length > 0;
+
+    /// <summary>
+    /// Пометка образца из сданной работы: «Сдано · предмет», а если файл сданной работы указал владелец, ещё «файл указан вручную». У прочих записей пусто
+    /// </summary>
+    public string Mark { get; }
+
+    /// <summary>
+    /// У записи есть пометка образца
+    /// </summary>
+    public bool HasMark => Mark.Length > 0;
 
     /// <summary>
     /// Материал учитывается при подготовке заданий

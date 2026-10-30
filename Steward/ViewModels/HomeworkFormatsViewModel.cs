@@ -273,7 +273,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
         (id, enabled) => GuideEnabledChanged?.Invoke(id, enabled),
         (subject, kind, paths) => GuideFilesAdded?.Invoke(subject, kind, paths) ?? string.Empty,
         (subject, kind, path) => GuideFolderAdded?.Invoke(subject, kind, path) ?? string.Empty,
-        (subject, kind, link) => GuideLinkAdded?.Invoke(subject, kind, link) ?? Task.FromResult(string.Empty));
+        (subject, kind, link) => GuideLinkAdded?.Invoke(subject, kind, link) ?? Task.FromResult(string.Empty),
+        RemarkLister is { } load && RemarkUpdater is { } update && RemarkRemover is { } remove ? new RemarkHooks(load, update, remove) : null);
 
     /// <summary>
     /// Создаёт окно «Подготовить задание» для занятия
@@ -385,6 +386,59 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// Нужно открыть окно «Переделать» для занятия
     /// </summary>
     public event Action<LessonFormatViewModel>? RedoDialogRequested;
+
+    /// <summary>
+    /// Запоминает замечание из окна «Переделать»: занятие, текст, вид и признак «для всех предметов». Возвращает предупреждение или пустую строку. Вызывается в фоновой задаче: файл замечаний может быть занят до 10 секунд
+    /// </summary>
+    public Func<Lesson, string, RemarkKindEnum, bool, string>? RemarkSaver { get; set; }
+
+    /// <summary>
+    /// Читает все замечания владельца: общие и всех предметов. Вызывается в фоновой задаче
+    /// </summary>
+    public Func<IReadOnlyList<Remark>>? RemarkLister { get; set; }
+
+    /// <summary>
+    /// Заменяет замечание с тем же ключом, в том числе переносит его между файлом предмета и общим. Вызывается в фоновой задаче
+    /// </summary>
+    public Action<Remark>? RemarkUpdater { get; set; }
+
+    /// <summary>
+    /// Удаляет замечание по ключу. Вызывается в фоновой задаче
+    /// </summary>
+    public Action<string>? RemarkRemover { get; set; }
+
+    /// <summary>
+    /// Переделывает работы занятия по замечаниям из окна «Переделать»: замечание запоминается в фоне, подготовка начинается сразу и не ждёт записи. Если замечание записать не удалось, переделка всё равно идёт, а предупреждение дописывается к итогу в карточке
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="format">Формат прежней работы</param>
+    /// <param name="text">Что не понравилось</param>
+    /// <param name="files">Файлы с замечаниями преподавателя</param>
+    /// <param name="kind">Вид замечания</param>
+    /// <param name="global">Замечание для всех предметов</param>
+    /// <returns>Задача, которая завершается, когда переделка закончена и итог показан</returns>
+    public async Task RedoAsync(LessonFormatViewModel lesson, HomeworkFormatEnum format, string text, IReadOnlyList<string> files, RemarkKindEnum kind, bool global)
+    {
+        var save = RemarkSaver;
+        var saving = save is null || text.Trim().Length == 0 ? Task.FromResult(string.Empty) : Task.Run(() => save(lesson.Lesson, text, kind, global));
+
+        await lesson.PrepareAsync(new PrepareRequest(format, text, null, Redo: true, RemarkFiles: files));
+
+        string warning;
+        try
+        {
+            warning = await saving;
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError($"Замечание к переделке {lesson.Id}: {exception}");
+            warning = "Замечание не запомнилось: " + exception.Message;
+        }
+
+        // Итог подготовки остаётся, предупреждение дописывается к нему: иначе подготовка затёрла бы его своим итогом
+        if (warning.Length > 0)
+            lesson.ShowResult(lesson.Status.Length > 0 ? lesson.Status + ". " + warning : warning, lesson.Failed);
+    }
 
     /// <summary>
     /// Нужно спросить, удалять ли готовое задание занятия

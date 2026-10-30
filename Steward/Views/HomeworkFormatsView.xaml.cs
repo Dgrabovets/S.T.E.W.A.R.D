@@ -116,14 +116,21 @@ public partial class HomeworkFormatsView : UserControl
     }
 
     /// <summary>
-    /// Открывает окно «Переделать задание» и, если записаны замечания, запускает подготовку заново
+    /// Открывает окно «Переделать задание» и, если записаны замечания, запоминает замечание и запускает подготовку заново. Ошибки ловятся внутри <see cref="HomeworkFormatsViewModel.RedoAsync"/> и подготовки, остальные пишутся в журнал и показываются в карточке
     /// </summary>
     /// <param name="lesson">Занятие</param>
     private async void ShowRedo(LessonFormatViewModel lesson)
     {
-        var remarks = RedoWindow.Ask(Window.GetWindow(this), lesson.Meta);
-        if (remarks is { } answer)
-            await lesson.PrepareAsync(new Steward.Homework.Models.PrepareRequest(FormatOfDrafts(lesson), answer.Text, null, Redo: true, RemarkFiles: answer.Files));
+        try
+        {
+            if (DataContext is HomeworkFormatsViewModel model && RedoWindow.Ask(Window.GetWindow(this), lesson.Meta) is { } answer)
+                await model.RedoAsync(lesson, FormatOfDrafts(lesson), answer.Text, answer.Files, answer.Kind, answer.Global);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError($"Переделка {lesson.Id}: {exception}");
+            lesson.ShowResult("Переделка не удалась: " + exception.Message, failed: true);
+        }
     }
 
     /// <summary>

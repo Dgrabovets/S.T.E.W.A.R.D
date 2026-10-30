@@ -1,10 +1,12 @@
+using System.IO;
 using Steward.Homework.Models;
+using Steward.Homework.Storage;
 using Steward.Mvvm;
 
 namespace Steward.ViewModels;
 
 /// <summary>
-/// Окно «Методические указания»: две закладки, «Указания» и «Образцы», у каждого файла галочка «учитывать», значок открытия и значок удаления
+/// Окно «Методические указания»: закладки «Указания», «Образцы» и «Замечания». У каждого файла галочка «учитывать», значок открытия и значок удаления; у замечания правка текста, галочки «учитывать» и «для всех предметов» и удаление
 /// </summary>
 public sealed class GuidesDialogViewModel : Bindable
 {
@@ -49,9 +51,39 @@ public sealed class GuidesDialogViewModel : Bindable
     private readonly Func<string, GuideKindEnum, string, Task<string>> _addLink;
 
     /// <summary>
-    /// Открыта закладка «Образцы»
+    /// Как читать и менять замечания владельца. Пусто: закладки «Замечания» нет
     /// </summary>
-    private bool _examplesTab;
+    private readonly RemarkHooks? _remarkHooks;
+
+    /// <summary>
+    /// Открытая закладка
+    /// </summary>
+    private GuidesTabEnum _tab;
+
+    /// <summary>
+    /// Замечания владельца
+    /// </summary>
+    private IReadOnlyList<RemarkViewModel> _remarks = [];
+
+    /// <summary>
+    /// Замечания уже прочитаны хотя бы раз: до этого пустой список не называется пустым
+    /// </summary>
+    private bool _remarksLoaded;
+
+    /// <summary>
+    /// Номер последнего чтения замечаний: устаревший ответ не затирает свежий
+    /// </summary>
+    private int _remarksVersion;
+
+    /// <summary>
+    /// Идущие чтения и записи замечаний
+    /// </summary>
+    private readonly List<Task> _remarkTasks = [];
+
+    /// <summary>
+    /// Защищает список идущих задач: в тестах без потока окна задачи завершаются в пуле потоков
+    /// </summary>
+    private readonly object _remarkGate = new();
 
     /// <summary>
     /// Методические указания
@@ -80,6 +112,7 @@ public sealed class GuidesDialogViewModel : Bindable
     /// <param name="addFiles">Копирует файлы и возвращает текст ошибки</param>
     /// <param name="addFolder">Запоминает папку и возвращает текст ошибки</param>
     /// <param name="addLink">Запоминает ссылку в интернете, скачивает файл и возвращает пояснение</param>
+    /// <param name="remarks">Как читать и менять замечания владельца. Пусто: закладки «Замечания» нет</param>
     public GuidesDialogViewModel(
         string subject,
         Func<string, IReadOnlyList<GuideEntry>> lister,
@@ -89,7 +122,8 @@ public sealed class GuidesDialogViewModel : Bindable
         Action<string, bool> enabled,
         Func<string, GuideKindEnum, IReadOnlyList<string>, string> addFiles,
         Func<string, GuideKindEnum, string, string> addFolder,
-        Func<string, GuideKindEnum, string, Task<string>> addLink)
+        Func<string, GuideKindEnum, string, Task<string>> addLink,
+        RemarkHooks? remarks = null)
     {
         Subject = subject;
         _lister = lister;
@@ -100,9 +134,34 @@ public sealed class GuidesDialogViewModel : Bindable
         _addFiles = addFiles;
         _addFolder = addFolder;
         _addLink = addLink;
-        ShowGuidesCommand = new RelayCommand(() => ExamplesTab = false);
-        ShowExamplesCommand = new RelayCommand(() => ExamplesTab = true);
+        _remarkHooks = remarks;
+        ShowGuidesCommand = new RelayCommand(() => Tab = GuidesTabEnum.Guides);
+        ShowExamplesCommand = new RelayCommand(() => Tab = GuidesTabEnum.Examples);
+        ShowRemarksCommand = new RelayCommand(() => Tab = GuidesTabEnum.Remarks, () => HasRemarksTab);
         Refresh();
+        if (remarks is not null)
+            Track(LoadRemarksAsync());
+    }
+
+    /// <summary>
+    /// Закладка окна
+    /// </summary>
+    private enum GuidesTabEnum
+    {
+        /// <summary>
+        /// Методические указания
+        /// </summary>
+        Guides,
+
+        /// <summary>
+        /// Образцы
+        /// </summary>
+        Examples,
+
+        /// <summary>
+        /// Замечания владельца
+        /// </summary>
+        Remarks,
     }
 
     /// <summary>
@@ -111,18 +170,20 @@ public sealed class GuidesDialogViewModel : Bindable
     public string Subject { get; }
 
     /// <summary>
-    /// Открыта закладка «Образцы»
+    /// Открытая закладка
     /// </summary>
-    public bool ExamplesTab
+    private GuidesTabEnum Tab
     {
-        get => _examplesTab;
-        private set
+        get => _tab;
+        set
         {
-            if (!Set(ref _examplesTab, value))
+            if (!Set(ref _tab, value))
                 return;
 
             Raise(nameof(IsGuidesTab));
             Raise(nameof(IsExamplesTab));
+            Raise(nameof(IsRemarksTab));
+            Raise(nameof(CanAddFiles));
             Raise(nameof(CurrentKind));
         }
     }
@@ -130,17 +191,210 @@ public sealed class GuidesDialogViewModel : Bindable
     /// <summary>
     /// Открыта закладка «Указания»
     /// </summary>
-    public bool IsGuidesTab => !_examplesTab;
+    public bool IsGuidesTab => _tab == GuidesTabEnum.Guides;
 
     /// <summary>
     /// Открыта закладка «Образцы»
     /// </summary>
-    public bool IsExamplesTab => _examplesTab;
+    public bool IsExamplesTab => _tab == GuidesTabEnum.Examples;
+
+    /// <summary>
+    /// Открыта закладка «Замечания»
+    /// </summary>
+    public bool IsRemarksTab => _tab == GuidesTabEnum.Remarks;
+
+    /// <summary>
+    /// Закладка «Замечания» подключена
+    /// </summary>
+    public bool HasRemarksTab => _remarkHooks is not null;
+
+    /// <summary>
+    /// Кнопки «Обзор…» и «Ссылка» работают: на закладке «Замечания» добавлять файлы некуда
+    /// </summary>
+    public bool CanAddFiles => !IsRemarksTab;
 
     /// <summary>
     /// Что добавляется кнопками внизу: то, что открыто на закладке
     /// </summary>
-    public GuideKindEnum CurrentKind => _examplesTab ? GuideKindEnum.Example : GuideKindEnum.Guide;
+    public GuideKindEnum CurrentKind => _tab == GuidesTabEnum.Examples ? GuideKindEnum.Example : GuideKindEnum.Guide;
+
+    /// <summary>
+    /// Замечания владельца: новые выше
+    /// </summary>
+    public IReadOnlyList<RemarkViewModel> Remarks
+    {
+        get => _remarks;
+        private set
+        {
+            if (Set(ref _remarks, value))
+            {
+                Raise(nameof(RemarksTitle));
+                Raise(nameof(RemarksEmpty));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Подпись закладки «Замечания» с числом замечаний; пока замечания не прочитаны, без числа, чтобы не показывать ложный ноль
+    /// </summary>
+    public string RemarksTitle => _remarksLoaded ? $"Замечания · {Remarks.Count}" : "Замечания";
+
+    /// <summary>
+    /// Замечания прочитаны, и их нет
+    /// </summary>
+    public bool RemarksEmpty => _remarksLoaded && Remarks.Count == 0;
+
+    /// <summary>
+    /// Открывает закладку «Замечания»
+    /// </summary>
+    public RelayCommand ShowRemarksCommand { get; }
+
+    /// <summary>
+    /// Ждёт, пока закончатся начатые к этому моменту чтения и записи замечаний, в том числе начатые ими новые чтения
+    /// </summary>
+    /// <returns>Задача, которая завершается, когда всё применено; ошибок не выбрасывает</returns>
+    public async Task WhenRemarksIdle()
+    {
+        while (true)
+        {
+            Task[] pending;
+            lock (_remarkGate)
+                pending = [.. _remarkTasks];
+
+            if (pending.Length == 0)
+                return;
+
+            await Task.WhenAll(pending);
+        }
+    }
+
+    /// <summary>
+    /// Запоминает идущую задачу замечаний и убирает её из списка, когда она закончится
+    /// </summary>
+    /// <param name="task">Задача, которая сама ловит свои ошибки</param>
+    private void Track(Task task)
+    {
+        lock (_remarkGate)
+            _remarkTasks.Add(task);
+
+        _ = task.ContinueWith(done =>
+        {
+            lock (_remarkGate)
+                _remarkTasks.Remove(done);
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Перечитывает замечания в фоновой задаче и применяет список. Поправленный, но не сохранённый текст строк остаётся в полях
+    /// </summary>
+    /// <returns>Задача, которая завершается, когда список применён; ошибок не выбрасывает</returns>
+    private async Task LoadRemarksAsync()
+    {
+        if (_remarkHooks is not { } hooks)
+            return;
+
+        var version = Interlocked.Increment(ref _remarksVersion);
+        try
+        {
+            var loaded = await Task.Run(hooks.Load);
+            if (version != Volatile.Read(ref _remarksVersion))
+                return;
+
+            var known = _remarks.ToDictionary(row => row.Id, StringComparer.Ordinal);
+            var rows = new List<RemarkViewModel>();
+            foreach (var remark in loaded.Reverse().OrderByDescending(remark => remark.Date))
+            {
+                if (known.TryGetValue(remark.Id, out var row))
+                    row.Accept(remark);
+                else
+                    row = new RemarkViewModel(remark, (target, updated) => Track(ChangeRemarkAsync(target, updated)), target => Track(RemoveRemarkAsync(target)));
+
+                rows.Add(row);
+            }
+
+            _remarksLoaded = true;
+            Remarks = rows;
+            Raise(nameof(RemarksEmpty));
+            Raise(nameof(RemarksTitle));
+        }
+        catch (Exception exception)
+        {
+            Report("Не удалось прочитать замечания: ", exception);
+        }
+    }
+
+    /// <summary>
+    /// Записывает новое содержимое замечания в фоновой задаче. Удача: список перечитывается (при смене области повтор в другом файле сливается). Неудача: галочки возвращаются, набранный текст остаётся, владелец видит сообщение
+    /// </summary>
+    /// <param name="row">Строка</param>
+    /// <param name="updated">Новое содержимое</param>
+    /// <returns>Задача, которая завершается, когда итог применён; ошибок не выбрасывает</returns>
+    private async Task ChangeRemarkAsync(RemarkViewModel row, Remark updated)
+    {
+        if (_remarkHooks is not { } hooks || row.IsBusy)
+            return;
+
+        var text = RemarkStore.Flatten(updated.Text);
+        if (text.Length == 0)
+        {
+            Message = "Пустое замечание не сохраняю. Чтобы убрать его, нажми крестик.";
+
+            return;
+        }
+
+        row.IsBusy = true;
+        try
+        {
+            await Task.Run(() => hooks.Update(updated with { Text = text }));
+            Message = string.Empty;
+            row.IsBusy = false;
+            Track(LoadRemarksAsync());
+        }
+        catch (Exception exception)
+        {
+            row.IsBusy = false;
+            row.Revert();
+            Report("Не удалось сохранить замечание: ", exception);
+        }
+    }
+
+    /// <summary>
+    /// Удаляет замечание в фоновой задаче. Неудача: строка остаётся в списке, владелец видит сообщение
+    /// </summary>
+    /// <param name="row">Строка</param>
+    /// <returns>Задача, которая завершается, когда итог применён; ошибок не выбрасывает</returns>
+    private async Task RemoveRemarkAsync(RemarkViewModel row)
+    {
+        if (_remarkHooks is not { } hooks || row.IsBusy)
+            return;
+
+        row.IsBusy = true;
+        try
+        {
+            await Task.Run(() => hooks.Remove(row.Id));
+            Message = string.Empty;
+            row.IsBusy = false;
+            Track(LoadRemarksAsync());
+        }
+        catch (Exception exception)
+        {
+            row.IsBusy = false;
+            Report("Не удалось удалить замечание: ", exception);
+        }
+    }
+
+    /// <summary>
+    /// Показывает ошибку замечаний; неожиданную (не файлов и не данных) ещё и пишет в журнал
+    /// </summary>
+    /// <param name="prefix">Начало сообщения</param>
+    /// <param name="exception">Исключение</param>
+    private void Report(string prefix, Exception exception)
+    {
+        if (exception is not (IOException or UnauthorizedAccessException or System.Text.Json.JsonException))
+            System.Diagnostics.Trace.TraceError($"Замечания: {exception}");
+
+        Message = prefix + exception.Message;
+    }
 
     /// <summary>
     /// Методические указания

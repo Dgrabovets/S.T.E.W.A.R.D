@@ -25,17 +25,72 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" ToolTip="Учитывать при подготовке заданий" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" ToolTip="Учитывать при подготовке заданий" AutomationProperties.Name="Учитывать при подготовке заданий" VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+                            <Border Grid.Column="1" Style="{StaticResource Chip}" BorderBrush="{StaticResource AccentBrush}" Margin="8,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Visibility="{Binding HasMark, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="{Binding Mark}" Foreground="{StaticResource AccentBrush}" FontSize="{StaticResource FontSizeCaption}" TextTrimming="CharacterEllipsis"/>
+                            </Border>
+                        </Grid>
                         <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Meta}"/>
                         <TextBlock Text="{Binding Note}" Foreground="{StaticResource AttentionBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"
                                    Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
                     </StackPanel>
-                    <Button Grid.Column="2" Command="{Binding OpenCommand}" Style="{StaticResource IconButton}" ToolTip="Открыть">
+                    <Button Grid.Column="2" Command="{Binding OpenCommand}" Style="{StaticResource IconButton}" ToolTip="Открыть" AutomationProperties.Name="Открыть">
                         <Path Data="{StaticResource IconEye}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeLineJoin="Round" Width="18" Height="18"/>
                     </Button>
-                    <Button Grid.Column="3" Command="{Binding RemoveCommand}" Style="{StaticResource IconButton}" ToolTip="Убрать из списка">
+                    <Button Grid.Column="3" Command="{Binding RemoveCommand}" Style="{StaticResource IconButton}" ToolTip="Убрать из списка" AutomationProperties.Name="Убрать из списка">
+                        <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:Key="RemarkRow">
+            <Border Background="{StaticResource WindowBrush}" CornerRadius="{StaticResource RadiusField}" Padding="12,10" Margin="0,0,0,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" IsEnabled="{Binding IsIdle}" VerticalAlignment="Top" Margin="0,9,12,0"
+                              ToolTip="Учитывать при подготовке заданий" AutomationProperties.Name="Учитывать замечание"/>
+                    <StackPanel Grid.Column="1">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Style.Triggers>
+                                    <!-- Выключенное замечание приглушено, но остаётся доступным для правки -->
+                                    <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                        <Setter Property="Opacity" Value="{StaticResource OpacityDone}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <TextBox Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource Field}" Margin="0"
+                                 TextWrapping="Wrap" AcceptsReturn="False" MaxHeight="120" VerticalScrollBarVisibility="Auto"
+                                 AutomationProperties.Name="{Binding AccessibleName}" ToolTip="Текст замечания: поправь и нажми «Сохранить»"/>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Meta}"/>
+                            <CheckBox Grid.Column="1" Content="Для всех предметов" IsChecked="{Binding IsGlobal, Mode=TwoWay}" IsEnabled="{Binding IsIdle}" FontSize="{StaticResource FontSizeCaption}"
+                                      VerticalAlignment="Center" Margin="12,0,0,0" AutomationProperties.Name="Для всех предметов"
+                                      ToolTip="Без галочки замечание учитывается только в своём предмете"/>
+                            <Button Grid.Column="2" Content="Сохранить" Command="{Binding SaveCommand}" IsEnabled="{Binding IsIdle}" Style="{StaticResource OutlineButton}" Margin="12,0,0,0"
+                                    Visibility="{Binding IsDirty, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Сохранить текст замечания"/>
+                        </Grid>
+                    </StackPanel>
+                    <Button Grid.Column="2" Command="{Binding RemoveCommand}" IsEnabled="{Binding IsIdle}" Style="{StaticResource IconButton}" VerticalAlignment="Top" Margin="8,0,0,0"
+                            ToolTip="Удалить замечание" AutomationProperties.Name="Удалить замечание">
                         <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
                     </Button>
                 </Grid>
@@ -89,6 +144,18 @@
                             </Style>
                         </Button.Style>
                     </Button>
+                    <Button Content="{Binding RemarksTitle}" Command="{Binding ShowRemarksCommand}" AutomationProperties.Name="Замечания"
+                            Visibility="{Binding HasRemarksTab, Converter={StaticResource BoolToVisibility}}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource TabButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsRemarksTab}" Value="True">
+                                        <Setter Property="Tag" Value="Active"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
             </Border>
 
@@ -108,6 +175,13 @@
                                    Visibility="{Binding ExamplesEmpty, Converter={StaticResource BoolToVisibility}}"/>
                         <ItemsControl ItemsSource="{Binding Examples}" ItemTemplate="{StaticResource GuideRow}"/>
                     </StackPanel>
+                    <StackPanel Visibility="{Binding IsRemarksTab, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Что ты поправлял раньше. Claude получает до 10 включённых замечаний своего предмета и общих как данные, а замечания вида «условие» учитываются и при поиске заданий."/>
+                        <TextBlock Text="Замечаний пока нет. Они появляются сами, когда ты переделываешь работу или поправляешь условие задания." Style="{StaticResource TextCaption}" TextWrapping="Wrap"
+                                   Visibility="{Binding RemarksEmpty, Converter={StaticResource BoolToVisibility}}"/>
+                        <ItemsControl ItemsSource="{Binding Remarks}" ItemTemplate="{StaticResource RemarkRow}" IsTabStop="False"/>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
@@ -115,7 +189,7 @@
                 <TextBlock Text="{Binding Message}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,0,0,8"
                            Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}"/>
                 <Grid>
-                    <StackPanel Orientation="Horizontal">
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding CanAddFiles, Converter={StaticResource BoolToVisibility}}">
                         <Button Content="Обзор…" Click="Browse_OnClick" Style="{StaticResource OutlineButton}" ToolTip="Выбери файлы или открой папку и нажми «Открыть»: добавится вся папка"/>
                         <Button Content="Ссылка" Click="Link_OnClick" Style="{StaticResource ActionButton}" Margin="8,0,0,0" ToolTip="Взять ссылку на файл из буфера обмена. То же делает Ctrl+V"/>
                     </StackPanel>
