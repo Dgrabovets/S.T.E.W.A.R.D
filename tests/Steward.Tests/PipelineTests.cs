@@ -995,6 +995,32 @@ public class PipelineTests
     }
 
     /// <summary>
+    /// Сборка строк из прежнего снимка не перекрывает свежий снимок: после многих обновлений подряд строки всегда показывают последнее прочитанное
+    /// </summary>
+    [Fact]
+    public async Task A_stale_cached_build_never_overrides_a_fresh_snapshot()
+    {
+        var lesson = new Lesson("pending", "Физика", new DateOnly(2026, 10, 10));
+        var submitted = false;
+        var model = new HomeworkFormatsViewModel([(lesson, HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            ItemsReader = _ => [(1, new HomeworkItem("Ждёт", null, string.Empty, string.Empty, Volatile.Read(ref submitted), Submitted: Volatile.Read(ref submitted)), false)],
+        };
+        IReadOnlyList<(Lesson, HomeworkFormatEnum)> all = [(lesson, HomeworkFormatEnum.Word)];
+        model.Update(all);
+        await model.WhenPipelineLoaded();
+
+        for (var round = 0; round < 200; round++)
+        {
+            Volatile.Write(ref submitted, round % 2 == 0);
+            model.Update(all);
+            await model.WhenPipelineLoaded();
+
+            Assert.Equal(round % 2 == 0, model.Lessons[0].Items[0].Submitted);
+        }
+    }
+
+    /// <summary>
     /// «Проверить заново» не запускает агента, пока фоновая подготовка держит блокировку
     /// </summary>
     [Fact]

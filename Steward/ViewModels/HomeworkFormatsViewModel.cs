@@ -701,6 +701,22 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="lesson">Занятие</param>
     private void BuildItems(LessonFormatViewModel lesson)
     {
+        // Снимок берётся и применяется под одной блокировкой сборки: сборка из устаревшего снимка не может применить его после свежего
+        lock (_buildGate)
+            BuildItemsCore(lesson);
+    }
+
+    /// <summary>
+    /// Защищает сборку строк заданий: снимок читается и передаётся в <see cref="LessonFormatViewModel.SetItems"/> без вклинивания другой сборки. Под ней берётся блокировка кеша, но не наоборот
+    /// </summary>
+    private readonly object _buildGate = new();
+
+    /// <summary>
+    /// Собирает строки заданий из последнего снимка; вызывается под блокировкой сборки
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    private void BuildItemsCore(LessonFormatViewModel lesson)
+    {
         LessonData? data;
         lock (_pipelineGate)
             data = _data.GetValueOrDefault(lesson.Id);
