@@ -16,8 +16,9 @@ public sealed class TaskCardViewModel
     /// <param name="activity">Что показывает индикатор процесса</param>
     /// <param name="activitySince">Когда процесс закончился, если индикатор показывает галочку</param>
     /// <param name="metrics">Показатели под текстом карточки: Docker, контейнер и так далее</param>
+    /// <param name="progress">Что сейчас выполняется: шаги и счётчик. Пусто, если процесс не работает или не сообщает прогресс</param>
     /// <param name="openSettings">Действие шестерёнки: открыть страницу процесса с настройками. Пусто, если у процесса нет страницы</param>
-    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default, Action<string>? openSettings = null, IReadOnlyList<StatusTileViewModel>? metrics = null)
+    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default, Action<string>? openSettings = null, IReadOnlyList<StatusTileViewModel>? metrics = null, ProgressCardViewModel? progress = null)
     {
         Id = row.Id;
         Kind = ActivityKinds.Of(row);
@@ -32,6 +33,7 @@ public sealed class TaskCardViewModel
         CanRun = row.CanRun;
         RunCommand = new RelayCommand(() => run(row.Id), () => row.CanRun);
         Metrics = metrics ?? [];
+        Progress = progress;
         HasSettings = openSettings is not null;
         SettingsCommand = new RelayCommand(() => openSettings?.Invoke(row.Id));
     }
@@ -105,6 +107,21 @@ public sealed class TaskCardViewModel
     /// У карточки есть показатели
     /// </summary>
     public bool HasMetrics => Metrics.Count > 0;
+
+    /// <summary>
+    /// Что сейчас выполняется: шаги запуска и счётчик
+    /// </summary>
+    public ProgressCardViewModel? Progress { get; }
+
+    /// <summary>
+    /// Процесс сообщает, что именно он сейчас делает
+    /// </summary>
+    public bool HasProgress => Progress is not null;
+
+    /// <summary>
+    /// В карточке есть рамка с прогрессом или показателями
+    /// </summary>
+    public bool HasFrame => HasProgress || HasMetrics;
 
     /// <summary>
     /// У процесса есть страница с настройками

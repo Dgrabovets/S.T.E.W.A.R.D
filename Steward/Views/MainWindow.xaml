@@ -82,9 +82,45 @@
                                     <Ellipse Canvas.Left="2.5" Canvas.Top="9.5" Width="5" Height="5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Fill="{StaticResource SurfaceBrush}"/>
                                 </Canvas>
                             </Button>
-                            <Border Grid.Row="1" Grid.ColumnSpan="4" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,10,0,0"
-                                    Visibility="{Binding HasMetrics, Converter={StaticResource BoolToVisibility}}">
-                                <ItemsControl ItemsSource="{Binding Metrics}" AlternationCount="100">
+                            <Border Grid.Row="1" Grid.ColumnSpan="4" BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusField}" Margin="0,12,0,0" Padding="16,12"
+                                    Visibility="{Binding HasFrame, Converter={StaticResource BoolToVisibility}}">
+                              <StackPanel>
+                                <StackPanel Visibility="{Binding HasProgress, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Что сейчас выполняется"
+                                           >
+                                    <ItemsControl ItemsSource="{Binding Progress.Steps}" Focusable="False" AutomationProperties.Name="Шаги запуска">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Rows="1"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="Seg" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusSmall}" Padding="4,6" Margin="0,0,6,0"
+                                                        AutomationProperties.Name="{Binding AccessibleName}">
+                                                    <TextBlock x:Name="Step" Text="{Binding Title}" Style="{StaticResource TextCaption}" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                        <Setter TargetName="Seg" Property="Background" Value="{StaticResource OkSurfaceBrush}"/>
+                                                        <Setter TargetName="Step" Property="Foreground" Value="{StaticResource OkBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                        <Setter TargetName="Seg" Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                                                        <Setter TargetName="Seg" Property="BorderThickness" Value="1"/>
+                                                        <Setter TargetName="Step" Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                                                        <Setter TargetName="Step" Property="FontWeight" Value="SemiBold"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding Progress.Line}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,10,0,6"/>
+                                    <ProgressBar Value="{Binding Progress.Share, Mode=OneWay}" Style="{StaticResource ThinProgress}" AutomationProperties.Name="{Binding Progress.AccessibleName}"/>
+                                    <TextBlock Text="{Binding Progress.Elapsed}" Style="{StaticResource TextCaption}" Margin="0,6,0,0"/>
+                                    <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,12,0,12"
+                                            Visibility="{Binding HasMetrics, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding Metrics}" AlternationCount="100" Visibility="{Binding HasMetrics, Converter={StaticResource BoolToVisibility}}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
                                             <UniformGrid Rows="1"/>
@@ -107,6 +143,7 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                              </StackPanel>
                             </Border>
                         </Grid>
                     </Border>

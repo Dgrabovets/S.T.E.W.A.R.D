@@ -7,6 +7,7 @@ using Steward.Lms.Common;
 using Steward.Lms.Models;
 using Steward.Lms.Services;
 using Steward.Status.Common;
+using Steward.Status.Progress;
 using Steward.Status.State;
 
 namespace Steward.Lms;
@@ -20,6 +21,16 @@ internal static class Program
     /// Идентификатор процесса в общем формате статусов и в config/jobs.json
     /// </summary>
     private const string STATUS_ID = "lms";
+
+    /// <summary>
+    /// Шаги обычного запуска по порядку: их видно на странице «Статус», пока процесс работает
+    /// </summary>
+    private static readonly string[] Stages = ["Занятия", "Расшифровки", "Разбор", "Задания", "Работы", "Заметки"];
+
+    /// <summary>
+    /// Прогресс обычного запуска. Пусто у остальных команд: им шаги не нужны
+    /// </summary>
+    private static RunProgressReporter? _progress;
 
     /// <summary>
     /// Выполняет команду: по умолчанию выгружает занятия и записывает итог в общий статус
@@ -124,18 +135,27 @@ internal static class Program
                     return signedIn ? 0 : 1;
                 default:
                     var store = new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"));
+                    _progress = new RunProgressReporter(new RunProgressStore(DataLocation.StatusDirectory()), STATUS_ID, Stages);
+                    _progress.Enter(0, 0, "Список занятий в LMS");
                     var summary = await SyncAsync(settings, store);
+                    _progress.Enter(1, 0, "Запись занятия из MTS Link");
                     summary += "\n" + await FetchAsync(browser, settings, store, settings.MaxFetchPerRun);
+                    _progress.Enter(0, 0, "Работы и сроки в LMS");
                     summary += "\n" + await TasksAsync(settings, store, dryRun: !settings.CreateTasks);
+                    _progress.Enter(2, 0, "Разбор занятий");
                     summary += "\n" + await AnalyzeAsync(settings, store);
+                    _progress.Enter(3, 0, "Поиск заданий");
                     summary += "\n" + await ExtractAsync(settings, store);
+                    _progress.Enter(4, 0, "Подготовка работ");
                     var (prepareSummary, notices) = await PrepareAsync(settings, store);
                     summary += "\n" + prepareSummary;
+                    _progress.Enter(5, 0, "Заметки и работы в Singularity");
                     summary += "\n" + await PublishSafelyAsync(settings, store);
                     Log(summary);
 
                     // Строки «Готова работа: …» уже напечатаны по мере готовности; в сводку статуса они идут для уведомления в трее
                     Report(statusStore, ProcessStateEnum.Ok, notices.Count > 0 ? summary + "\n" + string.Join("\n", notices) : summary, null);
+                    _progress.Finish();
 
                     return 0;
             }
@@ -144,6 +164,7 @@ internal static class Program
         {
             Log($"Ошибка: {exception}");
             Report(statusStore, ProcessStateEnum.Failed, null, Describe(exception));
+            _progress?.Finish();
 
             return 1;
         }
@@ -238,6 +259,9 @@ internal static class Program
         if (wanted.Count == 0)
             return "Расшифровки: новых к выгрузке нет";
 
+        _progress?.Enter(1, wanted.Count, "Запись занятия из MTS Link");
+        var fetched = 0;
+
         var singularity = settings.Singularity is { Token.Length: > 0 } configured && !configured.Token.StartsWith('<') ? new Steward.Mail.Services.SingularityClient(configured) : null;
         try
         {
@@ -255,6 +279,7 @@ internal static class Program
                     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                     File.WriteAllText(path, TranscriptFormatter.Format(lesson, transcript));
                     Log($"Расшифровка: {lesson.Title}, {lesson.Date:dd.MM.yyyy}");
+                    _progress?.Step(++fetched, $"{lesson.Title}, {lesson.Date:dd.MM.yyyy}");
 
                     if (singularity is null || noted.Contains(TranscriptNote.KEY_PREFIX + lessonId))
                         return;
@@ -286,8 +311,10 @@ internal static class Program
             return "Разбор: новых занятий нет";
 
         var done = 0;
+        _progress?.Enter(2, todo.Length, "Разбор занятий");
         foreach (var lesson in todo)
         {
+            _progress?.Step(done, $"{lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}");
             var path = store.AnalysisPath(lesson.Id);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
@@ -328,8 +355,10 @@ internal static class Program
             .ToDictionary(work => work.Id, work => Path.Combine(store.AssignmentDirectory(work.Id), "assignment.md"), StringComparer.Ordinal);
 
         var done = 0;
+        _progress?.Enter(3, todo.Length, "Поиск заданий");
         foreach (var lesson in todo)
         {
+            _progress?.Step(done, $"{lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}");
             var path = store.ItemsPath(lesson.Id);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
@@ -364,7 +393,13 @@ internal static class Program
     {
         var preparer = new HomeworkPreparer(store, new GuideStore(store.Root), new RemarkStore(Path.Combine(store.Root, "remarks")), ClaudeAgent.RunAsync);
         var budget = TimeSpan.FromMinutes(Math.Max(settings.PrepareBudgetMinutes, 1));
-        var report = await preparer.RunWithBudgetAsync(settings.MaxPreparePerRun, budget, work => Log(HomeworkPreparer.NOTICE + work), CancellationToken.None, settings.PrepareMaxAgeDays);
+        var ready = 0;
+        _progress?.Enter(4, Math.Max(settings.MaxPreparePerRun, 0), "Агент готовит работы");
+        var report = await preparer.RunWithBudgetAsync(settings.MaxPreparePerRun, budget, work =>
+        {
+            Log(HomeworkPreparer.NOTICE + work);
+            _progress?.Step(++ready, work);
+        }, CancellationToken.None, settings.PrepareMaxAgeDays);
         if (report.Busy)
             return ("Подготовка работ: уже идёт в другом запуске", []);
 

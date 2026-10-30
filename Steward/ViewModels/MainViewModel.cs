@@ -5,6 +5,7 @@ using Steward.Models;
 using Steward.Mvvm;
 using Steward.Monitoring.Models;
 using Steward.Status.Rows;
+using Steward.Status.Progress;
 using Steward.Status.Running;
 
 namespace Steward.ViewModels;
@@ -326,6 +327,11 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
+    /// Читает, что сейчас делает процесс: шаги и счётчик из файла прогресса. Пусто: прогресс не показывается
+    /// </summary>
+    public Func<string, RunProgress?>? ProgressReader { get; set; }
+
+    /// <summary>
     /// Собирает карточки задач вместе с показателями процессов
     /// </summary>
     private void BuildTasks()
@@ -339,7 +345,14 @@ public sealed class MainViewModel : PanelViewModel
             _ => [],
         };
 
-        Tasks = _rows.Select(row => new TaskCardViewModel(row, id => RunRequested?.Invoke(id), _activity.StateOf(row), _activity.FinishedAt(row.Id), NavItems.Any(item => item.RowId == row.Id) ? OpenProcessSettings : null, Metrics(row.Id))).ToArray();
+        var now = DateTimeOffset.Now;
+        Tasks = _rows.Select(row =>
+        {
+            var state = _activity.StateOf(row);
+
+            return new TaskCardViewModel(row, id => RunRequested?.Invoke(id), state, _activity.FinishedAt(row.Id), NavItems.Any(item => item.RowId == row.Id) ? OpenProcessSettings : null, Metrics(row.Id),
+                ProgressCardViewModel.Create(state == ActivityStateEnum.Working ? ProgressReader?.Invoke(row.Id) : null, state == ActivityStateEnum.Working, now));
+        }).ToArray();
     }
 
     /// <summary>

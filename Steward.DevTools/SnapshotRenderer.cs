@@ -251,6 +251,18 @@ public static class SnapshotRenderer
                 settleSeconds = 1.2;
             }
 
+            // «main:progress»: «Автоматизация образования» работает, на карточке видны шаги запуска и что обрабатывается сейчас
+            if (parts.Length > 1 && string.Equals(parts[1], "progress", StringComparison.OrdinalIgnoreCase))
+            {
+                main.Height = 1300;
+                var started = DateTimeOffset.Now.AddMinutes(-4);
+                main.Model.ProgressReader = id => id == "lms"
+                    ? new Steward.Status.Progress.RunProgress(["Занятия", "Расшифровки", "Разбор", "Задания", "Работы", "Заметки"], 2, 1, 3, "Гейм-дизайн, 25.10.2026", started, DateTimeOffset.Now)
+                    : null;
+                main.Apply(snapshot, [.. jobs.Select(job => job.Id == "lms" ? job with { Tone = RowToneEnum.Working, Headline = "Выполняется", Detail = "Запущена сегодня в 10:41" } : job)], SampleRecords(now), [], SampleIdeas(now));
+                settleSeconds = 1.2;
+            }
+
             // «maximized:1920x1080[@125][:страница]»: развёрнутое окно на мониторе такого размера и масштаба с панелью задач внизу.
             // Окно ставится так, как Windows ставит развёрнутое окно без рамки без поправки (шире рабочей области на рамку с каждой стороны),
             // содержимое отступает на рассчитанные отступы, а на снимок попадает только рабочая область, то есть то, что видно на экране
