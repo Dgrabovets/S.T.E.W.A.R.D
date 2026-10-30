@@ -53,17 +53,24 @@ public static class SettingsProbe
     /// </summary>
     /// <param name="root">Корень репозитория</param>
     /// <returns>Чипы для страницы «Рилсы»</returns>
-    public static IReadOnlyList<StatusChipViewModel> Reels(string root)
+    public static IReadOnlyList<StatusChipViewModel> Reels(string root) => Reels(root, FirefoxProfiles());
+
+    /// <summary>
+    /// Состояние бота рилсов с заданной папкой профилей Firefox: так проверку профиля можно испытать без настоящего браузера
+    /// </summary>
+    /// <param name="root">Корень репозитория</param>
+    /// <param name="firefoxProfiles">Папка профилей Firefox, по которой видно, что вход в Instagram можно взять из браузера</param>
+    /// <returns>Чипы для страницы «Рилсы»</returns>
+    public static IReadOnlyList<StatusChipViewModel> Reels(string root, string firefoxProfiles)
     {
         using var document = Read(ReelsFile(root));
-        var browser = document is not null && document.RootElement.TryGetProperty("cookiesFromBrowser", out var value) ? value.GetString() ?? string.Empty : string.Empty;
-        var profile = string.Equals(browser, "firefox", StringComparison.OrdinalIgnoreCase)
-            && Directory.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Mozilla", "Firefox", "Profiles"));
+        var browser = document is not null && TryGet(document.RootElement, "cookiesFromBrowser", out var value) && value.ValueKind == JsonValueKind.String ? (value.GetString() ?? string.Empty).Trim() : string.Empty;
+        var profile = string.Equals(browser, "firefox", StringComparison.OrdinalIgnoreCase) && Directory.Exists(firefoxProfiles);
 
         return
         [
             Chip(Filled(document, null, "botToken"), "Токен бота", "задан", "не задан"),
-            Chip(document is not null && document.RootElement.TryGetProperty("allowedUserId", out var owner) && owner.ValueKind == JsonValueKind.Number && owner.GetInt64() != 0, "Владелец бота", "задан", "не задан"),
+            Chip(document is not null && TryGet(document.RootElement, "allowedUserId", out var owner) && owner.ValueKind == JsonValueKind.Number && owner.TryGetInt64(out var id) && id != 0, "Владелец бота", "задан", "не задан"),
             browser.Length == 0
                 ? new StatusChipViewModel("Вход в Instagram", "не настроен", PanelToneEnum.Attention)
                 : Chip(profile || !string.Equals(browser, "firefox", StringComparison.OrdinalIgnoreCase), "Вход в Instagram", browser, $"нет профиля {browser}"),
@@ -79,7 +86,7 @@ public static class SettingsProbe
     {
         using var document = Read(LmsFile(root));
         var state = Path.Combine(root, "data", "lms", "mts-state.json");
-        var create = document is not null && document.RootElement.TryGetProperty("createTasks", out var flag) && flag.ValueKind == JsonValueKind.True;
+        var create = document is not null && TryGet(document.RootElement, "createTasks", out var flag) && flag.ValueKind == JsonValueKind.True;
 
         return
         [
@@ -88,6 +95,12 @@ public static class SettingsProbe
             create ? new StatusChipViewModel("Запись в Singularity", "включена", PanelToneEnum.Running) : new StatusChipViewModel("Запись в Singularity", "выключена", PanelToneEnum.Attention),
         ];
     }
+
+    /// <summary>
+    /// Папка профилей Firefox текущего пользователя
+    /// </summary>
+    /// <returns>Путь к <c>%APPDATA%\Mozilla\Firefox\Profiles</c></returns>
+    private static string FirefoxProfiles() => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Mozilla", "Firefox", "Profiles");
 
     /// <summary>
     /// Собирает чип: зелёный, когда всё в порядке, и жёлтый, когда нет
