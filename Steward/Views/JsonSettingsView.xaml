@@ -16,7 +16,10 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel>
-                                        <TextBlock Text="{Binding Title}" Style="{StaticResource FieldTitle}"/>
+                                        <TextBlock Text="{Binding Title}" Style="{StaticResource FieldTitle}" Visibility="{Binding HasTitleAbove, Converter={StaticResource BoolToVisibility}}"/>
+                                        <CheckBox Content="{Binding Title}" IsChecked="{Binding IsOn, Mode=TwoWay}" FontWeight="SemiBold" Margin="0,16,0,4" HorizontalAlignment="Left"
+                                                  AutomationProperties.Name="{Binding Title}"
+                                                  Visibility="{Binding IsToggle, Converter={StaticResource BoolToVisibility}}"/>
                                         <TextBlock Text="{Binding Hint}" Style="{StaticResource Hint}" TextWrapping="Wrap" Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}"/>
                                         <TextBox Style="{StaticResource Field}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                                                  Visibility="{Binding IsPlain, Converter={StaticResource BoolToVisibility}}"/>

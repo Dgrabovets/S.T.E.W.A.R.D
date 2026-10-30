@@ -309,11 +309,11 @@ public sealed class MainViewModel : PanelViewModel
                     new SettingFieldViewModel("StudentName", "Ваше имя в расшифровках", "Как вас называют на занятиях. По нему в разбор попадают ваши задачи, а не поручения другим студентам."),
                 ]),
                 new SettingsSectionViewModel("Вход в MTS Link", [], "Войти в MTS Link", "Откроется окно браузера: войди один раз, вход сохранится.", () => MtsLoginRequested?.Invoke()),
-                new SettingsSectionViewModel("Программы", [
-                    new SettingFieldViewModel("MdEditor", "Программа для MD-файлов", "Например code для Visual Studio Code. Пусто: code, а если её нет, программа по умолчанию."),
-                ]),
                 new SettingsSectionViewModel("Выгрузка", [
                     new SettingFieldViewModel("MaxFetchPerRun", "Занятий за один запуск", "Сколько расшифровок забирать за раз.", number: true),
+                ]),
+                new SettingsSectionViewModel("SingularityApp", [
+                    new SettingFieldViewModel("CreateTasks", "Записывать в Singularity", "Когда выключено, процесс «Автоматизация образования» ничего не создаёт и не дописывает в Singularity, а только пишет в журнал, что сделал бы.", toggle: true),
                 ]),
             ],
             () => FileRequested?.Invoke("lms"));

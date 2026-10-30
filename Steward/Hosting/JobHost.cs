@@ -295,31 +295,17 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
-    /// Открывает файл или папку. MD-файлы открываются в программе из настройки «Программа для MD-файлов» (по умолчанию Visual Studio Code), остальное в программе по умолчанию
+    /// Открывает файл или папку в программе, которую Windows связала с этим типом. Если связи нет, Windows сама спросит, чем открыть
     /// </summary>
     /// <param name="path">Путь к файлу или папке</param>
     /// <returns>Пояснение, если открыть не удалось, иначе пустая строка</returns>
     public string OpenFile(string path)
     {
-        var editor = Path.GetExtension(path).Equals(".md", StringComparison.OrdinalIgnoreCase) ? LmsSetting("MdEditor", "code") : string.Empty;
         try
         {
-            System.Diagnostics.Process.Start(editor.Length > 0 ? new System.Diagnostics.ProcessStartInfo(editor, $"\"{path}\"") { UseShellExecute = true } : new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
 
             return string.Empty;
-        }
-        catch (System.ComponentModel.Win32Exception) when (editor.Length > 0)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
-
-                return string.Empty;
-            }
-            catch (System.ComponentModel.Win32Exception exception)
-            {
-                return exception.Message;
-            }
         }
         catch (System.ComponentModel.Win32Exception exception)
         {

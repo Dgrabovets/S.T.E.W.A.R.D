@@ -14,7 +14,10 @@ namespace Steward.ViewModels;
 /// <param name="number">
 /// <see langword="true"/>, если в файл нужно записать число
 /// </param>
-public sealed class SettingFieldViewModel(string path, string title, string hint, bool secret = false, bool number = false) : Bindable
+/// <param name="toggle">
+/// <see langword="true"/>, если значение — переключатель «да или нет», который пишется в файл как <c>true</c> или <c>false</c>
+/// </param>
+public sealed class SettingFieldViewModel(string path, string title, string hint, bool secret = false, bool number = false, bool toggle = false) : Bindable
 {
     /// <summary>
     /// Введённое значение
@@ -47,21 +50,44 @@ public sealed class SettingFieldViewModel(string path, string title, string hint
     public bool IsNumber { get; } = number;
 
     /// <summary>
+    /// Значение — переключатель, записывается как <c>true</c> или <c>false</c>
+    /// </summary>
+    public bool IsToggle { get; } = toggle;
+
+    /// <summary>
     /// У поля есть пояснение
     /// </summary>
     public bool HasHint => Hint.Length > 0;
 
     /// <summary>
-    /// Значение открыто на экране
+    /// Значение открыто на экране в поле ввода
     /// </summary>
-    public bool IsPlain => !IsSecret;
+    public bool IsPlain => !IsSecret && !IsToggle;
 
     /// <summary>
-    /// Введённое значение
+    /// Над полем нужна отдельная подпись: у переключателя подпись стоит рядом с ним
+    /// </summary>
+    public bool HasTitleAbove => !IsToggle;
+
+    /// <summary>
+    /// Введённое значение. У переключателя это <c>true</c>, <c>false</c> или пусто, если ключа в файле нет
     /// </summary>
     public string Value
     {
         get => _value;
-        set => Set(ref _value, value);
+        set
+        {
+            if (Set(ref _value, value))
+                Raise(nameof(IsOn));
+        }
+    }
+
+    /// <summary>
+    /// Переключатель включён. Пустое или непонятное значение считается выключенным
+    /// </summary>
+    public bool IsOn
+    {
+        get => bool.TryParse(_value.Trim(), out var on) && on;
+        set => Value = value ? "true" : "false";
     }
 }

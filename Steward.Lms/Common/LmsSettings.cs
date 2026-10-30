@@ -46,11 +46,6 @@ public sealed class LmsSettings
     public bool CreateTasks { get; init; }
 
     /// <summary>
-    /// Программа, в которой открываются готовые MD-файлы, например <c>code</c> для Visual Studio Code. Пусто: берётся <c>code</c>, а если её нет, программа по умолчанию
-    /// </summary>
-    public string MdEditor { get; init; } = string.Empty;
-
-    /// <summary>
     /// Как вас называют в расшифровках, например «Иванов Иван Иванович». По имени в разбор занятия попадают ваши задачи, а не поручения другим студентам. Пусто: берутся задачи для всех
     /// </summary>
     public string StudentName { get; init; } = string.Empty;

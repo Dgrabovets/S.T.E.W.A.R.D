@@ -38,4 +38,19 @@ public class PrepareSettingsTests
         Assert.Equal(21, old.PrepareMaxAgeDays);
         Assert.Equal(7, set.PrepareMaxAgeDays);
     }
+
+    /// <summary>
+    /// Старый файл с убранной настройкой «Программа для MD-файлов» читается как раньше: лишний ключ пропускается, остальные значения на месте
+    /// </summary>
+    [Fact]
+    public void An_old_file_with_MdEditor_still_loads()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        var old = JsonSerializer.Deserialize<LmsSettings>("""{"Login": "x", "MdEditor": "code", "CreateTasks": false, "MaxFetchPerRun": 4}""", options)!;
+
+        Assert.Equal("x", old.Login);
+        Assert.False(old.CreateTasks);
+        Assert.Equal(4, old.MaxFetchPerRun);
+    }
 }

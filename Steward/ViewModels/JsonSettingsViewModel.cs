@@ -115,6 +115,7 @@ public sealed class JsonSettingsViewModel : Bindable
 
         foreach (var field in Fields)
         {
+            // У true и false в JSON текст «true» и «false»: переключатель читает его без изменений
             var text = Find(root, field.Path)?.ToString() ?? string.Empty;
             field.Value = text.StartsWith('<') ? string.Empty : text;
         }
@@ -134,6 +135,15 @@ public sealed class JsonSettingsViewModel : Bindable
                 var value = field.Value.Trim();
                 if (value.Length == 0 && Find(root, field.Path) is null)
                     continue;
+
+                // Переключатель пишется настоящим true или false: строку "true" программа процесса не прочтёт. Непонятное значение, которого человек не трогал, остаётся в файле как было
+                if (field.IsToggle)
+                {
+                    if (bool.TryParse(value, out var on))
+                        Put(root, field.Path, JsonValue.Create(on));
+
+                    continue;
+                }
 
                 if (field.IsNumber && !long.TryParse(value, out _))
                 {
