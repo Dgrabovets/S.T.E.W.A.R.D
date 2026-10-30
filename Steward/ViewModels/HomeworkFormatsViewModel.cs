@@ -1231,6 +1231,107 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public bool HasReadingSpeakers => _reading.Speakers.Count > 0;
 
     /// <summary>
+    /// Выбранная вкладка читалки. Если в ней нет содержимого, показывается первая из доступных
+    /// </summary>
+    private ReaderTabEnum _readerTab = ReaderTabEnum.Covered;
+
+    /// <summary>
+    /// Вкладки читалки, в которых для этого занятия есть что показать, в порядке показа
+    /// </summary>
+    public IReadOnlyList<ReaderTabViewModel> ReaderTabs
+    {
+        get
+        {
+            var shown = ActiveReaderTab;
+
+            return [.. AvailableReaderTabs().Select(item => new ReaderTabViewModel(item.Tab, item.Title, item.Tab == shown, new RelayCommand(() => SelectReaderTab(item.Tab))))];
+        }
+    }
+
+    /// <summary>
+    /// У занятия есть хотя бы один раздел для вкладок
+    /// </summary>
+    public bool HasReaderTabs => AvailableReaderTabs().Count > 0;
+
+    /// <summary>
+    /// Показан раздел «Пройдено»
+    /// </summary>
+    public bool IsCoveredTab => ActiveReaderTab == ReaderTabEnum.Covered && HasReaderTabs;
+
+    /// <summary>
+    /// Показан раздел «Темы»
+    /// </summary>
+    public bool IsTopicsTab => ActiveReaderTab == ReaderTabEnum.Topics && HasReaderTabs;
+
+    /// <summary>
+    /// Показан раздел «Решения и задачи»
+    /// </summary>
+    public bool IsActionsTab => ActiveReaderTab == ReaderTabEnum.Actions && HasReaderTabs;
+
+    /// <summary>
+    /// Показан раздел «Кто говорил»
+    /// </summary>
+    public bool IsSpeakersTab => ActiveReaderTab == ReaderTabEnum.Speakers && HasReaderTabs;
+
+    /// <summary>
+    /// Какая вкладка читалки показана сейчас: выбранная, а если в ней пусто, то первая с содержимым
+    /// </summary>
+    public ReaderTabEnum ActiveReaderTab
+    {
+        get
+        {
+            var available = AvailableReaderTabs();
+
+            return available.Any(item => item.Tab == _readerTab) || available.Count == 0 ? _readerTab : available[0].Tab;
+        }
+    }
+
+    /// <summary>
+    /// Собирает вкладки, у которых есть содержимое
+    /// </summary>
+    /// <returns>Вкладки и их названия по порядку</returns>
+    private List<(ReaderTabEnum Tab, string Title)> AvailableReaderTabs()
+    {
+        var tabs = new List<(ReaderTabEnum, string)>();
+        if (HasReadingPoints || HasReadingOverview)
+            tabs.Add((ReaderTabEnum.Covered, "Пройдено"));
+
+        if (HasReadingTopics || HasReadingFormulations)
+            tabs.Add((ReaderTabEnum.Topics, "Темы"));
+
+        if (HasReadingDecisions || HasReadingTasks)
+            tabs.Add((ReaderTabEnum.Actions, "Решения и задачи"));
+
+        if (HasReadingSpeakers)
+            tabs.Add((ReaderTabEnum.Speakers, "Кто говорил"));
+
+        return tabs;
+    }
+
+    /// <summary>
+    /// Показывает раздел выбранной вкладки
+    /// </summary>
+    /// <param name="tab">Вкладка</param>
+    private void SelectReaderTab(ReaderTabEnum tab)
+    {
+        _readerTab = tab;
+        RaiseReaderTabs();
+    }
+
+    /// <summary>
+    /// Сообщает окну, что вкладки читалки или выбранная вкладка изменились
+    /// </summary>
+    private void RaiseReaderTabs()
+    {
+        Raise(nameof(ReaderTabs));
+        Raise(nameof(HasReaderTabs));
+        Raise(nameof(IsCoveredTab));
+        Raise(nameof(IsTopicsTab));
+        Raise(nameof(IsActionsTab));
+        Raise(nameof(IsSpeakersTab));
+    }
+
+    /// <summary>
     /// Показатели занятия: дата, длительность, слов, участников
     /// </summary>
     public IReadOnlyList<StatusTileViewModel> ReadingStats => OpenLesson is null ? [] :
@@ -1299,6 +1400,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             other.IsOpen = other == lesson;
 
         _reading = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty, AnalysisReader?.Invoke(lesson.Id));
+        _readerTab = ReaderTabEnum.Covered;
         OpenLesson = lesson;
         RaiseReading();
     }
@@ -1341,6 +1443,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         Raise(nameof(ReadingSpeakers));
         Raise(nameof(HasReadingSpeakers));
         Raise(nameof(ReadingStats));
+        RaiseReaderTabs();
     }
 
     /// <summary>
