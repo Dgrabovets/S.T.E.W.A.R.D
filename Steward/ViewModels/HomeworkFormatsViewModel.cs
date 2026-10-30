@@ -989,8 +989,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
 
         try
         {
-            System.Windows.Clipboard.SetText(text);
-            lesson.ShowResult("Условие скопировано в буфер обмена", failed: false);
+            ClipboardWriter(text);
+            ClearCopyError(lesson);
         }
         catch (System.Runtime.InteropServices.ExternalException)
         {
@@ -1118,13 +1118,28 @@ public sealed class HomeworkFormatsViewModel : Bindable
 
         try
         {
-            System.Windows.Clipboard.SetText(text);
-            lesson.ShowResult("Конспект к практике скопирован в буфер обмена", failed: false);
+            ClipboardWriter(text);
+            ClearCopyError(lesson);
         }
         catch (System.Runtime.InteropServices.ExternalException)
         {
             lesson.ShowResult("Буфер обмена занят другой программой, повтори", failed: true);
         }
+    }
+
+    /// <summary>
+    /// Кладёт текст в буфер обмена. По умолчанию системный буфер, в тестах подменяется
+    /// </summary>
+    public Action<string> ClipboardWriter { get; set; } = System.Windows.Clipboard.SetText;
+
+    /// <summary>
+    /// После удачного копирования убирает прежнюю ошибку из строки занятия, чтобы она не висела. Об успехе копирование не сообщает: текст просто оказывается в буфере. Строку хода другого действия, например «Завожу задачу…», не трогает
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    private static void ClearCopyError(LessonFormatViewModel lesson)
+    {
+        if (lesson.Failed)
+            lesson.ShowResult(string.Empty, failed: false);
     }
 
     /// <summary>

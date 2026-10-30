@@ -765,6 +765,8 @@
     </GeometryGroup>
     <PathGeometry x:Key="IconRedo" Figures="M15,9 A6,6 0 1 1 11.8,3.7 M15,2.5 V6.5 H11"/>
     <PathGeometry x:Key="IconClose" Figures="M4,4 L14,14 M14,4 L4,14"/>
+    <!-- Копировать: передний лист целиком и уголок заднего листа за ним -->
+    <PathGeometry x:Key="IconCopy" Figures="M3,6.5 H11.5 V15.5 H3 Z M6.5,6.5 V2.5 H15 V12 H11.5"/>
 
     <!-- Меню «…» карточки: тёмная плашка как у выпадающего списка, пункт при наведении и с клавиатуры подсвечивается, недоступный приглушён -->
     <Style x:Key="CardMenuItem" TargetType="MenuItem">
