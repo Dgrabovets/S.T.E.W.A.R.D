@@ -339,7 +339,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <summary>
     /// Удаляет готовые файлы занятия
     /// </summary>
-    public Action<string>? DraftsDeleted { get; set; }
+    public Func<string, string>? DraftsDeleted { get; set; }
 
     /// <summary>
     /// Прикрепляет готовую работу владельца: ключ занятия, номер задания и путь к файлу. Возвращает итог и признак неудачи. Вызывается в фоновой задаче, потому что копирует файл
@@ -451,13 +451,22 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <param name="lesson">Занятие</param>
     public void DeleteDrafts(LessonFormatViewModel lesson)
     {
+        string refused;
         try
         {
-            DraftsDeleted?.Invoke(lesson.Id);
+            refused = DraftsDeleted?.Invoke(lesson.Id) ?? string.Empty;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             lesson.ShowResult("Не удалось удалить: закрой файл задания в Word или PowerPoint и повтори. " + exception.Message, failed: true);
+
+            return;
+        }
+
+        // Идёт фоновая подготовка: ничего не удалено
+        if (refused.Length > 0)
+        {
+            lesson.ShowResult(refused, failed: true);
 
             return;
         }

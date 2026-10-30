@@ -72,8 +72,28 @@ public partial class HomeworkFormatsView : UserControl
     /// <param name="item">Задание</param>
     private async void AttachWork(LessonFormatViewModel lesson, LessonItemViewModel item)
     {
-        if (DataContext is HomeworkFormatsViewModel model && PickFile($"Своя готовая работа: задание {item.Number}") is { } file)
-            await model.AttachWorkAsync(lesson, item.Number, file);
+        try
+        {
+            if (DataContext is HomeworkFormatsViewModel model && PickFile($"Своя готовая работа: задание {item.Number}") is { } file)
+                await model.AttachWorkAsync(lesson, item.Number, file);
+        }
+        catch (Exception exception)
+        {
+            // Обработчик без ожидания: ошибка не должна уронить окно
+            Fail(lesson, "Не удалось прикрепить работу: ", exception);
+        }
+    }
+
+    /// <summary>
+    /// Пишет ошибку действия в журнал и показывает её в карточке занятия
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="prefix">Начало сообщения: что не удалось</param>
+    /// <param name="exception">Ошибка</param>
+    private static void Fail(LessonFormatViewModel lesson, string prefix, Exception exception)
+    {
+        System.Diagnostics.Trace.TraceError($"{prefix}{lesson.Id}: {exception}");
+        lesson.ShowResult(prefix + exception.Message, failed: true);
     }
 
     /// <summary>
@@ -83,8 +103,16 @@ public partial class HomeworkFormatsView : UserControl
     /// <param name="item">Задание</param>
     private async void ChooseSubmittedFile(LessonFormatViewModel lesson, LessonItemViewModel item)
     {
-        if (DataContext is HomeworkFormatsViewModel model && PickFile($"Файл сданной работы: задание {item.Number}") is { } file)
-            await model.SetSubmittedFileAsync(lesson, item.Number, file);
+        try
+        {
+            if (DataContext is HomeworkFormatsViewModel model && PickFile($"Файл сданной работы: задание {item.Number}") is { } file)
+                await model.SetSubmittedFileAsync(lesson, item.Number, file);
+        }
+        catch (Exception exception)
+        {
+            // Обработчик без ожидания: ошибка не должна уронить окно
+            Fail(lesson, "Не удалось записать сданную работу: ", exception);
+        }
     }
 
     /// <summary>
@@ -94,8 +122,16 @@ public partial class HomeworkFormatsView : UserControl
     /// <param name="item">Задание</param>
     private async void EditCondition(LessonFormatViewModel lesson, LessonItemViewModel item)
     {
-        if (DataContext is HomeworkFormatsViewModel model && ConditionWindow.Ask(Window.GetWindow(this), lesson.Meta, item.Title, item.FullRequirements) is { } answer)
-            await model.FixConditionAsync(lesson, item.Number, answer.Title, answer.Requirements);
+        try
+        {
+            if (DataContext is HomeworkFormatsViewModel model && ConditionWindow.Ask(Window.GetWindow(this), lesson.Meta, item.Title, item.FullRequirements) is { } answer)
+                await model.FixConditionAsync(lesson, item.Number, answer.Title, answer.Requirements);
+        }
+        catch (Exception exception)
+        {
+            // Обработчик без ожидания: ошибка не должна уронить окно
+            Fail(lesson, "Не удалось поправить условие: ", exception);
+        }
     }
 
     /// <summary>

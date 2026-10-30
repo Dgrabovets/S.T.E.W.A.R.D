@@ -995,6 +995,24 @@ public class PipelineTests
     }
 
     /// <summary>
+    /// Отказ удалить работу из-за идущей фоновой подготовки показывается в карточке как есть, без совета закрыть файл в Word
+    /// </summary>
+    [Fact]
+    public void A_busy_refusal_to_delete_drafts_is_shown_as_is()
+    {
+        var lesson = new Lesson("l1", "Физика", new DateOnly(2026, 10, 10));
+        var model = new HomeworkFormatsViewModel([(lesson, HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)))
+        {
+            DraftsDeleted = _ => HomeworkPreparer.DELETE_BUSY_MESSAGE,
+        };
+
+        model.DeleteDrafts(model.Lessons[0]);
+
+        Assert.Equal(HomeworkPreparer.DELETE_BUSY_MESSAGE, model.Lessons[0].Status);
+        Assert.True(model.Lessons[0].Failed);
+    }
+
+    /// <summary>
     /// Сборка строк из прежнего снимка не перекрывает свежий снимок: после многих обновлений подряд строки всегда показывают последнее прочитанное
     /// </summary>
     [Fact]

@@ -718,15 +718,12 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
-    /// Удаляет готовые файлы занятия вместе с прежними версиями: кнопка «Подготовить задание» вернётся
+    /// Удаляет готовые файлы занятия вместе с прежними версиями: кнопка «Подготовить задание» вернётся. Пока идёт фоновая подготовка, ничего не удаляет
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
-    public void DeleteDrafts(string lessonId)
-    {
-        var folder = _homework.DraftsDirectory(lessonId);
-        if (Directory.Exists(folder))
-            Directory.Delete(folder, recursive: true);
-    }
+    /// <returns>Пустая строка или причина, почему не удалено</returns>
+    /// <exception cref="IOException">Файл занят, например открыт в Word</exception>
+    public string DeleteDrafts(string lessonId) => _preparer.DeleteDrafts(lessonId);
 
     /// <summary>
     /// Найденные в расшифровке задания занятия без убранных в архив
