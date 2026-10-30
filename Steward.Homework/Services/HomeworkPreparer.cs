@@ -65,14 +65,24 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     private const string LOCK_FILE = "prepare.lock";
 
     /// <summary>
-    /// Сколько раз пробовать удалить занятый файл прерванной попытки
+    /// Сколько раз пробовать убрать занятый файл прерванной попытки
     /// </summary>
     private const int DELETE_ATTEMPTS = 10;
 
     /// <summary>
-    /// Пауза между попытками удаления, миллисекунды
+    /// Пауза между попытками убрать файл, миллисекунды
     /// </summary>
     private const int DELETE_RETRY_MS = 200;
+
+    /// <summary>
+    /// Сообщение владельцу, когда работу нельзя удалить из-за идущей фоновой подготовки
+    /// </summary>
+    public const string DELETE_BUSY_MESSAGE = "Идёт подготовка работ в фоне, удали работу позже";
+
+    /// <summary>
+    /// Часы для отбора свежих занятий; в тестах подменяются
+    /// </summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 
     /// <summary>
     /// Учёт попыток и зарегистрированных образцов
@@ -82,28 +92,44 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     /// <summary>
     /// Готовит работы по найденным заданиям: от свежих занятий к старым, только несданные, не в архиве, без файла работы, у предметов, которые готовятся, и не больше лимита за запуск.
     /// Задание, в котором Steward не уверен, ждёт подтверждения. После ошибки агента повтор на следующем запуске, не больше трёх раз подряд. Каждая новая работа сразу проверяется. Работа сданного задания один раз становится образцом предмета.
-    /// При отмене агент останавливается, прерванная попытка не засчитывается, а отчёт возвращается с тем, что успели
+    /// При отмене агент останавливается, прерванная попытка не засчитывается, а отчёт возвращается с тем, что успели.
+    /// Готовятся только занятия не старше <paramref name="maxAgeDays"/> дней (граница включается): старые недоделанные задания сами не готовятся, чтобы не тратить подписку на историю, их можно подготовить кнопкой. Образцы сданных работ регистрируются у всех занятий.
+    /// Если не читаются список занятий или снимок работ LMS, запуск не падает: отчёт возвращается с ошибкой
     /// </summary>
     /// <param name="maxWorks">Сколько работ готовить за запуск, с удачными и неудачными попытками</param>
     /// <param name="cancellationToken">Отменяет запуск</param>
     /// <param name="ready">Вызывается сразу после каждой готовой работы со строкой «предмет, задание», или <see langword="null"/></param>
+    /// <param name="maxAgeDays">Сколько дней от даты занятия до сегодня ещё можно готовить сами; 0 или меньше — без ограничения</param>
     /// <returns>Готовые, ждущие и неудачные задания</returns>
-    public async Task<PrepareReport> RunAsync(int maxWorks, CancellationToken cancellationToken, Action<string>? ready = null)
+    public async Task<PrepareReport> RunAsync(int maxWorks, CancellationToken cancellationToken, Action<string>? ready = null, int maxAgeDays = 0)
     {
         using var hold = TryHold();
         if (hold is null)
             return new PrepareReport([], [], [], Busy: true);
 
         var run = new RunState(Math.Max(maxWorks, 0), ready);
+        IReadOnlySet<string> doneWorks;
+        IReadOnlyList<Lesson> lessons;
         try
         {
-            var doneWorks = store.DoneWorkIds();
-            foreach (var lesson in store.LoadLessons())
+            doneWorks = store.DoneWorkIds();
+            lessons = store.LoadLessons();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Без списка занятий готовить нечего, но остальные шаги фоновой задачи идут дальше
+            return new PrepareReport([], [], [Flat("не удалось прочитать занятия или работы LMS: " + exception.Message)]);
+        }
+
+        var oldest = maxAgeDays > 0 ? DateOnly.FromDateTime(Clock.GetLocalNow().DateTime).AddDays(-maxAgeDays) : DateOnly.MinValue;
+        try
+        {
+            foreach (var lesson in lessons)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    await RunLessonAsync(lesson, doneWorks, run, cancellationToken);
+                    await RunLessonAsync(lesson, doneWorks, run, lesson.Date >= oldest, cancellationToken);
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException or System.Text.Json.JsonException)
                 {
@@ -126,13 +152,14 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     /// <param name="budget">Сколько времени дано шагу</param>
     /// <param name="ready">Вызывается сразу после каждой готовой работы, или <see langword="null"/></param>
     /// <param name="cancellationToken">Отменяет запуск раньше срока</param>
+    /// <param name="maxAgeDays">Сколько дней от даты занятия до сегодня ещё можно готовить сами; 0 или меньше — без ограничения</param>
     /// <returns>Отчёт; <see cref="PrepareReport.Cancelled"/>, если срок вышел</returns>
-    public async Task<PrepareReport> RunWithBudgetAsync(int maxWorks, TimeSpan budget, Action<string>? ready, CancellationToken cancellationToken)
+    public async Task<PrepareReport> RunWithBudgetAsync(int maxWorks, TimeSpan budget, Action<string>? ready, CancellationToken cancellationToken, int maxAgeDays = 0)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(budget);
 
-        return await RunAsync(maxWorks, deadline.Token, ready);
+        return await RunAsync(maxWorks, deadline.Token, ready, maxAgeDays);
     }
 
     /// <summary>
@@ -221,6 +248,26 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         {
             return "Работа прикреплена, но образец предмета не записался: " + exception.Message;
         }
+    }
+
+    /// <summary>
+    /// Удаляет готовые работы занятия вместе с прежними версиями по кнопке «Удалить». Занимает блокировку подготовки, но не ждёт её: пока идёт фоновая подготовка, удаление её рабочей папки сорвало бы попытку, поэтому ничего не удаляется
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Пустая строка, если удалено (или удалять нечего), иначе <see cref="DELETE_BUSY_MESSAGE"/></returns>
+    /// <exception cref="IOException">Файл занят, например открыт в Word</exception>
+    /// <exception cref="UnauthorizedAccessException">Нет доступа к файлу</exception>
+    public string DeleteDrafts(string lessonId)
+    {
+        using var hold = TryHold();
+        if (hold is null)
+            return DELETE_BUSY_MESSAGE;
+
+        var folder = store.DraftsDirectory(lessonId);
+        if (Directory.Exists(folder))
+            Directory.Delete(folder, recursive: true);
+
+        return string.Empty;
     }
 
     /// <summary>
@@ -447,9 +494,10 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     /// <param name="lesson">Занятие</param>
     /// <param name="doneWorks">Номера работ LMS, которые LMS показывает сданными</param>
     /// <param name="run">Состояние запуска: остаток лимита и списки отчёта. Лимит, потраченный до ошибки, не возвращается</param>
+    /// <param name="fresh">Занятие достаточно свежее, чтобы готовить его работы самим; у старого только регистрируются образцы</param>
     /// <param name="cancellationToken">Отменяет запуск</param>
     /// <returns>Задача обработки занятия</returns>
-    private async Task RunLessonAsync(Lesson lesson, IReadOnlySet<string> doneWorks, RunState run, CancellationToken cancellationToken)
+    private async Task RunLessonAsync(Lesson lesson, IReadOnlySet<string> doneWorks, RunState run, bool fresh, CancellationToken cancellationToken)
     {
         if (store.ReadItems(lesson.Id) is not { Count: > 0 } items)
             return;
@@ -468,8 +516,8 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
                 RegisterSample(lesson, number);
         }
 
-        // Предмет и занятие, которые не готовятся («Не готовить», не «Расшифровывать»), агента не тратят
-        if (!store.PreparesHomework(lesson) || store.SubjectFormatFor(lesson.Title) == HomeworkFormatEnum.Skip)
+        // Предмет и занятие, которые не готовятся («Не готовить», не «Расшифровывать»), и старые занятия агента не тратят
+        if (!fresh || !store.PreparesHomework(lesson) || store.SubjectFormatFor(lesson.Title) == HomeworkFormatEnum.Skip)
             return;
 
         var format = store.FormatFor(lesson.Id);
@@ -529,7 +577,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
     }
 
     /// <summary>
-    /// Готовит работу одного задания. Попытка засчитывается до запуска агента (так сбой процесса тоже считается), удача сбрасывает счётчик, отмена возвращает прежнее значение. Файл, который агент оставил при ошибке, удаляется, чтобы недописанная работа не стала «Готово»
+    /// Готовит работу одного задания. Попытка засчитывается до запуска агента (так сбой процесса тоже считается), удача сбрасывает счётчик, отмена возвращает прежнее значение. Файл, который агент оставил при ошибке, откладывается в <c>.failed</c>, чтобы недописанная работа не стала «Готово»
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="items">Все задания занятия</param>
@@ -565,7 +613,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         var (_, error) = await DraftBuilder.BuildAsync(store, lesson, single, format, agent, cancellationToken, materials, string.Empty, assignments, owner);
         if (cancellationToken.IsCancellationRequested)
         {
-            await RemoveNewAsync(folder, number, before);
+            await SetAsideNewAsync(folder, number, before);
             TrySetAttempts(key, attempts);
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -578,7 +626,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
             return string.Empty;
         }
 
-        await RemoveNewAsync(folder, number, before);
+        await SetAsideNewAsync(folder, number, before);
 
         return error.Length > 0 ? error : "агент не записал файл";
     }
@@ -647,21 +695,31 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         : [];
 
     /// <summary>
-    /// Удаляет файлы задания, которые появились во время неудачной или прерванной попытки. Занятый файл (его ещё держит останавливаемый агент) удаляется с несколькими повторами
+    /// Убирает файлы задания, которые появились во время неудачной или прерванной попытки, чтобы они не считались готовой работой. Недописанные (<c>.partial</c>, <c>.tmp</c>) удаляются, остальные переносятся в <c>.failed</c> папки занятия с новым именем, если такое там уже есть: файл мог оказаться не мусором агента, поэтому он не удаляется. Занятый файл (его ещё держит останавливаемый агент) убирается с несколькими повторами
     /// </summary>
     /// <param name="folder">Папка готовых файлов занятия</param>
     /// <param name="number">Номер задания</param>
     /// <param name="before">Файлы задания до попытки</param>
     /// <returns>Задача очистки</returns>
-    private static async Task RemoveNewAsync(string folder, int number, IReadOnlySet<string> before)
+    private static async Task SetAsideNewAsync(string folder, int number, IReadOnlySet<string> before)
     {
         foreach (var file in TaskFiles(folder, number).Where(file => !before.Contains(file)))
         {
+            var unfinished = file.EndsWith(".partial", StringComparison.OrdinalIgnoreCase) || file.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase);
             for (var attempt = 1; ; attempt++)
             {
                 try
                 {
-                    File.Delete(file);
+                    if (unfinished)
+                    {
+                        File.Delete(file);
+                    }
+                    else
+                    {
+                        var failed = Path.Combine(folder, HomeworkStore.FAILED_FOLDER);
+                        Directory.CreateDirectory(failed);
+                        File.Move(file, HomeworkStore.UniquePath(failed, Path.GetFileName(file)));
+                    }
 
                     break;
                 }

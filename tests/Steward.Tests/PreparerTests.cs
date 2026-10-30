@@ -68,7 +68,7 @@ public partial class PreparerTests : IDisposable
     /// Новый подготовщик: как отдельный запуск фоновой задачи
     /// </summary>
     /// <returns>Подготовщик с агентом-заглушкой</returns>
-    private HomeworkPreparer Preparer() => new(_store, _guides, _remarks, _agent.Run);
+    private HomeworkPreparer Preparer() => new(_store, _guides, _remarks, _agent.Run) { Clock = new FixedClock(new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.FromHours(3))) };
 
     /// <summary>
     /// Записывает занятие и его задания
@@ -258,6 +258,31 @@ public partial class PreparerTests : IDisposable
         Assert.Single(report.Failed);
         Assert.Null(_store.SampleCandidate("l1", 1));
         Assert.False(File.Exists(_agent.Leftover));
+        Assert.Equal("половина", File.ReadAllText(Path.Combine(_store.DraftsDirectory("l1"), HomeworkStore.FAILED_FOLDER, "Задание 1. Эссе.md")));
+    }
+
+    /// <summary>
+    /// Файл неудачной попытки не затирает одноимённый файл прошлой неудачи в <c>.failed</c>, а недописанный <c>.partial</c> удаляется, а не откладывается
+    /// </summary>
+    [Fact]
+    public async Task Failed_attempts_never_overwrite_set_aside_files_and_partials_are_deleted()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        var failed = Path.Combine(_store.DraftsDirectory("l1"), HomeworkStore.FAILED_FOLDER);
+        Directory.CreateDirectory(failed);
+        File.WriteAllText(Path.Combine(failed, "Задание 1. Эссе.md"), "прошлая неудача");
+        _agent.Error = "оборвался";
+        _agent.Leftover = Path.Combine(_store.DraftsDirectory("l1"), "Задание 1. Эссе.md");
+        var partial = Path.Combine(_store.DraftsDirectory("l1"), "Задание 1. Эссе.md.partial");
+        _agent.AlsoLeftover = partial;
+
+        await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Equal("прошлая неудача", File.ReadAllText(Path.Combine(failed, "Задание 1. Эссе.md")));
+        Assert.Equal("половина", File.ReadAllText(Path.Combine(failed, "Задание 1. Эссе (2).md")));
+        Assert.False(File.Exists(partial));
+        Assert.Empty(Directory.EnumerateFiles(failed, "*.partial"));
+        Assert.Null(_store.SampleCandidate("l1", 1));
     }
 
     /// <summary>
@@ -460,6 +485,7 @@ public partial class PreparerTests : IDisposable
         Assert.Empty(report.Prepared);
         Assert.False(File.Exists(_agent.HangLeftover));
         Assert.Null(_store.SampleCandidate("l1", 1));
+        Assert.True(File.Exists(Path.Combine(_store.DraftsDirectory("l1"), HomeworkStore.FAILED_FOLDER, "Задание 1.py")));
     }
 
     /// <summary>
@@ -480,6 +506,80 @@ public partial class PreparerTests : IDisposable
         Assert.True(report.Cancelled);
         Assert.False(File.Exists(_agent.HangLeftover));
         Assert.Null(_store.SampleCandidate("l1", 1));
+        Assert.True(File.Exists(Path.Combine(_store.DraftsDirectory("l1"), HomeworkStore.FAILED_FOLDER, "Задание 1.py")));
+    }
+
+    /// <summary>
+    /// Фоновая подготовка берёт только занятия не старше заданного числа дней: занятие ровно на границе готовится, более старое агента не тратит, но образец его сданной работы регистрируется
+    /// </summary>
+    [Fact]
+    public async Task Only_lessons_within_the_age_limit_are_prepared()
+    {
+        AddLesson("recent", 25, """[{"title": "Свежее"}]""");
+        AddLesson("edge", 9, """[{"title": "На границе"}]""");
+        AddLesson("old", 8, """[{"title": "Старое"}, {"title": "Сданное"}]""");
+        AddWork("old", "Задание 2. Сданное.md", "сданная работа");
+        _store.SetSubmitted("old", 2, true);
+
+        var report = await Preparer().RunAsync(10, CancellationToken.None, maxAgeDays: 21);
+
+        Assert.Equal(["Физика, Свежее", "Физика, На границе"], report.Prepared);
+        Assert.Equal(2, _agent.WorkPrompts.Count);
+        Assert.DoesNotContain(_agent.WorkPrompts, prompt => prompt.Contains("Старое", StringComparison.Ordinal));
+        Assert.Null(_store.SampleCandidate("old", 1));
+        Assert.Contains(_guides.Load(), entry => entry.Id == "sample:old:2");
+    }
+
+    /// <summary>
+    /// Кнопка «Подготовить задание» срок не учитывает: старое занятие готовится по просьбе владельца
+    /// </summary>
+    [Fact]
+    public async Task The_manual_button_prepares_an_old_lesson()
+    {
+        var lesson = AddLesson("old", 1, """[{"title": "Старое"}]""");
+
+        var error = await Preparer().PrepareLessonAsync(lesson, _store.ReadItems("old")!, HomeworkFormatEnum.Text, () => string.Empty, null, CancellationToken.None);
+
+        Assert.Equal(string.Empty, error);
+        Assert.NotNull(_store.SampleCandidate("old", 1));
+    }
+
+    /// <summary>
+    /// Если снимок работ LMS не читается, запуск подготовки не падает: отчёт возвращается с ошибкой, и остальные шаги фоновой задачи идут дальше
+    /// </summary>
+    [Fact]
+    public async Task An_unreadable_activity_snapshot_returns_a_failed_report()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        File.WriteAllText(Path.Combine(_root, "activities.json"), """[{"kind": 1.5}]""");
+
+        var report = await Preparer().RunAsync(2, CancellationToken.None);
+
+        Assert.Single(report.Failed);
+        Assert.Empty(_agent.Prompts);
+        Assert.False(report.Busy);
+    }
+
+    /// <summary>
+    /// Пока идёт фоновая подготовка, «Удалить» ничего не удаляет и сообщает об этом; после подготовки удаляет папку работ занятия
+    /// </summary>
+    [Fact]
+    public async Task Deleting_drafts_is_refused_while_a_background_prepare_runs()
+    {
+        AddLesson("l1", 20, """[{"title": "Эссе"}]""");
+        AddWork("l9", "Задание 1.md", "работа");
+        _agent.Gate = new TaskCompletionSource();
+
+        var run = Preparer().RunAsync(2, CancellationToken.None);
+        await _agent.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var refused = Preparer().DeleteDrafts("l9");
+        _agent.Gate.SetResult();
+        await run;
+
+        Assert.Equal(HomeworkPreparer.DELETE_BUSY_MESSAGE, refused);
+        Assert.True(Directory.Exists(_store.DraftsDirectory("l9")));
+        Assert.Equal(string.Empty, Preparer().DeleteDrafts("l9"));
+        Assert.False(Directory.Exists(_store.DraftsDirectory("l9")));
     }
 
     /// <summary>
@@ -504,6 +604,19 @@ public partial class PreparerTests : IDisposable
         {
             File.SetAttributes(attempts, FileAttributes.Normal);
         }
+    }
+
+    /// <summary>
+    /// Часы с постоянным временем
+    /// </summary>
+    /// <param name="now">Текущее время</param>
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        /// <summary>
+        /// Текущее время в UTC
+        /// </summary>
+        /// <returns>Заданное время</returns>
+        public override DateTimeOffset GetUtcNow() => now.ToUniversalTime();
     }
 
     /// <summary>
@@ -535,6 +648,11 @@ public partial class PreparerTests : IDisposable
         /// Файл, который агент оставляет перед ошибкой, или <see langword="null"/>
         /// </summary>
         public string? Leftover { get; set; }
+
+        /// <summary>
+        /// Второй файл, который агент оставляет перед ошибкой, или <see langword="null"/>
+        /// </summary>
+        public string? AlsoLeftover { get; set; }
 
         /// <summary>
         /// Если задано, подготовка ждёт его завершения
@@ -626,6 +744,9 @@ public partial class PreparerTests : IDisposable
 
             if (Leftover is not null)
                 File.WriteAllText(Leftover, "половина");
+
+            if (AlsoLeftover is not null)
+                File.WriteAllText(AlsoLeftover, "хвост");
 
             if (Error.Length > 0)
                 return Error;

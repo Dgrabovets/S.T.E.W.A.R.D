@@ -131,7 +131,7 @@ internal static class Program
                     summary += "\n" + await ExtractAsync(settings, store);
                     var (prepareSummary, notices) = await PrepareAsync(settings, store);
                     summary += "\n" + prepareSummary;
-                    summary += "\n" + await PublishAsync(settings, store);
+                    summary += "\n" + await PublishSafelyAsync(settings, store);
                     Log(summary);
 
                     // Строки «Готова работа: …» уже напечатаны по мере готовности; в сводку статуса они идут для уведомления в трее
@@ -354,7 +354,7 @@ internal static class Program
     }
 
     /// <summary>
-    /// Готовит работы по найденным несданным заданиям, не больше <see cref="LmsSettings.MaxPreparePerRun"/> за запуск и не дольше <see cref="LmsSettings.PrepareBudgetMinutes"/>, и сразу их проверяет.
+    /// Готовит работы по найденным несданным заданиям занятий не старше <see cref="LmsSettings.PrepareMaxAgeDays"/> дней, не больше <see cref="LmsSettings.MaxPreparePerRun"/> за запуск и не дольше <see cref="LmsSettings.PrepareBudgetMinutes"/>, и сразу их проверяет.
     /// По каждой готовой работе сразу пишет строку «Готова работа: предмет, задание». Если срок вышел, агент останавливается, готовое сохраняется, а запуск идёт дальше как обычный
     /// </summary>
     /// <param name="settings">Настройки: сколько работ готовить и сколько минут даётся шагу</param>
@@ -364,7 +364,7 @@ internal static class Program
     {
         var preparer = new HomeworkPreparer(store, new GuideStore(store.Root), new RemarkStore(Path.Combine(store.Root, "remarks")), ClaudeAgent.RunAsync);
         var budget = TimeSpan.FromMinutes(Math.Max(settings.PrepareBudgetMinutes, 1));
-        var report = await preparer.RunWithBudgetAsync(settings.MaxPreparePerRun, budget, work => Log(HomeworkPreparer.NOTICE + work), CancellationToken.None);
+        var report = await preparer.RunWithBudgetAsync(settings.MaxPreparePerRun, budget, work => Log(HomeworkPreparer.NOTICE + work), CancellationToken.None, settings.PrepareMaxAgeDays);
         if (report.Busy)
             return ("Подготовка работ: уже идёт в другом запуске", []);
 
@@ -482,6 +482,32 @@ internal static class Program
         written += await new HomeworkWorkLinker(store, singularity, TimeProvider.System, Log, dryRun).RunAsync(timeout.Token);
 
         return settings.CreateTasks ? $"Заметки и работы в Singularity: записано {written}" : "Заметки и работы: запись в Singularity выключена";
+    }
+
+    /// <summary>
+    /// Публикует заметки и работы так, что сбой или истёкший срок публикации не роняет запуск: итог статуса с уведомлениями о готовых работах всё равно записывается
+    /// </summary>
+    /// <param name="settings">Настройки: подключение к SingularityApp и разрешение на запись</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <returns>Строка итога для статуса</returns>
+    private static async Task<string> PublishSafelyAsync(LmsSettings settings, HomeworkStore store)
+    {
+        try
+        {
+            return await PublishAsync(settings, store);
+        }
+        catch (OperationCanceledException)
+        {
+            Log("Заметки и работы: вышло время публикации (5 мин), остальное в следующем запуске");
+
+            return "Заметки и работы: остановлено по сроку";
+        }
+        catch (Exception exception)
+        {
+            Log($"Заметки и работы: не удалось: {exception.GetType().Name}: {exception.Message}");
+
+            return "Заметки и работы: ошибка, повтор в следующем запуске";
+        }
     }
 
     /// <summary>

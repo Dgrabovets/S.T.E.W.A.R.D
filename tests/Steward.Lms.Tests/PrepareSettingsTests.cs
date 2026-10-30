@@ -23,4 +23,19 @@ public class PrepareSettingsTests
         Assert.Equal(5, set.MaxPreparePerRun);
         Assert.Equal(20, old.PrepareBudgetMinutes);
     }
+
+    /// <summary>
+    /// Старый файл настроек без срока автоподготовки даёт 21 день, а заданное значение читается
+    /// </summary>
+    [Fact]
+    public void PrepareMaxAgeDays_defaults_to_21_and_is_read_from_the_file()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+
+        var old = JsonSerializer.Deserialize<LmsSettings>("""{"login": "x", "maxPreparePerRun": 3}""", options)!;
+        var set = JsonSerializer.Deserialize<LmsSettings>("""{"prepareMaxAgeDays": 7}""", options)!;
+
+        Assert.Equal(21, old.PrepareMaxAgeDays);
+        Assert.Equal(7, set.PrepareMaxAgeDays);
+    }
 }
