@@ -579,15 +579,18 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private Task RefreshItemsAsync(LessonFormatViewModel lesson)
     {
         bool cached;
-        Task load;
+        int version;
         lock (_pipelineGate)
         {
             cached = _data.ContainsKey(lesson.Id);
-            var version = _pipelineVersions.GetValueOrDefault(lesson.Id) + 1;
+            version = _pipelineVersions.GetValueOrDefault(lesson.Id) + 1;
             _pipelineVersions[lesson.Id] = version;
-            load = LoadLessonAsync(lesson, ItemsReader, PipelineReader, version);
-            Track(load);
         }
+
+        // Чтение запускается вне блокировки кеша: если фоновая часть успеет закончиться сразу, сборка строк возьмёт блокировку сборки, а под блокировкой кеша это давало бы обратный порядок и взаимную блокировку
+        var load = LoadLessonAsync(lesson, ItemsReader, PipelineReader, version);
+        lock (_pipelineGate)
+            Track(load);
 
         // Строки собираются и объявляются вне блокировки: подписчики изменений не должны выполняться под ней
         if (cached)
@@ -1361,8 +1364,10 @@ public sealed class HomeworkFormatsViewModel : Bindable
         UpdateSubjects();
 
         // Свежий порядок применяется один раз, когда прочитаны все занятия этого обновления
+        // Пересортировка тоже запускается вне блокировки кеша: если чтения уже закончились, она выполняется сразу
+        var reorder = ReorderAfterAsync(loads);
         lock (_pipelineGate)
-            Track(ReorderAfterAsync(loads));
+            Track(reorder);
 
         LessonFormatViewModel BuildRow((Lesson Lesson, HomeworkFormatEnum Format) item)
         {
