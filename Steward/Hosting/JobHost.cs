@@ -287,6 +287,11 @@ public sealed class JobHost : IDisposable
         {
             return exception.Message;
         }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Список материалов занят или не читается: прежний список цел, ссылка не записана
+            return "Список материалов недоступен, ссылка не записана: " + exception.Message;
+        }
     }
 
     /// <summary>
@@ -370,6 +375,11 @@ public sealed class JobHost : IDisposable
         {
             return exception.Message;
         }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Список материалов занят или не читается: прежний список цел, папка не записана
+            return "Список материалов недоступен, папка не записана: " + exception.Message;
+        }
     }
 
     /// <summary>
@@ -377,13 +387,35 @@ public sealed class JobHost : IDisposable
     /// </summary>
     /// <param name="id">Ключ записи</param>
     /// <param name="enabled">Учитывать материал</param>
-    public void SetGuideEnabled(string id, bool enabled) => _guides.SetEnabled(id, enabled);
+    public void SetGuideEnabled(string id, bool enabled)
+    {
+        try
+        {
+            _guides.SetEnabled(id, enabled);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Список материалов занят или не читается: прежний список цел, галочка не сохранится до следующей попытки
+            System.Diagnostics.Trace.TraceError($"Галочка материала {id}: {exception}");
+        }
+    }
 
     /// <summary>
     /// Убирает материал предмета
     /// </summary>
     /// <param name="id">Ключ записи</param>
-    public void RemoveGuide(string id) => _guides.Remove(id);
+    public void RemoveGuide(string id)
+    {
+        try
+        {
+            _guides.Remove(id);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Список материалов занят или не читается: прежний список цел, материал остаётся в списке
+            System.Diagnostics.Trace.TraceError($"Удаление материала {id}: {exception}");
+        }
+    }
 
     /// <summary>
     /// Читает подробный разбор занятия

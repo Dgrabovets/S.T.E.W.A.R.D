@@ -411,7 +411,15 @@ internal static class Program
             await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, items[number - 1], number, store.FormatFor(lessonId), configured.ProjectId, offset, drafts), CancellationToken.None);
         }
 
-        store.MarkCreated([externalId]);
+        try
+        {
+            store.MarkCreated([externalId]);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Задача уже в Singularity: повтор её не заведёт, потому что ключ найдётся в списке задач
+            Log($"Отметка о задаче не записалась: {exception.Message}");
+        }
 
         return known.Contains(externalId) ? $"Задача по заданию уже была в Singularity: {items[number - 1].Title}" : $"Задача заведена в Singularity: {items[number - 1].Title}";
     }
@@ -453,7 +461,16 @@ internal static class Program
             else
                 await singularity.CreateTaskAsync(AnalysisNote.Build(lesson, analysis, configured.ProjectId, offset), CancellationToken.None);
 
-            store.MarkCreated(["note:" + lesson.Id]);
+            try
+            {
+                store.MarkCreated(["note:" + lesson.Id]);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // Заметка уже записана: следующий запуск обновит её, а не заведёт вторую
+                Log($"Отметка о заметке не записалась: {exception.Message}");
+            }
+
             written++;
         }
 

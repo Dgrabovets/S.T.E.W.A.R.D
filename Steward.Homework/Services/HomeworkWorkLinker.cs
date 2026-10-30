@@ -69,7 +69,7 @@ public sealed class HomeworkWorkLinker(HomeworkStore store, ISingularityNotes no
                 continue;
             }
 
-            store.MarkCreated([work.Mark]);
+            HomeworkTaskCreator.TryMark(store, [work.Mark], log);
             log($"Добавил ссылку на готовую работу в задачу: {work.Item.Title}");
             written++;
         }

@@ -272,15 +272,15 @@ public sealed class HomeworkStore(string directory)
     /// Запоминает ключи задач, которые созданы или уже были в SingularityApp
     /// </summary>
     /// <param name="externalIds">Ключи задач</param>
+    /// <exception cref="IOException">Файл занят дольше ожидания или не читается: прежние ключи целы, новые не записаны</exception>
     public void MarkCreated(IEnumerable<string> externalIds)
     {
-        var all = LoadCreated().Union(externalIds).Order(StringComparer.Ordinal).ToList();
-
-        Directory.CreateDirectory(directory);
-
-        var temp = CreatedFile + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(all, Json));
-        File.Move(temp, CreatedFile, overwrite: true);
+        var added = externalIds.ToList();
+        Locked(() =>
+        {
+            var all = (JsonFiles.ReadForWrite<List<string>>(CreatedFile, Json) ?? []).Union(added).Order(StringComparer.Ordinal).ToList();
+            WriteAtomic(CreatedFile, all);
+        });
     }
 
     /// <summary>
@@ -857,7 +857,7 @@ public sealed class HomeworkStore(string directory)
     /// <exception cref="IOException">Файл занят другим процессом дольше ожидания или не записался</exception>
     private void SetItemState(string lessonId, int number, string? state) => Locked(() =>
     {
-        var states = new Dictionary<string, string>(Read<Dictionary<string, string>>(ItemStatesFile) ?? [], StringComparer.Ordinal);
+        var states = new Dictionary<string, string>(JsonFiles.ReadForWrite<Dictionary<string, string>>(ItemStatesFile, Json) ?? [], StringComparer.Ordinal);
         if (state is not null)
             states[ItemKey(lessonId, number)] = state;
         else
@@ -1046,9 +1046,10 @@ public sealed class HomeworkStore(string directory)
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии, с единицы</param>
+    /// <exception cref="IOException">Файл подтверждений не читается или не записался: прежние подтверждения целы</exception>
     private void ConfirmCore(string lessonId, int number)
     {
-        var keys = new HashSet<string>(Read<List<string>>(ItemConfirmedFile) ?? [], StringComparer.Ordinal) { ItemKey(lessonId, number) };
+        var keys = new HashSet<string>(JsonFiles.ReadForWrite<List<string>>(ItemConfirmedFile, Json) ?? [], StringComparer.Ordinal) { ItemKey(lessonId, number) };
         WriteAtomic(ItemConfirmedFile, keys.Order(StringComparer.Ordinal).ToList());
     }
 
@@ -1062,7 +1063,7 @@ public sealed class HomeworkStore(string directory)
     /// <exception cref="IOException">Файл занят дольше ожидания или не записался</exception>
     public void SetOverride(string lessonId, int number, string title, string requirements) => Locked(() =>
     {
-        var overrides = new Dictionary<string, ItemOverride>(Read<Dictionary<string, ItemOverride>>(ItemOverridesFile) ?? [], StringComparer.Ordinal)
+        var overrides = new Dictionary<string, ItemOverride>(JsonFiles.ReadForWrite<Dictionary<string, ItemOverride>>(ItemOverridesFile, Json) ?? [], StringComparer.Ordinal)
         {
             [ItemKey(lessonId, number)] = new ItemOverride(title.Trim(), requirements.Trim()),
         };

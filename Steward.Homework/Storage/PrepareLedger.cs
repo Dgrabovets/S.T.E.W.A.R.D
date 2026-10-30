@@ -5,7 +5,7 @@ namespace Steward.Homework.Storage;
 
 /// <summary>
 /// Учёт автоподготовки: попытки подряд после ошибки агента (<c>prepare-attempts.json</c>) и задания, чья сданная работа уже стала образцом (<c>sample-registered.json</c>).
-/// Каждое изменение идёт под общей блокировкой процессов и пишется атомарно через временный файл с уникальным именем. Нет файла или он испорчен: учёт пуст
+/// Каждое изменение идёт под общей блокировкой процессов и пишется атомарно через временный файл с уникальным именем. Нет файла: учёт пуст. Перед изменением испорченный файл откладывается в <c>.bad</c>, а нечитаемый из-за сбоя не перезаписывается
 /// </summary>
 /// <param name="directory">Папка домашних заданий</param>
 internal sealed class PrepareLedger(string directory)
@@ -55,7 +55,7 @@ internal sealed class PrepareLedger(string directory)
     /// <exception cref="IOException">Файл занят другим процессом или недоступен</exception>
     public void SetAttempts(string key, int count) => FileLock.Run(directory, LOCK_PREFIX, () =>
     {
-        var attempts = new Dictionary<string, int>(Read<Dictionary<string, int>>(AttemptsFile) ?? [], StringComparer.Ordinal);
+        var attempts = new Dictionary<string, int>(JsonFiles.ReadForWrite<Dictionary<string, int>>(AttemptsFile, Json) ?? [], StringComparer.Ordinal);
         if (count > 0)
             attempts[key] = count;
         else if (!attempts.Remove(key))
@@ -80,7 +80,7 @@ internal sealed class PrepareLedger(string directory)
     /// <exception cref="IOException">Файл занят другим процессом или недоступен</exception>
     public void MarkSample(string key) => FileLock.Run(directory, LOCK_PREFIX, () =>
     {
-        var keys = new SortedSet<string>(Read<List<string>>(SamplesFile) ?? [], StringComparer.Ordinal);
+        var keys = new SortedSet<string>(JsonFiles.ReadForWrite<List<string>>(SamplesFile, Json) ?? [], StringComparer.Ordinal);
         if (keys.Add(key))
             Write(SamplesFile, keys);
     });

@@ -74,16 +74,34 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
                 }
 
                 handled.Add(externalId);
-                store.MarkCreated([externalId]);
+                TryMark(store, [externalId], log);
                 log($"ДЗ: {item.Title} ({lesson.Title})");
                 created++;
             }
         }
 
         if (!dryRun)
-            store.MarkCreated(handled);
+            TryMark(store, handled, log);
 
         return (created, existing);
+    }
+
+    /// <summary>
+    /// Запоминает ключи задач, не роняя запуск: если файл отметок занят или не читается, прежние отметки целы, а повтор задачи на следующем запуске не даст список задач Singularity, где она уже есть
+    /// </summary>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <param name="externalIds">Ключи задач</param>
+    /// <param name="log">Журнал</param>
+    internal static void TryMark(HomeworkStore store, IReadOnlyList<string> externalIds, Action<string> log)
+    {
+        try
+        {
+            store.MarkCreated(externalIds);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            log($"Отметка о задачах не записалась, повторю при следующем запуске: {exception.Message}");
+        }
     }
 
     /// <summary>

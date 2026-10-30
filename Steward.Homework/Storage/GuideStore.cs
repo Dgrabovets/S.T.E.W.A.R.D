@@ -84,6 +84,13 @@ public sealed partial class GuideStore(string directory)
     }
 
     /// <summary>
+    /// Читает список перед изменением под блокировкой. Испорченный список откладывается в <c>guides.json.bad</c>, а нечитаемый из-за сбоя не перезаписывается пустым
+    /// </summary>
+    /// <returns>Материалы в порядке добавления; пусто, если файла нет или он был испорчен</returns>
+    /// <exception cref="IOException">Список не удалось прочитать: изменение не записывается</exception>
+    private List<GuideEntry> LoadForWrite() => JsonFiles.ReadForWrite<List<GuideEntry>>(ListFile, Json) ?? [];
+
+    /// <summary>
     /// Материалы для подготовки заданий. Они общие для всех предметов: один набор методических указаний и образцов подходит к любому предмету
     /// </summary>
     /// <param name="subject">Название предмета. Не влияет на выбор, оставлено для совместимости</param>
@@ -165,7 +172,8 @@ public sealed partial class GuideStore(string directory)
             throw new FileNotFoundException("Файл не найден", file);
 
         var id = SampleId(lessonId, number);
-        var previous = Load().FirstOrDefault(entry => entry.Id == id);
+        var all = LoadForWrite();
+        var previous = all.FirstOrDefault(entry => entry.Id == id);
         var previousExists = previous is { Path.Length: > 0 } && File.Exists(previous.Path);
         if (previous is { Manual: true } && previousExists && !fromUser)
             return previous;
@@ -194,7 +202,7 @@ public sealed partial class GuideStore(string directory)
         }
 
         var entry = new GuideEntry(id, subject, GuideKindEnum.Example, Path.GetFileName(target), target, string.Empty, string.Empty, Enabled: previous?.Enabled ?? true, Manual: fromUser, Added: unchanged ? previous!.Added : DateTime.UtcNow);
-        Write([.. Load().Where(item => item.Id != id), entry]);
+        Write([.. all.Where(item => item.Id != id), entry]);
 
         // Прежний файл с другим расширением больше не нужен
         if (previous is not null && previous.Path.Length > 0 && !string.Equals(Path.GetFullPath(previous.Path), target, StringComparison.OrdinalIgnoreCase) && IsInside(previous.Path, SamplesFolder) && File.Exists(previous.Path))
@@ -297,7 +305,7 @@ public sealed partial class GuideStore(string directory)
     /// </summary>
     /// <param name="id">Ключ записи</param>
     /// <param name="enabled">Учитывать материал</param>
-    public void SetEnabled(string id, bool enabled) => Locked(() => Write([.. Load().Select(item => item.Id == id ? item with { Enabled = enabled } : item)]));
+    public void SetEnabled(string id, bool enabled) => Locked(() => Write([.. LoadForWrite().Select(item => item.Id == id ? item with { Enabled = enabled } : item)]));
 
     /// <summary>
     /// Убирает материал из списка. Файл, который приложение скопировало к себе, удаляется, оригиналы по ссылке не трогаются
@@ -305,7 +313,7 @@ public sealed partial class GuideStore(string directory)
     /// <param name="id">Ключ записи</param>
     public void Remove(string id) => Locked(() =>
     {
-        var all = Load();
+        var all = LoadForWrite();
         var entry = all.FirstOrDefault(item => item.Id == id);
         if (entry is null)
             return;
@@ -539,7 +547,7 @@ public sealed partial class GuideStore(string directory)
     /// <returns>Та же запись</returns>
     private GuideEntry Save(GuideEntry entry)
     {
-        Locked(() => Write([.. Load(), entry]));
+        Locked(() => Write([.. LoadForWrite(), entry]));
 
         return entry;
     }
@@ -551,7 +559,7 @@ public sealed partial class GuideStore(string directory)
     /// <returns>Та же запись</returns>
     private GuideEntry Replace(GuideEntry entry)
     {
-        Locked(() => Write([.. Load().Select(item => item.Id == entry.Id ? entry : item)]));
+        Locked(() => Write([.. LoadForWrite().Select(item => item.Id == entry.Id ? entry : item)]));
 
         return entry;
     }

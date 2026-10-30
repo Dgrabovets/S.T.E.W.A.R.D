@@ -552,7 +552,16 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
 
         // Остальные задания отмечены сданными: агент выполняет только это, нумерация сохраняется
         var single = items.Select((item, index) => item with { Done = index != number - 1 }).ToArray();
-        _ledger.SetAttempts(key, attempts + 1);
+        try
+        {
+            _ledger.SetAttempts(key, attempts + 1);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Без засчитанной попытки агент не запускается: иначе сбой процесса не ограничили бы три попытки. Задание пропускается, запуск идёт дальше
+            return "учёт попыток недоступен, задание пропущено: " + exception.Message;
+        }
+
         var (_, error) = await DraftBuilder.BuildAsync(store, lesson, single, format, agent, cancellationToken, materials, string.Empty, assignments, owner);
         if (cancellationToken.IsCancellationRequested)
         {
