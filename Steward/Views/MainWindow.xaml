@@ -246,7 +246,18 @@
         </Style>
     </Window.Resources>
 
-    <Border x:Name="Frame" Style="{StaticResource WindowChrome}" CornerRadius="{StaticResource RadiusSystemWindow}">
+    <Border x:Name="Frame" CornerRadius="{StaticResource RadiusSystemWindow}">
+        <Border.Style>
+            <Style TargetType="Border" BasedOn="{StaticResource WindowChrome}">
+                <Style.Triggers>
+                    <!-- Развёрнутое окно упирается в края экрана: рамка заметнее и без скруглений, чтобы было видно, где оно кончается -->
+                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                        <Setter Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                        <Setter Property="CornerRadius" Value="0"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
