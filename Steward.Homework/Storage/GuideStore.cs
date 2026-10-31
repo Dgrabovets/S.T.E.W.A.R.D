@@ -503,7 +503,12 @@ public sealed partial class GuideStore(string directory)
         var guides = Files(GuideKindEnum.Guide);
         var examples = Files(GuideKindEnum.Example);
 
-        return new GuideMaterials(guides, examples, [.. directories]);
+        // Оформление измеряется по самим файлам образцов Word, а не по их текстовым копиям: в копиях оформления нет
+        var originals = entries.Where(item => item.Kind == GuideKindEnum.Example)
+            .SelectMany(item => Directory.Exists(item.Path) ? Directory.EnumerateFiles(item.Path, "*.docx", SearchOption.AllDirectories).Take(FOLDER_LIMIT) : [item.Path])
+            .Where(file => file.EndsWith(".docx", StringComparison.OrdinalIgnoreCase));
+
+        return new GuideMaterials(guides, examples, [.. directories], Services.WordStyle.Measure(originals));
     }
 
     /// <summary>
@@ -698,7 +703,8 @@ public sealed partial class GuideStore(string directory)
 /// <param name="Guides">Читаемые файлы методических указаний</param>
 /// <param name="Examples">Читаемые файлы образцов</param>
 /// <param name="Directories">Папки, к которым агенту нужен доступ на чтение</param>
-public sealed record GuideMaterials(IReadOnlyList<string> Guides, IReadOnlyList<string> Examples, IReadOnlyList<string> Directories)
+/// <param name="Style">Оформление Word, измеренное по образцам владельца (шрифт, размер, интервал, поля). Пусто, если образцов Word нет или измерить их не удалось</param>
+public sealed record GuideMaterials(IReadOnlyList<string> Guides, IReadOnlyList<string> Examples, IReadOnlyList<string> Directories, Services.WordStyle? Style = null)
 {
     /// <summary>
     /// Материалов нет

@@ -17,14 +17,15 @@ public static class OfficeWriter
     private const string SLIDES_TEMPLATE = "Steward.Homework.Templates.slides-template.pptx";
 
     /// <summary>
-    /// Пишет документ Word: заголовки крупным жирным шрифтом, абзацы, пункты списка, жирный текст и курсив. Если текст начинается с блока оформления, применяются его шрифт, размер, интервал, поля, выравнивание и красная строка, а строки «&lt;center&gt;» и «&lt;pagebreak&gt;» дают титульный лист и разрывы страниц
+    /// Пишет документ Word: заголовки жирным (названия разделов по центру, заголовки пунктов с красной строки), абзацы, пункты списка, таблицы с рамками, подписи «Таблица …» и «Рисунок …», жирный текст и курсив. Если текст начинается с блока оформления, применяются его шрифт, размер, интервал, поля, выравнивание и красная строка; чего в блоке нет, берётся из оформления образцов владельца, а затем из обычного оформления учебных работ. Строки «&lt;center&gt;» и «&lt;pagebreak&gt;» дают титульный лист и разрывы страниц
     /// </summary>
     /// <param name="path">Куда записать .docx</param>
     /// <param name="markdown">Текст работы в Markdown</param>
-    public static void WriteWord(string path, string markdown)
+    /// <param name="fallback">Оформление, которое берётся там, где текст его не задал: измеренное по образцам владельца. Пусто: обычное оформление учебных работ</param>
+    public static void WriteWord(string path, string markdown, WordStyle? fallback = null)
     {
-        var style = WordStyle.Extract(markdown, out var text);
-        var basePt = style.SizePt ?? 11;
+        var style = WordStyle.Extract(markdown, out var text).Over(fallback ?? WordStyle.Academic).Over(WordStyle.Academic);
+        var basePt = style.SizePt ?? 14;
         using var document = WordprocessingDocument.Create(path, WordprocessingDocumentType.Document);
         var main = document.AddMainDocumentPart();
         var body = new Body();
@@ -45,14 +46,30 @@ public static class OfficeWriter
             switch (block.Kind)
             {
                 case MarkdownBlocks.BlockKind.Heading:
+                    // Как в образцах и указаниях: заголовок того же размера, что и текст, жирный; названия разделов по центру, заголовки пунктов с красной строки, без точки в конце, до и после пустая строка
                     properties.ParagraphStyleId = new ParagraphStyleId { Val = block.Level == 1 ? "Title" : $"Heading{Math.Min(block.Level - 1, 3)}" };
-                    properties.SpacingBetweenLines = new SpacingBetweenLines { Before = "240", After = "120", Line = line, LineRule = LineSpacingRuleValues.Auto };
-                    size = style.SizePt is { } baseSize ? baseSize + (block.Level == 1 ? 2 : block.Level == 2 ? 1 : 0) : block.Level switch { 1 => 20, 2 => 16, _ => 13 };
+                    properties.KeepNext = new KeepNext();
+                    properties.SpacingBetweenLines = new SpacingBetweenLines { Before = "240", After = "240", Line = line, LineRule = LineSpacingRuleValues.Auto };
                     bold = true;
-                    if (style.Justify)
+                    if (block.Level == 1)
+                    {
+                        properties.Indentation = new Indentation { FirstLine = "0" };
                         properties.Justification = new Justification { Val = JustificationValues.Center };
+                    }
+                    else
+                    {
+                        properties.Indentation = new Indentation { FirstLine = ((int)((style.IndentMm ?? 12.5) * 56.7)).ToString(System.Globalization.CultureInfo.InvariantCulture) };
+                        properties.Justification = new Justification { Val = JustificationValues.Left };
+                    }
 
                     break;
+                case MarkdownBlocks.BlockKind.Table:
+                    body.AppendChild(Table(block.Rows ?? [], style));
+
+                    // Пустая строка после таблицы, чтобы следующий текст не прилипал к рамке
+                    body.AppendChild(new Paragraph(new ParagraphProperties(new SpacingBetweenLines { After = "0", Line = "240", LineRule = LineSpacingRuleValues.Auto })));
+
+                    continue;
                 case MarkdownBlocks.BlockKind.Center:
                     properties.SpacingBetweenLines = new SpacingBetweenLines { After = "120", Line = line, LineRule = LineSpacingRuleValues.Auto };
                     properties.Justification = new Justification { Val = JustificationValues.Center };
@@ -60,18 +77,35 @@ public static class OfficeWriter
                 case MarkdownBlocks.BlockKind.Bullet:
                     properties.Indentation = new Indentation { Left = "567", Hanging = "283" };
                     properties.SpacingBetweenLines = new SpacingBetweenLines { After = "60", Line = line, LineRule = LineSpacingRuleValues.Auto };
-                    if (style.Justify)
+                    if (style.Justify == true)
                         properties.Justification = new Justification { Val = JustificationValues.Both };
 
                     paragraph.AppendChild(Run("•\t", size, false, false, style.Font));
                     break;
                 default:
-                    properties.SpacingBetweenLines = new SpacingBetweenLines { After = "140", Line = line, LineRule = LineSpacingRuleValues.Auto };
-                    if (style.IndentMm is { } indent)
-                        properties.Indentation = new Indentation { FirstLine = ((int)(indent * 56.7)).ToString(System.Globalization.CultureInfo.InvariantCulture) };
+                    properties.SpacingBetweenLines = new SpacingBetweenLines { After = "0", Line = line, LineRule = LineSpacingRuleValues.Auto };
 
-                    if (style.Justify)
-                        properties.Justification = new Justification { Val = JustificationValues.Both };
+                    // Подписи «Таблица …» и «Рисунок …» оформляются как в указаниях: таблица слева без красной строки над таблицей, рисунок по центру под рисунком
+                    var plain = MarkdownBlocks.Plain(block.Text);
+                    if (plain.StartsWith("Таблица ", StringComparison.Ordinal))
+                    {
+                        properties.Indentation = new Indentation { FirstLine = "0" };
+                        properties.Justification = new Justification { Val = JustificationValues.Left };
+                        properties.KeepNext = new KeepNext();
+                    }
+                    else if (plain.StartsWith("Рисунок ", StringComparison.Ordinal))
+                    {
+                        properties.Indentation = new Indentation { FirstLine = "0" };
+                        properties.Justification = new Justification { Val = JustificationValues.Center };
+                    }
+                    else
+                    {
+                        if (style.IndentMm is { } indent)
+                            properties.Indentation = new Indentation { FirstLine = ((int)(indent * 56.7)).ToString(System.Globalization.CultureInfo.InvariantCulture) };
+
+                        if (style.Justify == true)
+                            properties.Justification = new Justification { Val = JustificationValues.Both };
+                    }
 
                     break;
             }
@@ -152,6 +186,54 @@ public static class OfficeWriter
         }
 
         File.WriteAllBytes(path, buffer.ToArray());
+    }
+
+    /// <summary>
+    /// Собирает таблицу Word: тонкие рамки, шапка жирным по центру, текст на два пункта мельче основного через одинарный интервал
+    /// </summary>
+    /// <param name="rows">Строки таблицы, первая шапка</param>
+    /// <param name="style">Оформление документа</param>
+    /// <returns>Таблица</returns>
+    private static DocumentFormat.OpenXml.Wordprocessing.Table Table(IReadOnlyList<IReadOnlyList<string>> rows, WordStyle style)
+    {
+        var size = Math.Max((style.SizePt ?? 14) - 2, 8);
+        var border = BorderValues.Single;
+        var table = new DocumentFormat.OpenXml.Wordprocessing.Table(new TableProperties(
+            new TableWidth { Width = "5000", Type = TableWidthUnitValues.Pct },
+            new TableBorders(
+                new TopBorder { Val = border, Size = 4 },
+                new BottomBorder { Val = border, Size = 4 },
+                new LeftBorder { Val = border, Size = 4 },
+                new RightBorder { Val = border, Size = 4 },
+                new InsideHorizontalBorder { Val = border, Size = 4 },
+                new InsideVerticalBorder { Val = border, Size = 4 }),
+            new TableCellMarginDefault(new TopMargin { Width = "40", Type = TableWidthUnitValues.Dxa }, new BottomMargin { Width = "40", Type = TableWidthUnitValues.Dxa })));
+        var columns = rows.Count == 0 ? 0 : rows.Max(row => row.Count);
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = new TableRow();
+            if (index == 0)
+                row.AppendChild(new TableRowProperties(new TableHeader()));
+
+            for (var column = 0; column < columns; column++)
+            {
+                var text = column < rows[index].Count ? rows[index][column] : string.Empty;
+                var cell = new TableCell(new TableCellProperties(new TableCellWidth { Width = (5000 / Math.Max(columns, 1)).ToString(System.Globalization.CultureInfo.InvariantCulture), Type = TableWidthUnitValues.Pct }));
+                var paragraph = new Paragraph(new ParagraphProperties(
+                    new SpacingBetweenLines { Before = "0", After = "0", Line = "240", LineRule = LineSpacingRuleValues.Auto },
+                    new Indentation { FirstLine = "0" },
+                    new Justification { Val = index == 0 ? JustificationValues.Center : JustificationValues.Left }));
+                foreach (var (piece, isBold, isItalic) in MarkdownBlocks.Runs(text))
+                    paragraph.AppendChild(Run(piece, size, index == 0 || isBold, isItalic, style.Font));
+
+                cell.AppendChild(paragraph);
+                row.AppendChild(cell);
+            }
+
+            table.AppendChild(row);
+        }
+
+        return table;
     }
 
     /// <summary>

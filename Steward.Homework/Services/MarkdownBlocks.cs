@@ -34,6 +34,11 @@ public static partial class MarkdownBlocks
         /// Разрыв страницы: строка «&lt;pagebreak&gt;»
         /// </summary>
         PageBreak,
+
+        /// <summary>
+        /// Таблица: строки вида «| ячейка | ячейка |», вторая строка с чертами «|---|---|» отделяет шапку
+        /// </summary>
+        Table,
     }
 
     /// <summary>
@@ -42,7 +47,8 @@ public static partial class MarkdownBlocks
     /// <param name="Kind">Вид блока</param>
     /// <param name="Level">Уровень заголовка, от 1. Для остальных блоков ноль</param>
     /// <param name="Text">Текст без знаков разметки в начале строки. Жирный текст остаётся в виде <c>**…**</c></param>
-    public sealed record Block(BlockKind Kind, int Level, string Text);
+    /// <param name="Rows">Строки таблицы по ячейкам для блока-таблицы, иначе <see langword="null"/></param>
+    public sealed record Block(BlockKind Kind, int Level, string Text, IReadOnlyList<IReadOnlyList<string>>? Rows = null);
 
     /// <summary>
     /// Делит текст на блоки. Пустые строки и тройные кавычки кода пропускаются
@@ -52,9 +58,27 @@ public static partial class MarkdownBlocks
     public static IReadOnlyList<Block> Parse(string markdown)
     {
         var blocks = new List<Block>();
-        foreach (var raw in markdown.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        var table = new List<IReadOnlyList<string>>();
+        foreach (var raw in markdown.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Append(string.Empty))
         {
             var line = raw.Trim();
+
+            // Подряд идущие строки «| … |» собираются в одну таблицу; строка из одних черт разделяет шапку и тело
+            if (line.Length > 2 && line[0] == '|' && line[^1] == '|')
+            {
+                var cells = line[1..^1].Split('|').Select(cell => cell.Trim()).ToArray();
+                if (!cells.All(cell => cell.Length > 0 && cell.All(symbol => symbol is '-' or ':' or ' ')))
+                    table.Add(cells);
+
+                continue;
+            }
+
+            if (table.Count > 0)
+            {
+                blocks.Add(new Block(BlockKind.Table, 0, string.Empty, [.. table]));
+                table.Clear();
+            }
+
             if (line.Length == 0 || line.StartsWith("```", StringComparison.Ordinal))
                 continue;
 

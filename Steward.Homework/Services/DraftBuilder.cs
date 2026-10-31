@@ -96,7 +96,14 @@ public static partial class DraftBuilder
 
         if (format == HomeworkFormatEnum.Word)
         {
-            text.Append("\nЕсли указания или образцы задают оформление, начни файл с блока между строками «---»: font, size (pt), spacing (межстрочный интервал, например 1.5), margins (мм: лево,верх,право,низ), align (justify), indent (красная строка в мм) и numbers (нумерация страниц внизу: left, center или right). Для титульного листа пиши строки «<center>текст</center>», а между листами ставь строку «<pagebreak>». Выполняй требования к титульному листу, разделам, списку литературы и нумерации, если они есть.");
+            var measured = materials.Style is { } style ? $"\nОформление образцов владельца, измеренное по их файлам Word: {style.Describe()}. Если методические указания не требуют другого, используй именно эти значения. " : "\n";
+            text.Append(measured).Append("Начни файл с блока оформления между строками «---»: font, size (pt), spacing (межстрочный интервал, например 1.5), margins (мм: лево,верх,право,низ), align (justify), indent (красная строка в мм) и numbers (нумерация страниц внизу: left, center или right). Для титульного листа пиши строки «<center>текст</center>», а между листами ставь строку «<pagebreak>». Выполняй требования к титульному листу, разделам, списку литературы и нумерации, если они есть.\n")
+                .Append("Оформляй элементы работы так, как в образцах владельца и указаниях: ")
+                .Append("названия структурных элементов («Содержание», «Введение», «Заключение», «Список литературных источников») пиши заголовком «# …» (по центру, жирным, без точки в конце); заголовки параграфов «## …» (жирным, с красной строки, без точки); ")
+                .Append("основной текст по ширине с красной строкой, без лишних пустых строк и без выделения жирным внутри абзацев; ")
+                .Append("таблицы пиши строками «| ячейка | ячейка |» с шапкой и строкой «|---|---|», над таблицей отдельным абзацем «Таблица N — Название» (слева, без красной строки), в тексте ссылайся на таблицу по номеру; ")
+                .Append("подпись рисунка отдельным абзацем «Рисунок N — Название» под рисунком, по центру; формулы и списки оформляй как в образцах; ")
+                .Append("список литературных источников нумеруй и оформляй по ГОСТу из указаний, ссылки на источники в тексте ставь в квадратных скобках; не выдумывай источники.");
         }
 
         return text.ToString();
@@ -152,7 +159,7 @@ public static partial class DraftBuilder
             string? produced;
             try
             {
-                produced = isCode ? store.SampleCandidate(lesson.Id, number) : Convert(folder, number, items[index].Title, format, resultPath);
+                produced = isCode ? store.SampleCandidate(lesson.Id, number) : Convert(folder, number, items[index].Title, format, resultPath, materials?.Style);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or System.Xml.XmlException or DocumentFormat.OpenXml.Packaging.OpenXmlPackageException)
             {
@@ -186,8 +193,9 @@ public static partial class DraftBuilder
     /// <param name="title">Название задания для имени файла</param>
     /// <param name="format">Формат</param>
     /// <param name="sourcePath">Файл Markdown</param>
+    /// <param name="style">Оформление Word, измеренное по образцам владельца: берётся там, где в тексте работы оформление не задано</param>
     /// <returns>Путь к готовому файлу или <see langword="null"/>, если агент ничего не записал</returns>
-    public static string? Convert(string folder, int number, string title, HomeworkFormatEnum format, string sourcePath)
+    public static string? Convert(string folder, int number, string title, HomeworkFormatEnum format, string sourcePath, WordStyle? style = null)
     {
         if (!File.Exists(sourcePath) || new FileInfo(sourcePath).Length == 0)
             return null;
@@ -201,7 +209,7 @@ public static partial class DraftBuilder
             switch (format)
             {
                 case HomeworkFormatEnum.Word:
-                    OfficeWriter.WriteWord(partial, markdown);
+                    OfficeWriter.WriteWord(partial, markdown, style);
                     break;
                 case HomeworkFormatEnum.Presentation:
                     OfficeWriter.WriteSlides(partial, markdown);
