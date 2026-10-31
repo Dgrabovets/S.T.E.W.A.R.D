@@ -601,6 +601,8 @@ public sealed class TrayHost : IDisposable
         _formats.ConditionFixer = _jobs.FixItemCondition;
         _formats.SampleRegistrar = _jobs.RegisterSubmittedSample;
         _formats.SubmittedFileSetter = _jobs.SetSubmittedFile;
+        _formats.SubjectOptionsReader = _jobs.SubjectOptions;
+        _formats.SubjectOptionsSaver = _jobs.SaveSubjectOptions;
         _formats.RemarkSaver = _jobs.SaveRedoRemark;
         _formats.RemarkLister = _jobs.AllRemarks;
         _formats.RemarkUpdater = _jobs.UpdateRemark;

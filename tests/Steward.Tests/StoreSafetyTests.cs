@@ -163,6 +163,7 @@ public class StoreSafetyTests : IDisposable
         var store = new HomeworkStore(_root);
         store.SetSubjectState("Физика", LessonStateEnum.Fetch);
         store.SetSubjectFormat("Физика", HomeworkFormatEnum.Text);
+        store.SetSubjectAutoPrepare("Физика", true);
         store.SaveLessons([new Lesson("l1", "Физика", new DateOnly(2026, 10, 20))]);
         Directory.CreateDirectory(Path.Combine(_root, "items"));
         File.WriteAllText(store.ItemsPath("l1"), """[{"title": "Эссе"}]""");

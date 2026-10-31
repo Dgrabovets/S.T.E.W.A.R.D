@@ -51,6 +51,7 @@ public partial class PreparerTests : IDisposable
         _agent = new StubAgent();
         _store.SetSubjectState(SUBJECT, LessonStateEnum.Fetch);
         _store.SetSubjectFormat(SUBJECT, HomeworkFormatEnum.Text);
+        _store.SetSubjectAutoPrepare(SUBJECT, true);
     }
 
     /// <summary>
@@ -137,6 +138,7 @@ public partial class PreparerTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "activities.json"), """[{"subject": "Физика", "name": "Работа", "kind": 0, "done": true, "id": "77"}]""");
         _store.SetSubjectState("Химия", LessonStateEnum.Fetch);
         _store.SetSubjectFormat("Химия", HomeworkFormatEnum.Skip);
+        _store.SetSubjectAutoPrepare("Химия", true);
         AddLesson("c1", 21, """[{"title": "Не готовить"}]""", "Химия");
 
         var report = await Preparer().RunAsync(5, CancellationToken.None);

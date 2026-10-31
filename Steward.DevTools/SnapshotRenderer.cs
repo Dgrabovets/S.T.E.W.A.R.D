@@ -178,6 +178,8 @@ public static class SnapshotRenderer
                 [new StatusChipViewModel("Токен бота", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в Instagram", "firefox", PanelToneEnum.Running)],
                 [new StatusChipViewModel("Вход в LMS", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в MTS Link", "сохранён 27.10", PanelToneEnum.Running), new StatusChipViewModel("Запись в Singularity", "выключена", PanelToneEnum.Attention)]);
             main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", (_, _) => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
+            main.Model.Formats.SubjectOptionsReader = subject => subject == "Гейм-дизайн" ? new SubjectOptions(true, TaskSourceEnum.Transcript) : new SubjectOptions();
+            main.Model.Formats.SubjectOptionsSaver = (_, _) => { };
             if (parts.Length > 1 && parts[1].ToLowerInvariant() is "homework" or "transcripts" or "schedule")
                 settleSeconds = 1.0;
 

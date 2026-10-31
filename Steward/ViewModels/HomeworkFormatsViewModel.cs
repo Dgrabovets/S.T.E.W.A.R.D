@@ -1231,6 +1231,16 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public bool HasReadingSpeakers => _reading.Speakers.Count > 0;
 
     /// <summary>
+    /// Читает настройки предмета: автоподготовка и источник заданий. Пусто: настройки по умолчанию
+    /// </summary>
+    public Func<string, SubjectOptions>? SubjectOptionsReader { get; set; }
+
+    /// <summary>
+    /// Записывает настройки предмета. Вызывается в фоне и может выбросить исключение. Пусто: настройки предмета не показываются
+    /// </summary>
+    public Action<string, SubjectOptions>? SubjectOptionsSaver { get; set; }
+
+    /// <summary>
     /// Выбранная вкладка читалки. Если в ней нет содержимого, показывается первая из доступных
     /// </summary>
     private ReaderTabEnum _readerTab = ReaderTabEnum.Covered;
@@ -1534,13 +1544,20 @@ public sealed class HomeworkFormatsViewModel : Bindable
                 {
                     subject.Update([.. group]);
 
+                    // Хранилище настроек подключается после создания списка: предметы, созданные раньше, получают настройки при ближайшем обновлении
+                    if (subject.Options is null && SubjectOptionsSaver is { } existing)
+                        subject.Options = new SubjectOptionsViewModel(group.Key, SubjectOptionsReader?.Invoke(group.Key) ?? new SubjectOptions(), existing);
+
                     return subject;
                 }
 
                 var rows = group.ToArray();
                 var format = lessonsByTitle.TryGetValue(group.Key, out var found) ? found : HomeworkFormats.DEFAULT;
 
-                return new SubjectViewModel(group.Key, rows, _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen, format, _subjectFormatChosen, Select);
+                return new SubjectViewModel(group.Key, rows, _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen, format, _subjectFormatChosen, Select)
+                {
+                    Options = SubjectOptionsSaver is { } saver ? new SubjectOptionsViewModel(group.Key, SubjectOptionsReader?.Invoke(group.Key) ?? new SubjectOptions(), saver) : null,
+                };
             })
             .ToList();
 

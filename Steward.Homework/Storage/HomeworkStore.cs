@@ -9,7 +9,7 @@ namespace Steward.Homework.Storage;
 /// Папка домашних заданий: список занятий (его пишет выгрузка из MTS Link) и выбранные форматы (их пишет приложение)
 /// </summary>
 /// <param name="directory">Папка, например <c>data/homework</c></param>
-public sealed class HomeworkStore(string directory)
+public sealed partial class HomeworkStore(string directory)
 {
     /// <summary>
     /// Код вида работы «тест» в файле <c>activities.json</c>: так его пишет выгрузка LMS
@@ -959,13 +959,13 @@ public sealed class HomeworkStore(string directory)
     }
 
     /// <summary>
-    /// Нужно ли искать задания в расшифровке: расшифровка есть, файла заданий нет, а занятие готовится как «Расшифровывать» не в формате «Не готовить»
+    /// Нужно ли искать задания в расшифровке: расшифровка есть, файла заданий нет, занятие готовится как «Расшифровывать» не в формате «Не готовить», а задания предмета не лежат в LMS (их строит <see cref="SyncLmsItems"/> без агента)
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <returns>
     /// <see langword="true"/>, если поиск заданий пора запускать
     /// </returns>
-    public bool ShouldExtract(Lesson lesson) => HasTranscript(lesson.Id) && !File.Exists(ItemsPath(lesson.Id)) && PreparesHomework(lesson);
+    public bool ShouldExtract(Lesson lesson) => HasTranscript(lesson.Id) && !File.Exists(ItemsPath(lesson.Id)) && PreparesHomework(lesson) && TaskSourceFor(lesson.Title) != TaskSourceEnum.Lms;
 
     /// <summary>
     /// Читает работы из LMS, которые выгрузка записала в <c>activities.json</c>
@@ -1157,7 +1157,7 @@ public sealed class HomeworkStore(string directory)
             var hasTranscript = HasTranscript(lesson.Id);
             var transcript = hasTranscript ? ReadTranscript(lesson.Id) : string.Empty;
             var hasReport = File.Exists(CheckReportPath(lesson.Id));
-            var prepares = PreparesHomework(lesson) && SubjectFormatFor(lesson.Title) != HomeworkFormatEnum.Skip;
+            var prepares = PreparesHomework(lesson) && SubjectFormatFor(lesson.Title) != HomeworkFormatEnum.Skip && SubjectOptionsFor(lesson.Title).AutoPrepare;
             var attempts = new PrepareLedger(directory).AllAttempts();
 
             // Папка работ читается один раз на занятие: самый свежий файл задания тот же, что вернул бы SampleCandidate
@@ -1191,7 +1191,7 @@ public sealed class HomeworkStore(string directory)
     /// Подсказка для задания без работы: что будет дальше или почему работа не готовится
     /// </summary>
     /// <param name="attempts">Сколько раз подряд агент не справился</param>
-    /// <param name="prepares">Предмет и занятие готовятся сами</param>
+    /// <param name="prepares">Предмет и занятие готовятся сами: включена автоподготовка предмета, нужная отметка и формат</param>
     /// <returns>Текст подсказки и признак ошибки</returns>
     private static (string Hint, bool Problem) FoundHint(int attempts, bool prepares)
     {
@@ -1199,7 +1199,7 @@ public sealed class HomeworkStore(string directory)
             return ($"Агент не справился {HomeworkPreparer.MAX_ATTEMPTS} раза подряд: подготовь работу кнопкой «Подготовить задание»", true);
 
         if (!prepares)
-            return ("Этот предмет сам не готовится: подготовь работу кнопкой «Подготовить задание»", false);
+            return ("Автоподготовка у предмета выключена: подготовь работу кнопкой «Подготовить задание»", false);
 
         return attempts > 0
             ? ("Прошлая попытка не удалась, повтор при ближайшей выгрузке", true)

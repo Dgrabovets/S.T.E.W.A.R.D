@@ -345,9 +345,11 @@ internal static class Program
     /// <returns>Строка итога для статуса</returns>
     private static async Task<string> ExtractAsync(LmsSettings settings, HomeworkStore store)
     {
+        var fromLms = SyncLmsItems(store);
+        var lmsNote = fromLms > 0 ? $"\nЗадания из LMS: добавлено {fromLms}" : string.Empty;
         var todo = store.LoadLessons().Where(store.ShouldExtract).Take(Math.Max(settings.MaxAnalyzePerRun, 0)).ToArray();
         if (todo.Length == 0)
-            return "Поиск заданий: новых занятий нет";
+            return "Поиск заданий: новых занятий нет" + lmsNote;
 
         var activities = store.LoadActivities();
         var descriptions = activities
@@ -379,7 +381,30 @@ internal static class Program
             done++;
         }
 
-        return $"Поиск заданий: {done} из {todo.Length}";
+        return $"Поиск заданий: {done} из {todo.Length}{lmsNote}";
+    }
+
+    /// <summary>
+    /// Строит карточки заданий для предметов, у которых задания лежат в LMS: без агента, по работам LMS. Сбой записи не роняет запуск
+    /// </summary>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <returns>Сколько заданий добавлено</returns>
+    private static int SyncLmsItems(HomeworkStore store)
+    {
+        try
+        {
+            var added = store.SyncLmsItems(store.LoadLessons());
+            if (added > 0)
+                Log($"Задания из LMS: добавлено {added}");
+
+            return added;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Log($"Задания из LMS не записались: {exception.Message}");
+
+            return 0;
+        }
     }
 
     /// <summary>

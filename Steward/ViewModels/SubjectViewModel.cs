@@ -91,6 +91,11 @@ public sealed class SubjectViewModel : Bindable
     public string Title { get; }
 
     /// <summary>
+    /// Настройки предмета для домашних заданий: автоподготовка и откуда берутся задания. Пусто, пока окно не подключило хранилище
+    /// </summary>
+    public SubjectOptionsViewModel? Options { get; set; }
+
+    /// <summary>
     /// Нажатие на плитку: делает предмет выбранным
     /// </summary>
     public RelayCommand SelectCommand { get; }

@@ -449,7 +449,22 @@ public sealed class JobHost : IDisposable
     public async Task<(int Count, string Error)> PrepareHomeworkAsync(Lesson lesson, PrepareRequest request, CancellationToken cancellationToken)
     {
         var works = _homework.LoadActivities().Where(work => string.Equals(work.Subject, lesson.Title, StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (_homework.ReadItems(lesson.Id) is null)
+        if (_homework.TaskSourceFor(lesson.Title) == TaskSourceEnum.Lms)
+        {
+            // Задания предмета лежат в LMS: карточки строятся по работам LMS без агента и без токенов
+            try
+            {
+                _homework.SyncLmsItems(_homework.LoadLessons());
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return (0, "Не удалось записать задания из LMS: " + exception.Message);
+            }
+
+            if (_homework.ReadItems(lesson.Id) is null)
+                return (0, "Задания этого предмета берутся из LMS и лежат в самом свежем занятии с расшифровкой, а не в этом");
+        }
+        else if (_homework.ReadItems(lesson.Id) is null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_homework.ItemsPath(lesson.Id))!);
 
@@ -838,6 +853,29 @@ public sealed class JobHost : IDisposable
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="format">Выбранный формат</param>
     public void SetHomeworkFormat(string lessonId, HomeworkFormatEnum format) => _homework.SetFormat(lessonId, format);
+
+    /// <summary>
+    /// Читает настройки предмета для домашних заданий
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <returns>Автоподготовка и источник заданий</returns>
+    public SubjectOptions SubjectOptions(string subject) => _homework.SubjectOptionsFor(subject);
+
+    /// <summary>
+    /// Записывает настройки предмета для домашних заданий: изменённое значение, остальное не трогается
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="options">Новые настройки</param>
+    /// <exception cref="IOException">Файл настроек занят или не читается: прежнее содержимое цело</exception>
+    public void SaveSubjectOptions(string subject, SubjectOptions options)
+    {
+        var current = _homework.SubjectOptionsFor(subject);
+        if (current.AutoPrepare != options.AutoPrepare)
+            _homework.SetSubjectAutoPrepare(subject, options.AutoPrepare);
+
+        if (current.TaskSource != options.TaskSource)
+            _homework.SetSubjectTaskSource(subject, options.TaskSource);
+    }
 
     /// <summary>
     /// Запоминает формат заданий по умолчанию для предмета

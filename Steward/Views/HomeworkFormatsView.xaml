@@ -425,6 +425,42 @@
                         <Button Grid.Column="1" Content="Методические указания" Command="{Binding ManageGuidesCommand}" Style="{StaticResource OutlineButton}" BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"/>
                     </Grid>
                 </Border>
+                <Border Padding="14,10" Margin="0,0,0,8" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource Card}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedSubject.Options}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel DataContext="{Binding SelectedSubject.Options}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="Готовить задания автоматически" IsChecked="{Binding AutoPrepare, Mode=TwoWay}" VerticalAlignment="Center"
+                                      ToolTip="Фоновый процесс сам готовит работы по заданиям этого предмета. Кнопка «Подготовить задание» работает всегда"
+                                      AutomationProperties.Name="Готовить задания автоматически"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Откуда задания" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox Style="{StaticResource FieldChoice}" Width="190" ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource, Mode=TwoWay}"
+                                          AutomationProperties.Name="Откуда задания">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Title}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="{Binding SourceHint}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        <TextBlock Text="{Binding Error}" Style="{StaticResource HintError}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                </Border>
                 <StackPanel Margin="0,8,0,0" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
                     <ItemsControl ItemsSource="{Binding SelectedSubject.LessonsWithTranscript}">
                         <ItemsControl.ItemsPanel>

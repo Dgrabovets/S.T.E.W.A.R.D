@@ -406,6 +406,9 @@ public class PipelineTests
         try
         {
             store.SetSubjectState(lesson.Title, LessonStateEnum.Fetch);
+            Assert.Contains("выключена", store.PipelineInfo(lesson)[1].Hint, StringComparison.Ordinal);
+
+            store.SetSubjectAutoPrepare(lesson.Title, true);
             Assert.Contains("сама", store.PipelineInfo(lesson)[1].Hint, StringComparison.Ordinal);
             Assert.False(store.PipelineInfo(lesson)[1].HintIsProblem);
 
@@ -558,6 +561,7 @@ public class PipelineTests
         try
         {
             store.SetSubjectState(lesson.Title, LessonStateEnum.Fetch);
+            store.SetSubjectAutoPrepare(lesson.Title, true);
             var agent = new CountingAgent();
             var preparer = new HomeworkPreparer(store, new GuideStore(folder), new RemarkStore(Path.Combine(folder, "remarks")), agent.Run);
             var model = await ModelOver(store);

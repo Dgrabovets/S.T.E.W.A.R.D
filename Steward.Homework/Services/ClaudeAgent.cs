@@ -67,7 +67,7 @@ public static class ClaudeAgent
     /// <returns>Аргументы <c>--disallowedTools</c> с правилами запрета правки</returns>
     private static IReadOnlyList<string> ReadOnlyRules(string workDirectory, IReadOnlyList<string> extraDirectories, AgentAccessEnum access)
     {
-        string[] stateFiles = ["lesson-states.json", "item-states.json", "item-confirmed.json", "item-overrides.json", "created.json", "prepare-attempts.json", "sample-registered.json", "formats.json", "subject-formats.json", "subject-states.json", "lessons.json", "activities.json"];
+        string[] stateFiles = ["lesson-states.json", "item-states.json", "item-confirmed.json", "item-overrides.json", "created.json", "prepare-attempts.json", "sample-registered.json", "formats.json", "subject-formats.json", "subject-states.json", "subject-options.json", "lessons.json", "activities.json"];
         string[] ownerFolders = ["remarks", "samples", "guides", "assignments", "transcripts"];
         string[] lessonFolders = access == AgentAccessEnum.Draft ? ["items", "analysis"] : ["drafts"];
         string[] draftFolders = access == AgentAccessEnum.Draft ? [HomeworkStore.PREVIOUS_FOLDER, HomeworkStore.FAILED_FOLDER, HomeworkStore.OWNER_FOLDER] : [];

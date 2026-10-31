@@ -516,8 +516,8 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
                 RegisterSample(lesson, number);
         }
 
-        // Предмет и занятие, которые не готовятся («Не готовить», не «Расшифровывать»), и старые занятия агента не тратят
-        if (!fresh || !store.PreparesHomework(lesson) || store.SubjectFormatFor(lesson.Title) == HomeworkFormatEnum.Skip)
+        // Предмет и занятие, которые не готовятся («Не готовить», не «Расшифровывать»), предмет без включённой автоподготовки и старые занятия агента не тратят
+        if (!fresh || !store.PreparesHomework(lesson) || store.SubjectFormatFor(lesson.Title) == HomeworkFormatEnum.Skip || !store.SubjectOptionsFor(lesson.Title).AutoPrepare)
             return;
 
         var format = store.FormatFor(lesson.Id);
