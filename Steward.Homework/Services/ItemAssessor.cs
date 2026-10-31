@@ -70,6 +70,10 @@ public static class ItemAssessor
         if (!evidenceVerified)
             return Ask($"Не нашёл цитату задания «{item.Title}» в расшифровке");
 
+        // Задание без требований и без работы в LMS, в котором агент не уверен до конца, чаще всего оказывается напоминанием, а не новой работой
+        if (confidence != "high" && item.Requirements.Trim().Length == 0 && !(item.ActivityId.Length > 0 && item.ActivityId.All(char.IsAsciiDigit)))
+            return Ask($"У задания «{item.Title}» не названы требования, и оно не связано с работой в LMS: подтверди, что это новое задание");
+
         return confidence == "medium"
             ? new ItemAssessment(ItemReadinessEnum.ReadyWithNote, doubt.Length > 0 ? doubt : "Проверь формулировку")
             : new ItemAssessment(ItemReadinessEnum.Ready, string.Empty);

@@ -64,7 +64,7 @@ public class PipelineTests
     /// Задание с названием и заданными уверенностью, цитатой и сомнением
     /// </summary>
     private static HomeworkItem Item(string confidence, string evidence = "сделайте нормализацию", string doubt = "") =>
-        new("Нормализация", null, string.Empty, string.Empty, Evidence: evidence, Confidence: confidence, Doubt: doubt);
+        new("Нормализация", null, "Две страницы", string.Empty, Evidence: evidence, Confidence: confidence, Doubt: doubt);
 
     /// <summary>
     /// Высокая уверенность и проверенная цитата: работа готовится сама
@@ -142,6 +142,22 @@ public class PipelineTests
     {
         Assert.Equal(ItemReadinessEnum.NeedsConfirmation, ItemAssessor.Assess(Item("banana"), false, true, true, false).Readiness);
         Assert.Equal(ItemReadinessEnum.Ready, ItemAssessor.Assess(Item("banana"), true, true, true, false).Readiness);
+    }
+
+    /// <summary>
+    /// Задание без требований и без работы в LMS, в котором агент не уверен до конца, ждёт подтверждения; с требованиями, с работой LMS или с высокой уверенностью оно готовится
+    /// </summary>
+    [Fact]
+    public void An_item_without_requirements_and_without_an_lms_work_needs_confirmation_unless_it_is_certain()
+    {
+        var bare = Item("medium") with { Requirements = string.Empty };
+
+        Assert.Equal(ItemReadinessEnum.NeedsConfirmation, ItemAssessor.Assess(bare, true, true, true, false).Readiness);
+        Assert.Contains("не названы требования", ItemAssessor.Assess(bare, true, true, true, false).Question, StringComparison.Ordinal);
+        Assert.Equal(ItemReadinessEnum.ReadyWithNote, ItemAssessor.Assess(bare with { Requirements = "Две страницы" }, true, true, true, false).Readiness);
+        Assert.Equal(ItemReadinessEnum.ReadyWithNote, ItemAssessor.Assess(bare with { ActivityId = "1377862" }, true, true, true, false).Readiness);
+        Assert.Equal(ItemReadinessEnum.Ready, ItemAssessor.Assess(Item("high") with { Requirements = string.Empty }, true, true, true, false).Readiness);
+        Assert.Equal(ItemReadinessEnum.Ready, ItemAssessor.Assess(bare, true, true, true, true).Readiness);
     }
 
     /// <summary>
