@@ -16,9 +16,10 @@ public sealed class TaskCardViewModel
     /// <param name="activity">Что показывает индикатор процесса</param>
     /// <param name="activitySince">Когда процесс закончился, если индикатор показывает галочку</param>
     /// <param name="metrics">Показатели под текстом карточки: Docker, контейнер и так далее</param>
+    /// <param name="setEnabled">Действие тумблера: идентификатор задачи и включена ли она. Пусто, если у карточки нет тумблера</param>
     /// <param name="progress">Что сейчас выполняется: шаги и счётчик. Пусто, если процесс не работает или не сообщает прогресс</param>
     /// <param name="openSettings">Действие шестерёнки: открыть страницу процесса с настройками. Пусто, если у процесса нет страницы</param>
-    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default, Action<string>? openSettings = null, IReadOnlyList<StatusTileViewModel>? metrics = null, ProgressCardViewModel? progress = null)
+    public TaskCardViewModel(TaskStatusRow row, Action<string> run, ActivityStateEnum activity = ActivityStateEnum.None, DateTimeOffset activitySince = default, Action<string>? openSettings = null, IReadOnlyList<StatusTileViewModel>? metrics = null, ProgressCardViewModel? progress = null, Action<string, bool>? setEnabled = null)
     {
         Id = row.Id;
         Kind = ActivityKinds.Of(row);
@@ -33,6 +34,9 @@ public sealed class TaskCardViewModel
         CanRun = row.CanRun;
         RunCommand = new RelayCommand(() => run(row.Id), () => row.CanRun);
         Metrics = metrics ?? [];
+        CanSwitch = setEnabled is not null;
+        IsOn = !row.Muted;
+        SwitchCommand = new RelayCommand(() => setEnabled?.Invoke(row.Id, !IsOn));
         Progress = progress;
         HasSettings = openSettings is not null;
         SettingsCommand = new RelayCommand(() => openSettings?.Invoke(row.Id));
@@ -109,7 +113,22 @@ public sealed class TaskCardViewModel
     public bool HasMetrics => Metrics.Count > 0;
 
     /// <summary>
-    /// Что сейчас выполняется: шаги запуска и счётчик
+    /// У карточки есть тумблер «включить или выключить процесс»
+    /// </summary>
+    public bool CanSwitch { get; }
+
+    /// <summary>
+    /// Процесс включён и запускается по расписанию
+    /// </summary>
+    public bool IsOn { get; }
+
+    /// <summary>
+    /// Переключает процесс. Идущий запуск при выключении не прерывается
+    /// </summary>
+    public RelayCommand SwitchCommand { get; }
+
+    /// <summary>
+    /// Что сейчас выполняется: шаги и счётчик
     /// </summary>
     public ProgressCardViewModel? Progress { get; }
 

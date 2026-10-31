@@ -457,6 +457,7 @@ public sealed class TrayHost : IDisposable
         {
             _main = new MainWindow();
             _main.Model.RunRequested += id => _jobs.RunNow(id);
+            _main.Model.SwitchRequested += SetJobEnabled;
             _main.Model.FixRequested += OpenFix;
             _main.Model.ClearJournalRequested += (_, _) => ClearJournal();
             _main.Model.ClearGroupRequested += ClearGroup;
@@ -523,6 +524,23 @@ public sealed class TrayHost : IDisposable
     }
 
     /// <summary>
+    /// Включает или выключает процесс по тумблеру на карточке. Ошибка записи выключателя не роняет приложение: она уходит в журнал трассировки
+    /// </summary>
+    /// <param name="id">Идентификатор задачи</param>
+    /// <param name="enabled">Включить задачу</param>
+    private void SetJobEnabled(string id, bool enabled)
+    {
+        try
+        {
+            _jobs.SetJobEnabled(id, enabled);
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Trace.TraceError($"Не удалось записать выключатель задачи {id}: {exception}");
+        }
+    }
+
+    /// <summary>
     /// Открывает Claude с просьбой починить неудавшийся запуск. Если приложение не открылось, говорит об этом уведомлением
     /// </summary>
     /// <param name="record">Неудавшийся запуск из журнала</param>
@@ -567,7 +585,6 @@ public sealed class TrayHost : IDisposable
     {
         _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
         _main.ApplyHomework(_jobs.HomeworkRows());
-        _main.Model.ApplyDeadlines(_jobs.Deadlines(), DateOnly.FromDateTime(DateTime.Now));
         var root = DataLocation.RepoRootOrStart();
         _main.Model.AttachSettings(root, ApplyMain);
         _main.Model.SetSettingsHome(_jobs.SettingsHomeIds());

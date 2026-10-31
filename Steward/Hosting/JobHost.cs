@@ -113,9 +113,14 @@ public sealed class JobHost : IDisposable
     private readonly JobScheduler _scheduler;
 
     /// <summary>
-    /// Задачи из реестра
+    /// Задачи из реестра с выключателями владельца. Список общий с планировщиком: переключатель действует на следующей же сверке, а запущенный процесс не прерывается
     /// </summary>
-    private readonly IReadOnlyList<JobDefinition> _jobs;
+    private readonly List<JobDefinition> _jobs;
+
+    /// <summary>
+    /// Выключатели задач, которые владелец ставит в окне
+    /// </summary>
+    private readonly JobSwitches _switches;
 
     /// <summary>
     /// Читает реестр и готовит раннер. Запуск начинается в <see cref="Start"/>
@@ -131,7 +136,8 @@ public sealed class JobHost : IDisposable
         _preparer = new HomeworkPreparer(_homework, _guides, _remarks, ClaudeAgent.RunAsync);
 
         var registry = JobRegistry.Load(DataLocation.JobsFile(), DataLocation.FindRepoRoot());
-        _jobs = registry.Jobs;
+        _switches = new JobSwitches(Path.Combine(dataDirectory, "job-switches.json"));
+        _jobs = [.. _switches.Apply(registry.Jobs)];
         RegistryErrors = registry.Errors;
 
         _runner = new JobRunner(_store, dataDirectory);
@@ -186,6 +192,23 @@ public sealed class JobHost : IDisposable
     public bool RunNow(string id) => _scheduler.RunNow(id) is not null;
 
     /// <summary>
+    /// Включает или выключает задачу: выключенная не запускается по расписанию, но запускается вручную. Уже идущий запуск не прерывается
+    /// </summary>
+    /// <param name="id">Идентификатор задачи</param>
+    /// <param name="enabled">Включить задачу</param>
+    /// <exception cref="IOException">Выключатель не записался</exception>
+    public void SetJobEnabled(string id, bool enabled)
+    {
+        var index = _jobs.FindIndex(job => string.Equals(job.Id, id, StringComparison.Ordinal));
+        if (index < 0)
+            return;
+
+        _switches.Set(id, enabled);
+        _jobs[index] = _jobs[index] with { Enabled = enabled };
+        RaiseChanged();
+    }
+
+    /// <summary>
     /// Перестаёт запускать новые задачи. Уже запущенные процессы не трогает: оборванная проверка почты могла бы создать задачи в Singularity и не запомнить письма, а при следующем запуске создать их заново. Зависшие по-прежнему останавливает таймаут
     /// </summary>
     public void Dispose() => _timer.Stop();
@@ -222,12 +245,6 @@ public sealed class JobHost : IDisposable
     /// </summary>
     /// <returns>Задания по занятиям от свежих к старым</returns>
     public IReadOnlyList<HomeworkRow> HomeworkRows() => _homework.LoadRows();
-
-    /// <summary>
-    /// Несданные работы со сроком в ближайшую неделю и просроченные не больше чем на неделю
-    /// </summary>
-    /// <returns>Сроки по возрастанию даты</returns>
-    public IReadOnlyList<Deadline> Deadlines() => _homework.Deadlines(DateOnly.FromDateTime(DateTime.Now), 7, 7);
 
     /// <summary>
     /// Читает текст расшифровки занятия

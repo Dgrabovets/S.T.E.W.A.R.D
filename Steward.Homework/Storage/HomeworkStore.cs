@@ -739,26 +739,6 @@ public sealed partial class HomeworkStore(string directory)
         (Read<Dictionary<string, string>>(ItemStatesFile) ?? []).TryGetValue(ItemKey(lessonId, number), out var state) && state == "archived";
 
     /// <summary>
-    /// Ближайшие сроки несданных работ: из LMS и из найденных в расшифровках заданий. Сданные, отмеченные вручную и убранные в архив не попадают
-    /// </summary>
-    /// <param name="today">Сегодняшняя дата</param>
-    /// <param name="aheadDays">На сколько дней вперёд смотреть</param>
-    /// <param name="overdueDays">Сколько дней после срока ещё напоминать</param>
-    /// <returns>Сроки по возрастанию даты</returns>
-    public IReadOnlyList<Deadline> Deadlines(DateOnly today, int aheadDays, int overdueDays)
-    {
-        var items = new List<(string Subject, HomeworkItem Item)>();
-        foreach (var lesson in LoadLessons())
-        {
-            var skipped = ArchivedNumbers(lesson.Id).Union(SubmittedNumbers(lesson.Id)).ToHashSet();
-            var found = ReadItems(lesson.Id) ?? [];
-            items.AddRange(found.Where((_, index) => !skipped.Contains(index + 1)).Select(item => (lesson.Title, item)));
-        }
-
-        return DeadlineBuilder.Build(LoadActivities(), items, today, aheadDays, overdueDays);
-    }
-
-    /// <summary>
     /// Путь к отчёту о проверке готовой работы. Он лежит в служебной папке, поэтому не попадает в список готовых файлов
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>

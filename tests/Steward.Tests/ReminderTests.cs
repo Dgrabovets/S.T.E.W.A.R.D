@@ -7,40 +7,10 @@ using Steward.ViewModels;
 namespace Steward.Tests;
 
 /// <summary>
-/// Проверяет напоминания о сроках, отметку «сдано», условие для буфера, проверку работы и конспект к практике
+/// Проверяет отметку «сдано», условие для буфера, проверку работы и конспект к практике
 /// </summary>
 public class ReminderTests
 {
-    /// <summary>
-    /// В напоминания попадают несданные работы со сроком в ближайшую неделю и просроченные на неделю; задание из расшифровки не повторяет работу из LMS
-    /// </summary>
-    [Fact]
-    public void Deadlines_show_pending_work_once_and_in_order()
-    {
-        var today = new DateOnly(2026, 10, 28);
-        var works = new[]
-        {
-            new ActivityInfo("Гейм-дизайн", "Задание 5", false, false, Due: new DateOnly(2026, 10, 30), Id: "99"),
-            new ActivityInfo("Гейм-дизайн", "Сданное", false, true, Due: new DateOnly(2026, 10, 29), Id: "98"),
-            new ActivityInfo("Гейм-дизайн", "Тест", true, false, Due: new DateOnly(2026, 10, 29), Id: "97"),
-            new ActivityInfo("Статистика", "Старое", false, false, Due: new DateOnly(2026, 10, 1), Id: "96"),
-        };
-        var items = new (string, HomeworkItem)[]
-        {
-            ("Гейм-дизайн", new HomeworkItem("Баланс", new DateOnly(2026, 10, 30), string.Empty, string.Empty)),
-            ("Статистика", new HomeworkItem("Отчёт", new DateOnly(2026, 10, 27), string.Empty, string.Empty)),
-            ("Статистика", new HomeworkItem("Далёкое", new DateOnly(2026, 12, 1), string.Empty, string.Empty)),
-        };
-
-        var result = DeadlineBuilder.Build(works, items, today, 7, 7);
-
-        Assert.Equal(["Отчёт", "Задание 5"], result.Select(deadline => deadline.Title).ToArray());
-        Assert.Equal("просрочено на 1 дн.", DeadlineBuilder.When(new DateOnly(2026, 10, 27), today));
-        Assert.Equal("сегодня", DeadlineBuilder.When(today, today));
-        Assert.Equal("завтра", DeadlineBuilder.When(today.AddDays(1), today));
-        Assert.Equal("через 5 дн.", DeadlineBuilder.When(today.AddDays(5), today));
-    }
-
     /// <summary>
     /// Отметка «сдано» ставится и снимается, не мешая архиву, а условие для буфера собирается из названия, срока и требований
     /// </summary>

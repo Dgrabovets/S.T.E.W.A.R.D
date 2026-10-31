@@ -38,6 +38,31 @@
             <Setter Property="Padding" Value="7"/>
         </Style>
 
+        <Style x:Key="SwitchToggle" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Track" Width="46" Height="30" BorderThickness="1" BorderBrush="{StaticResource LineStrongBrush}" Background="Transparent" CornerRadius="{StaticResource RadiusField}">
+                            <Ellipse x:Name="Knob" Width="16" Height="16" HorizontalAlignment="Left" Margin="6,0,0,0" Fill="{StaticResource MutedBrush}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,6,0"/>
+                                <Setter TargetName="Knob" Property="Fill" Value="{StaticResource AccentTextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate x:Key="TaskCardTemplate">
                     <Border x:Name="Card" Style="{StaticResource Card}">
                         <Grid>
@@ -72,8 +97,17 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
-                            <Button x:Name="Run" Grid.Column="2" Content="Запустить" Style="{StaticResource ActionButton}" Margin="12,0,0,0"
-                                    VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+                                <ToggleButton Style="{StaticResource SwitchToggle}" IsChecked="{Binding IsOn, Mode=OneWay}" Command="{Binding SwitchCommand}" VerticalAlignment="Top"
+                                              ToolTip="Включить или выключить процесс. Выключенный не запускается сам, идущий запуск не прерывается" AutomationProperties.Name="Процесс включён"
+                                              Visibility="{Binding CanSwitch, Converter={StaticResource BoolToVisibility}}"/>
+                                <Button x:Name="Run" Style="{StaticResource GearButton}" Margin="8,0,0,0" VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"
+                                        ToolTip="Запустить сейчас" AutomationProperties.Name="Запустить сейчас">
+                                    <Canvas Width="16" Height="16">
+                                        <Path Data="M4.5,2.5 L13,8 L4.5,13.5 Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeLineJoin="Round"/>
+                                    </Canvas>
+                                </Button>
+                            </StackPanel>
                             <Button Grid.Column="3" Style="{StaticResource GearButton}" Margin="8,0,0,0" VerticalAlignment="Top" ToolTip="Настройки"
                                     Command="{Binding SettingsCommand}" Visibility="{Binding HasSettings, Converter={StaticResource BoolToVisibility}}">
                                 <Canvas Width="16" Height="16">
@@ -310,30 +344,6 @@
                                     <StackPanel>
                                         <TextBlock Text="В config/jobs.json есть ошибки" Foreground="{StaticResource AttentionBrush}" FontWeight="SemiBold" FontSize="{StaticResource FontSizeBody}"/>
                                         <TextBlock Text="{Binding RegistryErrors}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                                    </StackPanel>
-                                </Border>
-                                <Border Style="{StaticResource Card}" Visibility="{Binding HasDeadlines, Converter={StaticResource BoolToVisibility}}">
-                                    <StackPanel>
-                                        <TextBlock Text="Ближайшие сроки" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
-                                        <ItemsControl ItemsSource="{Binding Deadlines}" Margin="0,8,0,0">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid Margin="0,0,0,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
-                                                            <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Text="{Binding Subject}" Style="{StaticResource TextCaption}" TextTrimming="CharacterEllipsis"/>
-                                                        </StackPanel>
-                                                        <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="10,2" VerticalAlignment="Center" Margin="12,0,0,0" ToolTip="{Binding Date}">
-                                                            <TextBlock Text="{Binding When}" Style="{StaticResource ToneBadgeText}"/>
-                                                        </Border>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
                                     </StackPanel>
                                 </Border>
                                 <ItemsControl ItemsSource="{Binding Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}"/>
