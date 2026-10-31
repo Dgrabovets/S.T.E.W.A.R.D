@@ -193,6 +193,27 @@ public class LmsTests
     }
 
     /// <summary>
+    /// Работа с оценкой считается сданной, даже если состояние написано непривычными словами, а тест в строке без столбца оценки читается и считается непройденным
+    /// </summary>
+    [Fact]
+    public void A_grade_means_submitted_and_a_quiz_row_without_a_grade_column_still_parses()
+    {
+        const string assignments = """
+            <table><tr><td>Тема</td><td><a href="https://lms.ranepa.ru/mod/assign/view.php?id=3001">Задание</a></td><td>-</td><td>Принято преподавателем</td><td>85,00 / 100,00</td></tr></table>
+            """;
+        const string quizzes = """
+            <table><tr><td>Тема 1</td><td><a href="https://lms.ranepa.ru/mod/quiz/view.php?id=4001">Тест</a></td><td>Нет даты закрытия</td></tr></table>
+            """;
+
+        Assert.True(ActivityParser.ParseAssignments(assignments, 5, "C#").Single().Done);
+
+        var quiz = ActivityParser.ParseQuizzes(quizzes, 5, "C#").Single();
+
+        Assert.False(quiz.Done);
+        Assert.Equal("lms:quiz:4001", quiz.ExternalId);
+    }
+
+    /// <summary>
     /// Задачи заводятся только по несданным работам предметов «расшифровывать», а открытая задача на сданную работу закрывается
     /// </summary>
     [Fact]

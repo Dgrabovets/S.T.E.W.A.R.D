@@ -6,6 +6,11 @@ namespace Steward.Models;
 public enum ReaderTabEnum
 {
     /// <summary>
+    /// Где в расшифровке сказано задание: цитата и строки вокруг неё. Появляется, когда расшифровка открыта из карточки задания
+    /// </summary>
+    Quote,
+
+    /// <summary>
     /// Что пройдено и что было на занятии
     /// </summary>
     Covered,

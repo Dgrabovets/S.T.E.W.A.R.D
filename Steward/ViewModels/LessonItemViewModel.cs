@@ -52,6 +52,7 @@ public sealed class LessonItemViewModel
         Note = assessment?.Readiness == ItemReadinessEnum.ReadyWithNote && Step != PipelineStepEnum.Submitted ? NoteText(assessment.Question) : string.Empty;
         var evidence = item.Evidence.Trim().Trim('"', '«', '»', '„', '“', '”').Trim();
         Quote = evidence.Length > 0 ? $"«{evidence}»" : string.Empty;
+        Evidence = evidence;
         var verified = pipeline?.EvidenceVerified ?? false;
         var linked = pipeline?.LinkedToLms ?? false;
         (Reliability, ReliabilityWarning) = (verified, linked, evidence.Length > 0) switch
@@ -300,6 +301,11 @@ public sealed class LessonItemViewModel
     /// Цитата из расшифровки в кавычках-ёлочках или пусто
     /// </summary>
     public string Quote { get; }
+
+    /// <summary>
+    /// Цитата из расшифровки без кавычек: по ней ищется место, где задание было сказано
+    /// </summary>
+    public string Evidence { get; }
 
     /// <summary>
     /// У задания есть цитата

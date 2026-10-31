@@ -212,6 +212,13 @@ internal static class Program
             activities.AddRange(await lms.ActivitiesAsync(course, CancellationToken.None));
 
         ActivityStore.Save(store.Root, activities);
+        foreach (var subject in activities.GroupBy(activity => activity.Subject).OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase))
+        {
+            var assignments = subject.Where(activity => activity.Kind == ActivityKindEnum.Assignment).ToArray();
+            var quizzes = subject.Where(activity => activity.Kind == ActivityKindEnum.Quiz).ToArray();
+            Log($"LMS: {subject.Key}: заданий {assignments.Length}, сдано {assignments.Count(activity => activity.Done)}; тестов {quizzes.Length}, пройдено {quizzes.Count(activity => activity.Done)}");
+        }
+
         await AssignmentSync.SyncAsync(lms, store, activities, Log);
         foreach (var subject in activities.Where(activity => !activity.Done).GroupBy(activity => activity.Subject).OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase))
             Log($"Не сдано: {subject.Key}: {subject.Count()} ({store.SubjectStateFor(subject.Key)})");

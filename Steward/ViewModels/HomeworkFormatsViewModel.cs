@@ -791,7 +791,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         AttachWork = item => AttachFileRequested?.Invoke(lesson, item),
         SubmittedFile = item => SubmittedFileRequested?.Invoke(lesson, item),
         DeleteDrafts = _ => Run(lesson.DeleteCommand),
-        OpenTranscript = lesson.HasTranscript ? _ => ShowTranscriptOf(lesson) : null,
+        OpenTranscript = lesson.HasTranscript ? item => ShowTranscriptOf(lesson, item) : null,
     };
 
     /// <summary>
@@ -805,14 +805,48 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Переключает на вкладку «Расшифровки» и открывает читалку на занятии
+    /// Открывает расшифровку занятия из карточки задания и показывает на вкладке «Где сказано», на каких строках сказано это задание
     /// </summary>
     /// <param name="lesson">Занятие</param>
-    private void ShowTranscriptOf(LessonFormatViewModel lesson)
+    /// <param name="item">Задание, из карточки которого открыта расшифровка</param>
+    public void OpenFromItem(LessonFormatViewModel lesson, LessonItemViewModel item) => ShowTranscriptOf(lesson, item);
+
+    /// <summary>
+    /// Переключает на вкладку «Расшифровки» и открывает читалку на занятии. Из карточки задания ещё показывает, где оно сказано
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="item">Задание, из карточки которого открыта расшифровка: на отдельной вкладке показывается место, где оно сказано</param>
+    private void ShowTranscriptOf(LessonFormatViewModel lesson, LessonItemViewModel? item = null)
     {
         HomeworkTab = false;
         OpenTranscript(lesson);
+        if (item is null)
+            return;
+
+        var lines = item.Evidence.Length > 0 ? EvidenceCheck.Excerpt(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty, item.Evidence) : [];
+        _quote = new QuoteViewModel(
+            item.Title,
+            item.Evidence.Length > 0 ? item.Quote : string.Empty,
+            [.. lines.Select(line => new ExcerptLineViewModel(line.Text, line.Hit))],
+            item.Evidence.Length == 0 ? "У этого задания нет цитаты из расшифровки: оно взято из LMS или записано до того, как цитаты стали сохраняться." : lines.Count == 0 ? "Цитату в тексте расшифровки найти не удалось: возможно, преподаватель сказал это другими словами." : string.Empty);
+        _readerTab = ReaderTabEnum.Quote;
+        RaiseReaderTabs();
     }
+
+    /// <summary>
+    /// Место в расшифровке, где сказано задание, из которого открыта читалка. Пусто, если читалка открыта не из карточки задания
+    /// </summary>
+    private QuoteViewModel? _quote;
+
+    /// <summary>
+    /// Показана вкладка «Где сказано»
+    /// </summary>
+    public bool IsQuoteTab => ActiveReaderTab == ReaderTabEnum.Quote && HasReaderTabs;
+
+    /// <summary>
+    /// Место в расшифровке, где сказано задание
+    /// </summary>
+    public QuoteViewModel? Quote => _quote;
 
     /// <summary>
     /// Показывает ошибку фоновой записи в карточке занятия; неожиданную ошибку (не файлов и не данных) ещё и пишет в журнал
@@ -1369,6 +1403,9 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private List<(ReaderTabEnum Tab, string Title)> AvailableReaderTabs()
     {
         var tabs = new List<(ReaderTabEnum, string)>();
+        if (_quote is not null)
+            tabs.Add((ReaderTabEnum.Quote, "Где сказано"));
+
         if (HasReadingPoints || HasReadingOverview)
             tabs.Add((ReaderTabEnum.Covered, "Пройдено"));
 
@@ -1401,6 +1438,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
     {
         Raise(nameof(ReaderTabs));
         Raise(nameof(HasReaderTabs));
+        Raise(nameof(IsQuoteTab));
+        Raise(nameof(Quote));
         Raise(nameof(IsCoveredTab));
         Raise(nameof(IsTopicsTab));
         Raise(nameof(IsActionsTab));
@@ -1476,6 +1515,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             other.IsOpen = other == lesson;
 
         _reading = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty, AnalysisReader?.Invoke(lesson.Id));
+        _quote = null;
         _readerTab = ReaderTabEnum.Covered;
         OpenLesson = lesson;
         RaiseReading();

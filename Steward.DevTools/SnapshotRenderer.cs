@@ -245,10 +245,27 @@ public static class SnapshotRenderer
             // «card:found|confirm|ready|checked|submitted»: карточка задания на вкладке «Домашние задания» в одном шаге конвейера
             if (string.Equals(parts[0], "card", StringComparison.OrdinalIgnoreCase) && main.Model.Formats is { } cards)
             {
-                ShowCard(cards, parts.Length > 1 ? parts[1].ToLowerInvariant() : "found");
+                var cardState = parts.Length > 1 ? parts[1].ToLowerInvariant() : "found";
+
+                // «card:quote»: читалка открыта из карточки задания и показывает, где в расшифровке оно сказано
+                ShowCard(cards, cardState == "quote" ? "confirm" : cardState);
                 main.Model.Page = AppPageEnum.Transcripts;
                 main.Height = 1250;
                 settleSeconds = 1.0;
+                if (cardState == "quote")
+                {
+                    cards.TranscriptReader = _ => "Занятие: Гейм-дизайн, Лекция 3\n\n== Расшифровка ==\n[10:02] Преподаватель: Сегодня разобрали баланс.\n[10:40] Преподаватель: Значит, домашка на следующую неделю.\n[10:42] Преподаватель: Покажите прототип\nменю до пятницы, хотя бы на бумаге.\n[10:50] Студент: Хорошо, а формат какой?\n[10:55] Преподаватель: Любой, главное чтобы было видно экраны.\n[11:20] Преподаватель: На сегодня всё.";
+                    var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(1600) };
+                    timer.Tick += (_, _) =>
+                    {
+                        timer.Stop();
+                        var target = cards.Lessons.First(lesson => lesson.Items.Count > 0).Items[0];
+                        Console.Error.WriteLine($"quote: can={target.OpenTranscriptCommand.CanExecute(null)} lessons={cards.Lessons.Count}");
+                        target.OpenTranscriptCommand.Execute(null);
+                    };
+                    timer.Start();
+                    settleSeconds = 3.2;
+                }
             }
 
             // «main:done»: задача «telegram» только что закончилась, на её карточке рисуется галочка

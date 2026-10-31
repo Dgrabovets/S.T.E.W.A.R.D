@@ -335,6 +335,27 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                 </Border>
+                                <StackPanel Visibility="{Binding IsQuoteTab, Converter={StaticResource BoolToVisibility}}" DataContext="{Binding Quote}" Margin="0,4,0,0">
+                                    <TextBlock Text="Задание" Style="{StaticResource TextCaption}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Сказано на занятии" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasLines, Converter={StaticResource BoolToVisibility}}"/>
+                                    <ItemsControl ItemsSource="{Binding Lines}" Focusable="False" Visibility="{Binding HasLines, Converter={StaticResource BoolToVisibility}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="Row" Padding="10,4" Margin="0,0,0,2" BorderThickness="2,0,0,0" BorderBrush="Transparent" CornerRadius="{StaticResource RadiusSmall}">
+                                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="24" Foreground="{StaticResource MutedBrush}"/>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsHit}" Value="True">
+                                                        <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                                        <Setter TargetName="Row" Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding Note}" Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,12,0,0" Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
                                 <StackPanel Visibility="{Binding IsCoveredTab, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="Пройдено" Style="{StaticResource TextCaption}" Margin="0,14,0,6"
                                            Visibility="{Binding HasReadingPoints, Converter={StaticResource BoolToVisibility}}"/>
@@ -560,7 +581,7 @@
                                                 </Button>
                                             </StackPanel>
                                         </StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0">
+                                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0">
                                             <TextBlock Text="{Binding ItemsHint}" Style="{StaticResource TextCaption}" TextWrapping="Wrap"
                                                        Visibility="{Binding HasItemsHint, Converter={StaticResource BoolToVisibility}}"/>
                                             <ItemsControl ItemsSource="{Binding Items}">
@@ -724,7 +745,7 @@
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
                                         </StackPanel>
-                                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0"
+                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0"
                                                     Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
                                             <ctl:ActivityOrb Width="28" Height="28" Style="{StaticResource ActivityOrb}" Margin="-6,-4,8,-4"/>
                                             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextWrapping="Wrap">

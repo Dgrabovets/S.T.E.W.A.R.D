@@ -35,7 +35,8 @@ public static partial class ActivityParser
 
             var status = row.Cells[3];
             var grade = row.Cells.Count > 4 ? CleanGrade(row.Cells[4]) : string.Empty;
-            result.Add(new LmsActivity(link.Groups[2].Value, ActivityKindEnum.Assignment, courseId, subject, row.Cells[0], row.Cells[1], ParseDue(row.Cells[2]), status, grade, IsSubmitted(status), link.Value));
+            // Оценка есть только у сданной работы, даже если состояние написано непривычными словами
+            result.Add(new LmsActivity(link.Groups[2].Value, ActivityKindEnum.Assignment, courseId, subject, row.Cells[0], row.Cells[1], ParseDue(row.Cells[2]), status, grade, IsSubmitted(status) || grade.Length > 0, link.Value));
         }
 
         return result;
@@ -53,10 +54,10 @@ public static partial class ActivityParser
         var result = new List<LmsActivity>();
         foreach (var row in Rows(html))
         {
-            if (row.Cells.Count < 4 || Link().Match(row.Html) is not { Success: true } link || link.Groups[1].Value != "quiz")
+            if (row.Cells.Count < 3 || Link().Match(row.Html) is not { Success: true } link || link.Groups[1].Value != "quiz")
                 continue;
 
-            var grade = CleanGrade(row.Cells[3]);
+            var grade = row.Cells.Count > 3 ? CleanGrade(row.Cells[3]) : string.Empty;
             result.Add(new LmsActivity(link.Groups[2].Value, ActivityKindEnum.Quiz, courseId, subject, row.Cells[0], row.Cells[1], ParseDue(row.Cells[2]), grade.Length > 0 ? $"Оценка {grade}" : "Не пройден", grade, grade.Length > 0, link.Value));
         }
 
