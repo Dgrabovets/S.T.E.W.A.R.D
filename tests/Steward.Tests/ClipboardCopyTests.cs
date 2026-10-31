@@ -78,4 +78,39 @@ public class ClipboardCopyTests
         Assert.True(lesson.Failed);
         Assert.Contains("Конспекта пока нет", lesson.Status, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// После копирования конспекта на несколько секунд появляется плашка «Скопировано!» и гаснет сама, а при неудаче копирования её нет
+    /// </summary>
+    /// <returns>Задача теста</returns>
+    [Fact]
+    public async Task The_copied_notice_appears_after_copying_and_fades_by_itself()
+    {
+        var analysis = new LessonAnalysis("Баланс", "Обзор", ["Пройдено"], [new AnalysisTopic("Прогрессия", "Растёт по ступеням")], [], [], []);
+        var busy = true;
+        var model = new HomeworkFormatsViewModel([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((1, string.Empty)))
+        {
+            TranscriptReader = _ => "== Расшифровка ==",
+            AnalysisReader = _ => analysis,
+            ClipboardWriter = _ =>
+            {
+                if (busy)
+                    throw new System.Runtime.InteropServices.ExternalException("занят");
+            },
+        };
+        model.Lessons.Single().OpenCommand.Execute(null);
+
+        model.CopyBriefCommand.Execute(null);
+        Assert.False(model.CopiedNotice);
+
+        busy = false;
+        model.CopyBriefCommand.Execute(null);
+        Assert.True(model.CopiedNotice);
+
+        var until = DateTime.UtcNow.AddSeconds(6);
+        while (model.CopiedNotice && DateTime.UtcNow < until)
+            await Task.Delay(50);
+
+        Assert.False(model.CopiedNotice);
+    }
 }

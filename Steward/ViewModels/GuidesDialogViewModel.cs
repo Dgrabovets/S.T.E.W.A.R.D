@@ -456,9 +456,43 @@ public sealed class GuidesDialogViewModel : Bindable
         get => _message;
         private set
         {
+            var version = ++_messageVersion;
             if (Set(ref _message, value))
                 Raise(nameof(HasMessage));
+
+            if (value.Length > 0)
+                _ = ClearMessageLaterAsync(version);
         }
+    }
+
+    /// <summary>
+    /// Сколько секунд сообщение остаётся на экране, прежде чем стереться само
+    /// </summary>
+    private const int MESSAGE_SECONDS = 6;
+
+    /// <summary>
+    /// Номер последнего сообщения: по нему старый таймер не стирает свежий текст
+    /// </summary>
+    private int _messageVersion;
+
+    /// <summary>
+    /// Стирает сообщение через несколько секунд, если за это время не появилось новое. Не выбрасывает исключений
+    /// </summary>
+    /// <param name="version">Номер сообщения, которое стирается</param>
+    /// <returns>Задача таймера</returns>
+    private async Task ClearMessageLaterAsync(int version)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(MESSAGE_SECONDS));
+        }
+        catch (TaskCanceledException)
+        {
+            // Таймер остановили: сообщение стирается ниже
+        }
+
+        if (version == _messageVersion && _message.Length > 0)
+            Message = string.Empty;
     }
 
     /// <summary>

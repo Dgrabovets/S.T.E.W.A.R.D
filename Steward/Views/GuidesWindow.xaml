@@ -186,8 +186,18 @@
             </ScrollViewer>
 
             <StackPanel Grid.Row="3" Margin="0,12,0,0">
-                <TextBlock Text="{Binding Message}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,0,0,8"
-                           Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}"/>
+                <TextBlock Text="{Binding Message, NotifyOnTargetUpdated=True}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock.Triggers>
+                        <EventTrigger RoutedEvent="Binding.TargetUpdated">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.35"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </TextBlock.Triggers>
+                </TextBlock>
                 <Grid>
                     <StackPanel Orientation="Horizontal" Visibility="{Binding CanAddFiles, Converter={StaticResource BoolToVisibility}}">
                         <Button Content="Обзор…" Click="Browse_OnClick" Style="{StaticResource OutlineButton}" ToolTip="Выбери файлы или открой папку и нажми «Открыть»: добавится вся папка"/>

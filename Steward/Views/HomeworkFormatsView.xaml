@@ -165,11 +165,31 @@
             <StackPanel Visibility="{Binding IsTranscriptsTab, Converter={StaticResource BoolToVisibility}}">
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="340"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="340" MinWidth="240" MaxWidth="520"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*" MinWidth="360"/>
                     </Grid.ColumnDefinitions>
 
-                    <ItemsControl ItemsSource="{Binding SelectedSubject.Lessons}" Margin="0,0,12,0">
+                    <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
+                                  Cursor="SizeWE" Focusable="False" ToolTip="Потяни, чтобы изменить ширину списка занятий" AutomationProperties.Name="Граница между списком занятий и расшифровкой">
+                        <GridSplitter.Template>
+                            <ControlTemplate TargetType="GridSplitter">
+                                <Border Background="Transparent">
+                                    <Border x:Name="Line" Width="2" HorizontalAlignment="Center" Background="{StaticResource LineBrush}" CornerRadius="1"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Line" Property="Background" Value="{StaticResource AccentOutlineBrush}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsDragging" Value="True">
+                                        <Setter TargetName="Line" Property="Background" Value="{StaticResource AccentTextBrush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </GridSplitter.Template>
+                    </GridSplitter>
+
+                    <ItemsControl ItemsSource="{Binding SelectedSubject.Lessons}" Margin="0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border x:Name="Row" Style="{StaticResource Card}" Margin="0,0,0,8" Padding="12,8">
@@ -209,7 +229,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,0,8" VerticalAlignment="Top">
+                    <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0,0,0,8" VerticalAlignment="Top">
                         <StackPanel>
                             <TextBlock TextWrapping="Wrap" Text="Выбери занятие и нажми «Посмотреть расшифровку»: здесь появятся резюме встречи и полный текст.">
                                 <TextBlock.Style>
@@ -224,6 +244,33 @@
                             </TextBlock>
                             <Grid Visibility="{Binding HasOpenLesson, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                    <Border Padding="10,4" Margin="0,0,6,0" VerticalAlignment="Center" BorderThickness="1" CornerRadius="{StaticResource RadiusBadge}"
+                                            BorderBrush="{StaticResource OkBrush}" Background="{StaticResource OkSurfaceBrush}" IsHitTestVisible="False" AutomationProperties.LiveSetting="Polite">
+                                        <TextBlock Text="Скопировано!" Style="{StaticResource TextCaption}" Foreground="{StaticResource OkBrush}"/>
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Opacity" Value="0"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CopiedNotice}" Value="True">
+                                                        <DataTrigger.EnterActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.18"/>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </DataTrigger.EnterActions>
+                                                        <DataTrigger.ExitActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.45"/>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </DataTrigger.ExitActions>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
                                     <Button Command="{Binding CopyBriefCommand}" Style="{StaticResource IconButton}" Margin="0"
                                             ToolTip="Скопировать конспект к практике" AutomationProperties.Name="Скопировать конспект к практике"
                                             Visibility="{Binding HasReadingTopics, Converter={StaticResource BoolToVisibility}}">
@@ -233,7 +280,7 @@
                                         <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
                                     </Button>
                                 </StackPanel>
-                            <StackPanel>
+                            <StackPanel TextElement.FontSize="{StaticResource FontSizeBodyLarge}">
                                 <ItemsControl ItemsSource="{Binding ReadingStats}" Margin="0,0,84,0" AlternationCount="100">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>

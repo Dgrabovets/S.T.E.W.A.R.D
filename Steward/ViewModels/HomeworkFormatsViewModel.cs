@@ -999,6 +999,55 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
+    /// Сколько миллисекунд плашка «Скопировано!» остаётся на экране
+    /// </summary>
+    private const int COPIED_NOTICE_MS = 1800;
+
+    /// <summary>
+    /// Номер последнего показа плашки «Скопировано!»: по нему старый таймер не гасит свежую плашку
+    /// </summary>
+    private int _copiedVersion;
+
+    /// <summary>
+    /// Плашка «Скопировано!» у значка копирования видна. Появляется и гаснет плавно, сама
+    /// </summary>
+    public bool CopiedNotice { get; private set; }
+
+    /// <summary>
+    /// Показывает плашку «Скопировано!» и через короткое время гасит её
+    /// </summary>
+    private void ShowCopiedNotice()
+    {
+        var version = ++_copiedVersion;
+        CopiedNotice = true;
+        Raise(nameof(CopiedNotice));
+        _ = HideCopiedNoticeAsync(version);
+    }
+
+    /// <summary>
+    /// Гасит плашку «Скопировано!», если за это время её не показали заново. Не выбрасывает исключений
+    /// </summary>
+    /// <param name="version">Номер показа, который гасится</param>
+    /// <returns>Задача таймера</returns>
+    private async Task HideCopiedNoticeAsync(int version)
+    {
+        try
+        {
+            await Task.Delay(COPIED_NOTICE_MS);
+        }
+        catch (TaskCanceledException)
+        {
+            // Таймер остановили: плашка всё равно гаснет ниже
+        }
+
+        if (version != _copiedVersion)
+            return;
+
+        CopiedNotice = false;
+        Raise(nameof(CopiedNotice));
+    }
+
+    /// <summary>
     /// Убирает задание в архив и обновляет список. Если файл отметок занят или не читается, отметка не записывается, прежние отметки целы, а причина видна в карточке
     /// </summary>
     /// <param name="lesson">Занятие</param>
@@ -1136,6 +1185,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         {
             ClipboardWriter(text);
             ClearCopyError(lesson);
+            ShowCopiedNotice();
         }
         catch (System.Runtime.InteropServices.ExternalException)
         {
