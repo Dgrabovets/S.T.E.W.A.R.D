@@ -445,7 +445,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
                 readable.Add(File.Exists(copy) ? copy : draft);
             }
 
-            var materials = guides.Materials(lesson.Title);
+            var materials = guides.Materials(lesson.Title, null, store.SubjectOptionsFor(lesson.Title).Excluded.ToHashSet(StringComparer.Ordinal));
             var assignments = store.AssignmentFiles(lesson.Title);
             var prompt = DraftCheckPrompt.Build(lesson, readable, store.ReadItems(lesson.Id) ?? [], store.TranscriptPath(lesson.Id), assignments, materials, report);
             var error = await agent(prompt, store.Root, [.. materials.Directories, .. assignments.Select(path => Path.GetDirectoryName(path)!).Distinct()], cancellationToken);
@@ -594,7 +594,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         var before = TaskFiles(folder, number);
 
         // Всё, что может упасть до агента, считается до засчёта попытки
-        var materials = guides.Materials(lesson.Title);
+        var materials = guides.Materials(lesson.Title, null, store.SubjectOptionsFor(lesson.Title).Excluded.ToHashSet(StringComparer.Ordinal));
         var assignments = store.AssignmentFiles(lesson.Title);
         var owner = remarks.ForPrepare(lesson.Title);
 

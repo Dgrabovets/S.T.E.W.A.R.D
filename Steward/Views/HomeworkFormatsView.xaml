@@ -422,7 +422,7 @@
                                 <TextBlock Text="{Binding ExampleCountText}" Style="{StaticResource TextCaption}" Foreground="{StaticResource TextBrush}"/>
                             </Border>
                         </StackPanel>
-                        <Button Grid.Column="1" Content="Методические указания" Command="{Binding ManageGuidesCommand}" Style="{StaticResource OutlineButton}" BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"/>
+                        <Button Grid.Column="1" Content="Уточнить" Command="{Binding SelectedSubject.RefineCommand}" ToolTip="Какие из общих методических указаний и образцов относятся к этому предмету" AutomationProperties.Name="Уточнить указания и образцы предмета" Style="{StaticResource OutlineButton}" BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"/>
                     </Grid>
                 </Border>
                 <Border Padding="14,10" Margin="0,0,0,8" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">

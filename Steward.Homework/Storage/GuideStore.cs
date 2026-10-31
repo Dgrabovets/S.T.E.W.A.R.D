@@ -116,7 +116,89 @@ public sealed partial class GuideStore(string directory)
         var target = UniquePath(folder, Path.GetFileName(sourcePath));
         File.Copy(sourcePath, target);
 
-        return Save(new GuideEntry(NewId(), subject, kind, Path.GetFileName(target), target, string.Empty, string.Empty));
+        return Save(new GuideEntry(NewId(), subject, kind, Path.GetFileName(target), target, string.Empty, string.Empty, Origin: Path.GetFullPath(sourcePath), OriginStamp: StampOf(sourcePath)));
+    }
+
+    /// <summary>
+    /// Сверяет копии в папке приложения с оригиналами, откуда они скопированы, и обновляет те копии, у которых оригинал изменился. Оригинал, которого больше нет, не мешает: остаётся прежняя копия
+    /// </summary>
+    /// <returns>Названия материалов, которые обновлены из оригинала</returns>
+    /// <exception cref="IOException">Список материалов занят другим процессом дольше ожидания</exception>
+    public IReadOnlyList<string> RefreshFromOrigins()
+    {
+        // Без изменений оригиналов список не блокируется и не перезаписывается
+        if (!Load().Any(Changed))
+            return [];
+
+        var updated = new List<string>();
+        Locked(() =>
+        {
+            var all = LoadForWrite();
+            var result = new List<GuideEntry>(all.Count);
+            foreach (var entry in all)
+            {
+                if (!Changed(entry))
+                {
+                    result.Add(entry);
+
+                    continue;
+                }
+
+                try
+                {
+                    var partial = entry.Path + ".partial";
+                    File.Copy(entry.Origin!, partial, overwrite: true);
+                    File.Move(partial, entry.Path, overwrite: true);
+                    result.Add(entry with { OriginStamp = StampOf(entry.Origin!), Note = $"Обновлено из оригинала {DateTime.Now:dd.MM.yyyy HH:mm}", Added = DateTime.UtcNow });
+                    updated.Add(entry.Title);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // Оригинал занят (например, открыт в Word): остаётся прежняя копия, проверка повторится при следующем обращении
+                    File.Delete(entry.Path + ".partial");
+                    result.Add(entry);
+                }
+            }
+
+            if (updated.Count > 0)
+                Write(result);
+        });
+
+        return updated;
+    }
+
+    /// <summary>
+    /// Оригинал, откуда скопирован материал, изменился с момента копирования
+    /// </summary>
+    /// <param name="entry">Материал</param>
+    /// <returns>
+    /// <see langword="true"/>, если у материала есть оригинал на месте и его размер или время изменения другие
+    /// </returns>
+    private bool Changed(GuideEntry entry)
+    {
+        if (string.IsNullOrEmpty(entry.Origin) || string.IsNullOrEmpty(entry.OriginStamp) || entry.Path.Length == 0 || !File.Exists(entry.Path) || !IsInside(entry.Path, Folder))
+            return false;
+
+        try
+        {
+            return File.Exists(entry.Origin) && StampOf(entry.Origin) != entry.OriginStamp;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Отпечаток файла для сравнения: размер и время последнего изменения
+    /// </summary>
+    /// <param name="path">Файл</param>
+    /// <returns>Строка вида «размер:тики»</returns>
+    private static string StampOf(string path)
+    {
+        var info = new FileInfo(path);
+
+        return $"{info.Length}:{info.LastWriteTimeUtc.Ticks}";
     }
 
     /// <summary>
@@ -379,12 +461,14 @@ public sealed partial class GuideStore(string directory)
     /// Собирает материалы предмета для агента: читаемые файлы указаний и образцов и папки, к которым агенту нужен доступ
     /// </summary>
     /// <param name="subject">Название предмета</param>
-    /// <param name="ids">Какие материалы взять. <see langword="null"/>: все включённые</param>
+    /// <param name="ids">Какие материалы взять. <see langword="null"/>: все включённые, кроме исключённых для предмета</param>
+    /// <param name="excluded">Ключи материалов, которые к предмету не относятся. Учитываются, только когда <paramref name="ids"/> не задан: явный выбор владельца сильнее</param>
     /// <returns>Файлы по видам и папки</returns>
-    public GuideMaterials Materials(string subject, IReadOnlySet<string>? ids = null)
+    public GuideMaterials Materials(string subject, IReadOnlySet<string>? ids = null, IReadOnlySet<string>? excluded = null)
     {
+        TryRefreshFromOrigins();
         var chosen = ForSubject(subject)
-            .Where(entry => ids is not null ? ids.Contains(entry.Id) : entry.Enabled)
+            .Where(entry => ids is not null ? ids.Contains(entry.Id) : entry.Enabled && excluded?.Contains(entry.Id) != true)
             .Where(entry => entry.Path.Length > 0 && (File.Exists(entry.Path) || Directory.Exists(entry.Path)))
             .ToArray();
 
@@ -420,6 +504,21 @@ public sealed partial class GuideStore(string directory)
         var examples = Files(GuideKindEnum.Example);
 
         return new GuideMaterials(guides, examples, [.. directories]);
+    }
+
+    /// <summary>
+    /// Обновляет копии из изменённых оригиналов, не мешая сборке материалов: занятый список или оригинал просто пропускаются до следующего раза
+    /// </summary>
+    private void TryRefreshFromOrigins()
+    {
+        try
+        {
+            RefreshFromOrigins();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Список занят: материалы собираются из прежних копий
+        }
     }
 
     /// <summary>

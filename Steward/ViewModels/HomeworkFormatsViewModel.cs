@@ -1081,6 +1081,22 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public event Action<LessonFormatViewModel>? PrepareDialogRequested;
 
     /// <summary>
+    /// Просит окно открыть выбор указаний и образцов предмета («Уточнить»)
+    /// </summary>
+    public event Action<SubjectViewModel>? SubjectGuidesRequested;
+
+    /// <summary>
+    /// Собирает окно «Уточнить для предмета»: общие указания и образцы с галочками. Образцы из сданных работ в список не входят
+    /// </summary>
+    /// <param name="subject">Предмет</param>
+    /// <returns>Модель окна</returns>
+    public SubjectGuidesDialogViewModel CreateSubjectGuidesDialog(SubjectViewModel subject) => new(
+        subject.Title,
+        [.. (GuideLister?.Invoke(subject.Title) ?? []).Where(entry => !entry.Id.StartsWith("sample:", StringComparison.Ordinal))],
+        subject.Options?.ExcludedGuides ?? [],
+        GuideFolder);
+
+    /// <summary>
     /// Переключает на вкладку «Расшифровки»
     /// </summary>
     public RelayCommand ShowTranscriptsCommand { get; }
@@ -1544,6 +1560,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
                 {
                     subject.Update([.. group]);
 
+                    subject.RefineRequested = refine => SubjectGuidesRequested?.Invoke(refine);
+
                     // Хранилище настроек подключается после создания списка: предметы, созданные раньше, получают настройки при ближайшем обновлении
                     if (subject.Options is null && SubjectOptionsSaver is { } existing)
                         subject.Options = new SubjectOptionsViewModel(group.Key, SubjectOptionsReader?.Invoke(group.Key) ?? new SubjectOptions(), existing);
@@ -1557,6 +1575,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
                 return new SubjectViewModel(group.Key, rows, _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen, format, _subjectFormatChosen, Select)
                 {
                     Options = SubjectOptionsSaver is { } saver ? new SubjectOptionsViewModel(group.Key, SubjectOptionsReader?.Invoke(group.Key) ?? new SubjectOptions(), saver) : null,
+                    RefineRequested = refine => SubjectGuidesRequested?.Invoke(refine),
                 };
             })
             .ToList();

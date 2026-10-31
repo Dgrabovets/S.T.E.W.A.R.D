@@ -227,6 +227,11 @@ public static class SnapshotRenderer
                 {
                     first.OpenCommand.Execute(null);
                 }
+                else if (parts[2].Equals("settings", StringComparison.OrdinalIgnoreCase))
+                {
+                    // «main:transcripts:settings»: страница настроек «Автоматизации образования»
+                    main.Model.ToggleSettingsCommand.Execute(null);
+                }
                 else
                 {
                     education.ShowHomeworkCommand.Execute(null);

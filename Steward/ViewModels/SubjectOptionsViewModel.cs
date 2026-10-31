@@ -80,6 +80,17 @@ public sealed class SubjectOptionsViewModel : Bindable
     }
 
     /// <summary>
+    /// Ключи общих указаний и образцов, которые к предмету не относятся
+    /// </summary>
+    public IReadOnlyList<string> ExcludedGuides => _current.Excluded;
+
+    /// <summary>
+    /// Запоминает, какие общие указания и образцы к предмету не относятся
+    /// </summary>
+    /// <param name="excluded">Ключи исключённых материалов; пусто: действуют все</param>
+    public void SetExcludedGuides(IEnumerable<string> excluded) => Change(_current with { ExcludedGuides = [.. excluded.Distinct(StringComparer.Ordinal)] });
+
+    /// <summary>
     /// Подсказка под выбором: что значит выбранный источник
     /// </summary>
     public string SourceHint => SelectedSource.Hint;

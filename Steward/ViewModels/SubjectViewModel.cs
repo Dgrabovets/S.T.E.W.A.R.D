@@ -45,6 +45,7 @@ public sealed class SubjectViewModel : Bindable
         _state = state;
         _format = format;
         SelectCommand = new RelayCommand(() => selected?.Invoke(this));
+        RefineCommand = new RelayCommand(() => RefineRequested?.Invoke(this));
         var options = new List<LessonStateOptionViewModel>();
         if (stateChosen is not null)
         {
@@ -89,6 +90,16 @@ public sealed class SubjectViewModel : Bindable
     /// Название предмета
     /// </summary>
     public string Title { get; }
+
+    /// <summary>
+    /// Кнопка «Уточнить»: открывает окно, в котором выбирается, какие общие указания и образцы относятся к предмету
+    /// </summary>
+    public RelayCommand RefineCommand { get; }
+
+    /// <summary>
+    /// Вызывается по кнопке «Уточнить»: просит окно открыть выбор указаний предмета
+    /// </summary>
+    public Action<SubjectViewModel>? RefineRequested { get; set; }
 
     /// <summary>
     /// Настройки предмета для домашних заданий: автоподготовка и откуда берутся задания. Пусто, пока окно не подключило хранилище

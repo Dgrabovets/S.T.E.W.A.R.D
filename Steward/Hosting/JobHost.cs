@@ -875,6 +875,9 @@ public sealed class JobHost : IDisposable
 
         if (current.TaskSource != options.TaskSource)
             _homework.SetSubjectTaskSource(subject, options.TaskSource);
+
+        if (!current.Excluded.Order(StringComparer.Ordinal).SequenceEqual(options.Excluded.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            _homework.SetSubjectExcludedGuides(subject, options.Excluded);
     }
 
     /// <summary>

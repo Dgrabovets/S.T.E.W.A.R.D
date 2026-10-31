@@ -600,6 +600,26 @@
                             <StackPanel Margin="0,0,12,0">
                                 <views:PageHeaderView Title="Автоматизация образования"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="Методические указания и образцы" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                                <TextBlock Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,4,12,0"
+                                                           Text="Общие для всех предметов: требования к оформлению и образцы работ. Какие из них относятся к предмету, выбирается кнопкой «Уточнить» на вкладке «Домашние задания» предмета."/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                    <TextBlock Text="{Binding Formats.GuideCountText}" Style="{StaticResource TextCaption}" Foreground="{StaticResource TextBrush}"/>
+                                                    <TextBlock Text="  ·  " Style="{StaticResource TextCaption}"/>
+                                                    <TextBlock Text="{Binding Formats.ExampleCountText}" Style="{StaticResource TextCaption}" Foreground="{StaticResource TextBrush}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Открыть" Command="{Binding Formats.ManageGuidesCommand}" Style="{StaticResource OutlineButton}" VerticalAlignment="Center"
+                                                    BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}" AutomationProperties.Name="Открыть методические указания и образцы"/>
+                                        </Grid>
+                                    </Border>
                                     <views:JsonSettingsView DataContext="{Binding LmsSettings}"/>
                                 </StackPanel>
                                 <StackPanel Style="{StaticResource ContentPanel}">

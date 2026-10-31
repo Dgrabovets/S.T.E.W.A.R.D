@@ -49,6 +49,14 @@ public sealed partial class HomeworkStore
     public void SetSubjectTaskSource(string subject, TaskSourceEnum source) => ChangeSubjectOptions(subject, options => options with { TaskSource = source });
 
     /// <summary>
+    /// Запоминает, какие общие указания и образцы к предмету не относятся: при подготовке заданий предмета они не учитываются
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="excluded">Ключи исключённых материалов; пусто: действуют все</param>
+    /// <exception cref="IOException">Файл настроек занят другим процессом дольше ожидания или не читается: прежнее содержимое цело</exception>
+    public void SetSubjectExcludedGuides(string subject, IEnumerable<string> excluded) => ChangeSubjectOptions(subject, options => options with { ExcludedGuides = [.. excluded.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] });
+
+    /// <summary>
     /// Меняет настройки одного предмета под общей блокировкой, не затирая настройки остальных
     /// </summary>
     /// <param name="subject">Название предмета</param>

@@ -29,6 +29,7 @@ public partial class HomeworkFormatsView : UserControl
         {
             old.GuidesDialogRequested -= ShowGuides;
             old.PrepareDialogRequested -= ShowPrepare;
+            old.SubjectGuidesRequested -= ShowSubjectGuides;
             old.RedoDialogRequested -= ShowRedo;
             old.DeleteConfirmRequested -= ConfirmDelete;
             old.AttachFileRequested -= AttachWork;
@@ -40,6 +41,7 @@ public partial class HomeworkFormatsView : UserControl
         {
             current.GuidesDialogRequested += ShowGuides;
             current.PrepareDialogRequested += ShowPrepare;
+            current.SubjectGuidesRequested += ShowSubjectGuides;
             current.RedoDialogRequested += ShowRedo;
             current.DeleteConfirmRequested += ConfirmDelete;
             current.AttachFileRequested += AttachWork;
@@ -204,6 +206,24 @@ public partial class HomeworkFormatsView : UserControl
 
         GuidesWindow.Show(Window.GetWindow(this), model.CreateGuidesDialog());
         model.RefreshGuides();
+    }
+
+    /// <summary>
+    /// Открывает окно «Уточнить для предмета» и запоминает, какие указания и образцы к предмету не относятся
+    /// </summary>
+    /// <param name="subject">Предмет</param>
+    private void ShowSubjectGuides(SubjectViewModel subject)
+    {
+        try
+        {
+            if (DataContext is HomeworkFormatsViewModel model && SubjectGuidesWindow.Ask(Window.GetWindow(this), model.CreateSubjectGuidesDialog(subject)) is { } excluded)
+                subject.Options?.SetExcludedGuides(excluded);
+        }
+        catch (Exception exception)
+        {
+            // Обработчик без ожидания: ошибка не должна уронить окно
+            System.Diagnostics.Trace.TraceError($"Не удалось открыть выбор указаний предмета {subject.Title}: {exception}");
+        }
     }
 
     /// <summary>

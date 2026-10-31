@@ -29,4 +29,6 @@ public enum GuideKindEnum
 /// <param name="Enabled">Материал учитывается при подготовке заданий. Выключенный остаётся в списке</param>
 /// <param name="Manual">Образец принёс владелец сам, а не взят из готового черновика. Необязательное поле: в старых записях его нет</param>
 /// <param name="Added">Когда запись добавлена или заменена (UTC). Нужно, чтобы выбрать последние образцы. Необязательное поле: в старых записях его нет</param>
-public sealed record GuideEntry(string Id, string Subject, GuideKindEnum Kind, string Title, string Path, string Url, string Note, bool Enabled = true, bool Manual = false, DateTime? Added = null);
+/// <param name="Origin">Откуда файл скопирован: путь к оригиналу. По нему программа замечает, что оригинал изменился, и обновляет копию. Необязательное поле: в старых записях его нет</param>
+/// <param name="OriginStamp">Размер и время изменения оригинала на момент копирования, строкой. Необязательное поле</param>
+public sealed record GuideEntry(string Id, string Subject, GuideKindEnum Kind, string Title, string Path, string Url, string Note, bool Enabled = true, bool Manual = false, DateTime? Added = null, string? Origin = null, string? OriginStamp = null);
