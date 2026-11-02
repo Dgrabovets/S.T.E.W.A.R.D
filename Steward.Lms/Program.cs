@@ -77,7 +77,7 @@ internal static class Program
 
                     return 0;
                 case "extract":
-                    Log(await ExtractAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
+                    Log(LmsItems(new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
 
                     return 0;
                 case "prepare":
@@ -93,6 +93,17 @@ internal static class Program
                     }
 
                     Log(await AddTaskAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")), args[1], int.Parse(args[2], CultureInfo.InvariantCulture)));
+
+                    return 0;
+                case "note-task":
+                    if (args.Length < 3 || !int.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                    {
+                        Log("Использование: note-task <ключ занятия> <номер задания в разборе>");
+
+                        return 2;
+                    }
+
+                    Log(await AddQuoteTaskAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")), args[1], int.Parse(args[2], CultureInfo.InvariantCulture)));
 
                     return 0;
                 case "analyze":
@@ -144,8 +155,8 @@ internal static class Program
                     summary += "\n" + await TasksAsync(settings, store, dryRun: !settings.CreateTasks);
                     _progress.Enter(2, 0, "Разбор занятий");
                     summary += "\n" + await AnalyzeAsync(settings, store);
-                    _progress.Enter(3, 0, "Поиск заданий");
-                    summary += "\n" + await ExtractAsync(settings, store);
+                    _progress.Enter(3, 0, "Задания из LMS");
+                    summary += "\n" + LmsItems(store);
                     _progress.Enter(4, 0, "Подготовка работ");
                     var (prepareSummary, notices) = await PrepareAsync(settings, store);
                     summary += "\n" + prepareSummary;
@@ -326,8 +337,26 @@ internal static class Program
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
             var error = await ClaudeAgent.RunLessonAsync(LessonAnalysisPrompt.Build(lesson, store.TranscriptPath(lesson.Id), path, settings.StudentName), store.Root, [], CancellationToken.None);
-            if (error.Length == 0 && store.ReadAnalysis(lesson.Id) is null)
+            var analysis = error.Length == 0 ? store.ReadAnalysis(lesson.Id) : null;
+            if (error.Length == 0 && analysis is null)
                 error = "Claude записал разбор в неверном формате";
+
+            if (analysis is not null)
+            {
+                // К каждому заданию дописываются реплики до и после слов преподавателя: сохраняется только этот отрывок, а не вся расшифровка
+                var temp = $"{path}.{Guid.NewGuid():N}.tmp";
+                try
+                {
+                    File.WriteAllText(temp, analysis.WithExcerpts(File.ReadAllText(store.TranscriptPath(lesson.Id))).ToJson());
+                    File.Move(temp, path, overwrite: true);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // Отрывки это дополнение: любой сбой при их сборке оставляет разбор агента как есть, он годится и без них
+                    Log($"Не удалось сохранить отрывки заданий: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}: {exception.Message}");
+                    File.Delete(temp);
+                }
+            }
 
             if (error.Length > 0)
             {
@@ -345,50 +374,15 @@ internal static class Program
     }
 
     /// <summary>
-    /// Ищет домашние задания в расшифровках занятий, у которых их ещё не искали, и записывает найденное в <c>items</c>. Условия заданий берутся из LMS: агент получает и список работ, и пути к их описаниям
+    /// Добавляет задания из LMS: работы, у которых там явно написано условие или приложен файл, копируются в карточки без агента. Из расшифровок задания сами не берутся: владелец добавляет их кнопкой «Добавить в задание» на вкладке «Задания» читалки
     /// </summary>
-    /// <param name="settings">Настройки: сколько занятий обрабатывать за запуск</param>
     /// <param name="store">Папка домашних заданий</param>
     /// <returns>Строка итога для статуса</returns>
-    private static async Task<string> ExtractAsync(LmsSettings settings, HomeworkStore store)
+    private static string LmsItems(HomeworkStore store)
     {
-        var fromLms = SyncLmsItems(store);
-        var lmsNote = fromLms > 0 ? $"\nЗадания из LMS: добавлено {fromLms}" : string.Empty;
-        var todo = store.LoadLessons().Where(store.ShouldExtract).Take(Math.Max(settings.MaxAnalyzePerRun, 0)).ToArray();
-        if (todo.Length == 0)
-            return "Поиск заданий: новых занятий нет" + lmsNote;
+        var added = SyncLmsItems(store);
 
-        var activities = store.LoadActivities();
-        var descriptions = activities
-            .Where(work => work.Id.Length > 0 && File.Exists(Path.Combine(store.AssignmentDirectory(work.Id), "assignment.md")))
-            .ToDictionary(work => work.Id, work => Path.Combine(store.AssignmentDirectory(work.Id), "assignment.md"), StringComparer.Ordinal);
-
-        var done = 0;
-        _progress?.Enter(3, todo.Length, "Поиск заданий");
-        foreach (var lesson in todo)
-        {
-            _progress?.Step(done, $"{lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}");
-            var path = store.ItemsPath(lesson.Id);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-
-            var works = activities.Where(work => string.Equals(work.Subject, lesson.Title, StringComparison.OrdinalIgnoreCase)).ToArray();
-            var error = await ClaudeAgent.RunLessonAsync(HomeworkExtractionPrompt.ForLesson(store, lesson, works, descriptions, settings.StudentName), store.Root, [.. descriptions.Values.Select(file => Path.GetDirectoryName(file)!).Distinct()], CancellationToken.None);
-            if (error.Length == 0 && store.ReadItems(lesson.Id) is null)
-                error = "Claude не записал файл заданий";
-
-            if (error.Length > 0)
-            {
-                File.Delete(path);
-                Log($"Поиск заданий не удался: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}: {error}");
-
-                continue;
-            }
-
-            Log($"Задания: {lesson.Title}, {lesson.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}: {store.ReadItems(lesson.Id)!.Count}");
-            done++;
-        }
-
-        return $"Поиск заданий: {done} из {todo.Length}{lmsNote}";
+        return added > 0 ? $"Задания из LMS: добавлено {added}" : "Задания из LMS: новых нет";
     }
 
     /// <summary>
@@ -472,7 +466,11 @@ internal static class Program
         using var singularity = new Steward.Mail.Services.SingularityClient(configured);
         var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
         var known = await singularity.ListExternalIdsAsync(new DateTimeOffset(lesson.Date.AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), CancellationToken.None);
-        if (!known.Contains(externalId))
+
+        // Задача могла быть заведена кнопкой «Только в Singularity» по тому же заданию: тогда вторая не создаётся
+        var remembered = store.LoadCreated();
+        var exists = store.SingularityKeysForItem(lesson, number).Any(key => known.Contains(key) || remembered.Contains(key));
+        if (!exists)
         {
             var drafts = Directory.Exists(store.DraftsDirectory(lessonId)) ? Directory.EnumerateFiles(store.DraftsDirectory(lessonId), $"Задание {number}.*").Order(StringComparer.Ordinal).ToArray() : [];
             await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, items[number - 1], number, store.FormatFor(lessonId), configured.ProjectId, offset, drafts), CancellationToken.None);
@@ -488,7 +486,51 @@ internal static class Program
             Log($"Отметка о задаче не записалась: {exception.Message}");
         }
 
-        return known.Contains(externalId) ? $"Задача по заданию уже была в Singularity: {items[number - 1].Title}" : $"Задача заведена в Singularity: {items[number - 1].Title}";
+        return exists ? $"Задача по заданию уже была в Singularity: {items[number - 1].Title}" : $"Задача заведена в Singularity: {items[number - 1].Title}";
+    }
+
+    /// <summary>
+    /// Заводит задачу SingularityApp по заданию из отрывка расшифровки, не добавляя его в список домашних заданий: кнопка «Только в Singularity» на вкладке «Задания» читалки. Флаг <c>CreateTasks</c> не нужен, потому что запись просит сам человек
+    /// </summary>
+    /// <param name="settings">Настройки: подключение к SingularityApp</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="index">Номер задания в разборе занятия, с единицы</param>
+    /// <returns>Строка итога</returns>
+    /// <exception cref="InvalidOperationException">Занятия или задания нет, либо Singularity не настроен</exception>
+    private static async Task<string> AddQuoteTaskAsync(LmsSettings settings, HomeworkStore store, string lessonId, int index)
+    {
+        if (settings.Singularity is not { Token.Length: > 0 } configured || configured.Token.StartsWith('<'))
+            throw new InvalidOperationException("Singularity не настроен: впиши токен в lmssettings.json");
+
+        var lesson = store.LoadLessons().FirstOrDefault(item => item.Id == lessonId) ?? throw new InvalidOperationException("Занятие не найдено");
+        var tasks = store.ReadAnalysis(lessonId)?.Tasks ?? [];
+        if (index < 1 || index > tasks.Count)
+            throw new InvalidOperationException("Такого задания в разборе занятия нет");
+
+        var task = tasks[index - 1];
+        var externalId = HomeworkTaskBuilder.QuoteExternalId(lesson, index);
+        using var singularity = new Steward.Mail.Services.SingularityClient(configured);
+        var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
+        var known = await singularity.ListExternalIdsAsync(new DateTimeOffset(lesson.Date.AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), CancellationToken.None);
+
+        // Задача могла быть заведена и из списка заданий (кнопкой карточки или фоновым шагом): тогда вторая не создаётся
+        var remembered = store.LoadCreated();
+        if (store.SingularityKeysForQuote(lesson, index).Any(key => known.Contains(key) || remembered.Contains(key)))
+            return $"Задача по заданию уже была в Singularity: {task.Title}";
+
+        await singularity.CreateTaskAsync(HomeworkTaskBuilder.BuildFromQuote(lesson, task, index, configured.ProjectId, offset), CancellationToken.None);
+        try
+        {
+            store.MarkCreated([externalId]);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Задача уже в Singularity: повтор её не заведёт, потому что ключ найдётся в списке задач
+            Log($"Отметка о задаче не записалась: {exception.Message}");
+        }
+
+        return $"Задача заведена в Singularity: {task.Title}";
     }
 
     /// <summary>

@@ -591,6 +591,7 @@ public sealed class TrayHost : IDisposable
         _main.Model.ApplyChips(SettingsProbe.Mail(root), SettingsProbe.Reels(root), SettingsProbe.Transcripts(root));
         _main.Model.ProgressReader ??= id => new Steward.Status.Progress.RunProgressStore(_jobs.StatusDirectory).Read(id);
         _main.Model.Formats = Formats();
+        _formats!.Toast = _main.Model.Toast;
     }
 
     /// <summary>
@@ -615,6 +616,10 @@ public sealed class TrayHost : IDisposable
         _formats.WorkAttacher = _jobs.AttachWork;
         _formats.PipelineReader = _jobs.ItemPipeline;
         _formats.ItemConfirmer = _jobs.ConfirmItem;
+        _formats.AssignmentAdder = _jobs.AddAssignment;
+        _formats.AssignmentToSingularity = _jobs.AddAssignmentToSingularityAsync;
+        _formats.AssignmentStateReader = _jobs.AssignmentStates;
+        _formats.AssignmentDismisser = _jobs.DismissAssignment;
         _formats.ConditionFixer = _jobs.FixItemCondition;
         _formats.SampleRegistrar = _jobs.RegisterSubmittedSample;
         _formats.SubmittedFileSetter = _jobs.SetSubmittedFile;

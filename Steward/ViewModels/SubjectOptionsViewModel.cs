@@ -44,18 +44,7 @@ public sealed class SubjectOptionsViewModel : Bindable
         _subject = subject;
         _current = current;
         _save = save;
-        Sources =
-        [
-            new TaskSourceOptionViewModel(TaskSourceEnum.Auto, "Определять самому", "Задания в LMS, если там у предмета написано условие, иначе их даёт преподаватель на занятии"),
-            new TaskSourceOptionViewModel(TaskSourceEnum.Lms, "В LMS", "Карточки строятся по работам LMS, из расшифровок задания не берутся"),
-            new TaskSourceOptionViewModel(TaskSourceEnum.Transcript, "На занятии", "Преподаватель даёт задания на занятии: их ищет в расшифровке агент"),
-        ];
     }
-
-    /// <summary>
-    /// Варианты источника заданий
-    /// </summary>
-    public IReadOnlyList<TaskSourceOptionViewModel> Sources { get; }
 
     /// <summary>
     /// Фоновый процесс сам готовит работы по заданиям предмета
@@ -64,19 +53,6 @@ public sealed class SubjectOptionsViewModel : Bindable
     {
         get => _current.AutoPrepare;
         set => Change(_current with { AutoPrepare = value });
-    }
-
-    /// <summary>
-    /// Выбранный источник заданий
-    /// </summary>
-    public TaskSourceOptionViewModel SelectedSource
-    {
-        get => Sources.First(option => option.Source == _current.TaskSource);
-        set
-        {
-            if (value is not null)
-                Change(_current with { TaskSource = value.Source });
-        }
     }
 
     /// <summary>
@@ -89,11 +65,6 @@ public sealed class SubjectOptionsViewModel : Bindable
     /// </summary>
     /// <param name="excluded">Ключи исключённых материалов; пусто: действуют все</param>
     public void SetExcludedGuides(IEnumerable<string> excluded) => Change(_current with { ExcludedGuides = [.. excluded.Distinct(StringComparer.Ordinal)] });
-
-    /// <summary>
-    /// Подсказка под выбором: что значит выбранный источник
-    /// </summary>
-    public string SourceHint => SelectedSource.Hint;
 
     /// <summary>
     /// Причина, по которой настройки не записались
@@ -122,7 +93,6 @@ public sealed class SubjectOptionsViewModel : Bindable
         if (next == _current || _saving)
         {
             Raise(nameof(AutoPrepare));
-            Raise(nameof(SelectedSource));
 
             return;
         }
@@ -165,7 +135,5 @@ public sealed class SubjectOptionsViewModel : Bindable
     private void RaiseAll()
     {
         Raise(nameof(AutoPrepare));
-        Raise(nameof(SelectedSource));
-        Raise(nameof(SourceHint));
     }
 }

@@ -9,7 +9,7 @@ namespace Steward.Tests;
 public class SubjectOptionsViewModelTests
 {
     /// <summary>
-    /// Список занятий создаёт предмету настройки из хранилища, а переключатель и выбор источника записывают новое значение в фоне, не трогая второе
+    /// Список занятий создаёт предмету настройки из хранилища, а переключатель записывает новое значение в фоне, не трогая второе
     /// </summary>
     /// <returns>Задача теста</returns>
     [Fact]
@@ -19,7 +19,7 @@ public class SubjectOptionsViewModelTests
         var written = new TaskCompletionSource();
         var model = new HomeworkFormatsViewModel([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)], (_, _) => { }, _ => true, (_, _) => Task.FromResult((1, string.Empty)))
         {
-            SubjectOptionsReader = _ => new SubjectOptions(true, TaskSourceEnum.Transcript),
+            SubjectOptionsReader = _ => new SubjectOptions(false),
             SubjectOptionsSaver = (subject, options) =>
             {
                 saved.Add((subject, options));
@@ -30,15 +30,13 @@ public class SubjectOptionsViewModelTests
 
         var options = model.Subjects.Single().Options!;
 
-        Assert.True(options.AutoPrepare);
-        Assert.Equal(TaskSourceEnum.Transcript, options.SelectedSource.Source);
-        Assert.False(string.IsNullOrEmpty(options.SourceHint));
+        Assert.False(options.AutoPrepare);
 
-        options.SelectedSource = options.Sources.Single(source => source.Source == TaskSourceEnum.Lms);
+        options.AutoPrepare = true;
         await written.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(("Гейм-дизайн", new SubjectOptions(true, TaskSourceEnum.Lms)), saved.Single());
-        Assert.Equal(TaskSourceEnum.Lms, options.SelectedSource.Source);
+        Assert.Equal(("Гейм-дизайн", new SubjectOptions(true)), saved.Single());
+        Assert.True(options.AutoPrepare);
     }
 
     /// <summary>

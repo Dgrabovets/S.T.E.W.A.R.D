@@ -16,6 +16,11 @@ public enum ReaderTabEnum
     Covered,
 
     /// <summary>
+    /// Задания занятия: слова преподавателя с репликами вокруг них. Есть, только если на занятии давали задания
+    /// </summary>
+    Assignments,
+
+    /// <summary>
     /// Темы и формулировки преподавателя
     /// </summary>
     Topics,

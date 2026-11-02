@@ -53,11 +53,6 @@ public sealed class LessonFormatViewModel : Bindable
     private IReadOnlyList<LessonItemViewModel> _items = [];
 
     /// <summary>
-    /// Поиск заданий уже прошёл
-    /// </summary>
-    private bool _itemsSearched;
-
-    /// <summary>
     /// Расшифровку этого занятия уже попросили забрать
     /// </summary>
     private bool _fetchRequested;
@@ -146,6 +141,88 @@ public sealed class LessonFormatViewModel : Bindable
     }
 
     /// <summary>
+    /// Занятие свежее: последнее у предмета. Остальные уже прошли, и по ним всё должно быть разобрано
+    /// </summary>
+    private bool _isCurrent = true;
+
+    /// <summary>
+    /// Сколько заданий из разбора ещё без реакции владельца
+    /// </summary>
+    private int _openAssignments;
+
+    /// <summary>
+    /// Занятие свежее: последнее у предмета, оно не выделяется цветом
+    /// </summary>
+    public bool IsCurrent
+    {
+        get => _isCurrent;
+        set
+        {
+            if (!Set(ref _isCurrent, value))
+                return;
+
+            Raise(nameof(IsPast));
+            Raise(nameof(Age));
+        }
+    }
+
+    /// <summary>
+    /// Занятие уже прошло: на плашке оно приглушено и подписано, сколько времени назад было
+    /// </summary>
+    public bool IsPast => !_isCurrent;
+
+    /// <summary>
+    /// Сколько прошло с занятия: «вчера», «5 дн. назад». Пусто у свежего занятия
+    /// </summary>
+    public string Age => _isCurrent ? string.Empty : AgeOf(Lesson.Date, DateOnly.FromDateTime(DateTime.Today));
+
+    /// <summary>
+    /// Описывает, сколько прошло со дня занятия
+    /// </summary>
+    /// <param name="date">День занятия</param>
+    /// <param name="today">Сегодняшний день</param>
+    /// <returns>«сегодня», «вчера», «5 дн. назад», «3 нед. назад» или «2 мес. назад»</returns>
+    public static string AgeOf(DateOnly date, DateOnly today)
+    {
+        var days = today.DayNumber - date.DayNumber;
+
+        return days switch
+        {
+            <= 0 => "сегодня",
+            1 => "вчера",
+            < 14 => $"{days} дн. назад",
+            < 60 => $"{days / 7} нед. назад",
+            _ => $"{days / 30} мес. назад",
+        };
+    }
+
+    /// <summary>
+    /// Сколько заданий из разбора ещё без реакции владельца: их нет в списке заданий и в Singularity, и они не убраны
+    /// </summary>
+    public int OpenAssignments
+    {
+        get => _openAssignments;
+        set
+        {
+            if (!Set(ref _openAssignments, value))
+                return;
+
+            Raise(nameof(HasOpenAssignments));
+            Raise(nameof(OpenAssignmentsText));
+        }
+    }
+
+    /// <summary>
+    /// В занятии есть задания, на которые владелец ещё не отреагировал
+    /// </summary>
+    public bool HasOpenAssignments => _openAssignments > 0;
+
+    /// <summary>
+    /// Плашка «Не разобрано: 2»
+    /// </summary>
+    public string OpenAssignmentsText => $"Не разобрано: {_openAssignments}";
+
+    /// <summary>
     /// Готовые файлы с заданием: они показываются на вкладке «Домашние задания»
     /// </summary>
     public IReadOnlyList<DraftFileViewModel> Drafts
@@ -222,25 +299,9 @@ public sealed class LessonFormatViewModel : Bindable
     public bool AllSubmitted => PipelineStepper.LessonGroup(Items.Count, PendingCount) == 2;
 
     /// <summary>
-    /// Поиск заданий в расшифровке уже прошёл
+    /// Подсказка, когда заданий нет: из расшифровки задание добавляется только вручную
     /// </summary>
-    public bool ItemsSearched
-    {
-        get => _itemsSearched;
-        set
-        {
-            if (!Set(ref _itemsSearched, value))
-                return;
-
-            Raise(nameof(ItemsHint));
-            Raise(nameof(HasItemsHint));
-        }
-    }
-
-    /// <summary>
-    /// Подсказка, когда заданий нет: ещё ищутся или в расшифровке их не оказалось
-    /// </summary>
-    public string ItemsHint => HasItems ? string.Empty : ItemsSearched ? "В расшифровке заданий нет" : "Задания ищутся при разборе занятия, они появятся после ближайшей выгрузки";
+    public string ItemsHint => HasItems ? string.Empty : "Заданий пока нет. Если преподаватель дал задание, открой расшифровку и добавь его на вкладке «Задания»";
 
     /// <summary>
     /// Есть подсказка про задания
@@ -262,10 +323,8 @@ public sealed class LessonFormatViewModel : Bindable
     /// Обновляет список найденных заданий
     /// </summary>
     /// <param name="items">Строки заданий</param>
-    /// <param name="searched">Поиск заданий уже прошёл</param>
-    public void SetItems(IReadOnlyList<LessonItemViewModel> items, bool searched)
+    public void SetItems(IReadOnlyList<LessonItemViewModel> items)
     {
-        ItemsSearched = searched;
         // Сравнивается всё, что видно на карточке: шаг, вопрос, подсказка, файл работы. Иначе после «Подтвердить» вопрос остался бы на экране
         if (!items.Select(item => item.StateKey).SequenceEqual(Items.Select(item => item.StateKey), StringComparer.Ordinal))
             Items = items;

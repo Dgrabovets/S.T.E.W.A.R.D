@@ -41,13 +41,15 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
         foreach (var lesson in ready)
         {
             var items = store.ReadItems(lesson.Id)!;
+            var tasks = store.ReadAnalysis(lesson.Id)?.Tasks ?? [];
             foreach (var number in WantedNumbers(lesson, items, doneWorks))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var item = items[number - 1];
                 var externalId = HomeworkTaskBuilder.ExternalId(lesson, number);
-                if (known.Contains(externalId) || remembered.Contains(externalId))
+                // Задача могла быть заведена и кнопкой «Только в Singularity» по тому же заданию из отрывка расшифровки
+                if (HomeworkTaskBuilder.KeysForItem(lesson, number, items, tasks).Any(key => known.Contains(key) || remembered.Contains(key)))
                 {
                     existing++;
                     handled.Add(externalId);

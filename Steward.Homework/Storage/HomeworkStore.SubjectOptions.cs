@@ -15,6 +15,11 @@ public sealed partial class HomeworkStore
     private const int MIN_CONDITION_CHARS = 40;
 
     /// <summary>
+    /// Служебные файлы папки работы: описание и отметки выгрузки. Всё остальное в папке это приложенные преподавателем файлы
+    /// </summary>
+    private static readonly string[] ServiceFiles = ["assignment.md", "changed.txt", "checked.txt", "fingerprint.txt"];
+
+    /// <summary>
     /// Строка-заглушка, которую выгрузка пишет, когда на странице работы нет текста условия
     /// </summary>
     private const string NO_CONDITION_STUB = "Текст условия на странице не указан";
@@ -41,14 +46,6 @@ public sealed partial class HomeworkStore
     public void SetSubjectAutoPrepare(string subject, bool autoPrepare) => ChangeSubjectOptions(subject, options => options with { AutoPrepare = autoPrepare });
 
     /// <summary>
-    /// Запоминает, откуда у предмета берутся задания
-    /// </summary>
-    /// <param name="subject">Название предмета</param>
-    /// <param name="source">Источник заданий</param>
-    /// <exception cref="IOException">Файл настроек занят другим процессом дольше ожидания или не читается: прежнее содержимое цело</exception>
-    public void SetSubjectTaskSource(string subject, TaskSourceEnum source) => ChangeSubjectOptions(subject, options => options with { TaskSource = source });
-
-    /// <summary>
     /// Запоминает, какие общие указания и образцы к предмету не относятся: при подготовке заданий предмета они не учитываются
     /// </summary>
     /// <param name="subject">Название предмета</param>
@@ -67,22 +64,6 @@ public sealed partial class HomeworkStore
         all[subject] = change(all.TryGetValue(subject, out var current) ? current : new SubjectOptions());
         WriteAtomic(SubjectOptionsFile, all);
     });
-
-    /// <summary>
-    /// Определяет, откуда берутся задания предмета: выбранный источник, а при «Определять самому» — LMS, если в нём у предмета есть несданная работа с текстом условия, иначе расшифровка
-    /// </summary>
-    /// <param name="subject">Название предмета</param>
-    /// <returns>«В LMS» или «На занятии»: «Определять самому» здесь не возвращается</returns>
-    public TaskSourceEnum TaskSourceFor(string subject)
-    {
-        var chosen = SubjectOptionsFor(subject).TaskSource;
-        if (chosen != TaskSourceEnum.Auto)
-            return chosen;
-
-        return LoadActivities().Any(work => !work.IsQuiz && !work.Done && work.Id.Length > 0 && SameSubject(work.Subject, subject) && HasConditionText(work.Id))
-            ? TaskSourceEnum.Lms
-            : TaskSourceEnum.Transcript;
-    }
 
     /// <summary>
     /// Проверяет, что у работы LMS в выгруженном описании есть настоящий текст условия, а не одна заглушка
@@ -158,27 +139,38 @@ public sealed partial class HomeworkStore
     private static bool SameSubject(string left, string right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Строит карточки заданий предметов, у которых задания лежат в LMS, прямо по работам LMS, без обращения к агенту: каждая несданная работа, которой ещё нет ни в одном занятии предмета, дописывается в конец файла заданий самого свежего занятия предмета с расшифровкой. Уже стоящие в файле задания не меняются, их номера остаются прежними
+    /// Строит карточки заданий по работам LMS без обращения к агенту: каждая несданная работа, у которой в LMS явно есть формулировка (текст условия или приложенный файл) и которой ещё нет ни в одном занятии предмета, дописывается в конец файла заданий самого свежего занятия предмета. Занятие берётся с расшифровкой или без: когда расшифровка появится, она подтянется в ту же плашку. Работа без формулировки, тест и работа предмета, который не отмечен «Расшифровывать», не добавляются. Уже стоящие в файле задания не меняются, их номера остаются прежними
     /// </summary>
     /// <param name="lessons">Занятия, среди которых выбираются предметы и самое свежее занятие каждого</param>
     /// <returns>Сколько заданий добавлено</returns>
     /// <exception cref="IOException">Файл заданий не записался</exception>
     public int SyncLmsItems(IReadOnlyList<Lesson> lessons)
     {
+        // Под общей блокировкой: иначе задание, которое владелец добавил кнопкой в тот же миг, затёрлось бы записью этого метода
+        var added = 0;
+        Locked(() => added = SyncLmsItemsCore(lessons));
+
+        return added;
+    }
+
+    /// <summary>
+    /// Дописывает работы LMS в файлы заданий; вызывается под блокировкой хранилища
+    /// </summary>
+    /// <param name="lessons">Занятия, среди которых выбираются предметы и самое свежее занятие каждого</param>
+    /// <returns>Сколько заданий добавлено</returns>
+    private int SyncLmsItemsCore(IReadOnlyList<Lesson> lessons)
+    {
         var works = LoadActivities().Where(work => !work.IsQuiz && work.Id.Length > 0).ToArray();
         var added = 0;
         foreach (var subject in lessons.Select(lesson => lesson.Title).Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            if (TaskSourceFor(subject) != TaskSourceEnum.Lms)
-                continue;
-
             var ofSubject = lessons.Where(lesson => SameSubject(lesson.Title, subject)).ToArray();
-            var target = ofSubject.Where(lesson => PreparesHomework(lesson) && HasTranscript(lesson.Id)).OrderByDescending(lesson => lesson.Date).FirstOrDefault();
+            var target = ofSubject.Where(PreparesHomework).OrderByDescending(lesson => lesson.Date).FirstOrDefault();
             if (target is null)
                 continue;
 
             var listed = ofSubject.SelectMany(lesson => ReadItemsFile(lesson.Id)).Select(item => item.ActivityId).Where(id => id.Length > 0).ToHashSet(StringComparer.Ordinal);
-            var fresh = works.Where(work => SameSubject(work.Subject, subject) && !work.Done && !listed.Contains(work.Id)).ToArray();
+            var fresh = works.Where(work => SameSubject(work.Subject, subject) && !work.Done && !listed.Contains(work.Id) && HasExplicitCondition(work.Id)).ToArray();
             if (fresh.Length == 0)
                 continue;
 
@@ -188,6 +180,28 @@ public sealed partial class HomeworkStore
         }
 
         return added;
+    }
+
+    /// <summary>
+    /// В LMS у работы явно есть формулировка: написан текст условия или приложен файл
+    /// </summary>
+    /// <param name="activityId">Номер работы в LMS</param>
+    /// <returns><see langword="true"/>, если условие можно скопировать без агента</returns>
+    private bool HasExplicitCondition(string activityId)
+    {
+        if (HasConditionText(activityId))
+            return true;
+
+        try
+        {
+            var folder = AssignmentDirectory(activityId);
+
+            return Directory.Exists(folder) && Directory.EnumerateFiles(folder).Any(file => !ServiceFiles.Contains(Path.GetFileName(file), StringComparer.OrdinalIgnoreCase));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

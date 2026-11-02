@@ -178,7 +178,7 @@ public static class SnapshotRenderer
                 [new StatusChipViewModel("Токен бота", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в Instagram", "firefox", PanelToneEnum.Running)],
                 [new StatusChipViewModel("Вход в LMS", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в MTS Link", "сохранён 27.10", PanelToneEnum.Running), new StatusChipViewModel("Запись в Singularity", "выключена", PanelToneEnum.Attention)]);
             main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", (_, _) => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
-            main.Model.Formats.SubjectOptionsReader = subject => subject == "Гейм-дизайн" ? new SubjectOptions(true, TaskSourceEnum.Transcript) : new SubjectOptions();
+            main.Model.Formats.SubjectOptionsReader = subject => subject == "Гейм-дизайн" ? new SubjectOptions(true) : new SubjectOptions();
             main.Model.Formats.SubjectOptionsSaver = (_, _) => { };
             if (parts.Length > 1 && parts[1].ToLowerInvariant() is "homework" or "transcripts" or "schedule")
                 settleSeconds = 1.0;
@@ -202,7 +202,7 @@ public static class SnapshotRenderer
                 var drafts = SampleDrafts();
                 education.TranscriptReader = _ => "Занятие: Гейм-дизайн, Лекция 1\nДата: 07.09.2026\n\n== Резюме ==\nТема встречи: Обсуждение курса по геймдизайну\n\nКраткое содержание:\nУчастники познакомились и обсудили содержание курса.\n\nКлючевые моменты:\n• Знакомство участников\n• Системность и реализация идей\n\n== Расшифровка ==\n[00:00] Преподаватель: Добрый день, начинаем.\n[00:12] Студент: Слышно хорошо.\n[00:30] Преподаватель: Сегодня разберём игровые циклы и баланс.";
                 // Подробный разбор с темами: без него читалка не показывает кнопку «Скопировать конспект к практике»
-                education.AnalysisReader = _ => new LessonAnalysis("Игровые циклы и баланс", "Обсудили, из чего складывается игровой цикл и как держать баланс.", ["Игровой цикл", "Баланс"], [new AnalysisTopic("Игровой цикл", "Действие, награда, новое действие"), new AnalysisTopic("Баланс", "Согласованность ресурсов и сложности")], ["Баланс — это согласованность"], [], [new AnalysisTask("Выбрать игру для отчёта", "02.11")]);
+                education.AnalysisReader = _ => new LessonAnalysis("Игровые циклы и баланс", "Обсудили, из чего складывается игровой цикл и как держать баланс.", ["Игровой цикл", "Баланс"], [new AnalysisTopic("Игровой цикл", "Действие, награда, новое действие"), new AnalysisTopic("Баланс", "Согласованность ресурсов и сложности")], ["Баланс — это согласованность"], [], [SampleTask("Выбрать игру для отчёта", "02.11", "Выберите любую игру и напишите по ней аналитический отчёт на одну-две страницы.", ["[00:41] Преподаватель: Разобрали баланс на примере карточных игр.", "[00:44] Студент: А ресурсы в стратегиях считаются так же?", "[00:45] Преподаватель: Да, принцип тот же."], ["[00:47] Преподаватель: Выберите любую игру и напишите по ней аналитический отчёт на одну-две страницы. Срок до второго ноября."], ["[00:52] Студент: Можно взять мобильную игру?", "[00:53] Преподаватель: Можно, главное разобрать правила и обратную связь."]), SampleTask("Собрать меню в Unity", string.Empty, "Соберите главное меню в Unity.", [], [], []), SampleTask("Подготовить презентацию проекта", string.Empty, string.Empty, [], [], [])]);
                 var firstId = SampleLessons().Select(item => item.Lesson.Id).First();
                 education.DraftLister = id => id == firstId ? [drafts[0]] : [];
                 education.ItemsReader = id => id == firstId
@@ -225,7 +225,13 @@ public static class SnapshotRenderer
                 var first = chosen.Lessons.First(lesson => lesson.HasTranscript);
                 if (parts[2].Equals("read", StringComparison.OrdinalIgnoreCase))
                 {
+                    education.AssignmentAdder = (_, _, _, _) => true;
+                    education.AssignmentToSingularity = (_, _) => Task.FromResult(("Задача заведена в Singularity", false));
+                    education.AssignmentDismisser = (_, _, _) => { };
                     first.OpenCommand.Execute(null);
+                    // «main:transcripts:read:tasks»: открыта вкладка «Задания»
+                    if (parts.Length > 3 && parts[3].Equals("tasks", StringComparison.OrdinalIgnoreCase))
+                        education.ReaderTabs.First(tab => tab.Tab == Steward.Models.ReaderTabEnum.Assignments).SelectCommand.Execute(null);
                 }
                 else if (parts[2].Equals("settings", StringComparison.OrdinalIgnoreCase))
                 {
@@ -709,6 +715,18 @@ public static class SnapshotRenderer
 
         return [docx, pptx, py, md];
     }
+
+    /// <summary>
+    /// Собирает выдуманное задание с отрывком расшифровки для снимков читалки
+    /// </summary>
+    /// <param name="title">Название</param>
+    /// <param name="due">Срок</param>
+    /// <param name="quote">Слова преподавателя</param>
+    /// <param name="before">Реплики до</param>
+    /// <param name="said">Реплики со словами преподавателя</param>
+    /// <param name="after">Реплики после</param>
+    /// <returns>Задача разбора</returns>
+    private static AnalysisTask SampleTask(string title, string due, string quote, string[] before, string[] said, string[] after) => new(title, due, quote, before, said, after);
 
     private static IReadOnlyList<(Lesson Lesson, HomeworkFormatEnum Format)> SampleLessons() =>
     [

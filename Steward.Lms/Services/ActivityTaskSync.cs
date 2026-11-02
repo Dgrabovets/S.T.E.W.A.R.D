@@ -30,7 +30,7 @@ public static class ActivityTaskSync
         var byKey = tasks.GroupBy(task => task.ExternalId, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
         var create = activities
-            .Where(activity => !activity.Done && subjectState(activity.Subject) == LessonStateEnum.Fetch && !byKey.ContainsKey(activity.ExternalId))
+            .Where(activity => !activity.Done && subjectState(activity.Subject) is LessonStateEnum.Fetch or LessonStateEnum.LmsOnly && !byKey.ContainsKey(activity.ExternalId))
             .ToArray();
         var close = activities
             .Where(activity => activity.Done && byKey.TryGetValue(activity.ExternalId, out var task) && !task.IsClosed)

@@ -14,7 +14,7 @@ public static class DraftCheckPrompt
     /// <param name="lesson">Занятие</param>
     /// <param name="works">Читаемые копии готовых работ</param>
     /// <param name="items">Задания занятия: название и требования</param>
-    /// <param name="transcriptPath">Путь к расшифровке</param>
+    /// <param name="transcriptPath">Путь к расшифровке. Пусто, если занятие ещё не расшифровано</param>
     /// <param name="assignments">Описания и файлы заданий из LMS</param>
     /// <param name="materials">Методические указания и образцы</param>
     /// <param name="reportPath">Куда записать отчёт</param>
@@ -32,7 +32,8 @@ public static class DraftCheckPrompt
         foreach (var item in items)
             text.Append("- ").Append(item.Title).Append(item.Requirements.Length > 0 ? ". Требования: " + item.Requirements : string.Empty).AppendLine();
 
-        text.AppendLine().AppendLine($"Расшифровка занятия: {transcriptPath}");
+        if (transcriptPath.Length > 0)
+            text.AppendLine().AppendLine($"Расшифровка занятия: {transcriptPath}");
         if (assignments.Count > 0)
         {
             text.AppendLine("Условия заданий из LMS:");

@@ -42,6 +42,7 @@ public sealed class SubjectViewModel : Bindable
     {
         Title = title;
         _lessons = lessons;
+        Watch(lessons);
         _state = state;
         _format = format;
         SelectCommand = new RelayCommand(() => selected?.Invoke(this));
@@ -49,7 +50,7 @@ public sealed class SubjectViewModel : Bindable
         var options = new List<LessonStateOptionViewModel>();
         if (stateChosen is not null)
         {
-            foreach (var option in new[] { LessonStateEnum.Undecided, LessonStateEnum.Fetch, LessonStateEnum.Analyze, LessonStateEnum.Skip, LessonStateEnum.Done })
+            foreach (var option in new[] { LessonStateEnum.Undecided, LessonStateEnum.Fetch, LessonStateEnum.Analyze, LessonStateEnum.LmsOnly, LessonStateEnum.Skip, LessonStateEnum.Done })
             {
                 options.Add(new LessonStateOptionViewModel(option, option == state, picked =>
                 {
@@ -167,9 +168,9 @@ public sealed class SubjectViewModel : Bindable
     }
 
     /// <summary>
-    /// Список форматов нужен: расшифровки забираются, значит, будут и домашние задания
+    /// Список форматов нужен: по предмету готовятся домашние задания (расшифровки забираются или задания берутся из LMS)
     /// </summary>
-    public bool ShowFormat => HasFormats && State == LessonStateEnum.Fetch;
+    public bool ShowFormat => HasFormats && State is LessonStateEnum.Fetch or LessonStateEnum.LmsOnly;
 
     /// <summary>
     /// Текущая отметка предмета: от неё зависит цвет кружка на плитке
@@ -185,6 +186,10 @@ public sealed class SubjectViewModel : Bindable
             Raise(nameof(Caption));
             Raise(nameof(ShowFormat));
             Raise(nameof(SelectedStateOption));
+            Raise(nameof(AssignmentsText));
+            Raise(nameof(AssignmentsProgress));
+            Raise(nameof(QuizzesText));
+            Raise(nameof(QuizzesProgress));
         }
     }
 
@@ -205,9 +210,9 @@ public sealed class SubjectViewModel : Bindable
     }
 
     /// <summary>
-    /// Подпись внизу плитки: отметка и формат, например «Расшифровывать · Word»
+    /// Подпись внизу плитки: отметка и формат, например «Расшифровывать · Word» или «Задания из LMS · Word»
     /// </summary>
-    public string Caption => State == LessonStateEnum.Fetch ? $"{LessonStateOptionViewModel.TitleOf(State)} · {HomeworkFormats.Title(Format)}" : LessonStateOptionViewModel.TitleOf(State);
+    public string Caption => State is LessonStateEnum.Fetch or LessonStateEnum.LmsOnly ? $"{LessonStateOptionViewModel.TitleOf(State)} · {HomeworkFormats.Title(Format)}" : LessonStateOptionViewModel.TitleOf(State);
 
     /// <summary>
     /// Занятия предмета от свежих к старым
@@ -220,14 +225,43 @@ public sealed class SubjectViewModel : Bindable
             if (!Set(ref _lessons, value))
                 return;
 
+            Watch(value);
             RaiseCounters();
+            RaiseOpenAssignments();
         }
+    }
+
+    /// <summary>
+    /// Подписывается на изменения занятий и отмечает свежее. Вызывается и для занятий, с которыми создана плитка
+    /// </summary>
+    /// <param name="value">Занятия предмета</param>
+    private void Watch(IReadOnlyList<LessonFormatViewModel> value)
+    {
+        // Задания занятий читаются в фоне и появляются позже самой строки: список вкладки обновляется, когда у занятия они появились
+        foreach (var lesson in value.Where(_watched.Add))
+            lesson.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName is nameof(LessonFormatViewModel.HasItems) or nameof(LessonFormatViewModel.HasTranscript))
+                    Raise(nameof(HomeworkLessons));
+                else if (args.PropertyName == nameof(LessonFormatViewModel.OpenAssignments))
+                    RaiseOpenAssignments();
+            };
+
+        // Свежее занятие одно, последнее по дате: остальные подписываются возрастом и приглушаются
+        var newest = value.Select(lesson => lesson.Lesson.Date).DefaultIfEmpty().Max();
+        foreach (var lesson in value)
+            lesson.IsCurrent = lesson.Lesson.Date == newest;
     }
 
     /// <summary>
     /// Сколько занятий расшифровано, словами для плитки
     /// </summary>
     public string TranscribedText => $"Расшифровано {Transcribed} из {Total}";
+
+    /// <summary>
+    /// Занятия, у которых уже слушается изменение заданий и расшифровки
+    /// </summary>
+    private readonly HashSet<LessonFormatViewModel> _watched = [];
 
     /// <summary>
     /// Работы предмета из LMS: задания и тесты
@@ -256,22 +290,27 @@ public sealed class SubjectViewModel : Bindable
     /// <summary>
     /// «Сдано 2 из 3»
     /// </summary>
-    public string AssignmentsText => _activities.Count(item => !item.IsQuiz) is var total and > 0 ? $"Сдано {_activities.Count(item => !item.IsQuiz && item.Done)} из {total}" : "Заданий нет";
+    public string AssignmentsText => IsClosed ? "Закрыт досрочно" : _activities.Count(item => !item.IsQuiz) is var total and > 0 ? $"Сдано {_activities.Count(item => !item.IsQuiz && item.Done)} из {total}" : "Заданий нет";
 
     /// <summary>
-    /// Доля сданных заданий
+    /// Доля сданных заданий. У досрочно закрытого предмета полная: сдавать больше нечего
     /// </summary>
-    public double AssignmentsProgress => _activities.Count(item => !item.IsQuiz) is var total and > 0 ? (double)_activities.Count(item => !item.IsQuiz && item.Done) / total : 0;
+    public double AssignmentsProgress => IsClosed ? 1 : _activities.Count(item => !item.IsQuiz) is var total and > 0 ? (double)_activities.Count(item => !item.IsQuiz && item.Done) / total : 0;
 
     /// <summary>
     /// «Тесты 1 из 2»
     /// </summary>
-    public string QuizzesText => _activities.Count(item => item.IsQuiz) is var total and > 0 ? $"Тесты {_activities.Count(item => item.IsQuiz && item.Done)} из {total}" : "Тестов нет";
+    public string QuizzesText => _activities.Count(item => item.IsQuiz) is var total and > 0 ? IsClosed ? "Тесты пройдены" : $"Тесты {_activities.Count(item => item.IsQuiz && item.Done)} из {total}" : "Тестов нет";
 
     /// <summary>
-    /// Доля пройденных тестов
+    /// Доля пройденных тестов. У досрочно закрытого предмета полная
     /// </summary>
-    public double QuizzesProgress => _activities.Count(item => item.IsQuiz) is var total and > 0 ? (double)_activities.Count(item => item.IsQuiz && item.Done) / total : 0;
+    public double QuizzesProgress => _activities.Count(item => item.IsQuiz) is var total and > 0 ? IsClosed ? 1 : (double)_activities.Count(item => item.IsQuiz && item.Done) / total : 0;
+
+    /// <summary>
+    /// Предмет отмечен «Завершён»: владелец закрыл его досрочно, поэтому несданное в LMS в счёт не идёт
+    /// </summary>
+    private bool IsClosed => State == LessonStateEnum.Done;
 
     /// <summary>
     /// У предмета есть тесты
@@ -295,6 +334,11 @@ public sealed class SubjectViewModel : Bindable
     /// По предмету найдены задания
     /// </summary>
     public bool HasHomework => Homework.Count > 0;
+
+    /// <summary>
+    /// Занятия для вкладки «Домашние задания»: с расшифровкой или с заданиями. Задания из LMS кладутся и к занятию без расшифровки, а когда расшифровка появится, она подтянется в ту же плашку
+    /// </summary>
+    public IReadOnlyList<LessonFormatViewModel> HomeworkLessons => [.. Lessons.Where(lesson => lesson.HasTranscript || lesson.HasItems)];
 
     /// <summary>
     /// У скольких занятий уже есть расшифровка
@@ -343,11 +387,37 @@ public sealed class SubjectViewModel : Bindable
     }
 
     /// <summary>
+    /// Сколько заданий из разбора во всех занятиях предмета ещё без реакции владельца
+    /// </summary>
+    public int OpenAssignments => Lessons.Sum(lesson => lesson.OpenAssignments);
+
+    /// <summary>
+    /// В занятиях предмета есть задания без реакции владельца: на плитке горит плашка
+    /// </summary>
+    public bool HasOpenAssignments => OpenAssignments > 0;
+
+    /// <summary>
+    /// Плашка на плитке: «Не разобрано: 3»
+    /// </summary>
+    public string OpenAssignmentsText => $"Не разобрано: {OpenAssignments}";
+
+    /// <summary>
+    /// Сообщает окну, что число неразобранных заданий изменилось
+    /// </summary>
+    private void RaiseOpenAssignments()
+    {
+        Raise(nameof(OpenAssignments));
+        Raise(nameof(HasOpenAssignments));
+        Raise(nameof(OpenAssignmentsText));
+    }
+
+    /// <summary>
     /// Сообщает окну, что числа на плитке изменились
     /// </summary>
     private void RaiseCounters()
     {
         Raise(nameof(LessonsWithTranscript));
+        Raise(nameof(HomeworkLessons));
         Raise(nameof(TranscribedText));
         Raise(nameof(Transcribed));
         Raise(nameof(Total));

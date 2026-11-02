@@ -31,6 +31,27 @@ public static class HomeworkItemParser
     }
 
     /// <summary>
+    /// Проверяет, что файл это пустой JSON-массив в любой записи: <c>[]</c>, <c>[ ]</c>, с переводами строк или в ограде из тройных кавычек
+    /// </summary>
+    /// <param name="json">Текст файла</param>
+    /// <returns>
+    /// <see langword="true"/>, если это массив без элементов
+    /// </returns>
+    public static bool IsEmptyArray(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(StripFence(json));
+
+            return document.RootElement.ValueKind == JsonValueKind.Array && document.RootElement.GetArrayLength() == 0;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Убирает ограду <c>```json … ```</c>, в которую агенты любят заворачивать ответ
     /// </summary>
     /// <param name="text">Текст файла</param>

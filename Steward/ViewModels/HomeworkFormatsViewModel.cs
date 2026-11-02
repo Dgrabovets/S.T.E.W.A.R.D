@@ -485,7 +485,49 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// </summary>
     /// <param name="Items">Задания или <see langword="null"/>, если их ещё не искали</param>
     /// <param name="Pipeline">Шаги заданий или <see langword="null"/>, если чтение шагов не подключено</param>
-    private sealed record LessonData(IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>? Items, IReadOnlyDictionary<int, ItemPipelineInfo>? Pipeline);
+    /// <param name="Open">Сколько заданий из разбора занятия ещё без реакции владельца</param>
+    private sealed record LessonData(IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>? Items, IReadOnlyDictionary<int, ItemPipelineInfo>? Pipeline, int Open = 0);
+
+    /// <summary>
+    /// Читает состояние каждого задания из разбора занятия: в списке, в Singularity, убрано. Пусто: все задания считаются необработанными
+    /// </summary>
+    public Func<string, IReadOnlyList<AssignmentState>>? AssignmentStateReader { get; set; }
+
+    /// <summary>
+    /// Убирает задание из разбора занятия или возвращает его: ключ занятия, название, признак «убрать». Вызывается в фоновой задаче. Пусто: кнопки «Убрать» нет
+    /// </summary>
+    public Action<string, string, bool>? AssignmentDismisser { get; set; }
+
+    /// <summary>
+    /// Всплывающее окошко внизу приложения: в него приходят сообщения «Задание убрано» с кнопкой «Откатить». Главное окно подставляет своё
+    /// </summary>
+    public ToastViewModel Toast { get; set; } = new();
+
+    /// <summary>
+    /// Считает задания из разбора занятия, на которые владелец ещё не отреагировал. Читает файлы, поэтому вызывается в фоновой задаче; ошибка чтения даёт ноль и пишется в журнал
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="found">Задания, найденные в занятии, или <see langword="null"/>, если их ещё не искали</param>
+    /// <returns>Число неразобранных заданий</returns>
+    private int CountOpen(string lessonId, IReadOnlyList<(int Number, HomeworkItem Item, bool InSingularity)>? found)
+    {
+        try
+        {
+            var tasks = AnalysisReader?.Invoke(lessonId)?.Tasks ?? [];
+            if (tasks.Count == 0)
+                return 0;
+
+            var states = AssignmentStateReader?.Invoke(lessonId) ?? [];
+
+            return tasks.Where((task, index) => (index < states.Count ? states[index] : default).IsOpen && !(found ?? []).Any(row => TaskMatch.Same(row.Item.Title, row.Item.Evidence, task.Title, task.Quote))).Count();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+        {
+            System.Diagnostics.Trace.TraceError($"Неразобранные задания {lessonId}: {exception}");
+
+            return 0;
+        }
+    }
 
     /// <summary>
     /// Прочитанные задания и шаги по ключу занятия: пока идёт новое чтение, карточка показывает прежние, поэтому строки не мигают
@@ -526,6 +568,16 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// Записывает правку условия и замечание вида «условие»: ключ занятия, номер, название, требования. Возвращает предупреждение или пустую строку. Вызывается в фоновой задаче
     /// </summary>
     public Func<string, int, string, string, string>? ConditionFixer { get; set; }
+
+    /// <summary>
+    /// Добавляет в задания занятия задание из отрывка расшифровки: ключ занятия, название, слова преподавателя, срок. Возвращает <see langword="false"/>, если такое задание уже есть. Вызывается в фоновой задаче
+    /// </summary>
+    public Func<string, string, string, string, bool>? AssignmentAdder { get; set; }
+
+    /// <summary>
+    /// Заводит задачу в Singularity по заданию из отрывка, не добавляя его в список: ключ занятия и номер задания в разборе. Возвращает итог и признак ошибки
+    /// </summary>
+    public Func<string, int, Task<(string Message, bool Failed)>>? AssignmentToSingularity { get; set; }
 
     /// <summary>
     /// Делает работу только что сданного задания образцом предмета: ключ занятия и номер. Возвращает, что стало с образцом. Вызывается в фоновой задаче
@@ -629,19 +681,20 @@ public sealed class HomeworkFormatsViewModel : Bindable
             var data = await Task.Run(() =>
             {
                 var found = items?.Invoke(lesson.Id);
+                var open = CountOpen(lesson.Id, found);
                 if (found is null || pipeline is null)
-                    return new LessonData(found, null);
+                    return new LessonData(found, null, open);
 
                 try
                 {
-                    return new LessonData(found, pipeline(lesson.Lesson));
+                    return new LessonData(found, pipeline(lesson.Lesson), open);
                 }
                 catch (Exception exception)
                 {
                     // Задания уже прочитаны: карточка покажет их без шагов, в нейтральном виде
                     System.Diagnostics.Trace.TraceError($"Шаги заданий {lesson.Id}: {exception}");
 
-                    return new LessonData(found, null);
+                    return new LessonData(found, null, open);
                 }
             });
 
@@ -658,6 +711,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
             if (clearError)
                 lesson.ShowResult(string.Empty, failed: false);
 
+            lesson.OpenAssignments = data.Open;
             BuildItems(lesson);
         }
         catch (Exception exception)
@@ -748,8 +802,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
                 entry => CopyCondition(lesson, row.Number),
                 pipeline is not null && pipeline.TryGetValue(row.Number, out var info) ? info : null,
                 actions,
-                _viewed.Contains(ViewedKey(lesson, row.Number))))],
-            found is not null);
+                _viewed.Contains(ViewedKey(lesson, row.Number))))]);
     }
 
     /// <summary>
@@ -831,6 +884,143 @@ public sealed class HomeworkFormatsViewModel : Bindable
             item.Evidence.Length == 0 ? "У этого задания нет цитаты из расшифровки: оно взято из LMS или записано до того, как цитаты стали сохраняться." : lines.Count == 0 ? "Цитату в тексте расшифровки найти не удалось: возможно, преподаватель сказал это другими словами." : string.Empty);
         _readerTab = ReaderTabEnum.Quote;
         RaiseReaderTabs();
+    }
+
+    /// <summary>
+    /// Задания занятия с отрывками расшифровки для вкладки «Задания»
+    /// </summary>
+    private IReadOnlyList<AssignmentExcerptViewModel> _assignments = [];
+
+    /// <summary>
+    /// У занятия есть задания с отрывками: вкладка «Задания» показывается только тогда
+    /// </summary>
+    public bool HasAssignments => _assignments.Count > 0;
+
+    /// <summary>
+    /// Показана вкладка «Задания»
+    /// </summary>
+    public bool IsAssignmentsTab => ActiveReaderTab == ReaderTabEnum.Assignments && HasReaderTabs;
+
+    /// <summary>
+    /// Задания занятия: слова преподавателя, реплики до и после, кнопка «Добавить в задание»
+    /// </summary>
+    public IReadOnlyList<AssignmentExcerptViewModel> Assignments => _assignments;
+
+    /// <summary>
+    /// Собирает задания открытого занятия из разбора. Какие из них уже лежат в списке заданий, определяется по названию и цитате
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <returns>Задания по порядку; пусто, если на занятии заданий не было</returns>
+    private IReadOnlyList<AssignmentExcerptViewModel> BuildAssignments(LessonFormatViewModel lesson)
+    {
+        var tasks = AnalysisReader?.Invoke(lesson.Id)?.Tasks ?? [];
+        var listed = ItemsReader?.Invoke(lesson.Id) ?? [];
+        var states = AssignmentStateReader?.Invoke(lesson.Id) ?? [];
+
+        // Номер задания остаётся номером в разборе, даже если соседнее убрано: по нему заводится задача в Singularity
+        return [.. tasks
+            .Select((task, index) => (Task: task, Index: index, State: index < states.Count ? states[index] : default))
+            .Where(row => !row.State.Dismissed)
+            .Select(row => new AssignmentExcerptViewModel(
+                row.Index + 1,
+                row.Task,
+                row.State.Listed || listed.Any(item => TaskMatch.Same(item.Item.Title, item.Item.Evidence, row.Task.Title, row.Task.Quote)),
+                AssignmentAdder is null ? null : item => Forget(AddAssignmentAsync(lesson, item), lesson),
+                AssignmentToSingularity is null ? null : item => Forget(AssignmentToSingularityAsync(lesson, item), lesson),
+                row.State.InSingularity,
+                AssignmentDismisser is null ? null : item => Forget(DismissAssignmentAsync(lesson, item), lesson)))];
+    }
+
+    /// <summary>
+    /// Убирает задание из разбора занятия в фоновой задаче и показывает окошко «Задание убрано» с кнопкой «Откатить». Убранное задание не считается неразобранным
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="row">Задание на вкладке</param>
+    /// <returns>Задача, которая завершается, когда задание убрано и окошко показано</returns>
+    private async Task DismissAssignmentAsync(LessonFormatViewModel lesson, AssignmentExcerptViewModel row)
+    {
+        try
+        {
+            await Task.Run(() => AssignmentDismisser!(lesson.Id, row.Title, true));
+        }
+        catch (Exception exception)
+        {
+            Fail(lesson, "Не удалось убрать задание: ", exception);
+
+            return;
+        }
+
+        // Остальные строки не пересобираются, чтобы не терять их пояснения под кнопками
+        _assignments = [.. _assignments.Where(item => item != row)];
+        RaiseReaderTabs();
+        Toast.Show($"Задание убрано: {row.Title}", () => Forget(RestoreAssignmentAsync(lesson, row.Title), lesson));
+        await RefreshItemsAsync(lesson);
+    }
+
+    /// <summary>
+    /// Возвращает убранное задание в разбор занятия; если читалка всё ещё открыта на этом занятии, задание снова видно на вкладке «Задания»
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="title">Название задания</param>
+    /// <returns>Задача, которая завершается, когда задание возвращено</returns>
+    private async Task RestoreAssignmentAsync(LessonFormatViewModel lesson, string title)
+    {
+        try
+        {
+            await Task.Run(() => AssignmentDismisser!(lesson.Id, title, false));
+        }
+        catch (Exception exception)
+        {
+            Fail(lesson, "Не удалось вернуть задание: ", exception);
+
+            return;
+        }
+
+        if (OpenLesson == lesson)
+        {
+            _assignments = BuildAssignments(lesson);
+            RaiseReaderTabs();
+        }
+
+        await RefreshItemsAsync(lesson);
+    }
+
+    /// <summary>
+    /// Заводит задачу в Singularity по заданию из отрывка в фоновой задаче, не добавляя задание в список заданий занятия
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="row">Задание на вкладке</param>
+    /// <returns>Задача, которая завершается, когда Singularity ответил и итог показан</returns>
+    private async Task AssignmentToSingularityAsync(LessonFormatViewModel lesson, AssignmentExcerptViewModel row)
+    {
+        row.ReportSingularity("Завожу задачу в Singularity…", created: false);
+        var (message, failed) = await AssignmentToSingularity!(lesson.Id, row.Number);
+        row.ReportSingularity(message, created: !failed);
+        await RefreshItemsAsync(lesson);
+    }
+
+    /// <summary>
+    /// Добавляет задание из отрывка в список заданий занятия в фоновой задаче и сообщает итог на кнопке
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="row">Задание на вкладке</param>
+    /// <returns>Задача, которая завершается, когда задание записано и итог показан</returns>
+    private async Task AddAssignmentAsync(LessonFormatViewModel lesson, AssignmentExcerptViewModel row)
+    {
+        try
+        {
+            var added = await Task.Run(() => AssignmentAdder!(lesson.Id, row.Title, row.Task.Quote, row.Due));
+            var hidden = _stateOf?.Invoke(lesson.Title) is { } state && state is not (LessonStateEnum.Fetch or LessonStateEnum.LmsOnly);
+            row.Report(!added ? "Такое задание уже есть в списке." : hidden ? "Добавлено. Оно появится на вкладке «Домашние задания», когда у предмета выбрано «Расшифровывать»." : "Добавлено: задание на вкладке «Домашние задания».", added: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            row.Report("Не удалось добавить: " + exception.Message, added: false);
+
+            return;
+        }
+
+        await RefreshItemsAsync(lesson);
     }
 
     /// <summary>
@@ -1316,9 +1506,9 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public bool HasReadingDecisions => _reading.Decisions.Count > 0;
 
     /// <summary>
-    /// Есть задачи
+    /// Есть задачи, которые нужно показать в разделе решений. У подробного разбора их нет: те же задания показывает вкладка «Задания», где к ним есть слова преподавателя и кнопки
     /// </summary>
-    public bool HasReadingTasks => _reading.Tasks.Count > 0;
+    public bool HasReadingTasks => !_reading.Detailed && _reading.Tasks.Count > 0;
 
     /// <summary>
     /// Кто сколько говорил, в процентах от всех слов
@@ -1374,7 +1564,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public bool IsTopicsTab => ActiveReaderTab == ReaderTabEnum.Topics && HasReaderTabs;
 
     /// <summary>
-    /// Показан раздел «Решения и задачи»
+    /// Показан раздел «Решения» («Решения и задачи» у короткого резюме)
     /// </summary>
     public bool IsActionsTab => ActiveReaderTab == ReaderTabEnum.Actions && HasReaderTabs;
 
@@ -1409,11 +1599,14 @@ public sealed class HomeworkFormatsViewModel : Bindable
         if (HasReadingPoints || HasReadingOverview)
             tabs.Add((ReaderTabEnum.Covered, "Пройдено"));
 
+        if (HasAssignments)
+            tabs.Add((ReaderTabEnum.Assignments, "Задания"));
+
         if (HasReadingTopics || HasReadingFormulations)
             tabs.Add((ReaderTabEnum.Topics, "Темы"));
 
         if (HasReadingDecisions || HasReadingTasks)
-            tabs.Add((ReaderTabEnum.Actions, "Решения и задачи"));
+            tabs.Add((ReaderTabEnum.Actions, _reading.Detailed ? "Решения" : "Решения и задачи"));
 
         if (HasReadingSpeakers)
             tabs.Add((ReaderTabEnum.Speakers, "Кто говорил"));
@@ -1443,6 +1636,8 @@ public sealed class HomeworkFormatsViewModel : Bindable
         Raise(nameof(IsCoveredTab));
         Raise(nameof(IsTopicsTab));
         Raise(nameof(IsActionsTab));
+        Raise(nameof(IsAssignmentsTab));
+        Raise(nameof(Assignments));
         Raise(nameof(IsSpeakersTab));
     }
 
@@ -1516,6 +1711,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
 
         _reading = TranscriptText.Parse(TranscriptReader?.Invoke(lesson.Id) ?? string.Empty, AnalysisReader?.Invoke(lesson.Id));
         _quote = null;
+        _assignments = BuildAssignments(lesson);
         _readerTab = ReaderTabEnum.Covered;
         OpenLesson = lesson;
         RaiseReading();
@@ -1689,6 +1885,10 @@ public sealed class HomeworkFormatsViewModel : Bindable
     {
         foreach (var other in Subjects)
             other.IsSelected = other == subject;
+
+        // Читалка показывает занятие прежнего предмета, пока не закрыта: при смене предмета она закрывается
+        if (OpenLesson is { } open && (subject is null || open.Title != subject.Title))
+            CloseLesson();
 
         SelectedSubject = subject;
         RefreshGuides();

@@ -447,7 +447,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
 
             var materials = guides.Materials(lesson.Title, null, store.SubjectOptionsFor(lesson.Title).Excluded.ToHashSet(StringComparer.Ordinal));
             var assignments = store.AssignmentFiles(lesson.Title);
-            var prompt = DraftCheckPrompt.Build(lesson, readable, store.ReadItems(lesson.Id) ?? [], store.TranscriptPath(lesson.Id), assignments, materials, report);
+            var prompt = DraftCheckPrompt.Build(lesson, readable, store.ReadItems(lesson.Id) ?? [], store.HasTranscript(lesson.Id) ? store.TranscriptPath(lesson.Id) : string.Empty, assignments, materials, report);
             var error = await agent(prompt, store.Root, [.. materials.Directories, .. assignments.Select(path => Path.GetDirectoryName(path)!).Distinct()], cancellationToken);
             if (error.Length > 0)
                 return error;

@@ -90,7 +90,7 @@ public sealed class GuideScopeTests : IDisposable
 
         File.WriteAllText(Path.Combine(_root, "hw", "subject-options.json"), """{"Философия":{"autoPrepare":true,"taskSource":1}}""");
 
-        Assert.Equal(new SubjectOptions(true, TaskSourceEnum.Lms), store.SubjectOptionsFor("Философия"));
+        Assert.Equal(new SubjectOptions(true), store.SubjectOptionsFor("Философия"));
         Assert.Empty(store.SubjectOptionsFor("Философия").Excluded);
     }
 

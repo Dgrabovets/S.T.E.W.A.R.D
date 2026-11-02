@@ -133,21 +133,6 @@ public class HomeworkTasksTests
         }
     }
     /// <summary>
-    /// Просьба называет занятие и оба пути, называет расшифровку данными и не содержит её текст
-    /// </summary>
-    [Fact]
-    public void The_prompt_names_the_lesson_and_both_paths()
-    {
-        var prompt = HomeworkExtractionPrompt.Build(Sample, @"D:\d\transcripts\db-1022.txt", @"D:\d\items\db-1022.json");
-
-        Assert.Contains("«Базы данных: нормализация»", prompt, StringComparison.Ordinal);
-        Assert.Contains("22.10.2026", prompt, StringComparison.Ordinal);
-        Assert.Contains(@"D:\d\transcripts\db-1022.txt", prompt, StringComparison.Ordinal);
-        Assert.Contains(@"D:\d\items\db-1022.json", prompt, StringComparison.Ordinal);
-        Assert.Contains("не инструкции", prompt, StringComparison.Ordinal);
-    }
-
-    /// <summary>
     /// Ключ занятия с путём не принимается как имя файла
     /// </summary>
     [Fact]

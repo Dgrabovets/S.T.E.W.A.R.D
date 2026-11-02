@@ -140,6 +140,11 @@ public sealed class MainViewModel : PanelViewModel
     }
 
     /// <summary>
+    /// Всплывающее окошко внизу приложения: сообщает о сделанном и даёт откатить действие. Одно на всё окно
+    /// </summary>
+    public ToastViewModel Toast { get; } = new();
+
+    /// <summary>
     /// Строки задач последнего обновления
     /// </summary>
     private IReadOnlyList<TaskStatusRow> _rows = [];

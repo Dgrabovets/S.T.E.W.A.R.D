@@ -399,11 +399,6 @@ public class EducationTests
         Assert.Equal([true, false, false], items.Select(item => item.Done).ToArray());
 
         var lesson = new Lesson("e1", "Гейм-дизайн", new DateOnly(2026, 10, 19));
-        var prompt = HomeworkExtractionPrompt.Build(lesson, "t.txt", "r.json", [new ActivityInfo("Гейм-дизайн", "Задание 1", false, true, "Баланс", new DateOnly(2026, 10, 23)), new ActivityInfo("Гейм-дизайн", "Итоговый тест", true, false)]);
-
-        Assert.Contains("Задание 1; раздел: Баланс; срок: 23.10.2026; сдано", prompt, StringComparison.Ordinal);
-        Assert.Contains("Итоговый тест; раздел: ; срок: нет; не сдано; тест", prompt, StringComparison.Ordinal);
-        Assert.DoesNotContain("Работы предмета в LMS", HomeworkExtractionPrompt.Build(lesson, "t.txt", "r.json"), StringComparison.Ordinal);
 
         var directory = Directory.CreateTempSubdirectory("steward-done-");
         try
@@ -486,13 +481,10 @@ public class EducationTests
             Directory.CreateDirectory(Path.GetDirectoryName(store.TranscriptPath("e1"))!);
             File.WriteAllText(store.TranscriptPath("e1"), "== Расшифровка ==");
 
-            Assert.True(store.ShouldExtract(lesson));
-
             Directory.CreateDirectory(Path.GetDirectoryName(store.ItemsPath("e1"))!);
             File.WriteAllText(store.ItemsPath("e1"), """[{"title":"Один"},{"title":"Два"}]""");
             File.WriteAllText(Path.Combine(directory.FullName, "lessons.json"), """[{"id":"e1","title":"Гейм-дизайн","date":"2026-10-19"}]""");
 
-            Assert.False(store.ShouldExtract(lesson));
             Assert.Equal(2, store.LoadRows().Count);
 
             store.SetArchived("e1", 1, archived: true);
@@ -504,10 +496,6 @@ public class EducationTests
 
             store.SetArchived("e1", 1, archived: false);
             Assert.Equal(2, store.LoadRows().Count);
-
-            store.SetSubjectState("Гейм-дизайн", LessonStateEnum.Analyze);
-            File.Delete(store.ItemsPath("e1"));
-            Assert.False(store.ShouldExtract(lesson));
         }
         finally
         {
@@ -555,7 +543,7 @@ public class EducationTests
         await model.WhenPipelineLoaded();
 
         Assert.False(lesson.CanPrepare);
-        Assert.Contains("ищутся", lesson.ItemsHint, StringComparison.Ordinal);
+        Assert.Contains("Заданий пока нет", lesson.ItemsHint, StringComparison.Ordinal);
 
         searched = true;
         found.Add((1, new HomeworkItem("Отчёт", null, string.Empty, string.Empty), false));
@@ -581,7 +569,7 @@ public class EducationTests
         found.Clear();
         model.Update([(new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)), HomeworkFormatEnum.Word)]);
         await model.WhenPipelineLoaded();
-        Assert.Contains("заданий нет", lesson.ItemsHint, StringComparison.Ordinal);
+        Assert.Contains("вкладке «Задания»", lesson.ItemsHint, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -594,11 +582,9 @@ public class EducationTests
         var item = new HomeworkItem("Отчёт", null, string.Empty, string.Empty);
 
         var draft = DraftBuilder.Prompt(lesson, item, 1, HomeworkFormatEnum.Word, "t.txt", "r.md", null, string.Empty, [@"D:\a\1\assignment.md"]);
-        var search = HomeworkExtractionPrompt.Build(lesson, "t.txt", "r.json", [new ActivityInfo("Гейм-дизайн", "Задание 5", false, false, "Баланс", null, "99")], new Dictionary<string, string> { ["99"] = @"D:\a\99\assignment.md" });
 
         Assert.Contains(@"D:\a\1\assignment.md", draft, StringComparison.Ordinal);
         Assert.Contains("Условия заданий предмета из LMS", draft, StringComparison.Ordinal);
-        Assert.Contains(@"условие и файлы: D:\a\99\assignment.md", search, StringComparison.Ordinal);
         Assert.DoesNotContain("Условия заданий предмета", DraftBuilder.Prompt(lesson, item, 1, HomeworkFormatEnum.Word, "t.txt", "r.md"), StringComparison.Ordinal);
         Assert.True(new PrepareRequest(HomeworkFormatEnum.Word, "замечания", null, Redo: true).Redo);
         Assert.False(PrepareRequest.Default(HomeworkFormatEnum.Word).Redo);
@@ -760,7 +746,7 @@ public class EducationTests
     }
 
     /// <summary>
-    /// Список формата показывается только при «Расшифровывать», а выбор в списке доходит до хранилища
+    /// Список формата показывается только при «Расшифровывать» и «Задания из LMS», а выбор в списке доходит до хранилища
     /// </summary>
     [Fact]
     public void The_format_list_is_shown_only_for_fetching_subjects()
@@ -769,14 +755,17 @@ public class EducationTests
         var subject = new SubjectViewModel("Гейм-дизайн", [], LessonStateEnum.Undecided, (_, state) => chosen.Add(state), HomeworkFormatEnum.Word, (_, _) => { });
 
         Assert.False(subject.ShowFormat);
-        Assert.Equal(["Ждёт решения", "Расшифровывать", "Только анализ", "Не нужно", "Завершён"], subject.StateOptions.Select(option => option.Title).ToArray());
+        Assert.Equal(["Ждёт решения", "Расшифровывать", "Только анализ", "Задания из LMS", "Не нужно", "Завершён"], subject.StateOptions.Select(option => option.Title).ToArray());
 
         subject.SelectedStateOption = subject.StateOptions.Single(option => option.State == LessonStateEnum.Fetch);
         Assert.True(subject.ShowFormat);
 
         subject.SelectedStateOption = subject.StateOptions.Single(option => option.State == LessonStateEnum.Analyze);
         Assert.False(subject.ShowFormat);
-        Assert.Equal([LessonStateEnum.Fetch, LessonStateEnum.Analyze], chosen);
+        subject.SelectedStateOption = subject.StateOptions.Single(option => option.State == LessonStateEnum.LmsOnly);
+        Assert.True(subject.ShowFormat);
+        Assert.Equal("Задания из LMS · Word", subject.Caption);
+        Assert.Equal([LessonStateEnum.Fetch, LessonStateEnum.Analyze, LessonStateEnum.LmsOnly], chosen);
     }
 
     /// <summary>

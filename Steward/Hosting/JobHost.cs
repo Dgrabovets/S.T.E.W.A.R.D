@@ -6,6 +6,7 @@ using Steward.Homework.Services;
 using Steward.Homework.Storage;
 using Steward.Ideas.Models;
 using Steward.Ideas.Storage;
+using Steward.Models;
 using Steward.Status.Common;
 using Steward.Status.Registry;
 using Steward.Status.Rows;
@@ -465,35 +466,9 @@ public sealed class JobHost : IDisposable
     /// <returns>Сколько заданий найдено и текст ошибки, если не получилось</returns>
     public async Task<(int Count, string Error)> PrepareHomeworkAsync(Lesson lesson, PrepareRequest request, CancellationToken cancellationToken)
     {
-        var works = _homework.LoadActivities().Where(work => string.Equals(work.Subject, lesson.Title, StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (_homework.TaskSourceFor(lesson.Title) == TaskSourceEnum.Lms)
-        {
-            // Задания предмета лежат в LMS: карточки строятся по работам LMS без агента и без токенов
-            try
-            {
-                _homework.SyncLmsItems(_homework.LoadLessons());
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                return (0, "Не удалось записать задания из LMS: " + exception.Message);
-            }
-
-            if (_homework.ReadItems(lesson.Id) is null)
-                return (0, "Задания этого предмета берутся из LMS и лежат в самом свежем занятии с расшифровкой, а не в этом");
-        }
-        else if (_homework.ReadItems(lesson.Id) is null)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(_homework.ItemsPath(lesson.Id))!);
-
-            var descriptions = AssignmentDescriptions(works);
-            var prompt = HomeworkExtractionPrompt.ForLesson(_homework, lesson, works, descriptions, LmsSetting("StudentName", string.Empty));
-            var error = await ClaudeAgent.RunLessonAsync(prompt, _homework.Root, [.. descriptions.Values.Select(file => Path.GetDirectoryName(file)!).Distinct()], cancellationToken);
-            if (error.Length > 0)
-                return (0, error);
-        }
-
-        if (_homework.ReadItems(lesson.Id) is not { } found)
-            return (0, "Claude не записал файл заданий");
+        // Задания в список попадают из LMS сами или по кнопке «Добавить в задание» на вкладке «Задания» в расшифровке: агент их в расшифровке больше не ищет
+        if (_homework.ReadItems(lesson.Id) is not { Count: > 0 } found)
+            return (0, "У занятия нет заданий: добавь его на вкладке «Задания» в расшифровке");
 
         // Сданные (по файлу заданий, отметке владельца или LMS) и убранные в архив задания не готовятся и при переделке остаются на месте
         var archivedNumbers = _homework.ArchivedNumbers(lesson.Id);
@@ -563,6 +538,32 @@ public sealed class JobHost : IDisposable
     public void ConfirmItem(string lessonId, int number) => _homework.Confirm(lessonId, number);
 
     /// <summary>
+    /// Добавляет в задания занятия задание из отрывка расшифровки. Пишет файл и может ждать блокировку, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="title">Что нужно сделать</param>
+    /// <param name="quote">Слова преподавателя, на которых основано задание</param>
+    /// <param name="due">Срок как записан в разборе или пустая строка</param>
+    /// <returns><see langword="true"/>, если задание добавлено; <see langword="false"/>, если такое уже есть</returns>
+    public bool AddAssignment(string lessonId, string title, string quote, string due) => _homework.AddItem(lessonId, title, quote, due);
+
+    /// <summary>
+    /// Состояние каждого задания из разбора занятия: в списке, в Singularity, убрано. Читает файлы, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <returns>Состояния по порядку заданий в разборе; пусто, если занятия или разбора нет</returns>
+    public IReadOnlyList<AssignmentState> AssignmentStates(string lessonId) =>
+        FindLesson(lessonId) is { } lesson ? [.. _homework.AssignmentStates(lesson).Select(state => new AssignmentState(state.Listed, state.InSingularity, state.Dismissed))] : [];
+
+    /// <summary>
+    /// Убирает задание из разбора занятия или возвращает его. Пишет файл и может ждать блокировку, поэтому окно вызывает метод из фоновой задачи
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="title">Название задания в разборе</param>
+    /// <param name="dismissed"><see langword="true"/>, чтобы убрать; <see langword="false"/>, чтобы вернуть</param>
+    public void DismissAssignment(string lessonId, string title, bool dismissed) => _homework.SetTaskDismissed(lessonId, title, dismissed);
+
+    /// <summary>
     /// Записывает правку условия и замечание вида «условие» для предмета. Пишет файлы и может ждать блокировку, поэтому окно вызывает метод из фоновой задачи
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
@@ -628,15 +629,6 @@ public sealed class JobHost : IDisposable
     /// <param name="lessonId">Ключ занятия</param>
     /// <returns>Занятие или <see langword="null"/></returns>
     private Lesson? FindLesson(string lessonId) => _homework.LoadLessons().FirstOrDefault(item => item.Id == lessonId);
-
-    /// <summary>
-    /// Путь к описанию каждой работы предмета из LMS, которое выгрузила программа
-    /// </summary>
-    /// <param name="works">Работы предмета</param>
-    /// <returns>Путь к <c>assignment.md</c> по номеру работы</returns>
-    private IReadOnlyDictionary<string, string> AssignmentDescriptions(IReadOnlyList<ActivityInfo> works) => works
-        .Where(work => work.Id.Length > 0 && File.Exists(Path.Combine(_homework.AssignmentDirectory(work.Id), "assignment.md")))
-        .ToDictionary(work => work.Id, work => Path.Combine(_homework.AssignmentDirectory(work.Id), "assignment.md"), StringComparer.Ordinal);
 
     /// <summary>
     /// Копирует файлы с замечаниями преподавателя в <c>.remarks</c> рядом с работой, чтобы агент мог их прочитать, и делает текстовые копии Word и презентаций
@@ -812,7 +804,24 @@ public sealed class JobHost : IDisposable
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="number">Номер задания в занятии</param>
     /// <returns>Итог одной строкой и признак ошибки</returns>
-    public async Task<(string Message, bool Failed)> AddItemToSingularityAsync(string lessonId, int number)
+    public Task<(string Message, bool Failed)> AddItemToSingularityAsync(string lessonId, int number) => RunLmsTaskAsync("task", lessonId, number);
+
+    /// <summary>
+    /// Заводит задачу SingularityApp по заданию из отрывка расшифровки, не добавляя его в список домашних заданий: запускает <c>Steward.Lms.exe note-task</c>
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="index">Номер задания в разборе занятия, с единицы</param>
+    /// <returns>Итог одной строкой и признак ошибки</returns>
+    public Task<(string Message, bool Failed)> AddAssignmentToSingularityAsync(string lessonId, int index) => RunLmsTaskAsync("note-task", lessonId, index);
+
+    /// <summary>
+    /// Запускает <c>Steward.Lms.exe</c> с командой, которая заводит одну задачу, и ждёт минуту
+    /// </summary>
+    /// <param name="command">Команда: <c>task</c> или <c>note-task</c></param>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="number">Номер задания</param>
+    /// <returns>Итог одной строкой и признак ошибки</returns>
+    private static async Task<(string Message, bool Failed)> RunLmsTaskAsync(string command, string lessonId, int number)
     {
         var program = Path.Combine(DataLocation.RepoRootOrStart(), "Steward.Lms", "publish", "Steward.Lms.exe");
         if (!File.Exists(program))
@@ -828,7 +837,7 @@ public sealed class JobHost : IDisposable
             StandardOutputEncoding = System.Text.Encoding.UTF8,
             StandardErrorEncoding = System.Text.Encoding.UTF8,
         };
-        start.ArgumentList.Add("task");
+        start.ArgumentList.Add(command);
         start.ArgumentList.Add(lessonId);
         start.ArgumentList.Add(number.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
@@ -889,9 +898,6 @@ public sealed class JobHost : IDisposable
         var current = _homework.SubjectOptionsFor(subject);
         if (current.AutoPrepare != options.AutoPrepare)
             _homework.SetSubjectAutoPrepare(subject, options.AutoPrepare);
-
-        if (current.TaskSource != options.TaskSource)
-            _homework.SetSubjectTaskSource(subject, options.TaskSource);
 
         if (!current.Excluded.Order(StringComparer.Ordinal).SequenceEqual(options.Excluded.Order(StringComparer.Ordinal), StringComparer.Ordinal))
             _homework.SetSubjectExcludedGuides(subject, options.Excluded);

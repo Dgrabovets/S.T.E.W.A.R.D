@@ -90,53 +90,21 @@ public sealed class SubjectOptionsTests : IDisposable
     }
 
     /// <summary>
-    /// Автоподготовка выключена по умолчанию, включается и выключается у одного предмета, не задевая остальные и источник заданий
+    /// Автоподготовка выключена по умолчанию, включается и выключается у одного предмета, не задевая остальные
     /// </summary>
     [Fact]
     public void Auto_prepare_is_off_by_default_and_changes_one_subject_only()
     {
         Assert.False(_store.SubjectOptionsFor(WITH_TEXT).AutoPrepare);
-        Assert.Equal(TaskSourceEnum.Auto, _store.SubjectOptionsFor(WITH_TEXT).TaskSource);
 
         _store.SetSubjectAutoPrepare(WITH_TEXT, true);
-        _store.SetSubjectTaskSource(WITH_TEXT, TaskSourceEnum.Lms);
 
-        Assert.Equal(new SubjectOptions(true, TaskSourceEnum.Lms), _store.SubjectOptionsFor(WITH_TEXT));
+        Assert.Equal(new SubjectOptions(true), _store.SubjectOptionsFor(WITH_TEXT));
         Assert.Equal(new SubjectOptions(), _store.SubjectOptionsFor(WITHOUT_TEXT));
 
         _store.SetSubjectAutoPrepare(WITH_TEXT, false);
 
-        Assert.Equal(new SubjectOptions(false, TaskSourceEnum.Lms), _store.SubjectOptionsFor(WITH_TEXT));
-    }
-
-    /// <summary>
-    /// «Определять самому»: условие в LMS есть, значит задания там; одна заглушка вместо текста или сданные работы, значит задания на занятии; явный выбор сильнее
-    /// </summary>
-    [Fact]
-    public void The_automatic_source_follows_the_condition_text_in_lms_and_an_explicit_choice_wins()
-    {
-        Assert.Equal(TaskSourceEnum.Lms, _store.TaskSourceFor(WITH_TEXT));
-        Assert.Equal(TaskSourceEnum.Transcript, _store.TaskSourceFor(WITHOUT_TEXT));
-        Assert.Equal(TaskSourceEnum.Transcript, _store.TaskSourceFor("Неизвестный предмет"));
-
-        _store.SetSubjectTaskSource(WITHOUT_TEXT, TaskSourceEnum.Lms);
-        _store.SetSubjectTaskSource(WITH_TEXT, TaskSourceEnum.Transcript);
-
-        Assert.Equal(TaskSourceEnum.Lms, _store.TaskSourceFor(WITHOUT_TEXT));
-        Assert.Equal(TaskSourceEnum.Transcript, _store.TaskSourceFor(WITH_TEXT));
-    }
-
-    /// <summary>
-    /// Поиск заданий агентом не запускается для предмета с заданиями в LMS, но запускается для остальных
-    /// </summary>
-    [Fact]
-    public void The_agent_search_is_skipped_for_a_subject_whose_tasks_are_in_lms()
-    {
-        var philosophy = AddLesson("p1", WITH_TEXT, new DateOnly(2026, 10, 20));
-        var design = AddLesson("g1", WITHOUT_TEXT, new DateOnly(2026, 10, 19));
-
-        Assert.False(_store.ShouldExtract(philosophy));
-        Assert.True(_store.ShouldExtract(design));
+        Assert.Equal(new SubjectOptions(false), _store.SubjectOptionsFor(WITH_TEXT));
     }
 
     /// <summary>
@@ -168,18 +136,110 @@ public sealed class SubjectOptionsTests : IDisposable
     }
 
     /// <summary>
-    /// Предмет с заданиями на занятии и предмет без расшифровки карточек из LMS не получают
+    /// Задания LMS кладутся и к занятию без расшифровки: плашка занятия создаётся сразу, а расшифровка подтянется в неё, когда появится
     /// </summary>
     [Fact]
-    public void Subjects_with_lessons_tasks_or_without_a_transcript_get_no_lms_items()
+    public void Lms_works_land_on_a_lesson_that_has_no_transcript_yet()
     {
-        AddLesson("g1", WITHOUT_TEXT, new DateOnly(2026, 10, 19));
         var noTranscript = new Lesson("p9", WITH_TEXT, new DateOnly(2026, 10, 21));
         _store.SaveLessons([noTranscript]);
         _store.SetSubjectState(WITH_TEXT, LessonStateEnum.Fetch);
 
+        Assert.Equal(2, _store.SyncLmsItems(_store.LoadLessons()));
+        Assert.Equal(["Задание 1", "Задание 2"], _store.ReadItems("p9")!.Select(item => item.Title).ToArray());
+    }
+
+    /// <summary>
+    /// Работа без написанного условия и без приложенного файла в список не попадает, а предмет без отметки «Расшифровывать» не получает ничего
+    /// </summary>
+    [Fact]
+    public void Works_without_an_explicit_condition_and_undecided_subjects_get_nothing()
+    {
+        AddLesson("g1", WITHOUT_TEXT, new DateOnly(2026, 10, 19));
         Assert.Equal(0, _store.SyncLmsItems(_store.LoadLessons()));
         Assert.Null(_store.ReadItems("g1"));
-        Assert.Null(_store.ReadItems("p9"));
+
+        var undecided = new Lesson("u1", "Другой предмет", new DateOnly(2026, 10, 22));
+        _store.SaveLessons([undecided]);
+        Assert.Equal(0, _store.SyncLmsItems(_store.LoadLessons()));
+        Assert.Null(_store.ReadItems("u1"));
+    }
+
+    /// <summary>
+    /// Приложенный файл сам по себе считается формулировкой: условие копируется без агента, даже если текста на странице нет
+    /// </summary>
+    [Fact]
+    public void An_attached_file_alone_counts_as_an_explicit_condition()
+    {
+        AddLesson("g1", WITHOUT_TEXT, new DateOnly(2026, 10, 19));
+        File.WriteAllText(Path.Combine(_store.AssignmentDirectory("21"), "Условие.xlsx"), "данные");
+
+        Assert.Equal(1, _store.SyncLmsItems(_store.LoadLessons()));
+        Assert.Equal(["21"], _store.ReadItems("g1")!.Select(item => item.ActivityId).ToArray());
+    }
+
+    /// <summary>
+    /// Отметка «Задания из LMS»: расшифровку не забирают и занятие не разбирают, а задания из LMS копируются и готовятся
+    /// </summary>
+    [Fact]
+    public void The_lms_only_state_copies_lms_works_but_never_fetches_or_analyzes()
+    {
+        var lesson = new Lesson("p9", WITH_TEXT, new DateOnly(2026, 10, 21), RecordUrl: "https://record.example/9");
+        _store.SaveLessons([lesson]);
+        _store.SetSubjectState(WITH_TEXT, LessonStateEnum.LmsOnly);
+
+        Assert.False(_store.ShouldFetch(lesson));
+        Assert.False(_store.ShouldAnalyze(lesson));
+        Assert.True(_store.PreparesHomework(lesson));
+        Assert.Equal(2, _store.SyncLmsItems(_store.LoadLessons()));
+        Assert.Equal(["Задание 1", "Задание 2"], _store.ReadItems("p9")!.Select(item => item.Title).ToArray());
+    }
+
+    /// <summary>
+    /// Предмет с отметкой «Завершён» работ из LMS не получает
+    /// </summary>
+    [Fact]
+    public void A_finished_subject_gets_no_lms_items()
+    {
+        _store.SaveLessons([new Lesson("p9", WITH_TEXT, new DateOnly(2026, 10, 21))]);
+        _store.SetSubjectState(WITH_TEXT, LessonStateEnum.Done);
+
+        Assert.Equal(0, _store.SyncLmsItems(_store.LoadLessons()));
+    }
+
+    /// <summary>
+    /// Ключи задач Singularity по одному заданию: из списка заданий и из отрывка расшифровки видят друг друга, чтобы две кнопки не создали две задачи
+    /// </summary>
+    [Fact]
+    public void Singularity_keys_link_an_item_with_the_same_excerpt_task()
+    {
+        var lesson = new Lesson("p9", WITH_TEXT, new DateOnly(2026, 10, 21));
+        _store.SaveLessons([lesson]);
+        Directory.CreateDirectory(Path.GetDirectoryName(_store.AnalysisPath("p9"))!);
+        File.WriteAllText(_store.AnalysisPath("p9"), """{"topic":"Т","tasks":[{"title":"Другое","quote":"слова"},{"title":"Отчёт","quote":"сделайте отчёт"}]}""");
+        Assert.True(_store.AddItem("p9", "Отчёт", "сделайте отчёт"));
+
+        Assert.Equal(["hw:p9:1", "hwq:p9:2"], _store.SingularityKeysForItem(lesson, 1));
+        Assert.Equal(["hwq:p9:2", "hw:p9:1"], _store.SingularityKeysForQuote(lesson, 2));
+        Assert.Equal(["hwq:p9:1"], _store.SingularityKeysForQuote(lesson, 1));
+    }
+
+    /// <summary>
+    /// Собственная отметка занятия «Задания из LMS» не даёт забрать расшифровку, даже если у предмета стоит «Расшифровывать»
+    /// </summary>
+    [Fact]
+    public void A_lesson_marked_lms_only_is_not_fetched_under_a_fetching_subject()
+    {
+        var lesson = new Lesson("p9", WITH_TEXT, new DateOnly(2026, 10, 21), RecordUrl: "https://record.example/9");
+        _store.SaveLessons([lesson]);
+        _store.SetSubjectState(WITH_TEXT, LessonStateEnum.Fetch);
+        Assert.True(_store.ShouldFetch(lesson));
+
+        _store.SetState("p9", LessonStateEnum.LmsOnly);
+
+        Assert.False(_store.ShouldFetch(lesson));
     }
 }
+
+
+

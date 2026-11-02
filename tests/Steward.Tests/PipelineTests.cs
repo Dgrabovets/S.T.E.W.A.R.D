@@ -48,19 +48,6 @@ public class PipelineTests
     }
 
     /// <summary>
-    /// Просьба к агенту требует цитату, уверенность и сомнение
-    /// </summary>
-    [Fact]
-    public void The_extraction_prompt_asks_for_evidence_and_confidence()
-    {
-        var prompt = HomeworkExtractionPrompt.Build(Sample, "t.txt", "r.json");
-
-        Assert.Contains("\"evidence\"", prompt);
-        Assert.Contains("\"confidence\"", prompt);
-        Assert.Contains("\"doubt\"", prompt);
-    }
-
-    /// <summary>
     /// Задание с названием и заданными уверенностью, цитатой и сомнением
     /// </summary>
     private static HomeworkItem Item(string confidence, string evidence = "сделайте нормализацию", string doubt = "") =>

@@ -34,18 +34,18 @@ public class ReaderTabsTests
     [Fact]
     public void Only_sections_with_content_get_tabs_and_selecting_one_switches_the_section()
     {
-        var analysis = new LessonAnalysis("Баланс", "Обзор", ["Пройдено"], [new AnalysisTopic("Прогрессия", "Растёт по ступеням")], ["Баланс это согласованность"], [], [new AnalysisTask("Сдать таблицу", string.Empty)]);
+        var analysis = new LessonAnalysis("Баланс", "Обзор", ["Пройдено"], [new AnalysisTopic("Прогрессия", "Растёт по ступеням")], ["Баланс это согласованность"], ["Решили считать баланс по таблице"], [new AnalysisTask("Сдать таблицу", string.Empty)]);
         var (model, _) = Open(analysis, "== Расшифровка ==\n[00:00] Преподаватель: Начинаем.");
 
-        Assert.Equal(["Пройдено", "Темы", "Решения и задачи", "Кто говорил"], model.ReaderTabs.Select(tab => tab.Title).ToArray());
+        Assert.Equal(["Пройдено", "Задания", "Темы", "Решения", "Кто говорил"], model.ReaderTabs.Select(tab => tab.Title).ToArray());
         Assert.True(model.IsCoveredTab);
         Assert.False(model.IsTopicsTab);
 
-        model.ReaderTabs.Single(tab => tab.Title == "Решения и задачи").SelectCommand.Execute(null);
+        model.ReaderTabs.Single(tab => tab.Title == "Решения").SelectCommand.Execute(null);
 
         Assert.True(model.IsActionsTab);
         Assert.False(model.IsCoveredTab);
-        Assert.Equal("Решения и задачи", model.ReaderTabs.Single(tab => tab.IsActive).Title);
+        Assert.Equal("Решения", model.ReaderTabs.Single(tab => tab.IsActive).Title);
     }
 
     /// <summary>
@@ -70,4 +70,23 @@ public class ReaderTabsTests
 
         Assert.Equal(ReaderTabEnum.Topics, model.ActiveReaderTab);
     }
+
+    /// <summary>
+    /// У подробного разбора задачи показывает вкладка «Задания», а раздел называется «Решения»; у короткого резюме из MTS Link задачи остаются в разделе «Решения и задачи»
+    /// </summary>
+    [Fact]
+    public void Tasks_are_listed_once_under_the_assignments_tab_and_stay_in_the_brief_summary()
+    {
+        var detailed = new LessonAnalysis("Баланс", string.Empty, [], [], [], ["Решили"], [new AnalysisTask("Сдать таблицу", string.Empty)]);
+        var (withAnalysis, _) = Open(detailed);
+
+        Assert.False(withAnalysis.HasReadingTasks);
+        Assert.Equal(["Задания", "Решения"], withAnalysis.ReaderTabs.Select(tab => tab.Title).ToArray());
+
+        var (brief, _) = Open(null, "== Резюме ==\nТема встречи: Баланс\n\nЗадачи:\n• Сдать таблицу\n\n== Расшифровка ==");
+
+        Assert.True(brief.HasReadingTasks);
+        Assert.Contains("Решения и задачи", brief.ReaderTabs.Select(tab => tab.Title));
+    }
 }
+

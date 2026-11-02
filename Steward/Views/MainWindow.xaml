@@ -848,6 +848,9 @@
                         </ScrollViewer>
                     </Grid>
                 </Grid>
+
+                <!-- Всплывающее окошко внизу: что сделано и как это откатить -->
+                <views:ToastView Grid.Column="1" DataContext="{Binding Toast}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8,0,24,40"/>
             </Grid>
         </Grid>
     </Border>

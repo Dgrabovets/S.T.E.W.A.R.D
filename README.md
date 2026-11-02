@@ -12,7 +12,7 @@
 | [`Steward.Status/`](Steward.Status/README.md) | Общий формат статуса процессов, реестр задач и раннер, который их запускает |
 | [`Steward.Schedule/`](Steward.Schedule/README.md) | Переносит расписание из Google Таблицы в задачи. Работает в Docker. Библиотеки: `Steward.Schedule.Core` и `Steward.Schedule.Shared` |
 | [`Steward.Mail/`](Steward.Mail/README.md) | Проверяет учебную почту и ставит задачи на письма, которые требуют ответа или содержат отзыв |
-| [`Steward.Homework.Tasks/`](Steward.Homework.Tasks/README.md) | Создаёт задачи SingularityApp по заданиям, которые агент нашёл в расшифровках. Запускается только вручную: в `config/jobs.json` её нет |
+| [`Steward.Homework.Tasks/`](Steward.Homework.Tasks/README.md) | Создаёт задачи SingularityApp по заданиям из списка домашних заданий (из LMS или добавленным владельцем из расшифровки). Запускается только вручную: в `config/jobs.json` её нет |
 | [`Steward.DevTools/`](Steward.DevTools/README.md) | Инструменты разработчика: снимки окон в PNG, проверка живого окна, значки, сканер комментариев. В приложение не входят |
 | [`Steward.Homework/`](Steward.Homework/README.md) | Занятия и выбранный для каждого формат ДЗ (Word, презентация, текст, код, не готовить). Выбор делается в блоке «Форматы заданий» на странице «Домашние задания» |
 | [`Steward.Reels/`](Steward.Reels/README.md) | Бот в Telegram: рилсы превращаются в идеи на странице «Идеи». Идеи хранит библиотека `Steward.Ideas` |

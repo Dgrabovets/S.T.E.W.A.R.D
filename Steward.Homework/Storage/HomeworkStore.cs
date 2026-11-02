@@ -215,7 +215,7 @@ public sealed partial class HomeworkStore(string directory)
     public bool ShouldFetch(Lesson lesson) =>
         lesson.RecordUrl.Length > 0
         && !HasTranscript(lesson.Id)
-        && (StateFor(lesson.Id) is LessonStateEnum.Fetch or LessonStateEnum.Analyze || (SubjectStateFor(lesson.Title) is LessonStateEnum.Fetch or LessonStateEnum.Analyze && StateFor(lesson.Id) is not (LessonStateEnum.Skip or LessonStateEnum.Done)));
+        && (StateFor(lesson.Id) is LessonStateEnum.Fetch or LessonStateEnum.Analyze || (SubjectStateFor(lesson.Title) is LessonStateEnum.Fetch or LessonStateEnum.Analyze && StateFor(lesson.Id) is not (LessonStateEnum.Skip or LessonStateEnum.Done or LessonStateEnum.LmsOnly)));
 
     /// <summary>
     /// Действующая отметка занятия: своя, а если её нет, отметка предмета. Отметки «Не нужно» и «Завершён» у занятия сильнее отметки предмета
@@ -226,7 +226,7 @@ public sealed partial class HomeworkStore(string directory)
     {
         var own = StateFor(lesson.Id);
 
-        return own is LessonStateEnum.Fetch or LessonStateEnum.Analyze or LessonStateEnum.Skip or LessonStateEnum.Done ? own : SubjectStateFor(lesson.Title);
+        return own is LessonStateEnum.Fetch or LessonStateEnum.Analyze or LessonStateEnum.LmsOnly or LessonStateEnum.Skip or LessonStateEnum.Done ? own : SubjectStateFor(lesson.Title);
     }
 
     /// <summary>
@@ -240,13 +240,13 @@ public sealed partial class HomeworkStore(string directory)
         HasTranscript(lesson.Id) && !File.Exists(AnalysisPath(lesson.Id)) && EffectiveState(lesson) is LessonStateEnum.Fetch or LessonStateEnum.Analyze;
 
     /// <summary>
-    /// Нужно ли готовить домашние задания по занятию: отметка «Расшифровывать» и формат не «Не готовить»
+    /// Нужно ли готовить домашние задания по занятию: отметка «Расшифровывать» или «Задания из LMS» и формат не «Не готовить»
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <returns>
     /// <see langword="true"/>, если задания готовятся
     /// </returns>
-    public bool PreparesHomework(Lesson lesson) => EffectiveState(lesson) == LessonStateEnum.Fetch && FormatFor(lesson.Id) != HomeworkFormatEnum.Skip;
+    public bool PreparesHomework(Lesson lesson) => EffectiveState(lesson) is LessonStateEnum.Fetch or LessonStateEnum.LmsOnly && FormatFor(lesson.Id) != HomeworkFormatEnum.Skip;
 
     /// <summary>
     /// Проверяет, лежит ли уже расшифровка занятия
@@ -939,15 +939,6 @@ public sealed partial class HomeworkStore(string directory)
     }
 
     /// <summary>
-    /// Нужно ли искать задания в расшифровке: расшифровка есть, файла заданий нет, занятие готовится как «Расшифровывать» не в формате «Не готовить», а задания предмета не лежат в LMS (их строит <see cref="SyncLmsItems"/> без агента)
-    /// </summary>
-    /// <param name="lesson">Занятие</param>
-    /// <returns>
-    /// <see langword="true"/>, если поиск заданий пора запускать
-    /// </returns>
-    public bool ShouldExtract(Lesson lesson) => HasTranscript(lesson.Id) && !File.Exists(ItemsPath(lesson.Id)) && PreparesHomework(lesson) && TaskSourceFor(lesson.Title) != TaskSourceEnum.Lms;
-
-    /// <summary>
     /// Читает работы из LMS, которые выгрузка записала в <c>activities.json</c>
     /// </summary>
     /// <returns>Работы. Пустой список, если файла нет или он испорчен</returns>
@@ -1038,6 +1029,61 @@ public sealed partial class HomeworkStore(string directory)
             ? item with { Title = fix.Title.Length > 0 ? fix.Title : item.Title, Requirements = fix.Requirements.Length > 0 ? fix.Requirements : item.Requirements }
             : item)];
     }
+
+    /// <summary>
+    /// Добавляет в задания занятия задание, которое владелец выбрал в отрывке расшифровки. Задание встаёт в конец списка, поэтому номера прежних заданий не сдвигаются
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="title">Что нужно сделать</param>
+    /// <param name="quote">Слова преподавателя, на которых основано задание</param>
+    /// <param name="due">Срок или <see langword="null"/>, если его не назвали</param>
+    /// <returns><see langword="true"/>, если задание добавлено; <see langword="false"/>, если такое уже есть</returns>
+    /// <exception cref="IOException">Файл занят дольше ожидания или не записался</exception>
+    public bool AddItem(string lessonId, string title, string quote, string due = "")
+    {
+        var added = false;
+        Locked(() =>
+        {
+            // Читается напрямую, а не через ReadItemsFile: тот при сбое чтения вернул бы пустой список, и запись затёрла бы найденные задания
+            var text = File.Exists(ItemsPath(lessonId)) ? File.ReadAllText(ItemsPath(lessonId)) : "[]";
+            var items = HomeworkItemParser.Parse(text);
+            if (items.Count == 0 && text.Trim().Length > 0 && !HomeworkItemParser.IsEmptyArray(text))
+                throw new InvalidDataException("Файл заданий занятия не читается, добавлять в него нельзя");
+
+            var evidence = quote.Trim();
+            if (items.Any(item => TaskMatch.Same(item.Title, item.Evidence, title, evidence)))
+                return;
+
+            // Срок словами («к следующему занятию») в дату не превращается, поэтому остаётся в требованиях как есть
+            var parsedDue = DueParser.Parse(due, LoadLessons().FirstOrDefault(item => item.Id == lessonId)?.Date ?? DateOnly.FromDateTime(DateTime.Today));
+            var requirements = parsedDue is null && due.Trim().Length > 0 ? $"Срок: {due.Trim()}" : string.Empty;
+            WriteItemsFile(lessonId, [.. items, new HomeworkItem(title.Trim(), parsedDue, requirements, string.Empty, Evidence: evidence, Confidence: "high")]);
+
+            // Владелец выбрал задание сам, поэтому второе подтверждение не нужно
+            ConfirmCore(lessonId, items.Count + 1);
+            added = true;
+        });
+
+        return added;
+    }
+
+    /// <summary>
+    /// Ключи, под которыми задача по заданию из списка могла быть заведена в SingularityApp: свой ключ задания и ключи задач, заведённых по тому же заданию из отрывка расшифровки. Нужны, чтобы две кнопки не создали две задачи
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="number">Номер задания в списке занятия, с единицы</param>
+    /// <returns>Ключи задач; первый всегда ключ самого задания</returns>
+    public IReadOnlyList<string> SingularityKeysForItem(Lesson lesson, int number) =>
+        HomeworkTaskBuilder.KeysForItem(lesson, number, ReadItemsFile(lesson.Id), ReadAnalysis(lesson.Id)?.Tasks ?? []);
+
+    /// <summary>
+    /// Ключи, под которыми задача по заданию из отрывка расшифровки могла быть заведена в SingularityApp: свой ключ и ключи задач по тем же заданиям из списка занятия
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="index">Номер задания в разборе занятия, с единицы</param>
+    /// <returns>Ключи задач; первый всегда ключ самого задания из отрывка</returns>
+    public IReadOnlyList<string> SingularityKeysForQuote(Lesson lesson, int index) =>
+        HomeworkTaskBuilder.KeysForQuote(lesson, index, ReadItemsFile(lesson.Id), ReadAnalysis(lesson.Id)?.Tasks ?? []);
 
     /// <summary>
     /// Файл с правками условий заданий, которые внёс владелец
