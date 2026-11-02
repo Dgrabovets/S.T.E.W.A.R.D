@@ -35,8 +35,11 @@
 
     <!-- Тень -->
     <Color x:Key="ShadowColor">#020617</Color>
+    <!-- Затемнение интерфейса, пока внизу висит окошко с откатом -->
+    <Color x:Key="ScrimColor">#99020617</Color>
 
     <SolidColorBrush x:Key="WindowBrush" Color="{StaticResource WindowColor}"/>
+    <SolidColorBrush x:Key="ScrimBrush" Color="{StaticResource ScrimColor}"/>
     <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
     <SolidColorBrush x:Key="RaisedBrush" Color="{StaticResource RaisedColor}"/>
     <SolidColorBrush x:Key="LineBrush" Color="{StaticResource LineColor}"/>

@@ -953,7 +953,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         // Остальные строки не пересобираются, чтобы не терять их пояснения под кнопками
         _assignments = [.. _assignments.Where(item => item != row)];
         RaiseReaderTabs();
-        Toast.Show($"Задание убрано: {row.Title}", () => Forget(RestoreAssignmentAsync(lesson, row.Title), lesson));
+        Toast.Show("Задание убрано",() => Forget(RestoreAssignmentAsync(lesson, row.Title), lesson));
         await RefreshItemsAsync(lesson);
     }
 

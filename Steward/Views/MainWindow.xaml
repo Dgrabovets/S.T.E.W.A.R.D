@@ -849,6 +849,32 @@
                     </Grid>
                 </Grid>
 
+                <!-- Пока окошко внизу висит, остальной интерфейс приглушён; клики сквозь затемнение проходят -->
+                <Border Grid.ColumnSpan="2" Background="{StaticResource ScrimBrush}" IsHitTestVisible="False" Opacity="0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Toast.IsVisible}" Value="True">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+
                 <!-- Всплывающее окошко внизу: что сделано и как это откатить -->
                 <views:ToastView Grid.Column="1" DataContext="{Binding Toast}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8,0,24,40"/>
             </Grid>

@@ -186,10 +186,7 @@ public sealed class SubjectViewModel : Bindable
             Raise(nameof(Caption));
             Raise(nameof(ShowFormat));
             Raise(nameof(SelectedStateOption));
-            Raise(nameof(AssignmentsText));
-            Raise(nameof(AssignmentsProgress));
-            Raise(nameof(QuizzesText));
-            Raise(nameof(QuizzesProgress));
+            Raise(nameof(IsCompleted));
         }
     }
 
@@ -290,27 +287,27 @@ public sealed class SubjectViewModel : Bindable
     /// <summary>
     /// «Сдано 2 из 3»
     /// </summary>
-    public string AssignmentsText => IsClosed ? "Закрыт досрочно" : _activities.Count(item => !item.IsQuiz) is var total and > 0 ? $"Сдано {_activities.Count(item => !item.IsQuiz && item.Done)} из {total}" : "Заданий нет";
+    public string AssignmentsText => _activities.Count(item => !item.IsQuiz) is var total and > 0 ? $"Сдано {_activities.Count(item => !item.IsQuiz && item.Done)} из {total}" : "Заданий нет";
 
     /// <summary>
-    /// Доля сданных заданий. У досрочно закрытого предмета полная: сдавать больше нечего
+    /// Доля сданных заданий
     /// </summary>
-    public double AssignmentsProgress => IsClosed ? 1 : _activities.Count(item => !item.IsQuiz) is var total and > 0 ? (double)_activities.Count(item => !item.IsQuiz && item.Done) / total : 0;
+    public double AssignmentsProgress => _activities.Count(item => !item.IsQuiz) is var total and > 0 ? (double)_activities.Count(item => !item.IsQuiz && item.Done) / total : 0;
 
     /// <summary>
     /// «Тесты 1 из 2»
     /// </summary>
-    public string QuizzesText => _activities.Count(item => item.IsQuiz) is var total and > 0 ? IsClosed ? "Тесты пройдены" : $"Тесты {_activities.Count(item => item.IsQuiz && item.Done)} из {total}" : "Тестов нет";
+    public string QuizzesText => _activities.Count(item => item.IsQuiz) is var total and > 0 ? $"Тесты {_activities.Count(item => item.IsQuiz && item.Done)} из {total}" : "Тестов нет";
 
     /// <summary>
-    /// Доля пройденных тестов. У досрочно закрытого предмета полная
+    /// Доля пройденных тестов
     /// </summary>
-    public double QuizzesProgress => _activities.Count(item => item.IsQuiz) is var total and > 0 ? IsClosed ? 1 : (double)_activities.Count(item => item.IsQuiz && item.Done) / total : 0;
+    public double QuizzesProgress => _activities.Count(item => item.IsQuiz) is var total and > 0 ? (double)_activities.Count(item => item.IsQuiz && item.Done) / total : 0;
 
     /// <summary>
-    /// Предмет отмечен «Завершён»: владелец закрыл его досрочно, поэтому несданное в LMS в счёт не идёт
+    /// Предмет отмечен «Завершён»: на плитке лента в углу, а счётчики остаются живыми, потому что работы в LMS могут ещё меняться
     /// </summary>
-    private bool IsClosed => State == LessonStateEnum.Done;
+    public bool IsCompleted => State == LessonStateEnum.Done;
 
     /// <summary>
     /// У предмета есть тесты

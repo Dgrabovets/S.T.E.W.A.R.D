@@ -177,7 +177,7 @@ public static class SnapshotRenderer
                 [new StatusChipViewModel("Файл настроек", "найден", PanelToneEnum.Running), new StatusChipViewModel("Пароль приложения", "задан", PanelToneEnum.Running), new StatusChipViewModel("Токен Singularity", "не задан", PanelToneEnum.Attention)],
                 [new StatusChipViewModel("Токен бота", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в Instagram", "firefox", PanelToneEnum.Running)],
                 [new StatusChipViewModel("Вход в LMS", "задан", PanelToneEnum.Running), new StatusChipViewModel("Вход в MTS Link", "сохранён 27.10", PanelToneEnum.Running), new StatusChipViewModel("Запись в Singularity", "выключена", PanelToneEnum.Attention)]);
-            main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", (_, _) => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
+            main.Model.Formats = new HomeworkFormatsViewModel(SampleLessons(), (_, _) => { }, lesson => lesson.Id != "en-1020", (_, _) => Task.FromResult((0, string.Empty)), (_, _) => { }, title => title == "Гейм-дизайн" ? LessonStateEnum.Fetch : title == "Базы данных" ? LessonStateEnum.Done : LessonStateEnum.Undecided, _ => { }, (_, _) => { });
             main.Model.Formats.SubjectOptionsReader = subject => subject == "Гейм-дизайн" ? new SubjectOptions(true) : new SubjectOptions();
             main.Model.Formats.SubjectOptionsSaver = (_, _) => { };
             if (parts.Length > 1 && parts[1].ToLowerInvariant() is "homework" or "transcripts" or "schedule")
@@ -232,6 +232,13 @@ public static class SnapshotRenderer
                     // «main:transcripts:read:tasks»: открыта вкладка «Задания»
                     if (parts.Length > 3 && parts[3].Equals("tasks", StringComparison.OrdinalIgnoreCase))
                         education.ReaderTabs.First(tab => tab.Tab == Steward.Models.ReaderTabEnum.Assignments).SelectCommand.Execute(null);
+
+                    // «main:transcripts:read:toast»: внизу висит окошко «Задание убрано» с откатом, фон приглушён
+                    if (parts.Length > 3 && parts[3].Equals("toast", StringComparison.OrdinalIgnoreCase))
+                    {
+                        education.Toast = main.Model.Toast;
+                        main.Model.Toast.Show("Задание убрано", () => { });
+                    }
                 }
                 else if (parts[2].Equals("settings", StringComparison.OrdinalIgnoreCase))
                 {

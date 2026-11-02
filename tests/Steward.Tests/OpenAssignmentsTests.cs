@@ -61,23 +61,24 @@ public class OpenAssignmentsTests
     }
 
     /// <summary>
-    /// У предмета, закрытого досрочно, плитка показывает закрытие и полные полосы, а не «Сдано 5 из 14»
+    /// Предмет с отметкой «Завершён» получает ленту на плитке, а счётчики остаются живыми и показывают сданное по данным LMS
     /// </summary>
     [Fact]
-    public void A_subject_closed_early_shows_full_bars()
+    public void A_completed_subject_gets_a_ribbon_and_keeps_live_counters()
     {
         var activities = new[] { new ActivityInfo("Философия", "Эссе", false, true), new ActivityInfo("Философия", "Реферат", false, false), new ActivityInfo("Философия", "Тест", true, true) };
-        var subject = new SubjectViewModel("Философия", [], LessonStateEnum.Fetch, (_, _) => { });
+        var subject = new SubjectViewModel("Философия", [], LessonStateEnum.Done, (_, _) => { });
         subject.SetActivities(activities);
+
+        Assert.True(subject.IsCompleted);
         Assert.Equal("Сдано 1 из 2", subject.AssignmentsText);
+        Assert.Equal(0.5, subject.AssignmentsProgress);
+        Assert.Equal("Тесты 1 из 1", subject.QuizzesText);
 
-        var closed = new SubjectViewModel("Философия", [], LessonStateEnum.Done, (_, _) => { });
-        closed.SetActivities(activities);
+        subject.SetActivities([.. activities.Select(item => item with { Done = true })]);
 
-        Assert.Equal("Закрыт досрочно", closed.AssignmentsText);
-        Assert.Equal(1.0, closed.AssignmentsProgress);
-        Assert.Equal("Тесты пройдены", closed.QuizzesText);
-        Assert.Equal(1.0, closed.QuizzesProgress);
+        Assert.Equal("Сдано 2 из 2", subject.AssignmentsText);
+        Assert.False(new SubjectViewModel("Философия", [], LessonStateEnum.Fetch, (_, _) => { }).IsCompleted);
     }
 
     /// <summary>

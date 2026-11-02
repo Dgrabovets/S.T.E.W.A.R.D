@@ -8,6 +8,7 @@
     <CornerRadius x:Key="RadiusFocus">10</CornerRadius>
     <CornerRadius x:Key="RadiusBadge">12</CornerRadius>
     <CornerRadius x:Key="RadiusCard">16</CornerRadius>
+    <CornerRadius x:Key="RadiusRound">17</CornerRadius>
     <CornerRadius x:Key="RadiusWindow">22</CornerRadius>
     <CornerRadius x:Key="RadiusSystemWindow">8</CornerRadius>
 

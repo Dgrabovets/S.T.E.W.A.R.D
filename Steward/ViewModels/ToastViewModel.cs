@@ -38,6 +38,11 @@ public sealed class ToastViewModel : Bindable
     private int _secondsLeft;
 
     /// <summary>
+    /// Сколько времени осталось, от единицы до нуля
+    /// </summary>
+    private double _progress = 1;
+
+    /// <summary>
     /// Номер последнего показа: по нему старый таймер не гасит свежее окошко
     /// </summary>
     private int _version;
@@ -80,13 +85,38 @@ public sealed class ToastViewModel : Bindable
     public bool HasUndo => _undo is not null;
 
     /// <summary>
-    /// Сколько секунд осталось до исчезновения: для подсказки на кнопке
+    /// Сколько секунд осталось до исчезновения: число в кольце
     /// </summary>
     public int SecondsLeft
     {
         get => _secondsLeft;
         private set => Set(ref _secondsLeft, value);
     }
+
+    /// <summary>
+    /// Сколько времени осталось, от единицы до нуля: от этого убывает заливка окошка
+    /// </summary>
+    public double Progress
+    {
+        get => _progress;
+        private set
+        {
+            if (!Set(ref _progress, value))
+                return;
+
+            Raise(nameof(RingOffset));
+        }
+    }
+
+    /// <summary>
+    /// Смещение штриха кольца для кольца диаметром 35 и толщиной 3 (длина окружности 36,65 толщины): кольцо опустошается вместе с временем
+    /// </summary>
+    public double RingOffset => (1 - _progress) * 36.65;
+
+    /// <summary>
+    /// Сколько кадров в секунду перерисовывается обратный отсчёт. В тестах секунда короче 100 миллисекунд и считается одним кадром
+    /// </summary>
+    private int Frames => TickMilliseconds >= 100 ? 10 : 1;
 
     /// <summary>
     /// Откатывает действие и закрывает окошко
@@ -110,6 +140,7 @@ public sealed class ToastViewModel : Bindable
         _undo = undo;
         Text = text;
         SecondsLeft = undo is null ? NOTICE_SECONDS : UNDO_SECONDS;
+        Progress = 1;
         IsVisible = true;
         Raise(nameof(HasUndo));
         System.Windows.Input.CommandManager.InvalidateRequerySuggested();
@@ -131,11 +162,18 @@ public sealed class ToastViewModel : Bindable
     /// <returns>Задача отсчёта</returns>
     private async Task CountDownAsync(int version)
     {
-        while (version == _version && SecondsLeft > 0)
+        var frames = Frames;
+        var total = SecondsLeft * frames;
+        var left = total;
+        while (version == _version && left > 0)
         {
-            await Task.Delay(TickMilliseconds);
-            if (version == _version)
-                SecondsLeft--;
+            await Task.Delay(Math.Max(1, TickMilliseconds / frames));
+            if (version != _version)
+                break;
+
+            left--;
+            Progress = (double)left / total;
+            SecondsLeft = (left + frames - 1) / frames;
         }
 
         if (version == _version)
