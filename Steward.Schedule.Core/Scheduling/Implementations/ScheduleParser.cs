@@ -187,6 +187,8 @@ public static partial class ScheduleParser
             var candidate = new DateOnly(today.Year, month, day);
             if (candidate < today.AddMonths(-4))
                 candidate = candidate.AddYears(1);
+            else if (candidate > today.AddMonths(8))
+                candidate = candidate.AddYears(-1); // декабрьская вкладка в январе: дата прошлого года
 
             return candidate;
         }

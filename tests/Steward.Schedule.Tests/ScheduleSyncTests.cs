@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Steward.Schedule.Common.Helpers;
 using Steward.Schedule.Common.Models;
 using Steward.Schedule.Scheduling.Interfaces;
+using Steward.Schedule.Scheduling.Models;
 using Steward.Schedule.Singularity.Implementations;
 using Steward.Schedule.Singularity.Interfaces;
 using Steward.Schedule.Singularity.Models;
@@ -23,6 +24,57 @@ public class ScheduleSyncTests
     private static readonly DateOnly Today = new(2026, 10, 8);
 
     #region Facts
+
+    /// <summary>
+    /// Когда в таблице появилась вкладка нового месяца, занятия ноября создаются, а занятия октября из прежней вкладки остаются как были
+    /// </summary>
+    [Fact]
+    public async Task Run_reads_the_new_month_tab_as_soon_as_it_appears()
+    {
+        var october = new ScheduleSheet("ОКТЯБРЬ", 10, """
+            ,Дата,время,РКИ-2-26
+            пт,30.10,17.20-18.40,"Октябрьский предмет, Иванов"
+            """);
+        var november = new ScheduleSheet("НОЯБРЬ", 11, """
+            ,Дата,время,РКИ-2-26
+            пн,02.11,17.20-18.40,"Ноябрьский предмет, Петров"
+            вт,03.11,17.20-18.40,"Следующий предмет, Сидоров"
+            """);
+        var client = new FakeClient();
+        client.Tasks.Add(TaskFrom(SampleLesson("up:rki-2-26:2026-10-30:1720", "Октябрьский предмет", "Октябрьский предмет, Иванов"), "T-october", checkState: 1));
+
+        var report = await Sync(new FakeSheets(october, november), client, new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.FromHours(3)), today: new DateOnly(2026, 11, 2));
+
+        Assert.Equal(["Ноябрьский предмет", "Следующий предмет"], client.Created.Select(lesson => lesson.Title).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(2, report.Created);
+        Assert.Empty(client.Completed);
+        Assert.Empty(client.Deleted);
+    }
+
+    /// <summary>
+    /// Неделя на стыке месяцев стоит в двух вкладках: день берётся из вкладки своего месяца, и пустая ячейка соседней вкладки не закрывает чужое занятие
+    /// </summary>
+    [Fact]
+    public async Task Run_prefers_the_tab_of_the_month_the_date_belongs_to()
+    {
+        var october = new ScheduleSheet("ОКТЯБРЬ", 10, """
+            ,Дата,время,РКИ-2-26
+            пт,30.10,17.20-18.40,"Октябрьский предмет, Иванов"
+            пн,02.11,17.20-18.40,
+            """);
+        var november = new ScheduleSheet("НОЯБРЬ", 11, """
+            ,Дата,время,РКИ-2-26
+            пт,30.10,17.20-18.40,
+            пн,02.11,17.20-18.40,"Ноябрьский предмет, Петров"
+            """);
+        var client = new FakeClient();
+
+        await Sync(new FakeSheets(october, november), client, new DateTimeOffset(2026, 10, 31, 12, 0, 0, TimeSpan.FromHours(3)), today: new DateOnly(2026, 10, 31));
+
+        Assert.Contains(client.Created, lesson => lesson.Title == "Октябрьский предмет");
+        Assert.Contains(client.Created, lesson => lesson.Title == "Ноябрьский предмет");
+        Assert.Equal(2, client.Created.Count);
+    }
 
     /// <summary>
     /// Новые ячейки создаются, удалённые отмечаются выполненными, а следующая пара получает пометку
@@ -534,7 +586,7 @@ public class ScheduleSyncTests
     /// <param name="projectTitle">Название проекта для задач</param>
     /// <param name="subjectTags">Включены ли теги предметов</param>
     /// <returns>Отчёт синхронизации</returns>
-    private static Task<SyncReport> Sync(FakeSource source, FakeClient client, DateTimeOffset? now = null, string projectTitle = "РКИ-2-26", bool subjectTags = false)
+    private static Task<SyncReport> Sync(IScheduleSource source, FakeClient client, DateTimeOffset? now = null, string projectTitle = "РКИ-2-26", bool subjectTags = false, DateOnly? today = null)
     {
         var options = new SyncOptions
         {
@@ -549,7 +601,7 @@ public class ScheduleSyncTests
             SubjectTags = subjectTags,
         };
 
-        var sync = new ScheduleSyncer(source, client, new FixedClock(Today, now ?? Moscow(1, 0)), options, NullLogger<ScheduleSyncer>.Instance);
+        var sync = new ScheduleSyncer(source, client, new FixedClock(today ?? Today, now ?? Moscow(1, 0)), options, NullLogger<ScheduleSyncer>.Instance);
         return sync.RunAsync(CancellationToken.None);
     }
 
@@ -634,6 +686,28 @@ public class ScheduleSyncTests
         /// Момент, переданный в конструктор
         /// </summary>
         public DateTimeOffset Now => now;
+    }
+
+    /// <summary>
+    /// Источник расписания с несколькими вкладками месяцев, которые он возвращает без разбора
+    /// </summary>
+    /// <param name="sheets">Вкладки от старой к новой</param>
+    private sealed class FakeSheets(params ScheduleSheet[] sheets) : IScheduleSource
+    {
+        /// <summary>
+        /// Первая вкладка как единственный лист: запасной путь старого источника
+        /// </summary>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>CSV первой вкладки</returns>
+        public Task<string> ReadCsvAsync(CancellationToken cancellationToken) => Task.FromResult(sheets[0].Csv);
+
+        /// <summary>
+        /// Возвращает заранее заданные вкладки
+        /// </summary>
+        /// <param name="today">Не используется</param>
+        /// <param name="cancellationToken">Не используется</param>
+        /// <returns>Вкладки, переданные в конструктор</returns>
+        public Task<IReadOnlyList<ScheduleSheet>> ReadSheetsAsync(DateOnly today, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ScheduleSheet>>(sheets);
     }
 
     /// <summary>
