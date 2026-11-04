@@ -1,3 +1,4 @@
+using System.IO;
 using Steward.Homework.Models;
 using Steward.Hosting;
 using Steward.Ideas.Models;
@@ -730,7 +731,7 @@ public sealed class MainViewModel : PanelViewModel
         var fromJournal = records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).Take(5)
             .SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal))))
             .Take(12).Select(line => MailLetterViewModel.From(line, link => LinkRequested?.Invoke(link)))
-            .Where(letter => !archived.Any(item => string.Equals(item.Subject, letter.Subject, StringComparison.OrdinalIgnoreCase)));
+            .Where(letter => !archived.Any(item => string.Equals(item.Subject, letter.Subject, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Sender, letter.Sender, StringComparison.OrdinalIgnoreCase)));
         MailLetters = [.. archived.Take(MAIL_ARCHIVE_SHOWN), .. fromJournal];
         Raise(nameof(MailLetters));
         Raise(nameof(MailCard));
@@ -775,6 +776,27 @@ public sealed class MainViewModel : PanelViewModel
         .ToArray();
 
     /// <summary>
+    /// Удаляет файл идеи, когда окошко закончилось. Если файл занят, идея возвращается в список, а окошко сообщает о неудаче: иначе рилс «удалён» на экране и тихо появился бы снова при следующем запуске
+    /// </summary>
+    /// <param name="idea">Идея, которую решено удалить</param>
+    private void CommitIdeaRemoval(Idea idea)
+    {
+        try
+        {
+            IdeaRejected?.Invoke(idea);
+            _pendingIdeas.Remove(idea.Id);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Trace.TraceError($"Идея {idea.Id} не удалилась: {exception}");
+            _pendingIdeas.Remove(idea.Id);
+            RebuildIdeas();
+            UpdateNav(WaitingIdeas());
+            Toast.Show("Не удалось удалить рилс: файл занят");
+        }
+    }
+
+    /// <summary>
     /// Прячет идею сразу и показывает окошко «Рилс удалён» с откатом. Файл идеи удаляется, когда окошко закончилось любым способом, кроме отката
     /// </summary>
     /// <param name="idea">Идея, которую решено удалить</param>
@@ -791,11 +813,7 @@ public sealed class MainViewModel : PanelViewModel
                 RebuildIdeas();
                 UpdateNav(WaitingIdeas());
             },
-            () =>
-            {
-                IdeaRejected?.Invoke(idea);
-                _pendingIdeas.Remove(idea.Id);
-            });
+            () => CommitIdeaRemoval(idea));
     }
 
     /// <summary>

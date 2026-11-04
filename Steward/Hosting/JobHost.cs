@@ -560,8 +560,9 @@ public sealed class JobHost : IDisposable
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="title">Название задания в разборе</param>
+    /// <param name="quote">Слова преподавателя из разбора</param>
     /// <param name="dismissed"><see langword="true"/>, чтобы убрать; <see langword="false"/>, чтобы вернуть</param>
-    public void DismissAssignment(string lessonId, string title, bool dismissed) => _homework.SetTaskDismissed(lessonId, title, dismissed);
+    public void DismissAssignment(string lessonId, string title, string quote, bool dismissed) => _homework.SetTaskDismissed(lessonId, title, quote, dismissed);
 
     /// <summary>
     /// Записывает правку условия и замечание вида «условие» для предмета. Пишет файлы и может ждать блокировку, поэтому окно вызывает метод из фоновой задачи

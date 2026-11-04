@@ -1,4 +1,5 @@
 using Steward.Homework.Models;
+using Steward.Ideas.Models;
 using Steward.Models;
 using Steward.ViewModels;
 
@@ -148,7 +149,7 @@ public class OpenAssignmentsTests
         model.AnalysisReader = _ => TwoTasks;
         model.TranscriptReader = _ => "== Расшифровка ==\n[00:01] Преподаватель: сделайте отчёт";
         model.AssignmentStateReader = _ => [.. TwoTasks.Tasks.Select(task => new AssignmentState(false, false, dismissed.Contains(task.Title)))];
-        model.AssignmentDismisser = (_, title, value) =>
+        model.AssignmentDismisser = (_, title, _, value) =>
         {
             calls.Add((title, value));
             if (value)
@@ -255,5 +256,105 @@ public class OpenAssignmentsTests
         await toast.ShowAsync("Четвёртое", () => undone++);
         Assert.False(toast.IsVisible);
         Assert.Equal(0, undone);
+    }
+
+    /// <summary>
+    /// При выходе из приложения убранные задания, которые ещё ждут конца окошка, записываются сразу, а не в фоне
+    /// </summary>
+    [Fact]
+    public void Pending_dismissals_are_written_synchronously_on_exit()
+    {
+        var calls = new List<(string Title, string Quote, bool Dismissed)>();
+        var model = Build(("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)));
+        model.AnalysisReader = _ => TwoTasks;
+        model.TranscriptReader = _ => "== Расшифровка ==\n[00:01] Преподаватель: сделайте отчёт";
+        model.AssignmentDismisser = (_, title, quote, value) => calls.Add((title, quote, value));
+        model.Lessons.Single().OpenCommand.Execute(null);
+        model.Toast.TickMilliseconds = 1000;
+
+        model.Assignments[0].DismissCommand.Execute(null);
+        Assert.Empty(calls);
+
+        model.CommitPendingDismissals();
+
+        Assert.Equal([("Отчёт", "сделайте отчёт", true)], calls);
+    }
+
+    /// <summary>
+    /// Рилс прячется сразу, а файл удаляется только в конце окошка; откат возвращает карточку и ничего не удаляет
+    /// </summary>
+    [Fact]
+    public void A_reel_is_hidden_at_once_removed_at_the_end_and_restored_by_undo()
+    {
+        var removed = new List<string>();
+        var model = new MainViewModel();
+        model.IdeaRejected += idea => removed.Add(idea.Id);
+        Idea Reel(string id) => new() { Id = id, CreatedAt = DateTimeOffset.UtcNow, SourceUrl = "https://example.com/" + id, Title = id };
+        model.Apply(new Steward.Monitoring.Models.SyncSnapshot(), [], [], [], [Reel("a"), Reel("b")]);
+
+        model.Ideas[0].RejectCommand.Execute(null);
+
+        Assert.Single(model.Ideas);
+        Assert.Empty(removed);
+        Assert.Equal("Рилс удалён", model.Toast.Text);
+
+        model.Toast.UndoCommand.Execute(null);
+
+        Assert.Equal(2, model.Ideas.Count);
+        Assert.Empty(removed);
+
+        model.Ideas[0].RejectCommand.Execute(null);
+        model.Toast.CloseCommand.Execute(null);
+
+        Assert.Single(model.Ideas);
+        Assert.Single(removed);
+    }
+
+    /// <summary>
+    /// Если файл рилса занят и удалить его не вышло, рилс возвращается в список, а окошко говорит о неудаче
+    /// </summary>
+    [Fact]
+    public void A_reel_that_cannot_be_deleted_comes_back_with_a_warning()
+    {
+        var model = new MainViewModel();
+        model.IdeaRejected += _ => throw new IOException("файл занят");
+        model.Apply(new Steward.Monitoring.Models.SyncSnapshot(), [], [], [], [new Idea { Id = "a", CreatedAt = DateTimeOffset.UtcNow, SourceUrl = "https://example.com/a", Title = "a" }]);
+
+        model.Ideas[0].RejectCommand.Execute(null);
+        model.Toast.CloseCommand.Execute(null);
+
+        Assert.Single(model.Ideas);
+        Assert.StartsWith("Не удалось удалить", model.Toast.Text);
+    }
+
+    /// <summary>
+    /// Убранное задание узнаётся по словам преподавателя, поэтому не возвращается, когда разбор пересчитан с новой формулировкой; запись в старом виде, с одним названием, по-прежнему работает
+    /// </summary>
+    [Fact]
+    public void A_dismissed_task_survives_a_reworded_analysis_and_legacy_entries_still_match()
+    {
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var store = new Steward.Homework.Storage.HomeworkStore(directory.FullName);
+            var lesson = new Lesson("a", "Гейм-дизайн", new DateOnly(2026, 10, 19));
+            Directory.CreateDirectory(Path.GetDirectoryName(store.AnalysisPath("a"))!);
+            File.WriteAllText(store.AnalysisPath("a"), new LessonAnalysis("Т", string.Empty, [], [], [], [], [new AnalysisTask("Отчёт", string.Empty, "сделайте отчёт")]).ToJson());
+
+            store.SetTaskDismissed("a", "Отчёт", "сделайте отчёт", dismissed: true);
+            File.WriteAllText(store.AnalysisPath("a"), new LessonAnalysis("Т", string.Empty, [], [], [], [], [new AnalysisTask("Написать отчёт по игре", string.Empty, "сделайте отчёт")]).ToJson());
+
+            Assert.True(store.AssignmentStates(lesson).Single().Dismissed);
+
+            File.WriteAllText(Path.Combine(directory.FullName, "task-dismissed.json"), "{\"a\":[\"Написать отчёт по игре\"]}");
+            Assert.True(store.AssignmentStates(lesson).Single().Dismissed);
+
+            store.SetTaskDismissed("a", "Написать отчёт по игре", "сделайте отчёт", dismissed: false);
+            Assert.False(store.AssignmentStates(lesson).Single().Dismissed);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
     }
 }

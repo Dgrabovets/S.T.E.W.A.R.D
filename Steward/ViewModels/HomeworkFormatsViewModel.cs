@@ -494,9 +494,9 @@ public sealed class HomeworkFormatsViewModel : Bindable
     public Func<string, IReadOnlyList<AssignmentState>>? AssignmentStateReader { get; set; }
 
     /// <summary>
-    /// Убирает задание из разбора занятия или возвращает его: ключ занятия, название, признак «убрать». Вызывается в фоновой задаче. Пусто: кнопки «Убрать» нет
+    /// Убирает задание из разбора занятия или возвращает его: ключ занятия, название, слова преподавателя, признак «убрать». Вызывается в фоновой задаче. Пусто: кнопки «Убрать» нет
     /// </summary>
-    public Action<string, string, bool>? AssignmentDismisser { get; set; }
+    public Action<string, string, string, bool>? AssignmentDismisser { get; set; }
 
     /// <summary>
     /// Всплывающее окошко внизу приложения: в него приходят сообщения «Задание убрано» с кнопкой «Откатить». Главное окно подставляет своё
@@ -934,7 +934,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// <summary>
     /// Задания, которые убраны с вкладки, но ещё ждут конца окошка «Задание убрано»: ключ «занятие + название». Пока окошко не закончилось, задание только спрятано и его можно откатить; файл меняется в конце
     /// </summary>
-    private readonly HashSet<string> _pendingDismiss = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (string LessonId, string Title, string Quote)> _pendingDismiss = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Ключ задания в наборе ожидающих
@@ -953,7 +953,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private bool IsPendingDismiss(string lessonId, string title)
     {
         lock (_pendingDismiss)
-            return _pendingDismiss.Contains(PendingKey(lessonId, title));
+            return _pendingDismiss.ContainsKey(PendingKey(lessonId, title));
     }
 
     /// <summary>
@@ -965,13 +965,38 @@ public sealed class HomeworkFormatsViewModel : Bindable
     private Task DismissAssignmentAsync(LessonFormatViewModel lesson, AssignmentExcerptViewModel row)
     {
         lock (_pendingDismiss)
-            _pendingDismiss.Add(PendingKey(lesson.Id, row.Title));
+            _pendingDismiss[PendingKey(lesson.Id, row.Title)] = (lesson.Id, row.Title, row.Task.Quote);
 
         _assignments = [.. _assignments.Where(item => item != row)];
         RaiseReaderTabs();
-        Toast.Show("Задание убрано", () => Forget(UndoDismissAsync(lesson, row.Title), lesson), () => Forget(CommitDismissAsync(lesson, row.Title), lesson));
+        Toast.Show("Задание убрано", () => Forget(UndoDismissAsync(lesson, row.Title), lesson), () => Forget(CommitDismissAsync(lesson, row.Title, row.Task.Quote), lesson));
 
         return RefreshItemsAsync(lesson);
+    }
+
+    /// <summary>
+    /// Записывает в файл все убранные задания, которые ещё ждут конца окошка, и ждёт записи. Вызывается при выходе из приложения: фоновая запись не успела бы до закрытия. Ошибка записи пишется в журнал и не мешает выходу
+    /// </summary>
+    public void CommitPendingDismissals()
+    {
+        (string LessonId, string Title, string Quote)[] pending;
+        lock (_pendingDismiss)
+        {
+            pending = [.. _pendingDismiss.Values];
+            _pendingDismiss.Clear();
+        }
+
+        foreach (var (lessonId, title, quote) in pending)
+        {
+            try
+            {
+                AssignmentDismisser?.Invoke(lessonId, title, quote, true);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                System.Diagnostics.Trace.TraceError($"Убранное задание {lessonId} не записалось при выходе: {exception}");
+            }
+        }
     }
 
     /// <summary>
@@ -999,12 +1024,13 @@ public sealed class HomeworkFormatsViewModel : Bindable
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="title">Название задания в разборе</param>
+    /// <param name="quote">Слова преподавателя из разбора</param>
     /// <returns>Задача, которая завершается, когда файл записан</returns>
-    private async Task CommitDismissAsync(LessonFormatViewModel lesson, string title)
+    private async Task CommitDismissAsync(LessonFormatViewModel lesson, string title, string quote)
     {
         try
         {
-            await Task.Run(() => AssignmentDismisser!(lesson.Id, title, true));
+            await Task.Run(() => AssignmentDismisser!(lesson.Id, title, quote, true));
         }
         catch (Exception exception)
         {

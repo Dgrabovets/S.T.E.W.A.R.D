@@ -60,11 +60,16 @@ public sealed class MailChecker(
         var feedback = new List<MailItem>();
         var replies = new List<MailItem>();
         var info = new List<MailItem>();
+        var done = new List<MailItem>();
 
         foreach (var mail in fresh)
         {
             var category = classifier.Classify(mail);
             var task = MailTaskBuilder.Build(mail, category, settings, dayStart);
+
+            // Архив пишется раньше задачи: если он не записался, письмо остаётся нетронутым и придёт снова, а повторная запись в архив его не задвоит. После создания задачи письмо уже не вернулось бы, потому что внешний ключ задачи пропускает его
+            if (!dryRun && category is MailCategoryEnum.TeacherFeedback or MailCategoryEnum.PersonalReply && !SaveToArchive(mail, category, task is not null, now))
+                continue;
 
             if (task is not null && !dryRun)
                 await singularity.CreateTaskAsync(task, cancellationToken);
@@ -72,8 +77,7 @@ public sealed class MailChecker(
             if (!dryRun)
             {
                 handled.Add(mail.MessageId);
-                if (category is MailCategoryEnum.TeacherFeedback or MailCategoryEnum.PersonalReply)
-                    SaveToArchive(mail, category, task is not null, now);
+                done.Add(mail);
             }
 
             (category switch
@@ -88,8 +92,8 @@ public sealed class MailChecker(
 
         }
 
-        if (!dryRun && fresh.Count > 0)
-            await MarkSeenAsync(fresh, cancellationToken);
+        if (!dryRun && done.Count > 0)
+            await MarkSeenAsync(done, cancellationToken);
 
         var summary = MailSummary.Build(feedback, replies, info);
         log(summary.Replace('\n', ' '));
@@ -101,13 +105,14 @@ public sealed class MailChecker(
     }
 
     /// <summary>
-    /// Кладёт важное письмо в архив. Сбой архива не роняет проверку: задача уже создана, письмо разобрано
+    /// Кладёт важное письмо в архив. Сбой архива не роняет проверку, а только оставляет письмо неразобранным
     /// </summary>
     /// <param name="mail">Письмо</param>
     /// <param name="category">Категория письма</param>
     /// <param name="taskCreated">По письму заведена задача</param>
     /// <param name="now">Время разбора</param>
-    private void SaveToArchive(MailItem mail, MailCategoryEnum category, bool taskCreated, DateTimeOffset now)
+    /// <returns><see langword="true"/>, если письмо в архиве или архива нет; <see langword="false"/>, если записать не вышло</returns>
+    private bool SaveToArchive(MailItem mail, MailCategoryEnum category, bool taskCreated, DateTimeOffset now)
     {
         try
         {
@@ -122,10 +127,14 @@ public sealed class MailChecker(
                 MailText.Truncate(string.Join(' ', mail.Body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)), PREVIEW_LENGTH),
                 MailLinks.Letter(mail, settings.Mail),
                 taskCreated));
+
+            return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            log($"Не удалось сохранить письмо в архив: {exception.Message}");
+            log($"Не удалось сохранить письмо в архив, оно будет разобрано при следующей проверке: {exception.Message}");
+
+            return false;
         }
     }
 

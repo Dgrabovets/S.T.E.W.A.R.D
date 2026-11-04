@@ -9,34 +9,50 @@ namespace Steward.Homework.Storage;
 public sealed partial class HomeworkStore
 {
     /// <summary>
-    /// Файл с заданиями из разбора, которые владелец убрал: по ключу занятия лежат их названия
+    /// Разделитель названия и слов преподавателя в записи убранного задания. Старые записи хранят одно название без разделителя
+    /// </summary>
+    private const char DISMISSED_SEPARATOR = '\n';
+
+    /// <summary>
+    /// Файл с заданиями из разбора, которые владелец убрал: по ключу занятия лежат их записи «название» или «название, разделитель, слова преподавателя»
     /// </summary>
     private string DismissedFile => Path.Combine(directory, "task-dismissed.json");
 
     /// <summary>
-    /// Названия заданий занятия из разбора, которые владелец убрал. Такое задание не считается неразобранным и не показывается на вкладке «Задания»
+    /// Задания занятия из разбора, которые владелец убрал. Такое задание не считается неразобранным и не показывается на вкладке «Задания»
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
-    /// <returns>Названия без учёта регистра; пусто, если ничего не убирали или файл не читается</returns>
-    public IReadOnlySet<string> DismissedTasks(string lessonId) =>
-        (Read<Dictionary<string, List<string>>>(DismissedFile) ?? []).GetValueOrDefault(lessonId)?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    /// <returns>Название и слова преподавателя; пусто, если ничего не убирали или файл не читается</returns>
+    public IReadOnlyList<(string Title, string Quote)> DismissedTasks(string lessonId) =>
+        [.. ((Read<Dictionary<string, List<string>>>(DismissedFile) ?? []).GetValueOrDefault(lessonId) ?? []).Select(entry =>
+        {
+            var at = entry.IndexOf(DISMISSED_SEPARATOR, StringComparison.Ordinal);
+
+            return at < 0 ? (entry, string.Empty) : (entry[..at], entry[(at + 1)..]);
+        })];
 
     /// <summary>
-    /// Убирает задание из разбора занятия или возвращает его
+    /// Убирает задание из разбора занятия или возвращает его. Задание узнаётся по названию или по словам преподавателя, поэтому после пересчёта разбора с новой формулировкой оно не возвращается
     /// </summary>
     /// <param name="lessonId">Ключ занятия</param>
     /// <param name="title">Название задания в разборе</param>
+    /// <param name="quote">Слова преподавателя из разбора; пусто, если их нет</param>
     /// <param name="dismissed"><see langword="true"/>, чтобы убрать; <see langword="false"/>, чтобы вернуть</param>
     /// <exception cref="IOException">Файл занят другим процессом дольше ожидания или не записался</exception>
-    public void SetTaskDismissed(string lessonId, string title, bool dismissed) => Locked(() =>
+    public void SetTaskDismissed(string lessonId, string title, string quote, bool dismissed) => Locked(() =>
     {
         var all = new Dictionary<string, List<string>>(JsonFiles.ReadForWrite<Dictionary<string, List<string>>>(DismissedFile, Json) ?? [], StringComparer.Ordinal);
-        var titles = (all.GetValueOrDefault(lessonId) ?? []).Where(item => !string.Equals(item, title.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
-        if (dismissed)
-            titles.Add(title.Trim());
+        var entries = (all.GetValueOrDefault(lessonId) ?? []).Where(entry =>
+        {
+            var at = entry.IndexOf(DISMISSED_SEPARATOR, StringComparison.Ordinal);
 
-        if (titles.Count > 0)
-            all[lessonId] = titles;
+            return !TaskMatch.Same(at < 0 ? entry : entry[..at], at < 0 ? string.Empty : entry[(at + 1)..], title, quote);
+        }).ToList();
+        if (dismissed)
+            entries.Add(quote.Trim().Length > 0 ? title.Trim() + DISMISSED_SEPARATOR + quote.Trim() : title.Trim());
+
+        if (entries.Count > 0)
+            all[lessonId] = entries;
         else
             all.Remove(lessonId);
 
@@ -44,7 +60,7 @@ public sealed partial class HomeworkStore
     });
 
     /// <summary>
-    /// Состояние каждого задания из разбора занятия: лежит ли оно в списке заданий (в том числе в архиве), заведена ли по нему задача в Singularity, убрал ли его владелец
+    /// Состояние каждого задания из разбора занятия: лежит ли оно в списке заданий (в том числе в архиве), заведена ли по нему задача в Singularity, убрал ли его владелец. Каждый файл читается один раз
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <returns>Состояния по порядку заданий в разборе; пусто, если разбора нет</returns>
@@ -54,13 +70,13 @@ public sealed partial class HomeworkStore
         if (tasks.Count == 0)
             return [];
 
-        var items = ReadItems(lesson.Id) ?? [];
+        var items = ReadItemsFile(lesson.Id);
         var created = LoadCreated();
         var dismissed = DismissedTasks(lesson.Id);
 
         return [.. tasks.Select((task, index) => (
             items.Any(item => TaskMatch.Same(item.Title, item.Evidence, task.Title, task.Quote)),
-            SingularityKeysForQuote(lesson, index + 1).Any(created.Contains),
-            dismissed.Contains(task.Title.Trim())))];
+            HomeworkTaskBuilder.KeysForQuote(lesson, index + 1, items, tasks).Any(created.Contains),
+            dismissed.Any(entry => TaskMatch.Same(entry.Title, entry.Quote, task.Title, task.Quote))))];
     }
 }

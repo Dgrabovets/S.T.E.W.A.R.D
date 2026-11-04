@@ -8,14 +8,9 @@ namespace Steward.ViewModels;
 public sealed class ToastViewModel : Bindable
 {
     /// <summary>
-    /// Сколько секунд окошко с откатом остаётся на экране
+    /// Сколько секунд окошко остаётся на экране
     /// </summary>
-    public const int UNDO_SECONDS = 5;
-
-    /// <summary>
-    /// Сколько секунд остаётся окошко без отката
-    /// </summary>
-    public const int NOTICE_SECONDS = 5;
+    public const int SECONDS = 5;
 
     /// <summary>
     /// Откатывает показанное действие. Пусто, если откат не нужен
@@ -127,7 +122,7 @@ public sealed class ToastViewModel : Bindable
         _undo = undo;
         _commit = commit;
         Text = text;
-        TotalSeconds = undo is null ? NOTICE_SECONDS : UNDO_SECONDS;
+        TotalSeconds = SECONDS;
         SecondsLeft = TotalSeconds;
         IsVisible = true;
         Raise(nameof(HasUndo));

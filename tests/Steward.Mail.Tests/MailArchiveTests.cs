@@ -87,4 +87,40 @@ public class MailArchiveTests
             directory.Delete(recursive: true);
         }
     }
+
+    /// <summary>
+    /// Архив, который не записывает
+    /// </summary>
+    private sealed class BrokenArchive : Steward.Mail.Interfaces.IMailArchive
+    {
+        /// <inheritdoc />
+        public void Add(ArchivedLetter letter) => throw new IOException("файл занят");
+    }
+
+    /// <summary>
+    /// Если важное письмо не легло в архив, задача не создаётся, письмо не считается разобранным и остаётся непрочитанным: оно придёт снова
+    /// </summary>
+    [Fact]
+    public async Task A_letter_the_archive_cannot_store_stays_unhandled_and_unread()
+    {
+        var singularity = new RecordingSingularity();
+        var handled = new FakeHandledMail();
+        var reader = new FakeMailReader([Samples.Mail("reply", hour: 9)]);
+        var checker = new MailChecker(
+            reader,
+            new MailClassifier(Settings.Mail, Settings.Classifier),
+            singularity,
+            handled,
+            new RecordingNotifier(),
+            Settings,
+            new FixedTime(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero)),
+            _ => { },
+            new BrokenArchive());
+
+        await checker.RunAsync(dryRun: false, CancellationToken.None);
+
+        Assert.Empty(singularity.Created);
+        Assert.Empty(handled.Ids);
+        Assert.Empty(reader.Marked);
+    }
 }

@@ -227,7 +227,7 @@ public static class SnapshotRenderer
                 {
                     education.AssignmentAdder = (_, _, _, _) => true;
                     education.AssignmentToSingularity = (_, _) => Task.FromResult(("Задача заведена в Singularity", false));
-                    education.AssignmentDismisser = (_, _, _) => { };
+                    education.AssignmentDismisser = (_, _, _, _) => { };
                     first.OpenCommand.Execute(null);
                     // «main:transcripts:read:tasks»: открыта вкладка «Задания»
                     if (parts.Length > 3 && parts[3].Equals("tasks", StringComparison.OrdinalIgnoreCase))
