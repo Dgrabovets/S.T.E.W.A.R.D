@@ -519,7 +519,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
 
             var states = AssignmentStateReader?.Invoke(lessonId) ?? [];
 
-            return tasks.Where((task, index) => (index < states.Count ? states[index] : default).IsOpen && !(found ?? []).Any(row => TaskMatch.Same(row.Item.Title, row.Item.Evidence, task.Title, task.Quote))).Count();
+            return tasks.Where((task, index) => (index < states.Count ? states[index] : default).IsOpen && !IsPendingDismiss(lessonId, task.Title) && !(found ?? []).Any(row => TaskMatch.Same(row.Item.Title, row.Item.Evidence, task.Title, task.Quote))).Count();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
         {
@@ -920,7 +920,7 @@ public sealed class HomeworkFormatsViewModel : Bindable
         // Номер задания остаётся номером в разборе, даже если соседнее убрано: по нему заводится задача в Singularity
         return [.. tasks
             .Select((task, index) => (Task: task, Index: index, State: index < states.Count ? states[index] : default))
-            .Where(row => !row.State.Dismissed)
+            .Where(row => !row.State.Dismissed && !IsPendingDismiss(lesson.Id, row.Task.Title))
             .Select(row => new AssignmentExcerptViewModel(
                 row.Index + 1,
                 row.Task,
@@ -932,48 +932,88 @@ public sealed class HomeworkFormatsViewModel : Bindable
     }
 
     /// <summary>
-    /// Убирает задание из разбора занятия в фоновой задаче и показывает окошко «Задание убрано» с кнопкой «Откатить». Убранное задание не считается неразобранным
+    /// Задания, которые убраны с вкладки, но ещё ждут конца окошка «Задание убрано»: ключ «занятие + название». Пока окошко не закончилось, задание только спрятано и его можно откатить; файл меняется в конце
+    /// </summary>
+    private readonly HashSet<string> _pendingDismiss = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Ключ задания в наборе ожидающих
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="title">Название задания в разборе</param>
+    /// <returns>Ключ</returns>
+    private static string PendingKey(string lessonId, string title) => lessonId + "|" + title.Trim();
+
+    /// <summary>
+    /// Задание убрано с вкладки и ждёт конца окошка
+    /// </summary>
+    /// <param name="lessonId">Ключ занятия</param>
+    /// <param name="title">Название задания в разборе</param>
+    /// <returns><see langword="true"/>, если задание спрятано, но ещё не записано в файл</returns>
+    private bool IsPendingDismiss(string lessonId, string title)
+    {
+        lock (_pendingDismiss)
+            return _pendingDismiss.Contains(PendingKey(lessonId, title));
+    }
+
+    /// <summary>
+    /// Прячет задание сразу и показывает окошко «Задание убрано» с откатом. Окончательно задание убирается, когда окошко закончилось: время вышло, его закрыли, показали другое или закрылось приложение
     /// </summary>
     /// <param name="lesson">Занятие</param>
     /// <param name="row">Задание на вкладке</param>
-    /// <returns>Задача, которая завершается, когда задание убрано и окошко показано</returns>
-    private async Task DismissAssignmentAsync(LessonFormatViewModel lesson, AssignmentExcerptViewModel row)
+    /// <returns>Задача, которая завершается, когда задание спрятано и окошко показано</returns>
+    private Task DismissAssignmentAsync(LessonFormatViewModel lesson, AssignmentExcerptViewModel row)
+    {
+        lock (_pendingDismiss)
+            _pendingDismiss.Add(PendingKey(lesson.Id, row.Title));
+
+        _assignments = [.. _assignments.Where(item => item != row)];
+        RaiseReaderTabs();
+        Toast.Show("Задание убрано", () => Forget(UndoDismissAsync(lesson, row.Title), lesson), () => Forget(CommitDismissAsync(lesson, row.Title), lesson));
+
+        return RefreshItemsAsync(lesson);
+    }
+
+    /// <summary>
+    /// Откатывает «Убрать»: задание снова на вкладке, файл не менялся
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="title">Название задания в разборе</param>
+    /// <returns>Задача, которая завершается, когда задание возвращено</returns>
+    private Task UndoDismissAsync(LessonFormatViewModel lesson, string title)
+    {
+        lock (_pendingDismiss)
+            _pendingDismiss.Remove(PendingKey(lesson.Id, title));
+
+        if (OpenLesson == lesson)
+        {
+            _assignments = BuildAssignments(lesson);
+            RaiseReaderTabs();
+        }
+
+        return RefreshItemsAsync(lesson);
+    }
+
+    /// <summary>
+    /// Записывает уход задания в файл, когда окошко закончилось. Если записать не вышло, задание возвращается на вкладку, а причина видна в карточке занятия
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    /// <param name="title">Название задания в разборе</param>
+    /// <returns>Задача, которая завершается, когда файл записан</returns>
+    private async Task CommitDismissAsync(LessonFormatViewModel lesson, string title)
     {
         try
         {
-            await Task.Run(() => AssignmentDismisser!(lesson.Id, row.Title, true));
+            await Task.Run(() => AssignmentDismisser!(lesson.Id, title, true));
         }
         catch (Exception exception)
         {
             Fail(lesson, "Не удалось убрать задание: ", exception);
-
-            return;
         }
-
-        // Остальные строки не пересобираются, чтобы не терять их пояснения под кнопками
-        _assignments = [.. _assignments.Where(item => item != row)];
-        RaiseReaderTabs();
-        Toast.Show("Задание убрано",() => Forget(RestoreAssignmentAsync(lesson, row.Title), lesson));
-        await RefreshItemsAsync(lesson);
-    }
-
-    /// <summary>
-    /// Возвращает убранное задание в разбор занятия; если читалка всё ещё открыта на этом занятии, задание снова видно на вкладке «Задания»
-    /// </summary>
-    /// <param name="lesson">Занятие</param>
-    /// <param name="title">Название задания</param>
-    /// <returns>Задача, которая завершается, когда задание возвращено</returns>
-    private async Task RestoreAssignmentAsync(LessonFormatViewModel lesson, string title)
-    {
-        try
+        finally
         {
-            await Task.Run(() => AssignmentDismisser!(lesson.Id, title, false));
-        }
-        catch (Exception exception)
-        {
-            Fail(lesson, "Не удалось вернуть задание: ", exception);
-
-            return;
+            lock (_pendingDismiss)
+                _pendingDismiss.Remove(PendingKey(lesson.Id, title));
         }
 
         if (OpenLesson == lesson)

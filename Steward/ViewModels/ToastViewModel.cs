@@ -3,7 +3,7 @@ using Steward.Mvvm;
 namespace Steward.ViewModels;
 
 /// <summary>
-/// Всплывающее окошко внизу приложения: коротко сообщает о сделанном, при желании даёт откатить действие и гаснет само. Пока оно показано, новое сообщение заменяет прежнее
+/// Всплывающее окошко внизу приложения: коротко сообщает о сделанном, даёт откатить действие и гаснет само. Действие считается окончательным, когда окошко закончилось любым способом, кроме отката: время вышло, окошко закрыли, показали другое или приложение закрывается
 /// </summary>
 public sealed class ToastViewModel : Bindable
 {
@@ -23,6 +23,11 @@ public sealed class ToastViewModel : Bindable
     private Action? _undo;
 
     /// <summary>
+    /// Завершает действие окончательно. Вызывается один раз, если действие не откатили
+    /// </summary>
+    private Action? _commit;
+
+    /// <summary>
     /// Текст сообщения
     /// </summary>
     private string _text = string.Empty;
@@ -36,11 +41,6 @@ public sealed class ToastViewModel : Bindable
     /// Сколько секунд осталось до исчезновения
     /// </summary>
     private int _secondsLeft;
-
-    /// <summary>
-    /// Сколько времени осталось, от единицы до нуля
-    /// </summary>
-    private double _progress = 1;
 
     /// <summary>
     /// Номер последнего показа: по нему старый таймер не гасит свежее окошко
@@ -94,29 +94,14 @@ public sealed class ToastViewModel : Bindable
     }
 
     /// <summary>
-    /// Сколько времени осталось, от единицы до нуля: от этого убывает заливка окошка
+    /// Номер показа: растёт при каждом новом сообщении, и по нему окно заново запускает плавную анимацию заливки и кольца
     /// </summary>
-    public double Progress
-    {
-        get => _progress;
-        private set
-        {
-            if (!Set(ref _progress, value))
-                return;
-
-            Raise(nameof(RingOffset));
-        }
-    }
+    public int Version => _version;
 
     /// <summary>
-    /// Смещение штриха кольца для кольца диаметром 35 и толщиной 3 (длина окружности 36,65 толщины): кольцо опустошается вместе с временем
+    /// Сколько секунд длится отсчёт показанного сообщения
     /// </summary>
-    public double RingOffset => (1 - _progress) * 36.65;
-
-    /// <summary>
-    /// Сколько кадров в секунду перерисовывается обратный отсчёт. В тестах секунда короче 100 миллисекунд и считается одним кадром
-    /// </summary>
-    private int Frames => TickMilliseconds >= 100 ? 10 : 1;
+    public int TotalSeconds { get; private set; }
 
     /// <summary>
     /// Откатывает действие и закрывает окошко
@@ -124,26 +109,32 @@ public sealed class ToastViewModel : Bindable
     public RelayCommand UndoCommand { get; }
 
     /// <summary>
-    /// Закрывает окошко: действие остаётся как есть
+    /// Закрывает окошко: действие становится окончательным
     /// </summary>
     public RelayCommand CloseCommand { get; }
 
     /// <summary>
-    /// Показывает сообщение вместо прежнего и запускает обратный отсчёт
+    /// Показывает сообщение вместо прежнего и запускает обратный отсчёт. Прежнее сообщение при этом заканчивается, и его действие становится окончательным
     /// </summary>
     /// <param name="text">Что сделано</param>
     /// <param name="undo">Откатывает действие. Пусто: кнопки «Откатить» нет, а окошко гаснет быстрее</param>
-    /// <returns>Задача отсчёта, которая завершается, когда окошко погасло или его закрыли; ошибок не выбрасывает</returns>
-    public Task ShowAsync(string text, Action? undo = null)
+    /// <param name="commit">Завершает действие окончательно, когда окошко закончилось без отката</param>
+    /// <returns>Задача отсчёта, которая завершается, когда окошко погасло или его закрыли</returns>
+    public Task ShowAsync(string text, Action? undo = null, Action? commit = null)
     {
+        var previous = _commit;
         var version = ++_version;
         _undo = undo;
+        _commit = commit;
         Text = text;
-        SecondsLeft = undo is null ? NOTICE_SECONDS : UNDO_SECONDS;
-        Progress = 1;
+        TotalSeconds = undo is null ? NOTICE_SECONDS : UNDO_SECONDS;
+        SecondsLeft = TotalSeconds;
         IsVisible = true;
         Raise(nameof(HasUndo));
+        Raise(nameof(TotalSeconds));
+        Raise(nameof(Version));
         System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+        previous?.Invoke();
 
         return CountDownAsync(version);
     }
@@ -153,27 +144,26 @@ public sealed class ToastViewModel : Bindable
     /// </summary>
     /// <param name="text">Что сделано</param>
     /// <param name="undo">Откатывает действие. Пусто: кнопки «Откатить» нет</param>
-    public void Show(string text, Action? undo = null) => _ = ShowAsync(text, undo);
+    /// <param name="commit">Завершает действие окончательно, когда окошко закончилось без отката</param>
+    public void Show(string text, Action? undo = null, Action? commit = null) => _ = ShowAsync(text, undo, commit);
 
     /// <summary>
-    /// Считает секунды и гасит окошко, если за это время его не показали заново и не закрыли
+    /// Заканчивает показанное сообщение сейчас: действие становится окончательным. Вызывается при закрытии приложения, чтобы не потерять действие, которое ещё ждёт отката
+    /// </summary>
+    public void Flush() => Hide();
+
+    /// <summary>
+    /// Считает секунды и гасит окошко, если за это время его не показали заново и не закрыли. Плавность заливки и кольца рисует окно анимацией, здесь меняется только число
     /// </summary>
     /// <param name="version">Номер показа, который гасится</param>
     /// <returns>Задача отсчёта</returns>
     private async Task CountDownAsync(int version)
     {
-        var frames = Frames;
-        var total = SecondsLeft * frames;
-        var left = total;
-        while (version == _version && left > 0)
+        while (version == _version && SecondsLeft > 0)
         {
-            await Task.Delay(Math.Max(1, TickMilliseconds / frames));
-            if (version != _version)
-                break;
-
-            left--;
-            Progress = (double)left / total;
-            SecondsLeft = (left + frames - 1) / frames;
+            await Task.Delay(TickMilliseconds);
+            if (version == _version)
+                SecondsLeft--;
         }
 
         if (version == _version)
@@ -181,23 +171,27 @@ public sealed class ToastViewModel : Bindable
     }
 
     /// <summary>
-    /// Откатывает действие один раз и закрывает окошко
+    /// Откатывает действие один раз и закрывает окошко без окончательного завершения
     /// </summary>
     private void Undo()
     {
         var undo = _undo;
+        _commit = null;
         Hide();
         undo?.Invoke();
     }
 
     /// <summary>
-    /// Прячет окошко и останавливает отсчёт
+    /// Прячет окошко, останавливает отсчёт и завершает действие окончательно, если его не откатили
     /// </summary>
     private void Hide()
     {
+        var commit = _commit;
         _version++;
+        _commit = null;
         _undo = null;
         IsVisible = false;
         Raise(nameof(HasUndo));
+        commit?.Invoke();
     }
 }

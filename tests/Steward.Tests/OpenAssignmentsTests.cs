@@ -137,12 +137,12 @@ public class OpenAssignmentsTests
     }
 
     /// <summary>
-    /// «Убрать» прячет задание и показывает окошко с «Откатить»; откат возвращает задание на вкладку
+    /// Собирает список с открытой читалкой, у которого разбор из двух заданий и записывающая «Убрать» заглушка
     /// </summary>
-    [Fact]
-    public async Task Dismissing_an_assignment_hides_it_and_undo_brings_it_back()
+    /// <param name="calls">Сюда пишутся вызовы записи: название и признак «убрать»</param>
+    /// <returns>Список с открытым занятием</returns>
+    private static HomeworkFormatsViewModel OpenWithDismisser(List<(string Title, bool Dismissed)> calls)
     {
-        var calls = new List<(string Title, bool Dismissed)>();
         var dismissed = new HashSet<string>();
         var model = Build(("a", "Гейм-дизайн", new DateOnly(2026, 10, 19)));
         model.AnalysisReader = _ => TwoTasks;
@@ -153,26 +153,78 @@ public class OpenAssignmentsTests
             calls.Add((title, value));
             if (value)
                 dismissed.Add(title);
-            else
-                dismissed.Remove(title);
         };
-        model.Toast.TickMilliseconds = 1000;
         model.Lessons.Single().OpenCommand.Execute(null);
+
+        return model;
+    }
+
+    /// <summary>
+    /// «Убрать» прячет задание сразу, но файл не трогает, пока окошко висит; «Откатить» возвращает задание, и в файл ничего не записывалось
+    /// </summary>
+    [Fact]
+    public async Task Dismissing_hides_the_assignment_at_once_and_undo_restores_it_without_writing()
+    {
+        var calls = new List<(string Title, bool Dismissed)>();
+        var model = OpenWithDismisser(calls);
+        model.Toast.TickMilliseconds = 1000;
         Assert.Equal(2, model.Assignments.Count);
 
         model.Assignments[0].DismissCommand.Execute(null);
         await Until(() => model.Toast.IsVisible);
 
-        Assert.Equal([("Отчёт", true)], calls);
+        Assert.Empty(calls);
         Assert.Equal(["Прототип"], model.Assignments.Select(row => row.Title).ToArray());
         Assert.True(model.Toast.HasUndo);
+        Assert.Equal("Задание убрано", model.Toast.Text);
 
         model.Toast.UndoCommand.Execute(null);
         await Until(() => model.Assignments.Count == 2);
 
-        Assert.Equal([("Отчёт", true), ("Отчёт", false)], calls);
+        Assert.Empty(calls);
         Assert.False(model.Toast.IsVisible);
         Assert.Equal(["Отчёт", "Прототип"], model.Assignments.Select(row => row.Title).ToArray());
+    }
+
+    /// <summary>
+    /// Когда время окошка вышло, задание убирается окончательно: оно записано в файл и на вкладку не возвращается
+    /// </summary>
+    [Fact]
+    public async Task A_dismissed_assignment_is_removed_for_good_when_the_toast_expires()
+    {
+        var calls = new List<(string Title, bool Dismissed)>();
+        var model = OpenWithDismisser(calls);
+        model.Toast.TickMilliseconds = 1;
+
+        model.Assignments[0].DismissCommand.Execute(null);
+        await Until(() => model.Toast.IsVisible);
+        await Until(() => !model.Toast.IsVisible);
+        await Until(() => calls.Count == 1);
+        await Task.Delay(200);
+
+        Assert.Equal([("Отчёт", true)], calls);
+        Assert.Equal(["Прототип"], model.Assignments.Select(row => row.Title).ToArray());
+        Assert.Equal(1, model.Lessons.Single().OpenAssignments);
+    }
+
+    /// <summary>
+    /// Закрытие окошка и новое окошко тоже делают действие окончательным, а закрытие приложения не теряет его
+    /// </summary>
+    [Fact]
+    public void Closing_replacing_or_flushing_the_toast_commits_the_action()
+    {
+        var committed = new List<string>();
+        var toast = new ToastViewModel();
+
+        toast.Show("Первое", () => { }, () => committed.Add("первое"));
+        toast.CloseCommand.Execute(null);
+        toast.Show("Второе", () => { }, () => committed.Add("второе"));
+        toast.Show("Третье", () => { }, () => committed.Add("третье"));
+        toast.Flush();
+        toast.Show("Четвёртое", () => committed.Add("откат"), () => committed.Add("четвёртое"));
+        toast.UndoCommand.Execute(null);
+
+        Assert.Equal(["первое", "второе", "третье", "откат"], committed);
     }
 
     /// <summary>

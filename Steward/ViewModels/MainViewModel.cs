@@ -690,7 +690,8 @@ public sealed class MainViewModel : PanelViewModel
         BuildTasks();
         Groups = BuildJournal(snapshot, records);
         RegistryErrors = string.Join(Environment.NewLine, registryErrors);
-        Ideas = ideas.Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), picked => IdeaRejected?.Invoke(picked), link => LinkRequested?.Invoke(link))).ToArray();
+        _allIdeas = ideas;
+        RebuildIdeas();
 
         var weekAgo = DateTimeOffset.Now.AddDays(-7);
         var last = snapshot.Entries.Count > 0 ? snapshot.Entries.Max(entry => entry.Time) : (DateTimeOffset?)null;
@@ -731,8 +732,56 @@ public sealed class MainViewModel : PanelViewModel
         Raise(nameof(MailCard));
         Raise(nameof(ScheduleCard));
         Raise(nameof(LmsCard));
-        UpdateNav(ideas.Count(idea => idea.State == IdeaStateEnum.New));
+        UpdateNav(WaitingIdeas());
         ApplySummary(rows);
+    }
+
+    /// <summary>
+    /// Идеи из последнего обновления, в том числе спрятанные до конца окошка «Рилс удалён»
+    /// </summary>
+    private IReadOnlyList<Idea> _allIdeas = [];
+
+    /// <summary>
+    /// Идеи, которые спрятаны с вкладки, но ещё не удалены: пока окошко висит, удаление можно откатить
+    /// </summary>
+    private readonly HashSet<string> _pendingIdeas = [];
+
+    /// <summary>
+    /// Сколько идей ждёт решения, не считая спрятанных
+    /// </summary>
+    /// <returns>Число идей</returns>
+    private int WaitingIdeas() => _allIdeas.Count(idea => idea.State == IdeaStateEnum.New && !_pendingIdeas.Contains(idea.Id));
+
+    /// <summary>
+    /// Собирает карточки из последних идей без спрятанных
+    /// </summary>
+    private void RebuildIdeas() => Ideas = _allIdeas
+        .Where(idea => !_pendingIdeas.Contains(idea.Id))
+        .Select(idea => new IdeaCardViewModel(idea, picked => IdeaApproved?.Invoke(picked), RejectIdea, link => LinkRequested?.Invoke(link)))
+        .ToArray();
+
+    /// <summary>
+    /// Прячет идею сразу и показывает окошко «Рилс удалён» с откатом. Файл идеи удаляется, когда окошко закончилось любым способом, кроме отката
+    /// </summary>
+    /// <param name="idea">Идея, которую решено удалить</param>
+    private void RejectIdea(Idea idea)
+    {
+        _pendingIdeas.Add(idea.Id);
+        RebuildIdeas();
+        UpdateNav(WaitingIdeas());
+        Toast.Show(
+            "Рилс удалён",
+            () =>
+            {
+                _pendingIdeas.Remove(idea.Id);
+                RebuildIdeas();
+                UpdateNav(WaitingIdeas());
+            },
+            () =>
+            {
+                IdeaRejected?.Invoke(idea);
+                _pendingIdeas.Remove(idea.Id);
+            });
     }
 
     /// <summary>

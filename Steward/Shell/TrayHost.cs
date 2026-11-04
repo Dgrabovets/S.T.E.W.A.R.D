@@ -173,6 +173,9 @@ public sealed class TrayHost : IDisposable
 
         _exiting = true;
         _timer.Stop();
+
+        // Окошко с откатом, которое ещё висит, заканчивается сейчас: идея или задание не должны остаться неудалёнными
+        _main?.Model.Toast.Flush();
         _jobs.Dispose();
         _icon.Visible = false;
         _icon.Dispose();
