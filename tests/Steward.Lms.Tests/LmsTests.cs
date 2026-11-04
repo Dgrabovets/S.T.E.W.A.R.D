@@ -193,6 +193,26 @@ public class LmsTests
     }
 
     /// <summary>
+    /// На странице списка тестов LMS ссылки относительные («view.php?id=…»): тесты всё равно находятся, а адрес собирается из папки тестов
+    /// </summary>
+    [Fact]
+    public void Quizzes_with_relative_links_are_found_and_get_a_full_address()
+    {
+        const string html = """
+            <table><tr><th>Секция</th><th>Имя</th><th>Тест закрывается</th><th>Оценка</th></tr>
+            <tr class=""><td class="cell c0">Тема 1</td><td class="cell c1"><a href="view.php?id=1334957">Тест 1</a></td><td class="cell c2">суббота, 31 октября 2026, 20:34</td><td class="cell c3"></td></tr>
+            <tr class=""><td class="cell c0">Тема 2</td><td class="cell c1"><a href="view.php?id=1334958">Тест 2</a></td><td class="cell c2">Нет даты закрытия</td><td class="cell c3">95,00/100,00</td></tr></table>
+            """;
+
+        var items = ActivityParser.ParseQuizzes(html, 5, "C#", "https://lms.ranepa.ru/mod/quiz/");
+
+        Assert.Equal([false, true], items.Select(item => item.Done).ToArray());
+        Assert.Equal("lms:quiz:1334958", items[1].ExternalId);
+        Assert.Equal("https://lms.ranepa.ru/mod/quiz/view.php?id=1334958", items[1].Url);
+        Assert.Empty(ActivityParser.ParseQuizzes(html, 5, "C#"));
+    }
+
+    /// <summary>
     /// Работа с оценкой считается сданной, даже если состояние написано непривычными словами, а тест в строке без столбца оценки читается и считается непройденным
     /// </summary>
     [Fact]

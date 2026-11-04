@@ -56,7 +56,8 @@ internal static class Program
                 new ToastNotifier(),
                 settings,
                 TimeProvider.System,
-                Log);
+                Log,
+                new MailArchive(Path.Combine(DataLocation.DataDirectory(), "mail", "archive.json")));
 
             var result = await checker.RunAsync(dryRun, CancellationToken.None);
 

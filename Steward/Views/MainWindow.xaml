@@ -540,9 +540,9 @@
                                         </StackPanel>
                                     </Border>
                                 </Grid>
-                                <TextBlock Text="Что разобрано последним" Style="{StaticResource TextTitle}" Margin="4,16,0,8"/>
+                                <TextBlock Text="Важные письма" Style="{StaticResource TextTitle}" Margin="4,16,0,8"/>
                                 <TextBlock Style="{StaticResource PageHint}" TextWrapping="Wrap" Margin="4,0,0,8"
-                                           Text="Каждое письмо от человека или с отзывом превращается в задачу в Singularity. Здесь письма из последних проверок."/>
+                                           Text="Каждое письмо от человека или с отзывом превращается в задачу в Singularity и сохраняется здесь: тема, отправитель, когда пришло и начало текста. Письма остаются в списке после проверки."/>
                                 <ItemsControl ItemsSource="{Binding MailLetters}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>

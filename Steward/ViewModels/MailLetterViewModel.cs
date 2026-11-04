@@ -28,6 +28,21 @@ public sealed record MailLetterViewModel(string Kind, string Subject, string Sen
     public bool HasLink => Link.Length > 0;
 
     /// <summary>
+    /// Собирает карточку из письма в архиве: тема, отправитель с адресом, когда письмо пришло, начало текста
+    /// </summary>
+    /// <param name="letter">Письмо из архива</param>
+    /// <param name="open">Действие кнопки «Открыть письмо»: принимает ссылку</param>
+    /// <returns>Карточка письма</returns>
+    public static MailLetterViewModel FromArchive(ArchivedLetter letter, Action<string>? open = null)
+    {
+        var link = Uri.TryCreate(letter.Link, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? letter.Link : string.Empty;
+        var sender = letter.FromName.Length > 0 && letter.FromAddress.Length > 0 ? $"{letter.FromName} <{letter.FromAddress}>" : letter.FromName.Length > 0 ? letter.FromName : letter.FromAddress;
+        var meta = string.Join(" · ", new[] { sender, $"пришло {letter.ReceivedAt.LocalDateTime.ToString("dd.MM HH:mm", CultureInfo.InvariantCulture)}", letter.TaskCreated ? "задача создана в Singularity" : string.Empty }.Where(part => part.Length > 0));
+
+        return new MailLetterViewModel(letter.Kind, letter.Subject, letter.FromName, meta, letter.Kind == "Отзыв" ? PanelToneEnum.Running : PanelToneEnum.Attention, letter.Preview, link, new RelayCommand(() => open?.Invoke(link), () => link.Length > 0));
+    }
+
+    /// <summary>
     /// Собирает карточку из строки вывода почты вида «Ответить: Иванов Иван — Вопрос → задача «…» ‖ ссылка ‖ описание»
     /// </summary>
     /// <param name="line">Строка вывода со временем проверки</param>

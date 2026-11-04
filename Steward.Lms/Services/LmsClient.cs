@@ -130,7 +130,7 @@ public sealed partial class LmsClient : IDisposable
         var assignments = await _http.GetStringAsync(Url($"/mod/assign/index.php?id={course.Id}"), cancellationToken);
         var quizzes = await _http.GetStringAsync(Url($"/mod/quiz/index.php?id={course.Id}"), cancellationToken);
 
-        return [.. ActivityParser.ParseAssignments(assignments, course.Id, course.Subject), .. ActivityParser.ParseQuizzes(quizzes, course.Id, course.Subject)];
+        return [.. ActivityParser.ParseAssignments(assignments, course.Id, course.Subject), .. ActivityParser.ParseQuizzes(quizzes, course.Id, course.Subject, Url("/mod/quiz/"))];
     }
 
     /// <summary>

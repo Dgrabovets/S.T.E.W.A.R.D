@@ -586,6 +586,7 @@ public sealed class TrayHost : IDisposable
     /// </summary>
     private void ApplyMain()
     {
+        _main!.Model.ArchivedLetters = _jobs.ArchivedLetters();
         _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
         _main.ApplyHomework(_jobs.HomeworkRows());
         var root = DataLocation.RepoRootOrStart();

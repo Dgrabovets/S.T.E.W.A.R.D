@@ -10,7 +10,7 @@ public sealed class ToastViewModel : Bindable
     /// <summary>
     /// Сколько секунд окошко с откатом остаётся на экране
     /// </summary>
-    public const int UNDO_SECONDS = 15;
+    public const int UNDO_SECONDS = 5;
 
     /// <summary>
     /// Сколько секунд остаётся окошко без отката

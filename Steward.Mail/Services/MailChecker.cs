@@ -15,6 +15,7 @@ namespace Steward.Mail.Services;
 /// <param name="settings">Настройки приложения</param>
 /// <param name="timeProvider">Часы: от них берётся день начала задачи</param>
 /// <param name="log">Принимает строки лога</param>
+/// <param name="archive">Сохраняет важные письма (от человека и с отзывом) с заголовком, отправителем и началом текста. Пусто: архива нет</param>
 public sealed class MailChecker(
     IMailReader reader,
     IMailClassifier classifier,
@@ -23,12 +24,18 @@ public sealed class MailChecker(
     INotifier notifier,
     AppSettings settings,
     TimeProvider timeProvider,
-    Action<string> log)
+    Action<string> log,
+    IMailArchive? archive = null)
 {
     /// <summary>
     /// Длина описания письма в логе в знаках
     /// </summary>
     private const int DESCRIPTION_LENGTH = 220;
+
+    /// <summary>
+    /// Длина начала письма в архиве в знаках
+    /// </summary>
+    private const int PREVIEW_LENGTH = 500;
 
     /// <summary>
     /// Читает непрочитанные письма, создаёт задачи и пишет по строке на письмо и на итог
@@ -63,7 +70,11 @@ public sealed class MailChecker(
                 await singularity.CreateTaskAsync(task, cancellationToken);
 
             if (!dryRun)
+            {
                 handled.Add(mail.MessageId);
+                if (category is MailCategoryEnum.TeacherFeedback or MailCategoryEnum.PersonalReply)
+                    SaveToArchive(mail, category, task is not null, now);
+            }
 
             (category switch
             {
@@ -87,6 +98,35 @@ public sealed class MailChecker(
             notifier.Show("Учебная почта", summary);
 
         return new MailCheckResult(feedback, replies, info, summary);
+    }
+
+    /// <summary>
+    /// Кладёт важное письмо в архив. Сбой архива не роняет проверку: задача уже создана, письмо разобрано
+    /// </summary>
+    /// <param name="mail">Письмо</param>
+    /// <param name="category">Категория письма</param>
+    /// <param name="taskCreated">По письму заведена задача</param>
+    /// <param name="now">Время разбора</param>
+    private void SaveToArchive(MailItem mail, MailCategoryEnum category, bool taskCreated, DateTimeOffset now)
+    {
+        try
+        {
+            archive?.Add(new ArchivedLetter(
+                mail.MessageId,
+                CategoryLabel(category),
+                mail.FromName,
+                mail.FromAddress,
+                mail.Subject,
+                mail.Date,
+                now,
+                MailText.Truncate(string.Join(' ', mail.Body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)), PREVIEW_LENGTH),
+                MailLinks.Letter(mail, settings.Mail),
+                taskCreated));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            log($"Не удалось сохранить письмо в архив: {exception.Message}");
+        }
     }
 
     /// <summary>

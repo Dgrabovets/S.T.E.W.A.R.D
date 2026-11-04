@@ -941,6 +941,33 @@ public sealed class JobHost : IDisposable
     public IReadOnlyList<Idea> Ideas() => [.. _ideas.LoadAll().Where(idea => idea.State is IdeaStateEnum.New or IdeaStateEnum.Approved)];
 
     /// <summary>
+    /// Читает архив важных писем и перечитывает файл, только когда он изменился
+    /// </summary>
+    /// <returns>Письма от новых к старым</returns>
+    public IReadOnlyList<ArchivedLetter> ArchivedLetters()
+    {
+        var path = Path.Combine(DataLocation.DataDirectory(), "mail", "archive.json");
+        var stamp = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
+        if (stamp != _archiveStamp)
+        {
+            _archive = ArchivedLetter.Load(path);
+            _archiveStamp = stamp;
+        }
+
+        return _archive;
+    }
+
+    /// <summary>
+    /// Прочитанный архив писем
+    /// </summary>
+    private IReadOnlyList<ArchivedLetter> _archive = [];
+
+    /// <summary>
+    /// Время записи файла архива, с которого прочитан <see cref="_archive"/>
+    /// </summary>
+    private DateTime _archiveStamp = DateTime.MinValue;
+
+    /// <summary>
     /// Путь к файлу идеи
     /// </summary>
     /// <param name="id">Идентификатор идеи</param>

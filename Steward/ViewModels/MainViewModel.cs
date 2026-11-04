@@ -725,9 +725,13 @@ public sealed class MainViewModel : PanelViewModel
         Raise(nameof(MailChecksCount));
         Raise(nameof(MailLastCheck));
         Raise(nameof(MailLastTone));
-        MailLetters = [.. records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).Take(5)
+        // Сначала архив важных писем, под ним письма из журнала, которых в архиве нет: они разобраны до появления архива
+        var archived = ArchivedLetters.Select(letter => MailLetterViewModel.FromArchive(letter, link => LinkRequested?.Invoke(link))).ToList();
+        var fromJournal = records.Where(record => record.JobId == "mail").OrderByDescending(record => record.StartedAt).Take(5)
             .SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal))))
-            .Take(12).Select(line => MailLetterViewModel.From(line, link => LinkRequested?.Invoke(link)))];
+            .Take(12).Select(line => MailLetterViewModel.From(line, link => LinkRequested?.Invoke(link)))
+            .Where(letter => !archived.Any(item => string.Equals(item.Subject, letter.Subject, StringComparison.OrdinalIgnoreCase)));
+        MailLetters = [.. archived.Take(MAIL_ARCHIVE_SHOWN), .. fromJournal];
         Raise(nameof(MailLetters));
         Raise(nameof(MailCard));
         Raise(nameof(ScheduleCard));
@@ -735,6 +739,16 @@ public sealed class MainViewModel : PanelViewModel
         UpdateNav(WaitingIdeas());
         ApplySummary(rows);
     }
+
+    /// <summary>
+    /// Сколько писем из архива показывается на странице «Почта»
+    /// </summary>
+    private const int MAIL_ARCHIVE_SHOWN = 50;
+
+    /// <summary>
+    /// Архив важных писем: страница «Почта» показывает его первым. Подставляется перед каждым обновлением
+    /// </summary>
+    public IReadOnlyList<ArchivedLetter> ArchivedLetters { get; set; } = [];
 
     /// <summary>
     /// Идеи из последнего обновления, в том числе спрятанные до конца окошка «Рилс удалён»

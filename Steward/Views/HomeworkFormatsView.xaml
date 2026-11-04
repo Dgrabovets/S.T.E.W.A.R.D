@@ -71,7 +71,7 @@
                             </Border.RenderTransform>
                             <TextBlock Text="Завершён" Foreground="{StaticResource OnAccentBrush}" FontSize="{StaticResource FontSizeCaption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel>
+                        <StackPanel x:Name="Stats">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -94,7 +94,7 @@
                             <ProgressBar Value="{Binding QuizzesProgress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
                         </StackPanel>
                             <!-- Два списка в ряд, а в узкой плитке (маленький экран или крупный масштаб) второй переносится вниз, а не обрезается -->
-                            <WrapPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,8,0,0">
+                            <WrapPanel x:Name="Pickers" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,8,0,0">
                                 <ComboBox Style="{StaticResource FieldChoice}" Width="172" Margin="4,4,4,0"
                                           ItemsSource="{Binding StateOptions}" SelectedItem="{Binding SelectedStateOption, Mode=TwoWay}"
                                           Visibility="{Binding HasStates, Converter={StaticResource BoolToVisibility}}">
@@ -133,6 +133,9 @@
                         <DataTrigger Binding="{Binding State}" Value="{x:Static hw:LessonStateEnum.Done}">
                             <Setter TargetName="Bar" Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
                             <Setter TargetName="Ribbon" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Tile" Property="Background" Value="{StaticResource WindowBrush}"/>
+                            <Setter TargetName="Stats" Property="Opacity" Value="0.55"/>
+                            <Setter TargetName="Pickers" Property="Opacity" Value="0.75"/>
                             <Setter TargetName="Marks" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="TitleText" Property="Margin" Value="0,0,30,0"/>
                         </DataTrigger>

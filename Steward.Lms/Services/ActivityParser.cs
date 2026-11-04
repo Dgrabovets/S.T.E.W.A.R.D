@@ -48,17 +48,27 @@ public static partial class ActivityParser
     /// <param name="html">Код страницы</param>
     /// <param name="courseId">Номер курса</param>
     /// <param name="subject">Название предмета</param>
+    /// <param name="quizFolder">Адрес папки тестов, например <c>https://lms.example/mod/quiz/</c>: на странице списка ссылки относительные («view.php?id=…»), и по ним собирается полный адрес. Пусто: берутся только полные ссылки</param>
     /// <returns>Тесты в порядке страницы. Пусто, если таблицы нет</returns>
-    public static IReadOnlyList<LmsActivity> ParseQuizzes(string html, int courseId, string subject)
+    public static IReadOnlyList<LmsActivity> ParseQuizzes(string html, int courseId, string subject, string quizFolder = "")
     {
         var result = new List<LmsActivity>();
         foreach (var row in Rows(html))
         {
-            if (row.Cells.Count < 3 || Link().Match(row.Html) is not { Success: true } link || link.Groups[1].Value != "quiz")
+            if (row.Cells.Count < 3)
+                continue;
+
+            string id;
+            string url;
+            if (Link().Match(row.Html) is { Success: true } link && link.Groups[1].Value == "quiz")
+                (id, url) = (link.Groups[2].Value, link.Value);
+            else if (quizFolder.Length > 0 && RelativeQuizLink().Match(row.Html) is { Success: true } relative)
+                (id, url) = (relative.Groups[1].Value, $"{quizFolder.TrimEnd('/')}/view.php?id={relative.Groups[1].Value}");
+            else
                 continue;
 
             var grade = row.Cells.Count > 3 ? CleanGrade(row.Cells[3]) : string.Empty;
-            result.Add(new LmsActivity(link.Groups[2].Value, ActivityKindEnum.Quiz, courseId, subject, row.Cells[0], row.Cells[1], ParseDue(row.Cells[2]), grade.Length > 0 ? $"Оценка {grade}" : "Не пройден", grade, grade.Length > 0, link.Value));
+            result.Add(new LmsActivity(id, ActivityKindEnum.Quiz, courseId, subject, row.Cells[0], row.Cells[1], ParseDue(row.Cells[2]), grade.Length > 0 ? $"Оценка {grade}" : "Не пройден", grade, grade.Length > 0, url));
         }
 
         return result;
@@ -147,6 +157,13 @@ public static partial class ActivityParser
     /// <returns>Регулярное выражение, группы: вид, номер</returns>
     [GeneratedRegex("https?://[^\"'\\s]+/mod/(assign|quiz)/view\\.php\\?id=(\\d+)", RegexOptions.CultureInvariant)]
     private static partial Regex Link();
+
+    /// <summary>
+    /// Относительная ссылка на тест на странице списка тестов: «view.php?id=1334958»
+    /// </summary>
+    /// <returns>Регулярное выражение с номером теста в первой группе</returns>
+    [GeneratedRegex("href=\"view\\.php\\?id=(\\d+)\"", RegexOptions.CultureInvariant)]
+    private static partial Regex RelativeQuizLink();
 
     /// <summary>
     /// Срок: день, месяц словом, год, часы и минуты
