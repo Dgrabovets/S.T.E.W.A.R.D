@@ -1,14 +1,18 @@
+using System.Diagnostics;
+using Steward.Ideas.Models;
 using Steward.Status.Running;
 using Steward.Status.Common;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using Steward.Homework.Models;
 using Steward.Hosting;
 using Steward.Models;
 using Steward.Monitoring.Implementations;
 using Steward.Monitoring.Models;
 using Steward.Status.Rows;
+using Steward.ViewModels;
 using Steward.Views;
 
 namespace Steward.Shell;
@@ -44,9 +48,14 @@ public sealed class TrayHost : IDisposable
     private readonly DockerSyncProbe _probe = new(DataLocation.RepoRootOrStart());
 
     /// <summary>
-    /// Панель с подробностями
+    /// Список занятий с выбором формата ДЗ: общий для окна и страницы, чтобы идущая подготовка заданий не сбрасывалась
     /// </summary>
-    private readonly StatusWindow _window = new();
+    private HomeworkFormatsViewModel? _formats;
+
+    /// <summary>
+    /// Меню иконки, пока оно открыто
+    /// </summary>
+    private TrayMenuPopup? _trayMenu;
 
     /// <summary>
     /// Иконка трея
@@ -59,19 +68,19 @@ public sealed class TrayHost : IDisposable
     private readonly DispatcherTimer _timer = new() { Interval = POLL_INTERVAL };
 
     /// <summary>
-    /// Значок работающего процесса
+    /// Текущая иконка: её нужно освободить, когда рисуется новая
     /// </summary>
-    private readonly Icon _runningIcon = CreateIcon(TrayPalette.Ok);
+    private Icon? _current;
 
     /// <summary>
-    /// Значок остановленного процесса
+    /// Перерисовывает иконку, пока что-то выполняется: сфера на ней вращается
     /// </summary>
-    private readonly Icon _stoppedIcon = CreateIcon(TrayPalette.Idle);
+    private readonly DispatcherTimer _iconTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
 
     /// <summary>
-    /// Значок ошибки
+    /// Вид и цвет сферы, которая сейчас на иконке
     /// </summary>
-    private readonly Icon _errorIcon = CreateIcon(TrayPalette.Danger);
+    private (ActivityKindEnum Kind, string Brush) _orb = (ActivityKindEnum.Dormant, "IdleBrush");
 
     /// <summary>
     /// Последний снимок
@@ -125,75 +134,34 @@ public sealed class TrayHost : IDisposable
     /// </summary>
     public TrayHost()
     {
-        var menu = new ContextMenuStrip
-        {
-            Renderer = new MenuRenderer(),
-            Font = new Font("Segoe UI", 10F),
-            BackColor = TrayPalette.Surface,
-            ForeColor = TrayPalette.Text,
-            ShowImageMargin = false,
-            Padding = new Padding(4, 6, 4, 6),
-        };
-
-        menu.Items.Add(Item("Открыть приложение", (_, _) => ShowMain()));
-        menu.Items.Add(Item("Быстрый статус", (_, _) => ShowWindow()));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Item("Выход", (_, _) => Exit()));
-
         _icon = new NotifyIcon
         {
-            Icon = _stoppedIcon,
             Visible = true,
             Text = "Расписание",
-            ContextMenuStrip = menu,
         };
 
+        // Левая кнопка открывает единственное окно приложения, правая даёт короткое меню в стилистике приложения
         _icon.MouseClick += (_, args) =>
         {
             if (args.Button == MouseButtons.Left)
-                ShowWindow();
+                ShowMain();
+            else if (args.Button == MouseButtons.Right)
+                ShowTrayMenu();
         };
 
-        _icon.DoubleClick += (_, _) => ShowMain();
         _icon.BalloonTipClicked += (_, _) => ShowMain();
-        _window.ExitRequested += (_, _) => Exit();
-        _window.OpenAppRequested += (_, _) =>
-        {
-            _window.Hide();
-            ShowMain();
-        };
 
-        _window.RestartRequested += async (_, _) =>
-        {
-            var restarted = await _probe.RestartAsync(CancellationToken.None);
-            if (_exiting)
-                return;
-
-            _window.SetSettingsStatus(restarted
-                ? "Контейнер перезапущен"
-                : "Не удалось перезапустить контейнер");
-
-            if (restarted)
-                await RefreshAsync();
-        };
+        _iconTimer.Tick += (_, _) => RenderIcon();
+        RenderIcon();
 
         _timer.Tick += async (_, _) => await RefreshAsync();
         _timer.Start();
         _ = RefreshAsync();
 
         _jobs.Changed += (_, _) => ApplyAll();
+        _jobs.WorksReady += (_, works) => NotifyWorksReady(works);
         _jobs.Start();
     }
-
-    /// <summary>
-    /// Удаляет значок, созданный через <c>GetHicon</c>
-    /// </summary>
-    /// <param name="handle">Дескриптор значка</param>
-    /// <returns>
-    /// <see langword="true"/>, если значок удалён
-    /// </returns>
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool DestroyIcon(IntPtr handle);
 
     /// <summary>
     /// Освобождает иконку
@@ -205,14 +173,16 @@ public sealed class TrayHost : IDisposable
 
         _exiting = true;
         _timer.Stop();
+
+        // Окошко с откатом, которое ещё висит, заканчивается сейчас: идея или задание не должны остаться неудалёнными
+        _formats?.CommitPendingDismissals();
+        _main?.Model.Toast.Flush();
         _jobs.Dispose();
         _icon.Visible = false;
         _icon.Dispose();
-        _window.Close();
         _main?.CloseForExit();
-        _runningIcon.Dispose();
-        _stoppedIcon.Dispose();
-        _errorIcon.Dispose();
+        _iconTimer.Stop();
+        _current?.Dispose();
     }
 
     #endregion Lifetime
@@ -220,62 +190,45 @@ public sealed class TrayHost : IDisposable
     #region Icon
 
     /// <summary>
-    /// Рисует скруглённый значок календаря
+    /// Рисует на иконке сферу текущего вида и цвета. Старая иконка освобождается
     /// </summary>
-    /// <param name="color">Цвет фона значка</param>
-    /// <returns>Иконка 32 на 32</returns>
-    private static Icon CreateIcon(Color color)
+    private void RenderIcon()
     {
-        using var bitmap = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
-        using var graphics = Graphics.FromImage(bitmap);
-        graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        graphics.Clear(Color.Transparent);
+        if (_exiting)
+            return;
 
-        using (var shape = Rounded(new Rectangle(1, 1, 30, 30), 8))
-        using (var brush = new SolidBrush(color))
-            graphics.FillPath(brush, shape);
-
-        using var white = new SolidBrush(Color.White);
-        graphics.FillRectangle(white, 9, 12, 14, 12);
-        using var band = new SolidBrush(color);
-        graphics.FillRectangle(band, 9, 12, 14, 4);
-        graphics.FillRectangle(white, 12, 8, 2, 6);
-        graphics.FillRectangle(white, 18, 8, 2, 6);
-
-        var handle = bitmap.GetHicon();
-        try
-        {
-            using var temporary = Icon.FromHandle(handle);
-            return (Icon)temporary.Clone();
-        }
-        finally
-        {
-            DestroyIcon(handle);
-        }
+        var brush = (System.Windows.Media.Brush)System.Windows.Application.Current.Resources[_orb.Brush];
+        var next = TrayOrbIcon.Render(_orb.Kind, brush);
+        _icon.Icon = next;
+        _current?.Dispose();
+        _current = next;
     }
 
     /// <summary>
-    /// Строит скруглённый контур значка
+    /// Выбирает вид и цвет сферы по состоянию: сбой, выполнение, ожидание решения, работа или остановка. Пока что-то выполняется, сфера движется
     /// </summary>
-    /// <param name="bounds">Прямоугольник контура</param>
-    /// <param name="radius">Радиус угла в пикселях</param>
-    /// <returns>Контур, который нужно освободить</returns>
-    private static GraphicsPath Rounded(Rectangle bounds, int radius)
+    /// <param name="snapshot">Текущее состояние контейнера</param>
+    private void ChooseOrb(SyncSnapshot snapshot)
     {
-        var path = new GraphicsPath();
-        var diameter = Math.Min(radius * 2, Math.Min(bounds.Width, bounds.Height));
-        var arc = new Rectangle(bounds.X, bounds.Y, diameter, diameter);
+        var enabled = _jobRows.Where(row => row.Enabled).ToList();
+        var next = snapshot.CurrentError is not null || enabled.Any(row => row.Tone == RowToneEnum.Problem)
+            ? (ActivityKindEnum.Failed, "DangerBrush")
+            : enabled.Any(row => row.Tone == RowToneEnum.Working)
+                ? (ActivityKindEnum.Working, "WorkingBrush")
+                : enabled.Any(row => row.Tone == RowToneEnum.Attention)
+                    ? (ActivityKindEnum.Attention, "AttentionBrush")
+                    : snapshot.ContainerRunning ? (ActivityKindEnum.Alive, "AccentTextBrush") : (ActivityKindEnum.Dormant, "IdleBrush");
 
-        path.AddArc(arc, 180, 90);
-        arc.X = bounds.Right - diameter;
-        path.AddArc(arc, 270, 90);
-        arc.Y = bounds.Bottom - diameter;
-        path.AddArc(arc, 0, 90);
-        arc.X = bounds.Left;
-        path.AddArc(arc, 90, 90);
-        path.CloseFigure();
+        if (next != _orb)
+        {
+            _orb = next;
+            RenderIcon();
+        }
 
-        return path;
+        if (_orb.Kind == ActivityKindEnum.Working)
+            _iconTimer.Start();
+        else
+            _iconTimer.Stop();
     }
 
     #endregion Icon
@@ -294,7 +247,8 @@ public sealed class TrayHost : IDisposable
         _refreshing = true;
         try
         {
-            _snapshot = await _probe.ReadAsync(CancellationToken.None);
+            var probed = await _probe.ReadAsync(CancellationToken.None);
+            _snapshot = probed with { Entries = ScheduleHistory.Update(probed.Entries) };
             if (_exiting)
                 return;
 
@@ -332,10 +286,8 @@ public sealed class TrayHost : IDisposable
 
         _jobRows = _jobs.Rows();
         ApplyIcon(_snapshot);
-        if (_window.IsVisible)
-            _window.Apply(_snapshot, _jobRows, scrollToProblem: false);
         if (_main is { IsVisible: true })
-            _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors);
+            ApplyMain();
 
         NotifyJobProblems(_jobRows);
     }
@@ -356,11 +308,26 @@ public sealed class TrayHost : IDisposable
             if (!_notifiedProblems.Add(key))
                 continue;
 
-            var tip = $"{row.Headline}. {row.Detail}";
+            var tip = $"{row.Headline}. {row.Detail.Replace('\n', ' ')}";
             if (tip.Length > BALLOON_TEXT_LIMIT)
                 tip = tip[..BALLOON_TEXT_LIMIT];
             _icon.ShowBalloonTip(BALLOON_MS, row.Title, tip, ToolTipIcon.None);
         }
+    }
+
+    /// <summary>
+    /// Сообщает о работах, которые фоновая задача подготовила сама
+    /// </summary>
+    /// <param name="works">Готовые работы: «предмет, задание»</param>
+    private void NotifyWorksReady(IReadOnlyList<string> works)
+    {
+        if (_exiting || works.Count == 0)
+            return;
+
+        var text = string.Join("\n", works);
+        if (text.Length > BALLOON_TEXT_LIMIT)
+            text = text[..BALLOON_TEXT_LIMIT];
+        _icon.ShowBalloonTip(BALLOON_MS, works.Count == 1 ? "Готова работа" : "Готовы работы", text, ToolTipIcon.None);
     }
 
     /// <summary>
@@ -390,9 +357,7 @@ public sealed class TrayHost : IDisposable
     private void ApplyIcon(SyncSnapshot snapshot)
     {
         var failed = _jobRows.FirstOrDefault(row => row.Enabled && row.Tone == RowToneEnum.Problem);
-        _icon.Icon = snapshot.CurrentError is not null || failed is not null
-            ? _errorIcon
-            : snapshot.ContainerRunning ? _runningIcon : _stoppedIcon;
+        ChooseOrb(snapshot);
 
         var text = snapshot.CurrentError is not null
                      ? "Расписание: не удалось обновить"
@@ -414,20 +379,80 @@ public sealed class TrayHost : IDisposable
     #region Window
 
     /// <summary>
-    /// Открывает или прячет панель у курсора
+    /// Открывает файл, папку или ссылку в программе по умолчанию
     /// </summary>
-    private void ShowWindow()
+    /// <param name="path">Путь или адрес</param>
+    private void OpenPath(string path)
     {
-        if (!_window.IsVisible)
-            _window.Apply(_snapshot, _jobRows, scrollToProblem: _snapshot.CurrentError is not null);
+        if (path.Length == 0)
+            return;
 
-        _window.ToggleFromIcon();
+        if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            OpenLink(path);
+
+            return;
+        }
+
+        var error = _jobs.OpenFile(path);
+        if (error.Length > 0)
+            _icon.ShowBalloonTip(BALLOON_MS, "Файл", "Не удалось открыть: " + error, ToolTipIcon.None);
+    }
+
+    /// <summary>
+    /// Запускает вход в MTS Link: окно браузера, в котором нужно войти один раз
+    /// </summary>
+    private void LoginToMts()
+    {
+        var program = System.IO.Path.Combine(DataLocation.RepoRootOrStart(), "Steward.Lms", "publish", "Steward.Lms.exe");
+        if (!System.IO.File.Exists(program))
+        {
+            _icon.ShowBalloonTip(BALLOON_MS, "MTS Link", "Не найден Steward.Lms.exe: собери проект Steward.Lms в publish", ToolTipIcon.None);
+
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo(program, "login") { UseShellExecute = true, WorkingDirectory = System.IO.Path.GetDirectoryName(program)! });
+    }
+
+    /// <summary>
+    /// Открывает файл настроек процесса в программе по умолчанию
+    /// </summary>
+    /// <param name="kind">Какой файл: «mail», «reels» или «lms»</param>
+    private void OpenSettingsFile(string kind)
+    {
+        var root = DataLocation.RepoRootOrStart();
+        var path = kind switch
+        {
+            "mail" => SettingsProbe.MailFile(root),
+            "reels" => SettingsProbe.ReelsFile(root),
+            _ => SettingsProbe.LmsFile(root),
+        };
+
+        if (System.IO.File.Exists(path))
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        else
+            _icon.ShowBalloonTip(BALLOON_MS, "Настройки", "Файл настроек не найден: " + path, ToolTipIcon.None);
+    }
+
+    /// <summary>
+    /// Показывает меню иконки у курсора. Если оно уже открыто, второе не появляется
+    /// </summary>
+    private void ShowTrayMenu()
+    {
+        if (_exiting || _trayMenu is { IsVisible: true })
+            return;
+
+        _trayMenu = new TrayMenuPopup(() => ShowMain(), Exit);
+        _trayMenu.Closed += (_, _) => _trayMenu = null;
+        _trayMenu.ShowAtCursor();
     }
 
     /// <summary>
     /// Открывает главное окно приложения с самыми свежими данными
     /// </summary>
-    private void ShowMain()
+    /// <param name="page">Раздел, который нужно открыть, или <see langword="null"/>, чтобы оставить прежний</param>
+    public void ShowMain(AppPageEnum? page = null)
     {
         if (_exiting)
             return;
@@ -436,14 +461,87 @@ public sealed class TrayHost : IDisposable
         {
             _main = new MainWindow();
             _main.Model.RunRequested += id => _jobs.RunNow(id);
+            _main.Model.SwitchRequested += SetJobEnabled;
             _main.Model.FixRequested += OpenFix;
-            _main.Model.ClearJournalRequested += (_, _) => _jobs.ClearRecords();
+            _main.Model.ClearJournalRequested += (_, _) => ClearJournal();
+            _main.Model.ClearGroupRequested += ClearGroup;
+            _main.Model.RecordRemoveRequested += record => _jobs.RemoveRecord(record);
+            _main.Model.CheckRemoveRequested += RemoveCheck;
+            _main.Model.IdeaApproved += ApproveIdea;
+            _main.Model.IdeaRejected += idea => _jobs.DeleteIdea(idea.Id);
+            _main.Model.LinkRequested += OpenLink;
+            _main.Model.FileRequested += OpenSettingsFile;
+            _main.Model.MtsLoginRequested += LoginToMts;
+            _main.Model.Settings.LinkRequested += OpenLink;
+            _main.Model.Settings.RestartRequested += async (_, _) => await RestartContainerAsync();
             _main.Model.ExitRequested += (_, _) => Exit();
         }
 
         _jobRows = _jobs.Rows();
-        _main.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors);
+        ApplyMain();
+        if (page is { } selected)
+            _main.Model.Page = selected;
+        else if (!_main.IsVisible)
+            _main.Model.Page = AppPageEnum.Status;
+
         _main.ShowAndActivate();
+    }
+
+    /// <summary>
+    /// Стирает журнал запусков вместе с историей сверок расписания
+    /// </summary>
+    private void ClearJournal()
+    {
+        _jobs.ClearRecords();
+        ScheduleHistory.Clear();
+        _snapshot = _snapshot with { Entries = [] };
+        ApplyAll();
+    }
+
+    /// <summary>
+    /// Удаляет одну сверку расписания из журнала
+    /// </summary>
+    /// <param name="entry">Запись сверки</param>
+    private void RemoveCheck(LogEntry entry)
+    {
+        ScheduleHistory.Remove(entry);
+        _snapshot = _snapshot with { Entries = [.. _snapshot.Entries.Where(stored => stored.Time != entry.Time)] };
+        ApplyAll();
+    }
+
+    /// <summary>
+    /// Стирает записи одного раздела журнала
+    /// </summary>
+    /// <param name="id">Идентификатор задачи или «schedule» для сверок расписания</param>
+    private void ClearGroup(string id)
+    {
+        if (id == "schedule")
+        {
+            ScheduleHistory.Clear();
+            _snapshot = _snapshot with { Entries = [] };
+            ApplyAll();
+
+            return;
+        }
+
+        _jobs.ClearRecords(id);
+    }
+
+    /// <summary>
+    /// Включает или выключает процесс по тумблеру на карточке. Ошибка записи выключателя не роняет приложение: она уходит в журнал трассировки
+    /// </summary>
+    /// <param name="id">Идентификатор задачи</param>
+    /// <param name="enabled">Включить задачу</param>
+    private void SetJobEnabled(string id, bool enabled)
+    {
+        try
+        {
+            _jobs.SetJobEnabled(id, enabled);
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Trace.TraceError($"Не удалось записать выключатель задачи {id}: {exception}");
+        }
     }
 
     /// <summary>
@@ -456,6 +554,118 @@ public sealed class TrayHost : IDisposable
         if (error.Length > 0)
             _icon.ShowBalloonTip(BALLOON_MS, "Починка", error, ToolTipIcon.None);
     }
+
+    /// <summary>
+    /// Открывает Claude с просьбой разобрать идею. Идея считается принятой, только если приложение открылось
+    /// </summary>
+    /// <param name="idea">Идея, которую решено делать</param>
+    private void ApproveIdea(Idea idea)
+    {
+        var error = ClaudeLauncher.Open(IdeaPrompt.Build(idea, DataLocation.RepoRootOrStart(), _jobs.IdeaPath(idea.Id)));
+        if (error.Length > 0)
+        {
+            _icon.ShowBalloonTip(BALLOON_MS, "Идея", error, ToolTipIcon.None);
+
+            return;
+        }
+
+        _jobs.SetIdeaState(idea.Id, IdeaStateEnum.Approved);
+    }
+
+    /// <summary>
+    /// Открывает ссылку в браузере, если это обычный адрес сайта
+    /// </summary>
+    /// <param name="link">Адрес рилса</param>
+    private static void OpenLink(string link)
+    {
+        if (Uri.TryCreate(link, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    /// <summary>
+    /// Показывает в главном окне свежие статусы, журнал, идеи и домашние задания
+    /// </summary>
+    private void ApplyMain()
+    {
+        _main!.Model.ArchivedLetters = _jobs.ArchivedLetters();
+        _main!.Apply(_snapshot, _jobRows, _jobs.Records(), _jobs.RegistryErrors, _jobs.Ideas());
+        _main.ApplyHomework(_jobs.HomeworkRows());
+        var root = DataLocation.RepoRootOrStart();
+        _main.Model.AttachSettings(root, ApplyMain);
+        _main.Model.SetSettingsHome(_jobs.SettingsHomeIds());
+        _main.Model.ApplyChips(SettingsProbe.Mail(root), SettingsProbe.Reels(root), SettingsProbe.Transcripts(root));
+        _main.Model.ProgressReader ??= id => new Steward.Status.Progress.RunProgressStore(_jobs.StatusDirectory).Read(id);
+        _main.Model.Formats = Formats();
+        _formats!.Toast = _main.Model.Toast;
+    }
+
+    /// <summary>
+    /// Общий список занятий с форматами: создаётся один раз и каждый раз обновляется свежими данными
+    /// </summary>
+    /// <returns>Модель списка</returns>
+    private HomeworkFormatsViewModel Formats()
+    {
+        _formats ??= new HomeworkFormatsViewModel(_jobs.SetHomeworkFormat, _jobs.HasTranscript, (lesson, request) => _jobs.PrepareHomeworkAsync(lesson, request, CancellationToken.None), _jobs.SetSubjectState, _jobs.SubjectState, _jobs.RequestTranscript, _jobs.SetSubjectFormat);
+        _formats.TranscriptReader = _jobs.ReadTranscript;
+        _formats.DraftLister = _jobs.DraftFiles;
+        _formats.AnalysisReader = _jobs.ReadAnalysis;
+        _formats.ItemsReader = _jobs.Items;
+        _formats.ItemArchived = _jobs.ArchiveItem;
+        _formats.DraftChecker = lesson => _jobs.CheckDraftsAsync(lesson, CancellationToken.None);
+        _formats.CheckReader = _jobs.CheckReport;
+        _formats.ItemUrlReader = _jobs.ItemUrl;
+        _formats.ItemSubmitted = _jobs.SetItemSubmitted;
+        _formats.ItemConditionReader = _jobs.ItemCondition;
+        _formats.ItemToSingularity = _jobs.AddItemToSingularityAsync;
+        _formats.DraftsDeleted = _jobs.DeleteDrafts;
+        _formats.WorkAttacher = _jobs.AttachWork;
+        _formats.PipelineReader = _jobs.ItemPipeline;
+        _formats.ItemConfirmer = _jobs.ConfirmItem;
+        _formats.AssignmentAdder = _jobs.AddAssignment;
+        _formats.AssignmentToSingularity = _jobs.AddAssignmentToSingularityAsync;
+        _formats.AssignmentStateReader = _jobs.AssignmentStates;
+        _formats.AssignmentDismisser = _jobs.DismissAssignment;
+        _formats.ConditionFixer = _jobs.FixItemCondition;
+        _formats.SampleRegistrar = _jobs.RegisterSubmittedSample;
+        _formats.SubmittedFileSetter = _jobs.SetSubmittedFile;
+        _formats.SubjectOptionsReader = _jobs.SubjectOptions;
+        _formats.SubjectOptionsSaver = _jobs.SaveSubjectOptions;
+        _formats.RemarkSaver = _jobs.SaveRedoRemark;
+        _formats.RemarkLister = _jobs.AllRemarks;
+        _formats.RemarkUpdater = _jobs.UpdateRemark;
+        _formats.RemarkRemover = _jobs.RemoveRemark;
+        _formats.GuideLister = _jobs.Guides;
+        _formats.GuideFilesAdded = _jobs.AddGuideFiles;
+        _formats.GuideFolderAdded = _jobs.AddGuideFolder;
+        _formats.GuideLinkAdded = _jobs.AddGuideLinkAsync;
+        _formats.GuideEnabledChanged = _jobs.SetGuideEnabled;
+        _formats.GuideRemoved = _jobs.RemoveGuide;
+        _formats.PathOpened = OpenPath;
+        _formats.GuideFolder = System.IO.Path.Combine(DataLocation.DataDirectory(), "homework", "guides");
+        _formats.Update(_jobs.Lessons());
+        _formats.ApplyActivities(_jobs.Activities());
+        _formats.ApplyHomework(_jobs.HomeworkRows());
+
+        return _formats;
+    }
+
+    /// <summary>
+    /// Пересоздаёт контейнер расписания и пишет итог на странице «Расписание»
+    /// </summary>
+    /// <returns>Задача, которая завершается, когда перезапуск закончился</returns>
+    private async Task RestartContainerAsync()
+    {
+        var restarted = await _probe.RestartAsync(CancellationToken.None);
+        if (_exiting)
+            return;
+
+        if (_main is not null)
+            _main.Model.Settings.SettingsMessage = restarted ? "Контейнер перезапущен" : "Не удалось перезапустить контейнер";
+
+        if (restarted)
+            await RefreshAsync();
+    }
+
     /// <summary>
     /// Убирает иконку и завершает процесс
     /// </summary>
@@ -464,66 +674,12 @@ public sealed class TrayHost : IDisposable
         if (_exiting)
             return;
 
+        if (!ConfirmWindow.Ask("Выйти из Steward?", "Пока приложение закрыто, почта, рилсы и расписание не проверяются. Запусти его снова, чтобы проверки продолжились.", "Выйти", "Остаться"))
+            return;
+
         Dispose();
         System.Windows.Application.Current.Shutdown();
     }
 
     #endregion Window
-
-    #region Menu
-
-    /// <summary>
-    /// Пункт меню в цветах панели
-    /// </summary>
-    /// <param name="text">Подпись</param>
-    /// <param name="onClick">Действие</param>
-    /// <returns>Пункт меню</returns>
-    private static ToolStripMenuItem Item(string text, EventHandler onClick)
-    {
-        return new ToolStripMenuItem(text, null, onClick)
-        {
-            ForeColor = TrayPalette.Text,
-            Padding = new Padding(8, 4, 8, 4),
-        };
-    }
-
-    /// <summary>
-    /// Рисует меню в цветах панели
-    /// </summary>
-    private sealed class MenuRenderer : ToolStripProfessionalRenderer
-    {
-        /// <summary>
-        /// Создаёт отрисовщик с тёмной палитрой
-        /// </summary>
-        public MenuRenderer()
-            : base(new MenuColors())
-        {
-            RoundedEdges = false;
-        }
-
-        /// <summary>
-        /// Пишет текст пункта светлым цветом
-        /// </summary>
-        /// <param name="e">Аргументы текста</param>
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        {
-            e.TextColor = e.Item.Enabled ? TrayPalette.Text : TrayPalette.Muted;
-            base.OnRenderItemText(e);
-        }
-
-        /// <summary>
-        /// Убирает рамку выделения
-        /// </summary>
-        /// <param name="e">Аргументы рамки</param>
-        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
-        {
-            var bounds = new Rectangle(4, 0, e.Item.Width - 8, e.Item.Height);
-            var color = e.Item.Selected ? TrayPalette.SurfaceRaised : TrayPalette.Surface;
-
-            using var brush = new SolidBrush(color);
-            e.Graphics.FillRectangle(brush, bounds);
-        }
-    }
-
-    #endregion Menu
 }

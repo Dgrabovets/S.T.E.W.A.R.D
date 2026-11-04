@@ -15,21 +15,15 @@ public sealed class PanelStatus
     /// <param name="summary">Фраза о текущем состоянии</param>
     /// <param name="label">Короткий текст плашки</param>
     /// <param name="tone">Цвет плашки</param>
-    /// <param name="emptyText">Строка вместо пустого журнала</param>
-    /// <param name="cards">Карточки журнала</param>
     private PanelStatus(string subtitle,
                         string summary,
                         string label,
-                        PanelToneEnum tone,
-                        string emptyText,
-                        IReadOnlyList<JournalCard> cards)
+                        PanelToneEnum tone)
     {
         Subtitle = subtitle;
         Summary = summary;
         Label = label;
         Tone = tone;
-        EmptyText = emptyText;
-        Cards = cards;
     }
 
     /// <summary>
@@ -52,23 +46,13 @@ public sealed class PanelStatus
     /// </summary>
     public PanelToneEnum Tone { get; }
 
-    /// <summary>
-    /// Что показать, если карточек нет
-    /// </summary>
-    public string EmptyText { get; }
-
-    /// <summary>
-    /// Карточки журнала от новых к старым
-    /// </summary>
-    public IReadOnlyList<JournalCard> Cards { get; }
-
     #region Snapshot
 
     /// <summary>
     /// Собирает тексты панели из снимка
     /// </summary>
     /// <param name="snapshot">Текущее состояние синхронизации</param>
-    /// <returns>Фразы и карточки для окна</returns>
+    /// <returns>Фразы для окна</returns>
     public static PanelStatus From(SyncSnapshot snapshot)
     {
         var tone = snapshot.CurrentError is not null
@@ -79,9 +63,7 @@ public sealed class PanelStatus
             When(snapshot.LastSuccess),
             SummaryOf(snapshot),
             LabelOf(snapshot),
-            tone,
-            snapshot.DockerAvailable ? "Журнал пока пуст" : "Docker не запущен",
-            JournalCard.From(snapshot.Entries));
+            tone);
     }
 
     #endregion Snapshot

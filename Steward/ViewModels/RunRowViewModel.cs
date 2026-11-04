@@ -16,11 +16,21 @@ public sealed class RunRowViewModel
     /// </summary>
     /// <param name="record">Запись о запуске</param>
     /// <param name="fix">Вызывается, когда человек просит починить запуск</param>
-    public RunRowViewModel(RunRecord record, Action<RunRecord> fix)
+    /// <param name="remove">Вызывается, когда человек удаляет запись из журнала</param>
+    /// <param name="same">
+    /// Все подряд идущие запуски с тем же итогом и тем же выводом от новых к старым, считая саму запись, или <see langword="null"/>, если запуск один. Показываются одной строкой, удаляются вместе
+    /// </param>
+    public RunRowViewModel(RunRecord record, Action<RunRecord> fix, Action<RunRecord>? remove = null, IReadOnlyList<RunRecord>? same = null)
     {
+        var all = same is { Count: > 0 } ? same : [record];
         FixCommand = new RelayCommand(() => fix(record));
-        CanFix = record.Outcome != RunOutcomeEnum.Ok;
-        When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm:ss", CultureInfo.InvariantCulture);
+        RemoveCommand = new RelayCommand(() =>
+        {
+            foreach (var item in all)
+                remove?.Invoke(item);
+        });
+        Repeats = JournalWording.Repeats(all.Count);
+        When = record.StartedAt.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture);
         Title = record.Title;
         Reason = record.Reason switch
         {
@@ -41,11 +51,26 @@ public sealed class RunRowViewModel
 
         Detail = record.Detail ?? string.Empty;
         Summary = record.Summary ?? string.Empty;
+        var finished = record.FinishedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+        SummaryLines = [.. Summary.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(line => new LogLine(finished, line, PanelToneEnum.Idle))];
         Output = record.Output ?? string.Empty;
         OutputLines = LogLines.Parse(Output);
-        Facts = string.Join(" · ", new[] { When, Reason, Duration(record.FinishedAt - record.StartedAt), record.ExitCode is { } code and not 0 ? $"код выхода {code}" : null }.Where(part => part is not null));
-        Tone = record.Outcome == RunOutcomeEnum.Ok ? PanelToneEnum.Running : PanelToneEnum.Problem;
+        CanFix = record.Outcome != RunOutcomeEnum.Ok || OutputLines.Any(line => line.Tone == PanelToneEnum.Problem);
+        IsManual = record.Reason == "manual";
+        Facts = JournalWording.Duration(record.FinishedAt - record.StartedAt);
+        (Tone, Kind) = record.Outcome switch
+        {
+            RunOutcomeEnum.Ok => (PanelToneEnum.Running, ActivityKindEnum.Sealed),
+            RunOutcomeEnum.Failed => (PanelToneEnum.Problem, ActivityKindEnum.Shattered),
+            RunOutcomeEnum.TimedOut => (PanelToneEnum.Attention, ActivityKindEnum.Sweep),
+            _ => (PanelToneEnum.Idle, ActivityKindEnum.Hollow),
+        };
     }
+
+    /// <summary>
+    /// Вид сферы запуска: глобус у удачного, осколки у ошибки, часовая стрелка у превышения времени, кольцо у несостоявшегося
+    /// </summary>
+    public ActivityKindEnum Kind { get; }
 
     /// <summary>
     /// Когда запущена
@@ -88,9 +113,24 @@ public sealed class RunRowViewModel
     public RelayCommand FixCommand { get; }
 
     /// <summary>
-    /// Запуск не удался, значит, его можно отдать на починку
+    /// Удаляет эту запись из журнала
+    /// </summary>
+    public RelayCommand RemoveCommand { get; }
+
+    /// <summary>
+    /// Запуск не удался или прошёл с ошибками в выводе (например, не вышло разобрать одну из ссылок), значит, его можно отдать на починку
     /// </summary>
     public bool CanFix { get; }
+
+    /// <summary>
+    /// Сводка построчно, в тех же рамках, что и вывод
+    /// </summary>
+    public IReadOnlyList<LogLine> SummaryLines { get; }
+
+    /// <summary>
+    /// Есть подпись о времени запуска
+    /// </summary>
+    public bool HasFacts => Facts.Length > 0;
 
     /// <summary>
     /// Есть сводка
@@ -113,9 +153,31 @@ public sealed class RunRowViewModel
     public IReadOnlyList<LogLine> OutputLines { get; }
 
     /// <summary>
-    /// Строка фактов: когда, почему, сколько шёл и каким кодом закончился
+    /// Запуск начал человек: такой запуск выделяется среди запусков по расписанию
+    /// </summary>
+    public bool IsManual { get; }
+
+    /// <summary>
+    /// Сколько шёл запуск
     /// </summary>
     public string Facts { get; }
+
+    /// <summary>
+    /// Сколько таких же запусков шло подряд. Пусто, если запуск один
+    /// </summary>
+    public string Repeats { get; }
+
+    /// <summary>
+    /// Запусков подряд было несколько
+    /// </summary>
+    public bool HasRepeats => Repeats.Length > 0;
+
+    /// <summary>
+    /// Ключ, по которому подряд идущие запуски считаются одинаковыми: итог, сводка, причина и вывод без отметок времени
+    /// </summary>
+    /// <param name="record">Запись о запуске</param>
+    /// <returns>Строка для сравнения</returns>
+    public static string SameKey(RunRecord record) => string.Join('\u001F', record.Outcome, record.Summary, record.Detail, string.Join('\n', LogLines.Parse(record.Output ?? string.Empty).Select(line => line.Text)));
 
     /// <summary>
     /// Цвет точки
@@ -142,11 +204,4 @@ public sealed class RunRowViewModel
     /// </summary>
     /// <param name="span">Сколько шёл запуск</param>
     /// <returns>Текст длительности</returns>
-    private static string Duration(TimeSpan span) => span.TotalSeconds switch
-    {
-        < 1 => "меньше секунды",
-        < 60 => $"{(int)span.TotalSeconds} с",
-        < 3600 => $"{(int)span.TotalMinutes} мин {span.Seconds} с",
-        _ => $"{(int)span.TotalHours} ч {span.Minutes} мин",
-    };
 }

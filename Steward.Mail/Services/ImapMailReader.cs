@@ -13,8 +13,8 @@ using Steward.Mail.Models;
 namespace Steward.Mail.Services;
 
 /// <summary>
-/// Чтение писем по IMAP через MailKit
-/// Письма читаются только по заголовкам и превью, флаг «прочитано» не ставится
+/// Чтение писем по IMAP через MailKit и отметка «прочитано» у разобранных
+/// Письма читаются только по заголовкам и превью, при чтении флаг «прочитано» не ставится. После разбора его ставит MarkSeenAsync
 /// </summary>
 public sealed partial class ImapMailReader(MailSettings settings) : IMailReader
 {
@@ -24,11 +24,75 @@ public sealed partial class ImapMailReader(MailSettings settings) : IMailReader
     private const int BODY_LIMIT = 20000;
 
     /// <summary>
+    /// Сколько раз пробовать прочитать ящик, если соединение оборвалось или ответ не разобрался
+    /// </summary>
+    private const int ATTEMPTS = 3;
+
+    /// <summary>
+    /// Пауза перед следующей попыткой
+    /// </summary>
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(3);
+
+    /// <summary>
     /// Подключается к ящику и собирает непрочитанные письма из «Входящих» и из папки преподавателей
     /// </summary>
     /// <param name="cancellationToken">Токен отмены запроса</param>
     /// <returns>Письма за последние дни, которые указаны в настройках. Папки открываются только для чтения, флаг «прочитано» не ставится</returns>
     public async Task<IReadOnlyList<MailItem>> GetUnreadAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await ReadOnceAsync(cancellationToken);
+            }
+            catch (Exception exception) when (attempt < ATTEMPTS && exception is ImapProtocolException or IOException or System.Net.Sockets.SocketException)
+            {
+                // Сервер изредка отдаёт ответ с нарушенным порядком, и разбор рвётся. Новое подключение обычно проходит
+                await Task.Delay(RetryDelay, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Ставит письмам отметку «прочитано». Нужна после разбора: иначе уже обработанные письма читались бы при каждой проверке. Письма из папки, у которой сменилась метка номеров, пропускаются: их номера уже не те
+    /// </summary>
+    /// <param name="items">Разобранные письма с номерами и метками папок</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задача, которая завершается, когда отметки поставлены</returns>
+    public async Task MarkSeenAsync(IReadOnlyList<MailItem> items, CancellationToken cancellationToken)
+    {
+        var marked = items.Where(item => item.Uid > 0).ToList();
+        if (marked.Count == 0)
+            return;
+
+        using var client = new ImapClient();
+        await client.ConnectAsync(settings.Host, settings.Port, SecureSocketOptions.SslOnConnect, cancellationToken);
+        await client.AuthenticateAsync(settings.Login, settings.AppPassword, cancellationToken);
+
+        foreach (var byFolder in marked.GroupBy(item => item.Folder, StringComparer.OrdinalIgnoreCase))
+        {
+            var folder = string.Equals(byFolder.Key, client.Inbox.Name, StringComparison.OrdinalIgnoreCase)
+                ? client.Inbox
+                : await FindFolderByNameAsync(client, byFolder.Key, cancellationToken);
+            if (folder is null)
+                continue;
+
+            await folder.OpenAsync(FolderAccess.ReadWrite, cancellationToken);
+            var uids = byFolder.Where(item => item.UidValidity == folder.UidValidity).Select(item => new UniqueId(item.Uid)).ToList();
+            if (uids.Count > 0)
+                await folder.AddFlagsAsync(uids, MessageFlags.Seen, true, cancellationToken);
+        }
+
+        await client.DisconnectAsync(true, cancellationToken);
+    }
+
+    /// <summary>
+    /// Один заход в ящик: подключение, чтение папок и отключение
+    /// </summary>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Непрочитанные письма из «Входящих» и папки преподавателей</returns>
+    private async Task<IReadOnlyList<MailItem>> ReadOnceAsync(CancellationToken cancellationToken)
     {
         using var client = new ImapClient();
         await client.ConnectAsync(settings.Host, settings.Port, SecureSocketOptions.SslOnConnect, cancellationToken);
@@ -92,7 +156,9 @@ public sealed partial class ImapMailReader(MailSettings settings) : IMailReader
             Subject: summary.Envelope.Subject ?? "(без темы)",
             Date: summary.Envelope.Date ?? DateTimeOffset.Now,
             Body: body.Length > 0 ? body : (summary.PreviewText ?? string.Empty).Trim(),
-            Links: links);
+            Links: links,
+            Uid: summary.UniqueId.Id,
+            UidValidity: folder.UidValidity);
     }
 
     /// <summary>

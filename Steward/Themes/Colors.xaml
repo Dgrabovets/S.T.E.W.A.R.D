@@ -32,12 +32,14 @@
     <Color x:Key="DangerColor">#F87171</Color>
     <Color x:Key="DangerSurfaceColor">#3B1D24</Color>
     <Color x:Key="IdleColor">#94A3B8</Color>
-    <Color x:Key="WorkingColor">#60A5FA</Color>
 
     <!-- Тень -->
     <Color x:Key="ShadowColor">#020617</Color>
+    <!-- Затемнение интерфейса, пока внизу висит окошко с откатом -->
+    <Color x:Key="ScrimColor">#99020617</Color>
 
     <SolidColorBrush x:Key="WindowBrush" Color="{StaticResource WindowColor}"/>
+    <SolidColorBrush x:Key="ScrimBrush" Color="{StaticResource ScrimColor}"/>
     <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
     <SolidColorBrush x:Key="RaisedBrush" Color="{StaticResource RaisedColor}"/>
     <SolidColorBrush x:Key="LineBrush" Color="{StaticResource LineColor}"/>
@@ -57,7 +59,8 @@
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
     <SolidColorBrush x:Key="DangerSurfaceBrush" Color="{StaticResource DangerSurfaceColor}"/>
     <SolidColorBrush x:Key="IdleBrush" Color="{StaticResource IdleColor}"/>
-    <SolidColorBrush x:Key="WorkingBrush" Color="{StaticResource WorkingColor}"/>
+    <!-- «Выполняется» того же цвета, что акцентный текст, поэтому отдельного цвета у него нет: при смене акцента меняется и оно -->
+    <SolidColorBrush x:Key="WorkingBrush" Color="{StaticResource AccentTextColor}"/>
 
     <LinearGradientBrush x:Key="WindowGradientBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="{StaticResource WindowTopColor}" Offset="0"/>

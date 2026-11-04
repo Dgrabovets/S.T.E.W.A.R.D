@@ -8,7 +8,9 @@
     <CornerRadius x:Key="RadiusFocus">10</CornerRadius>
     <CornerRadius x:Key="RadiusBadge">12</CornerRadius>
     <CornerRadius x:Key="RadiusCard">16</CornerRadius>
+    <CornerRadius x:Key="RadiusRound">17</CornerRadius>
     <CornerRadius x:Key="RadiusWindow">22</CornerRadius>
+    <CornerRadius x:Key="RadiusSystemWindow">8</CornerRadius>
 
     <!-- Отступы: шаг 4. Число в разметке берётся из этой шкалы -->
     <sys:Double x:Key="Space1">4</sys:Double>
@@ -22,5 +24,8 @@
     <Thickness x:Key="PadControl">16,8,16,8</Thickness>
     <Thickness x:Key="PadField">12,8,12,8</Thickness>
     <Thickness x:Key="GapCard">0,0,0,12</Thickness>
+
+    <!-- Прозрачность приглушённой записи: занятие, где всё сдано -->
+    <sys:Double x:Key="OpacityDone">0.6</sys:Double>
 
 </ResourceDictionary>

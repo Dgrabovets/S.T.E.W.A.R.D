@@ -22,10 +22,10 @@ public sealed record TaskSummary(PanelToneEnum Tone, string Label, string Subtit
 
         var waiting = active.Where(row => row.Tone == PanelToneEnum.Attention).Select(row => row.Name).ToArray();
         if (waiting.Length > 0)
-            return new TaskSummary(PanelToneEnum.Attention, "Ждёт тебя", "Ждут решения: " + string.Join(", ", waiting));
+            return new TaskSummary(PanelToneEnum.Attention, "Ждёт тебя", "Нужно твоё решение: " +string.Join(", ", waiting));
 
         return active.All(row => row.Tone == PanelToneEnum.Running)
             ? new TaskSummary(PanelToneEnum.Running, "Работает", "Все задачи работают")
-            : new TaskSummary(PanelToneEnum.Idle, "Не всё запущено", "Не все задачи запущены");
+            : new TaskSummary(PanelToneEnum.Idle, "Не всё запущено", "Часть задач сейчас не работает");
     }
 }

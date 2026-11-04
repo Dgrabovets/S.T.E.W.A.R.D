@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:ui="clr-namespace:Steward.Models">
+                    xmlns:ui="clr-namespace:Steward.Models"
+                    xmlns:ctl="clr-namespace:Steward.Controls">
 
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Colors.xaml"/>
@@ -78,6 +79,33 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Причина или перечень правок внутри записи: рамка и фон по цвету записи, чтобы объяснение не терялось среди остального текста -->
+    <Style x:Key="ReasonBlock" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusField}"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource AttentionBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Небольшая метка в записи: контур без заливки. Цвет рамки при необходимости меняет вызывающий -->
+    <Style x:Key="Chip" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusBadge}"/>
+        <Setter Property="Padding" Value="8,1"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
+    </Style>
+
     <!-- Точка состояния: заливка и тонкое кольцо вокруг неё того же цвета. Размер задаёт вызывающий, внутренняя точка на 6 меньше -->
     <Style x:Key="ToneDot" TargetType="Control">
         <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
@@ -92,6 +120,134 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
+                <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+    <!-- Индикатор процесса на карточке задачи: точка состояния, вращающаяся сфера во время работы, галочка после неё -->
+    <Style x:Key="ActivityOrb" TargetType="ctl:ActivityOrb">
+        <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
+        <Setter Property="DoneBrush" Value="{StaticResource OkBrush}"/>
+        <Setter Property="State" Value="{Binding Activity}"/>
+        <Setter Property="Kind" Value="{Binding Kind}"/>
+        <Setter Property="Since" Value="{Binding ActivitySince}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
+                <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Activity}" Value="{x:Static ui:ActivityStateEnum.Working}">
+                <Setter Property="Foreground" Value="{StaticResource WorkingBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+    <!-- Заголовок сворачиваемого блока: название слева и шеврон справа, который поворачивается -->
+    <Style x:Key="SectionToggle" TargetType="ToggleButton">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Frame" Background="Transparent" CornerRadius="{StaticResource RadiusField}" Padding="4,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter VerticalAlignment="Center"/>
+                            <Path x:Name="Chevron" Grid.Column="1" Data="M 0,0 L 5,5 L 10,0" Stroke="{StaticResource MutedBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="10" Height="5" Margin="12,0,6,0" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform x:Name="Turn" Angle="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Frame" Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Turn" Storyboard.TargetProperty="Angle" To="180" Duration="0:0:0.3">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Turn" Storyboard.TargetProperty="Angle" To="0" Duration="0:0:0.3">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Сворачиваемое содержимое: шаблон с частями Clip и Scale, анимацию ведёт сам элемент. Раскрыто, пока IsOpen равно True -->
+    <Style x:Key="CollapsibleBody" TargetType="ctl:CollapsibleBody">
+        <Setter Property="IsTabStop" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ctl:CollapsibleBody">
+                    <Border x:Name="Clip" ClipToBounds="True">
+                        <Border.LayoutTransform>
+                            <ScaleTransform x:Name="Scale" ScaleX="1" ScaleY="1"/>
+                        </Border.LayoutTransform>
+                        <ContentPresenter/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- Сфера состояния записи: цвет по цвету записи, вид берётся из модели. Для журнала и плашек, где процесса уже нет -->
+    <Style x:Key="StatusOrb" TargetType="ctl:ActivityOrb">
+        <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
+        <Setter Property="Kind" Value="{Binding Kind}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
+                <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Сфера общего состояния рядом с заголовком: свой вид с поясом из быстрых точек, цвет по общему состоянию -->
+    <Style x:Key="SummaryOrb" TargetType="ctl:ActivityOrb">
+        <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
+        <Setter Property="Kind" Value="Beacon"/>
         <Style.Triggers>
             <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
                 <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
@@ -216,6 +372,32 @@
     </Style>
 
     <!-- Вывод процесса: каждая запись на отдельной плашке, цвет рамки по смыслу записи. Текст можно выделить и скопировать -->
+    <Style x:Key="ThinProgress" TargetType="ProgressBar">
+        <Setter Property="Height" Value="6"/>
+        <Setter Property="Minimum" Value="0"/>
+        <Setter Property="Maximum" Value="1"/>
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource OkBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid>
+                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3"/>
+                        <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="3" HorizontalAlignment="Left"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="VBar" TargetType="Border">
+        <Setter Property="Width" Value="1"/>
+        <Setter Property="Height" Value="14"/>
+        <Setter Property="Background" Value="{StaticResource LineStrongBrush}"/>
+        <Setter Property="Margin" Value="12,0,0,0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
     <Style x:Key="LogLine" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource WindowBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
@@ -235,17 +417,106 @@
         </Style.Triggers>
     </Style>
 
-    <Style x:Key="LogView" TargetType="TextBox">
-        <Setter Property="IsReadOnly" Value="True"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="0"/>
+    <!-- Выпадающий список: вид поля ввода, список в тёмной плашке, выбранный пункт с акцентной рамкой -->
+    <Style x:Key="FieldItem" TargetType="ComboBoxItem">
         <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
-        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
-        <Setter Property="TextWrapping" Value="Wrap"/>
-        <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBoxItem">
+                    <Border x:Name="Plate" Background="Transparent" CornerRadius="{StaticResource RadiusField}" Padding="12,8">
+                        <ContentPresenter/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Plate" Property="Background" Value="{StaticResource RaisedBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
+
+    <Style x:Key="FieldChoice" TargetType="ComboBox">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="Margin" Value="0,4,0,4"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource FieldItem}"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton x:Name="Toggle" Focusable="False" ClickMode="Press" Cursor="Hand"
+                                      IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="Frame" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusField}"/>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Frame" Property="BorderBrush" Value="{StaticResource MutedBrush}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Frame" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <Grid IsHitTestVisible="False" Margin="{StaticResource PadField}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" VerticalAlignment="Center" TextBlock.Foreground="{StaticResource TextBrush}"/>
+                            <Path Grid.Column="1" Data="M 0,0 L 5,5 L 10,0" Stroke="{StaticResource MutedBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="10" Height="5" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade" Focusable="False">
+                            <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="320" Margin="0,4,0,0" Padding="4"
+                                    Background="{StaticResource RaisedBrush}" BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusField}">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Приглушённая подпись под полем, по нажатию раскрывающая подсказку. По центру, при наведении светлеет и подчёркивается -->
+    <Style x:Key="InlineLink" TargetType="ToggleButton">
+        <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,2,0,2"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <TextBlock x:Name="Label" Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" Padding="8,4"/>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Label" Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            <Setter TargetName="Label" Property="TextDecorations" Value="Underline"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Label" Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="FieldTitle" TargetType="TextBlock" BasedOn="{StaticResource TextBody}">
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Margin" Value="0,16,0,4"/>
@@ -391,6 +662,39 @@
         <Setter Property="Margin" Value="0,0,8,0"/>
     </Style>
 
+
+    <!-- Крестик удаления записи: приглушённый значок без фона, при наведении светлеет и получает плашку -->
+    <Style x:Key="RemoveButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
+        <Setter Property="Content" Value="&#xE711;"/>
+        <Setter Property="Padding" Value="10,9"/>
+        <Setter Property="Margin" Value="6,0,0,0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="ToolTip" Value="Удалить запись"/>
+    </Style>
+    <!-- Серая кнопка с видимой обводкой: для действий, которые должны быть заметны, но не кричать цветом -->
+    <Style x:Key="OutlineButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
+        <Setter Property="BorderBrush" Value="{StaticResource LineStrongBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{StaticResource RadiusField}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Frame" Property="BorderBrush" Value="{StaticResource MutedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
         <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
@@ -405,6 +709,159 @@
                 <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}"/>
             </Trigger>
         </Style.Triggers>
+    </Style>
+
+    <Style x:Key="TabButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="Padding" Value="16,10"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBodyLarge}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Underline" BorderBrush="Transparent" BorderThickness="0,0,0,2" Padding="{TemplateBinding Padding}" Background="Transparent">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Tag" Value="Active">
+                            <Setter TargetName="Underline" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="Tag" Value="Active">
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+
+    <Style x:Key="ChoiceButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Margin" Value="0,0,8,6"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                <Setter Property="Background" Value="{StaticResource RaisedBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Квадратная кнопка со значком: открыть, закрыть, убрать -->
+    <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource OutlineButton}">
+        <Setter Property="Width" Value="32"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="6,0,0,0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Значки в линиях толщиной 1,5 на сетке 18 на 18 -->
+    <GeometryGroup x:Key="IconEye">
+        <PathGeometry Figures="M1.5,9 C4,4.5 6.5,3 9,3 C11.5,3 14,4.5 16.5,9 C14,13.5 11.5,15 9,15 C6.5,15 4,13.5 1.5,9 Z"/>
+        <EllipseGeometry Center="9,9" RadiusX="2.5" RadiusY="2.5"/>
+    </GeometryGroup>
+    <PathGeometry x:Key="IconRedo" Figures="M15,9 A6,6 0 1 1 11.8,3.7 M15,2.5 V6.5 H11"/>
+    <PathGeometry x:Key="IconClose" Figures="M4,4 L14,14 M14,4 L4,14"/>
+    <!-- Откатить: стрелка назад, зеркало «Переделать» -->
+    <PathGeometry x:Key="IconUndo" Figures="M3,9 A6,6 0 1 0 6.2,3.7 M3,2.5 V6.5 H7"/>
+    <!-- Добавить в задания: плюс -->
+    <PathGeometry x:Key="IconPlus" Figures="M9,3 V15 M3,9 H15"/>
+    <!-- Задача в Singularity: список с галочками -->
+    <PathGeometry x:Key="IconTask" Figures="M2.5,4.5 L4,6 L6.5,3.5 M9,5 H16 M2.5,11.5 L4,13 L6.5,10.5 M9,12 H16"/>
+    <!-- Копировать: передний лист целиком и уголок заднего листа за ним -->
+    <PathGeometry x:Key="IconCopy" Figures="M3,6.5 H11.5 V15.5 H3 Z M6.5,6.5 V2.5 H15 V12 H11.5"/>
+
+    <!-- Меню «…» карточки: тёмная плашка как у выпадающего списка, пункт при наведении и с клавиатуры подсвечивается, недоступный приглушён -->
+    <Style x:Key="CardMenuItem" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Plate" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="{StaticResource RadiusField}" Padding="12,7">
+                        <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Plate" Property="Background" Value="{StaticResource SurfaceBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Plate" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource IdleBrush}"/>
+                            <Setter Property="Cursor" Value="Arrow"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CardMenuSeparator" TargetType="Separator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Height="1" Background="{StaticResource LineBrush}" Margin="8,4"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CardMenu" TargetType="ContextMenu">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="HasDropShadow" Value="False"/>
+        <Setter Property="Placement" Value="Bottom"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{StaticResource RaisedBrush}" BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusSmall}" Padding="4" MinWidth="220">
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <!-- Стиль пунктов задан неявно, а не через ItemContainerStyle: тот применился бы и к разделителям, и меню падало при открытии -->
+        <Style.Resources>
+            <Style TargetType="MenuItem" BasedOn="{StaticResource CardMenuItem}"/>
+            <Style TargetType="Separator" BasedOn="{StaticResource CardMenuSeparator}"/>
+        </Style.Resources>
+    </Style>
+
+    <!-- Галочка: квадрат со скруглением, при выборе заливается акцентом -->
+    <Style TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource FontSizeBody}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <StackPanel Orientation="Horizontal" Background="Transparent">
+                        <Border x:Name="Box" Width="18" Height="18" CornerRadius="{StaticResource RadiusSmall}" BorderThickness="1" BorderBrush="{StaticResource LineStrongBrush}" Background="{StaticResource SurfaceBrush}" VerticalAlignment="Center">
+                            <Path x:Name="Tick" Data="M4,9 L7.5,12.5 L14,5.5" Stroke="{StaticResource OnAccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed"/>
+                        </Border>
+                        <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" Visibility="{TemplateBinding HasContent, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource MutedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

@@ -1,4 +1,8 @@
-# Steward
+<p align="center">
+  <img src="docs/logo.png" alt="S.T.E.W.A.R.D" width="128">
+</p>
+
+# S.T.E.W.A.R.D
 
 Личные утилиты, которые заводят задачи в SingularityApp, и приложение в трее Windows, которое запускает их и показывает статус каждой.
 
@@ -8,8 +12,11 @@
 | [`Steward.Status/`](Steward.Status/README.md) | Общий формат статуса процессов, реестр задач и раннер, который их запускает |
 | [`Steward.Schedule/`](Steward.Schedule/README.md) | Переносит расписание из Google Таблицы в задачи. Работает в Docker. Библиотеки: `Steward.Schedule.Core` и `Steward.Schedule.Shared` |
 | [`Steward.Mail/`](Steward.Mail/README.md) | Проверяет учебную почту и ставит задачи на письма, которые требуют ответа или содержат отзыв |
+| [`Steward.DevTools/`](Steward.DevTools/README.md) | Инструменты разработчика: снимки окон в PNG, проверка живого окна, значки, сканер комментариев. В приложение не входят |
+| [`Steward.Homework/`](Steward.Homework/README.md) | Занятия и выбранный для каждого формат ДЗ (Word, презентация, текст, код, не готовить). Выбор делается в блоке «Форматы заданий» на странице «Домашние задания» |
+| [`Steward.Reels/`](Steward.Reels/README.md) | Бот в Telegram: рилсы превращаются в идеи на странице «Идеи». Идеи хранит библиотека `Steward.Ideas` |
 | [`Whisper/`](Whisper/README.md) | Локальная расшифровка речи из видео, пока для рилсов (Python) |
-| `tests/` | Тесты: `Steward.Tests`, `Steward.Status.Tests`, `Steward.Schedule.Tests` |
+| `tests/` | Тесты: `Steward.Tests`, `Steward.Status.Tests`, `Steward.Schedule.Tests`, `Steward.Mail.Tests`, `Steward.Reels.Tests` |
 | [`config/jobs.json`](config/jobs.json) | Список задач, которые приложение запускает само |
 | `tools/` | Служебные инструменты разработки, например проверка XML-комментариев |
 
@@ -26,6 +33,10 @@ config/jobs.json ──► Steward (приложение) ──запускае
 - **Расписание пар** работает отдельно, в Docker (`Dockerfile` и `docker-compose.yml` в корне), а приложение читает его журнал.
 - **Остальные задачи** запускает приложение: при старте, каждый день в заданное время или по интервалу, а ещё по кнопке «Запустить».
 - **Статус** каждой задачи лежит в одном формате. Новой задаче достаточно записать файл статуса и добавить строку в `config/jobs.json`, менять приложение не нужно.
+
+## Запуск вручную
+
+Двойной щелчок по Steward.bat в корне репозитория (или по ярлыку Steward.lnk со значком, его можно закрепить на панели задач) запускает приложение в трее и контейнер расписания так же, как при входе в Windows.
 
 ## Запуск при входе в Windows
 
@@ -56,4 +67,4 @@ dotnet run tools/DocScan.cs -- . --params
 
 ## Секреты
 
-Ни токены, ни пароли в репозиторий не попадают: `.env` и `Steward.Mail/appsettings.json` лежат в `.gitignore`. Образцы без значений: `.env.example` и `Steward.Mail/appsettings.example.json`.
+Ни токены, ни пароли в репозиторий не попадают: `.env` и `Steward.Mail/appsettings.json` и `Steward.Reels/appsettings.json` лежат в `.gitignore`. Образцы без значений: `.env.example` и `appsettings.example.json` в папках программ.

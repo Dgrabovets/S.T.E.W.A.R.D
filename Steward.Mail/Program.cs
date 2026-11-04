@@ -38,6 +38,9 @@ internal static class Program
     /// <returns>0, если проверка прошла, и 1, если случилась ошибка</returns>
     private static async Task<int> Main(string[] args)
     {
+        // Приложение в трее читает вывод как UTF-8, а консоль по умолчанию пишет в кодировке DOS: без этого русский текст превращается в кракозябры
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+
         var dryRun = args.Contains("--dry-run");
         var statusStore = new StatusStore(DataLocation.StatusDirectory());
 
@@ -49,10 +52,12 @@ internal static class Program
                 new ImapMailReader(settings.Mail),
                 new MailClassifier(settings.Mail, settings.Classifier),
                 singularity,
+                new HandledMailFile(Path.Combine(DataLocation.DataDirectory(), "mail", "handled.json")),
                 new ToastNotifier(),
                 settings,
                 TimeProvider.System,
-                Log);
+                Log,
+                new MailArchive(Path.Combine(DataLocation.DataDirectory(), "mail", "archive.json")));
 
             var result = await checker.RunAsync(dryRun, CancellationToken.None);
 
@@ -78,7 +83,23 @@ internal static class Program
     #region Helpers
 
     /// <summary>
-    /// Читает appsettings.json рядом с exe и проверяет, что пароль и токен не остались заглушками
+    /// Собирает секреты из переменных окружения пользователя: так их не нужно держать в файле открытым текстом
+    /// </summary>
+    /// <returns>Настройки, заданные в окружении: <c>STEWARD_MAIL_APPPASSWORD</c> и <c>STEWARD_SINGULARITY_TOKEN</c></returns>
+    private static Dictionary<string, string?> SecretsFromEnvironment()
+    {
+        var secrets = new Dictionary<string, string?>();
+        if (Environment.GetEnvironmentVariable("STEWARD_MAIL_APPPASSWORD") is { Length: > 0 } password)
+            secrets["Mail:AppPassword"] = password;
+
+        if (Environment.GetEnvironmentVariable("STEWARD_SINGULARITY_TOKEN") is { Length: > 0 } token)
+            secrets["Singularity:Token"] = token;
+
+        return secrets;
+    }
+
+    /// <summary>
+    /// Читает appsettings.json рядом с exe и проверяет, что пароль и токен не остались заглушками. Секреты из окружения важнее файла
     /// </summary>
     /// <returns>Настройки приложения</returns>
     /// <exception cref="InvalidOperationException">
@@ -89,6 +110,7 @@ internal static class Program
         var config = new ConfigurationBuilder()
             .SetBasePath(BaseDir)
             .AddJsonFile("appsettings.json", optional: false)
+            .AddInMemoryCollection(SecretsFromEnvironment())
             .Build();
 
         var settings = config.Get<AppSettings>() ?? throw new InvalidOperationException("Не удалось прочитать appsettings.json");

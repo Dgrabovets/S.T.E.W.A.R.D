@@ -38,8 +38,79 @@ public static class XlsxSheetParser
     public static string ToCsv(byte[] xlsx)
     {
         using var archive = new ZipArchive(new MemoryStream(xlsx), ZipArchiveMode.Read);
+
+        return SheetToCsv(archive, ReadSharedStrings(archive), "xl/worksheets/sheet1.xml");
+    }
+
+    /// <summary>
+    /// Превращает в CSV каждый лист книги и называет его так, как он назван на вкладке
+    /// </summary>
+    /// <param name="xlsx">Байты файла xlsx со всеми листами</param>
+    /// <returns>
+    /// Название вкладки и CSV листа, вкладки в порядке книги. Если в книге нет списка листов, возвращается один лист без названия
+    /// </returns>
+    /// <exception cref="FormatException">
+    /// В книге нет листа
+    /// </exception>
+    public static IReadOnlyList<(string Name, string Csv)> ToCsvSheets(byte[] xlsx)
+    {
+        using var archive = new ZipArchive(new MemoryStream(xlsx), ZipArchiveMode.Read);
         var strings = ReadSharedStrings(archive);
-        var sheet = archive.GetEntry("xl/worksheets/sheet1.xml")
+        var sheets = new List<(string Name, string Csv)>();
+        foreach (var (name, path) in ReadSheetPaths(archive))
+            sheets.Add((name, SheetToCsv(archive, strings, path)));
+
+        return sheets.Count > 0 ? sheets : [(string.Empty, SheetToCsv(archive, strings, "xl/worksheets/sheet1.xml"))];
+    }
+
+    /// <summary>
+    /// Находит, в каком файле книги лежит каждый лист: название вкладки берётся из <c>workbook.xml</c>, а путь к файлу из связей книги
+    /// </summary>
+    /// <param name="archive">Открытая книга xlsx</param>
+    /// <returns>Название вкладки и путь к файлу листа внутри архива. Пустой список, если список листов не читается</returns>
+    private static List<(string Name, string Path)> ReadSheetPaths(ZipArchive archive)
+    {
+        var book = archive.GetEntry("xl/workbook.xml");
+        var relations = archive.GetEntry("xl/_rels/workbook.xml.rels");
+        if (book is null || relations is null)
+            return [];
+
+        using var relationStream = relations.Open();
+        var targets = XDocument.Load(relationStream).Descendants(PackageRelationships + "Relationship")
+            .Where(relationship => (string?)relationship.Attribute("Id") is not null && (string?)relationship.Attribute("Target") is not null)
+            .ToDictionary(relationship => (string)relationship.Attribute("Id")!, relationship => (string)relationship.Attribute("Target")!, StringComparer.Ordinal);
+
+        using var bookStream = book.Open();
+        var result = new List<(string, string)>();
+        foreach (var sheet in XDocument.Load(bookStream).Descendants(Spreadsheet + "sheet"))
+        {
+            var name = (string?)sheet.Attribute("name");
+            var id = (string?)sheet.Attribute(OfficeRelationships + "id");
+            if (name is null || id is null || !targets.TryGetValue(id, out var target))
+                continue;
+
+            // Связи книги записывают путь относительно папки xl, а бывает и от корня архива
+            var path = target.StartsWith('/') ? target.TrimStart('/') : "xl/" + target;
+            if (archive.GetEntry(path) is not null)
+                result.Add((name, path));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Превращает один лист книги в CSV вместе с объединёнными ячейками и ссылками
+    /// </summary>
+    /// <param name="archive">Открытая книга xlsx</param>
+    /// <param name="strings">Общая таблица строк книги</param>
+    /// <param name="path">Путь к файлу листа внутри архива</param>
+    /// <returns>Текст CSV</returns>
+    /// <exception cref="FormatException">
+    /// Файла листа нет
+    /// </exception>
+    private static string SheetToCsv(ZipArchive archive, List<string> strings, string path)
+    {
+        var sheet = archive.GetEntry(path)
             ?? throw new FormatException("The workbook does not contain a worksheet.");
 
         using var sheetStream = sheet.Open();
@@ -47,7 +118,7 @@ public static class XlsxSheetParser
         var cells = ReadCells(document, strings);
 
         ApplyMerges(document, cells);
-        var links = ReadHyperlinks(archive, document);
+        var links = ReadHyperlinks(archive, document, path);
         ApplyMerges(document, links);
         AppendLinks(cells, links);
 
@@ -164,10 +235,11 @@ public static class XlsxSheetParser
     /// </summary>
     /// <param name="archive">Открытая книга xlsx</param>
     /// <param name="document">Документ листа</param>
+    /// <param name="sheetPath">Путь к файлу листа внутри архива: по нему находятся связи листа</param>
     /// <returns>Адрес ссылки по координатам ячейки с нуля. Внутренние ссылки пропускаются</returns>
-    private static Dictionary<(int Row, int Column), string> ReadHyperlinks(ZipArchive archive, XDocument document)
+    private static Dictionary<(int Row, int Column), string> ReadHyperlinks(ZipArchive archive, XDocument document, string sheetPath)
     {
-        var targets = ReadHyperlinkTargets(archive);
+        var targets = ReadHyperlinkTargets(archive, sheetPath);
         var links = new Dictionary<(int Row, int Column), string>();
         foreach (var link in document.Descendants(Spreadsheet + "hyperlink"))
         {
@@ -193,10 +265,11 @@ public static class XlsxSheetParser
     /// Читает цели внешних гиперссылок из связей листа
     /// </summary>
     /// <param name="archive">Открытая книга xlsx</param>
+    /// <param name="sheetPath">Путь к файлу листа внутри архива</param>
     /// <returns>Адрес по идентификатору связи. Пустой словарь, если файла связей нет</returns>
-    private static Dictionary<string, string> ReadHyperlinkTargets(ZipArchive archive)
+    private static Dictionary<string, string> ReadHyperlinkTargets(ZipArchive archive, string sheetPath)
     {
-        var entry = archive.GetEntry("xl/worksheets/_rels/sheet1.xml.rels");
+        var entry = archive.GetEntry($"xl/worksheets/_rels/{Path.GetFileName(sheetPath)}.rels");
         if (entry is null)
             return [];
 

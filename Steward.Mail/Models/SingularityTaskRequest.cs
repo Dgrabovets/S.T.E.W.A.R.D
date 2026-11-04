@@ -46,6 +46,13 @@ public sealed class SingularityTaskRequest
     /// <summary>
     /// Проект назначения. Если не задан, поле не отправляется и задача попадает во «Входящие»
     /// </summary>
+    /// <summary>
+    /// Создать заметку, а не задачу: у неё нет срока и отметки выполнения
+    /// </summary>
+    [JsonPropertyName("isNote")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsNote { get; init; }
+
     [JsonPropertyName("projectId")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ProjectId { get; init; }

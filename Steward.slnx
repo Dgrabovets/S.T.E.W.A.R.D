@@ -14,7 +14,6 @@
     <File Path="docker-compose.yml" />
     <File Path="start-steward.ps1" />
     <File Path="config/jobs.json" />
-    <File Path="tools/DocScan.cs" />
   </Folder>
   <Folder Name="/Whisper/">
     <File Path="Whisper/README.md" />
@@ -26,12 +25,19 @@
     <Project Path="tests/Steward.Tests/Steward.Tests.csproj" />
     <Project Path="tests/Steward.Status.Tests/Steward.Status.Tests.csproj" />
     <Project Path="tests/Steward.Mail.Tests/Steward.Mail.Tests.csproj" />
+    <Project Path="tests/Steward.Lms.Tests/Steward.Lms.Tests.csproj" />
+    <Project Path="tests/Steward.Reels.Tests/Steward.Reels.Tests.csproj" />
     <Project Path="tests/Steward.Schedule.Tests/Steward.Schedule.Tests.csproj" />
   </Folder>
   <Project Path="Steward/Steward.csproj" />
+  <Project Path="Steward.DevTools/Steward.DevTools.csproj" />
   <Project Path="Steward.Status/Steward.Status.csproj" />
   <Project Path="Steward.Schedule/Steward.Schedule.csproj" />
   <Project Path="Steward.Schedule.Core/Steward.Schedule.Core.csproj" />
   <Project Path="Steward.Schedule.Shared/Steward.Schedule.Shared.csproj" />
   <Project Path="Steward.Mail/Steward.Mail.csproj" />
+  <Project Path="Steward.Homework/Steward.Homework.csproj" />
+  <Project Path="Steward.Lms/Steward.Lms.csproj" />
+  <Project Path="Steward.Reels/Steward.Reels.csproj" />
+  <Project Path="Steward.Ideas/Steward.Ideas.csproj" />
 </Solution>

@@ -36,11 +36,11 @@ public static partial class LogLines
     /// Выбирает цвет плашки по началу текста
     /// </summary>
     /// <param name="text">Текст записи</param>
-    /// <returns>Ошибка это <see cref="PanelToneEnum.Problem"/>, письма к действию <see cref="PanelToneEnum.Attention"/>, прочее <see cref="PanelToneEnum.Idle"/></returns>
+    /// <returns>Ошибка это <see cref="PanelToneEnum.Problem"/>, письма и идеи к действию <see cref="PanelToneEnum.Attention"/>, прочее <see cref="PanelToneEnum.Idle"/></returns>
     private static PanelToneEnum ToneOf(string text) => text switch
     {
-        _ when text.StartsWith("Ошибка", StringComparison.Ordinal) || text.StartsWith("[тест] Ошибка", StringComparison.Ordinal) => PanelToneEnum.Problem,
-        _ when text.StartsWith("Ответить", StringComparison.Ordinal) || text.StartsWith("Отзыв", StringComparison.Ordinal) || text.StartsWith("[тест] Ответить", StringComparison.Ordinal) || text.StartsWith("[тест] Отзыв", StringComparison.Ordinal) => PanelToneEnum.Attention,
+        _ when text.StartsWith("Ошибка", StringComparison.Ordinal) || text.StartsWith("[тест] Ошибка", StringComparison.Ordinal) || text.StartsWith("Не получилось", StringComparison.Ordinal) => PanelToneEnum.Problem,
+        _ when text.StartsWith("Идея", StringComparison.Ordinal) || text.StartsWith("Ответить", StringComparison.Ordinal) || text.StartsWith("Отзыв", StringComparison.Ordinal) || text.StartsWith("[тест] Ответить", StringComparison.Ordinal) || text.StartsWith("[тест] Отзыв", StringComparison.Ordinal) => PanelToneEnum.Attention,
         _ => PanelToneEnum.Idle,
     };
 

@@ -16,6 +16,11 @@ public static class SyncLogMessages
     public const string UPDATED = "Updated ";
 
     /// <summary>
+    /// Что именно поменялось у задачи. Строка идёт перед строкой об обновлении, а пункты разделены « | »
+    /// </summary>
+    public const string CHANGES = "Changes ";
+
+    /// <summary>
     /// Задача возвращена из архива
     /// </summary>
     public const string UNARCHIVED = "Unarchived ";

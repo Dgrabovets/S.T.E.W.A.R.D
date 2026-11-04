@@ -58,7 +58,7 @@ public sealed class RunHistory
                 Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
                 File.AppendAllText(_path, JsonSerializer.Serialize(record, Json) + Environment.NewLine);
                 if (new FileInfo(_path).Length > TRIM_BYTES)
-                    File.WriteAllLines(_path, File.ReadLines(_path).TakeLast(KEEP));
+                    File.WriteAllLines(_path, File.ReadLines(_path).TakeLast(KEEP).ToList());
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -77,6 +77,58 @@ public sealed class RunHistory
             try
             {
                 File.Delete(_path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // ignore
+            }
+        }
+    }
+
+    /// <summary>
+    /// Стирает записи одной задачи, остальные остаются. Сбой записи не мешает работе: файл просто останется как был
+    /// </summary>
+    /// <param name="jobId">Идентификатор задачи</param>
+    public void Clear(string jobId)
+    {
+        lock (_gate)
+        {
+            try
+            {
+                if (!File.Exists(_path))
+                    return;
+
+                var kept = File.ReadLines(_path)
+                    .Where(line => Parse(line) is not { } record || !string.Equals(record.JobId, jobId, StringComparison.Ordinal))
+                    .ToArray();
+
+                File.WriteAllLines(_path, kept);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // ignore
+            }
+        }
+    }
+
+    /// <summary>
+    /// Удаляет одну запись: задача и момент начала у неё совпадают с переданными
+    /// </summary>
+    /// <param name="target">Запись, которую нужно убрать</param>
+    public void Remove(RunRecord target)
+    {
+        lock (_gate)
+        {
+            try
+            {
+                if (!File.Exists(_path))
+                    return;
+
+                var kept = File.ReadLines(_path)
+                    .Where(line => Parse(line) is not { } record || record.StartedAt != target.StartedAt || !string.Equals(record.JobId, target.JobId, StringComparison.Ordinal))
+                    .ToArray();
+
+                File.WriteAllLines(_path, kept);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {

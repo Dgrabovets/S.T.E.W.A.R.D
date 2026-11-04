@@ -1,0 +1,111 @@
+<UserControl x:Class="Steward.Views.ToastView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="380" Height="56" RenderTransformOrigin="0.5,0.5">
+    <UserControl.Resources>
+        <!-- Круглая кнопка окошка: залитая у «Откатить», прозрачная у «Закрыть» -->
+        <Style x:Key="ToastRoundButton" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Plate" CornerRadius="{StaticResource RadiusRound}" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Plate" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <UserControl.RenderTransform>
+        <TranslateTransform Y="0"/>
+    </UserControl.RenderTransform>
+    <!-- Начальные значения лежат в стиле, а не в самом элементе: значение на элементе сильнее триггера, и окошко не кликалось бы -->
+    <UserControl.Style>
+        <Style TargetType="UserControl">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsVisible}" Value="True">
+                    <Setter Property="IsHitTestVisible" Value="True"/>
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.18"/>
+                                <DoubleAnimation Storyboard.TargetProperty="RenderTransform.Y" From="14" To="0" Duration="0:0:0.18">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut"/>
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.EnterActions>
+                    <DataTrigger.ExitActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.12"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </DataTrigger.ExitActions>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Style>
+
+    <Grid AutomationProperties.LiveSetting="Polite">
+        <!-- Тень лежит на отдельном неподвижном слое: анимированная заливка не перерисовывает её каждый кадр -->
+        <Border Background="{StaticResource SurfaceBrush}" CornerRadius="{StaticResource RadiusCard}">
+            <Border.Effect>
+                <DropShadowEffect Color="Black" BlurRadius="26" ShadowDepth="8" Direction="270" Opacity="0.7"/>
+            </Border.Effect>
+        </Border>
+        <Grid>
+            <Grid.Clip>
+                <RectangleGeometry Rect="0,0,380,56" RadiusX="16" RadiusY="16"/>
+            </Grid.Clip>
+            <Border Background="{StaticResource AccentPressedBrush}" HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5">
+                <Border.RenderTransform>
+                    <ScaleTransform x:Name="DrainScale" ScaleX="1"/>
+                </Border.RenderTransform>
+            </Border>
+            <Grid Margin="18,0,10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Text}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                <Grid Grid.Column="1" Width="38" Height="38" Margin="8,0,10,0" VerticalAlignment="Center" Visibility="{Binding HasUndo, Converter={StaticResource BoolToVisibility}}">
+                    <Ellipse Width="35" Height="35" Stroke="{StaticResource LineStrongBrush}" StrokeThickness="3"/>
+                    <Ellipse x:Name="RingArc" Width="35" Height="35" Stroke="{StaticResource TextBrush}" StrokeThickness="3" StrokeDashArray="36.65 36.65" StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform Angle="-90"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <TextBlock Text="{Binding SecondsLeft}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+                <Button Grid.Column="2" Command="{Binding UndoCommand}" Style="{StaticResource ToastRoundButton}" Background="{StaticResource TextBrush}" Foreground="{StaticResource AccentPressedBrush}"
+                        Visibility="{Binding HasUndo, Converter={StaticResource BoolToVisibility}}" ToolTip="Откатить" AutomationProperties.Name="Откатить">
+                    <Path Data="{StaticResource IconUndo}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.75" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="18" Height="18"/>
+                </Button>
+                <Button Grid.Column="3" Command="{Binding CloseCommand}" Style="{StaticResource ToastRoundButton}" Margin="4,0,0,0" ToolTip="Закрыть" AutomationProperties.Name="Закрыть">
+                    <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.75" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="16" Height="16"/>
+                </Button>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

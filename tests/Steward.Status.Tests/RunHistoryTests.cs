@@ -32,6 +32,29 @@ public class RunHistoryTests
     }
 
     /// <summary>
+    /// Удаление одной записи убирает только её: такую же по задаче, но с другим временем начала и записи других задач оставляет
+    /// </summary>
+    [Fact]
+    public void Remove_deletes_only_the_matching_record_and_clear_by_job_keeps_the_others()
+    {
+        using var dir = new TempDir();
+        var history = new RunHistory(dir.Path);
+        var later = Record with { StartedAt = Record.StartedAt.AddHours(1), FinishedAt = Record.FinishedAt.AddHours(1) };
+        var other = Record with { JobId = "reels", Title = "Рилсы" };
+        history.Append(Record);
+        history.Append(later);
+        history.Append(other);
+
+        history.Remove(Record);
+
+        Assert.Equal([later.StartedAt, other.StartedAt], history.Load(10).Select(record => record.StartedAt).Reverse().ToArray());
+
+        history.Clear("mail");
+
+        Assert.Equal(["reels"], history.Load(10).Select(record => record.JobId).ToArray());
+    }
+
+    /// <summary>
     /// Очистка без файла журнала ничего не ломает
     /// </summary>
     [Fact]
@@ -61,5 +84,23 @@ public class RunHistoryTests
         Assert.Null(loaded[0].Output);
         Assert.Equal("строка 1\nстрока 2", loaded[1].Output);
         Assert.Equal("Прочее: 1", loaded[1].Summary);
+    }
+
+    /// <summary>
+    /// Когда файл журнала вырос больше предела, он сжимается до последних записей, а новые записи по-прежнему пишутся
+    /// </summary>
+    [Fact]
+    public void A_journal_over_the_limit_is_trimmed_to_the_latest_records()
+    {
+        using var dir = new TempDir();
+        var history = new RunHistory(dir.Path);
+        var fat = Record with { Output = new string('x', 4000) };
+
+        for (var index = 0; index < 400; index++)
+            history.Append(fat with { StartedAt = fat.StartedAt.AddMinutes(index), FinishedAt = fat.FinishedAt.AddMinutes(index) });
+
+        var lines = File.ReadLines(Path.Combine(dir.Path, "runs.jsonl")).Count();
+        Assert.InRange(lines, 1, 300);
+        Assert.Equal(fat.StartedAt.AddMinutes(399), history.Load(1).Single().StartedAt);
     }
 }

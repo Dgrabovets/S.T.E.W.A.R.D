@@ -7,5 +7,6 @@ namespace Steward.Monitoring.Models;
 /// <param name="Tone">Тон записи: тихий прогон, изменение или сбой</param>
 /// <param name="Title">Короткая строка о том, чем закончился прогон</param>
 /// <param name="Detail">Подробности, строки разделены переводом строки</param>
+/// <param name="Duration">Сколько шла сверка, по первой и последней строке её журнала. Пусто у записей, сохранённых до появления этого поля</param>
 /// <param name="Repeat">Сколько одинаковых тихих прогонов схлопнуто в эту запись</param>
-public sealed record LogEntry(DateTimeOffset Time, LogToneEnum Tone, string Title, string Detail, int Repeat);
+public sealed record LogEntry(DateTimeOffset Time, LogToneEnum Tone, string Title, string Detail, int Repeat, TimeSpan? Duration = null);

@@ -1,0 +1,48 @@
+<UserControl x:Class="Steward.Views.JsonSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:Steward.Behaviors">
+    <StackPanel>
+        <TextBlock Text="{Binding Intro}" Style="{StaticResource Hint}" TextWrapping="Wrap" Margin="4,0,0,4"
+                   Visibility="{Binding HasIntro, Converter={StaticResource BoolToVisibility}}"/>
+        <ItemsControl ItemsSource="{Binding Sections}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Margin="0,0,0,8">
+                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0">
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource TextTitle}" Margin="4,0,0,0"/>
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding Fields}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" Style="{StaticResource FieldTitle}" Visibility="{Binding HasTitleAbove, Converter={StaticResource BoolToVisibility}}"/>
+                                        <CheckBox Content="{Binding Title}" IsChecked="{Binding IsOn, Mode=TwoWay}" FontWeight="SemiBold" Margin="0,16,0,4" HorizontalAlignment="Left"
+                                                  AutomationProperties.Name="{Binding Title}"
+                                                  Visibility="{Binding IsToggle, Converter={StaticResource BoolToVisibility}}"/>
+                                        <TextBlock Text="{Binding Hint}" Style="{StaticResource Hint}" TextWrapping="Wrap" Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}"/>
+                                        <TextBox Style="{StaticResource Field}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                 Visibility="{Binding IsPlain, Converter={StaticResource BoolToVisibility}}"/>
+                                        <PasswordBox Style="{StaticResource SecretField}"
+                                                     behaviors:PasswordBinding.Password="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     Visibility="{Binding IsSecret, Converter={StaticResource BoolToVisibility}}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0" Visibility="{Binding HasAction, Converter={StaticResource BoolToVisibility}}">
+                            <Button Content="{Binding ActionTitle}" Style="{StaticResource OutlineButton}" Command="{Binding ActionCommand}"/>
+                            <TextBlock Text="{Binding ActionHint}" Style="{StaticResource Hint}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Orientation="Horizontal" Margin="0,16,0,8">
+            <Button Content="Сохранить" Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}"/>
+            <Button Content="Открыть файл настроек" Style="{StaticResource ActionButton}" Command="{Binding OpenFileCommand}" Margin="8,0,0,0"/>
+        </StackPanel>
+        <TextBlock Text="{Binding Message}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap"
+                   Visibility="{Binding HasMessage, Converter={StaticResource BoolToVisibility}}"/>
+    </StackPanel>
+</UserControl>

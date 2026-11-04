@@ -51,6 +51,11 @@ public sealed record JobDefinition
     public int? StaleAfterMinutes { get; init; }
 
     /// <summary>
+    /// Что показывать на главной странице процесса: «settings» открывает настройки сразу. Пусто, если у страницы есть своё содержимое
+    /// </summary>
+    public string? HomePage { get; init; }
+
+    /// <summary>
     /// Предельное время работы
     /// </summary>
     public TimeSpan Timeout => TimeSpan.FromMinutes(TimeoutMinutes);

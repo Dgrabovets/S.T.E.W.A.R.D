@@ -156,6 +156,23 @@ public class SingularityClientTests
     }
 
     /// <summary>
+    /// Отличия задачи от занятия называют каждое изменившееся поле, а совпавшие поля молчат
+    /// </summary>
+    [Fact]
+    public void Differences_name_each_changed_field_and_nothing_else()
+    {
+        var start = new DateTimeOffset(2026, 10, 29, 21, 0, 0, TimeSpan.FromHours(3));
+        var lesson = new Lesson("up:rki-2-26:2026-10-29:2010", "Новое", "Иванов", start, 60);
+        var same = new Steward.Schedule.Singularity.Models.SingularityTask("T-1", lesson.ExternalId, "Новое", "Иванов", SingularityClient.FormatStart(start), true, 60, 0, null, false, [15], null);
+        var moved = same with { Title = "Старое", TimeLength = 90, Start = "2026-10-29T20:10:00+03:00", Notifies = null };
+
+        Assert.Empty(SingularityClient.Differences(same, lesson));
+        Assert.Equal(
+            ["start=2026-10-29T20:10:00+03:00>" + SingularityClient.FormatStart(start), "title=Старое>Новое", "length=90>60", "reminder"],
+            SingularityClient.Differences(moved, lesson));
+    }
+
+    /// <summary>
     /// Из названия с типом занятия берётся только предмет
     /// </summary>
     [Fact]

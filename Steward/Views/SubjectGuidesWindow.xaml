@@ -1,0 +1,69 @@
+<Window x:Class="Steward.Views.SubjectGuidesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="S.T.E.W.A.R.D"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        FontFamily="{StaticResource FontBase}"
+        Width="560"
+        SizeToContent="Height"
+        MaxHeight="720"
+        PreviewKeyDown="Window_OnPreviewKeyDown">
+    <Border Style="{StaticResource WindowChrome}">
+        <StackPanel Margin="24,18,24,20">
+            <Grid Background="Transparent" MouseLeftButtonDown="Header_OnMouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Уточнить для предмета" Style="{StaticResource TextHeadline}"/>
+                    <TextBlock Text="{Binding Subject}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Button Grid.Column="1" Click="Cancel_OnClick" Style="{StaticResource IconButton}" VerticalAlignment="Top" ToolTip="Закрыть" AutomationProperties.Name="Закрыть">
+                    <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                </Button>
+            </Grid>
+
+            <TextBlock Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,14,0,10"
+                       Text="Отметь методические указания и образцы, которые относятся к этому предмету. Остальные при подготовке его заданий не учитываются. Сами материалы добавляются в настройках «Автоматизации образования»."/>
+
+            <TextBlock Text="Методические указания" Style="{StaticResource TextCaption}" Margin="0,6,0,6" Visibility="{Binding HasGuides, Converter={StaticResource BoolToVisibility}}"/>
+            <ItemsControl ItemsSource="{Binding Guides}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Margin="0,0,0,6" ToolTip="{Binding Meta}" AutomationProperties.Name="{Binding Title}">
+                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextBrush}"/>
+                        </CheckBox>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Образцы" Style="{StaticResource TextCaption}" Margin="0,10,0,6" Visibility="{Binding HasExamples, Converter={StaticResource BoolToVisibility}}"/>
+            <ItemsControl ItemsSource="{Binding Examples}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Margin="0,0,0,6" ToolTip="{Binding Meta}" AutomationProperties.Name="{Binding Title}">
+                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextBrush}"/>
+                        </CheckBox>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Общих указаний и образцов пока нет: добавь их в настройках «Автоматизации образования»." Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Visibility="{Binding NoMaterials, Converter={StaticResource BoolToVisibility}}"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button Content="Отмена" Click="Cancel_OnClick" IsCancel="True" Style="{StaticResource GhostButton}"/>
+                <Button Content="Сохранить" Click="Confirm_OnClick" IsDefault="True" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

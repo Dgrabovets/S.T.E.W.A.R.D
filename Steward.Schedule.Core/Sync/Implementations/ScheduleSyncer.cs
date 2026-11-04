@@ -73,8 +73,9 @@ public sealed class ScheduleSyncer
     /// <returns>Счётчики каждого действия. Уже выполненная задача прошедшего занятия не меняется</returns>
     public async Task<SyncReport> RunAsync(CancellationToken cancellationToken)
     {
-        var csv = await _source.ReadCsvAsync(cancellationToken);
-        var slots = ScheduleParser.Parse(csv, _options.GroupColumn, TimeHelper.ResolveTimeZone(_options.TimeZoneId), _clock.Today);
+        var sheets = await _source.ReadSheetsAsync(_clock.Today, cancellationToken);
+        _logger.LogInformation("Reading sheets: {Sheets}", string.Join(", ", sheets.Select(sheet => sheet.Name.Length > 0 ? sheet.Name : "(single sheet)")));
+        var slots = MergeSheets(sheets);
         _logger.LogInformation(
             "Parsed {Lessons} lessons across {Slots} slots in column {Group}",
             slots.Count(slot => slot.Lesson is not null),
@@ -113,6 +114,46 @@ public sealed class ScheduleSyncer
 
         return report;
     }
+
+    #region Reading
+
+    /// <summary>
+    /// Разбирает вкладки месяцев и склеивает слоты в один список. Неделя на стыке месяцев может стоять в двух вкладках: слот с датой берётся из вкладки своего месяца, а если такой нет, из более поздней
+    /// </summary>
+    /// <param name="sheets">Вкладки от старой к новой</param>
+    /// <returns>Слоты по возрастанию внешнего идентификатора</returns>
+    private IReadOnlyList<ScheduleSlot> MergeSheets(IReadOnlyList<ScheduleSheet> sheets)
+    {
+        var zone = TimeHelper.ResolveTimeZone(_options.TimeZoneId);
+        var merged = new Dictionary<string, (ScheduleSlot Slot, bool OwnMonth)>(StringComparer.Ordinal);
+        foreach (var sheet in sheets)
+        {
+            foreach (var slot in ScheduleParser.Parse(sheet.Csv, _options.GroupColumn, zone, _clock.Today))
+            {
+                var ownMonth = sheet.Month is { } month && SlotMonth(slot.ExternalId) == month;
+                if (merged.TryGetValue(slot.ExternalId, out var known) && known.OwnMonth && !ownMonth)
+                    continue;
+
+                merged[slot.ExternalId] = (slot, ownMonth);
+            }
+        }
+
+        return [.. merged.Values.Select(pair => pair.Slot).OrderBy(slot => slot.ExternalId, StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// Достаёт месяц из внешнего идентификатора слота вида <c>…2026-11-02:1720</c>
+    /// </summary>
+    /// <param name="externalId">Внешний идентификатор слота</param>
+    /// <returns>Номер месяца или <see langword="null"/>, если дата в идентификаторе не найдена</returns>
+    private static int? SlotMonth(string externalId)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(externalId, @"\d{4}-(\d{2})-\d{2}:", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        return match.Success && int.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var month) ? month : null;
+    }
+
+    #endregion Reading
 
     #region Loading
 
@@ -277,6 +318,10 @@ public sealed class ScheduleSyncer
         var target = WithTags(WithNotices(lesson, run.Notices), existing, run.SubjectTags);
         if (run.TargetTaskIds.Contains(existing.Id) && !SingularityClient.NeedsUpdate(existing, target))
             return;
+
+        var changes = SingularityClient.Differences(existing, target);
+        if (changes.Count > 0)
+            _logger.LogInformation(SyncLogMessages.CHANGES + "{ExternalId}: {Changes}", slot.ExternalId, string.Join(" | ", changes));
 
         await _client.UpdateTaskAsync(existing.Id, run.ProjectId, target, cancellationToken);
         run.Updated++;

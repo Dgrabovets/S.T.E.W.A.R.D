@@ -32,6 +32,11 @@ public sealed class JobRunner
     private const int OUTPUT_LIMIT = 4000;
 
     /// <summary>
+    /// Сколько знаков вывода процесса остаётся в памяти: с запасом на последние строки и сообщение об ошибке
+    /// </summary>
+    private const int TAIL_CHARS = 64 * 1024;
+
+    /// <summary>
     /// Хранилище статусов
     /// </summary>
     private readonly StatusStore _store;
@@ -201,6 +206,8 @@ public sealed class JobRunner
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+            StandardErrorEncoding = System.Text.Encoding.UTF8,
             WorkingDirectory = WorkingDirectoryOf(job),
         };
 
@@ -223,8 +230,8 @@ public sealed class JobRunner
             if (process is null)
                 return new ProcessResult(RunOutcomeEnum.NotStarted, null, "Процесс не создан");
 
-            var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-            var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
+            var output = ReadTailAsync(process.StandardOutput);
+            var error = ReadTailAsync(process.StandardError);
 
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(job.Timeout);
@@ -302,6 +309,26 @@ public sealed class JobRunner
 
         var directory = Path.IsPathRooted(job.Command) ? Path.GetDirectoryName(job.Command) : null;
         return directory is not null && Directory.Exists(directory) ? directory : string.Empty;
+    }
+
+    /// <summary>
+    /// Читает вывод процесса до конца, но держит в памяти только последние <see cref="TAIL_CHARS"/> знаков: задача, которая печатает без остановки, не съедает память
+    /// </summary>
+    /// <param name="reader">Поток вывода процесса</param>
+    /// <returns>Конец вывода</returns>
+    private static async Task<string> ReadTailAsync(StreamReader reader)
+    {
+        var tail = new System.Text.StringBuilder();
+        var buffer = new char[4096];
+        int read;
+        while ((read = await reader.ReadAsync(buffer, CancellationToken.None)) > 0)
+        {
+            tail.Append(buffer, 0, read);
+            if (tail.Length > TAIL_CHARS * 2)
+                tail.Remove(0, tail.Length - TAIL_CHARS);
+        }
+
+        return tail.Length > TAIL_CHARS ? tail.ToString(tail.Length - TAIL_CHARS, TAIL_CHARS) : tail.ToString();
     }
 
     /// <summary>

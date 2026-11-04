@@ -1,19 +1,28 @@
-<Window x:Class="Steward.Views.MainWindow"
+﻿<Window x:Class="Steward.Views.MainWindow"
+        Icon="pack://application:,,,/Steward;component/Assets/steward.ico"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:Steward.Models"
+        xmlns:ctl="clr-namespace:Steward.Controls"
+        xmlns:views="clr-namespace:Steward.Views"
+        xmlns:vm="clr-namespace:Steward.ViewModels"
         Title="Задачи"
-        Width="1020"
-        Height="700"
+        Width="1080"
+        Height="860"
+        MinWidth="900"
+        MinHeight="680"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent"
-        ResizeMode="NoResize"
-        WindowStartupLocation="CenterScreen"
+        AllowsTransparency="False"
+        Background="{StaticResource WindowBrush}"
+        ResizeMode="CanResize"
+        WindowStartupLocation="Manual"
         TextOptions.TextFormattingMode="Display"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
         FontFamily="{StaticResource FontBase}">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="8" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
     <Window.Resources>
         <Style x:Key="PageTitle" TargetType="TextBlock" BasedOn="{StaticResource TextHeadline}">
             <Setter Property="Margin" Value="4,0,0,4"/>
@@ -23,50 +32,307 @@
             <Setter Property="LineHeight" Value="22"/>
         </Style>
 
+        <Style x:Key="GearButton" TargetType="Button" BasedOn="{StaticResource OutlineButton}">
+            <Setter Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+            <Setter Property="Padding" Value="7"/>
+        </Style>
+
+        <Style x:Key="SwitchToggle" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Track" Width="46" Height="30" BorderThickness="1" BorderBrush="{StaticResource LineStrongBrush}" Background="Transparent" CornerRadius="{StaticResource RadiusField}">
+                            <Ellipse x:Name="Knob" Width="16" Height="16" HorizontalAlignment="Left" Margin="6,0,0,0" Fill="{StaticResource MutedBrush}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                                <Setter TargetName="Knob" Property="Margin" Value="0,0,6,0"/>
+                                <Setter TargetName="Knob" Property="Fill" Value="{StaticResource AccentTextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <DataTemplate x:Key="TaskCardTemplate">
+                    <Border x:Name="Card" Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ctl:ActivityOrb Width="24" Height="24" Style="{StaticResource ActivityOrb}" VerticalAlignment="Top" Margin="-4,0,12,0"/>
+                            <StackPanel Grid.Column="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="Name" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding Headline}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBodyLarge}" Margin="12,2,0,0"/>
+                                </StackPanel>
+                                <ItemsControl x:Name="Reason" ItemsSource="{Binding DetailLines}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,4,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="16"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="•"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+                                <ToggleButton Style="{StaticResource SwitchToggle}" IsChecked="{Binding IsOn, Mode=OneWay}" Command="{Binding SwitchCommand}" VerticalAlignment="Top"
+                                              ToolTip="Включить или выключить процесс. Выключенный не запускается сам, идущий запуск не прерывается" AutomationProperties.Name="Процесс включён"
+                                              Visibility="{Binding CanSwitch, Converter={StaticResource BoolToVisibility}}"/>
+                                <Button x:Name="Run" Style="{StaticResource GearButton}" Margin="8,0,0,0" VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"
+                                        ToolTip="Запустить сейчас" AutomationProperties.Name="Запустить сейчас">
+                                    <Canvas Width="16" Height="16">
+                                        <Path Data="M4.5,2.5 L13,8 L4.5,13.5 Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeLineJoin="Round"/>
+                                    </Canvas>
+                                </Button>
+                            </StackPanel>
+                            <Button Grid.Column="3" Style="{StaticResource GearButton}" Margin="8,0,0,0" VerticalAlignment="Top" ToolTip="Настройки"
+                                    Command="{Binding SettingsCommand}" Visibility="{Binding HasSettings, Converter={StaticResource BoolToVisibility}}">
+                                <Canvas Width="16" Height="16">
+                                    <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M2,4 H14 M2,12 H14"/>
+                                    <Ellipse Canvas.Left="8.5" Canvas.Top="1.5" Width="5" Height="5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Fill="{StaticResource SurfaceBrush}"/>
+                                    <Ellipse Canvas.Left="2.5" Canvas.Top="9.5" Width="5" Height="5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" Fill="{StaticResource SurfaceBrush}"/>
+                                </Canvas>
+                            </Button>
+                            <Border Grid.Row="1" Grid.ColumnSpan="4" BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusField}" Margin="0,12,0,0" Padding="16,12"
+                                    Visibility="{Binding HasFrame, Converter={StaticResource BoolToVisibility}}">
+                              <StackPanel>
+                                <StackPanel Visibility="{Binding HasProgress, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Что сейчас выполняется"
+                                           >
+                                    <ItemsControl ItemsSource="{Binding Progress.Steps}" Focusable="False" AutomationProperties.Name="Шаги запуска">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Rows="1"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="Seg" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusSmall}" Padding="4,6" Margin="0,0,6,0"
+                                                        AutomationProperties.Name="{Binding AccessibleName}">
+                                                    <TextBlock x:Name="Step" Text="{Binding Title}" Style="{StaticResource TextCaption}" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                        <Setter TargetName="Seg" Property="Background" Value="{StaticResource OkSurfaceBrush}"/>
+                                                        <Setter TargetName="Step" Property="Foreground" Value="{StaticResource OkBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                        <Setter TargetName="Seg" Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                                                        <Setter TargetName="Seg" Property="BorderThickness" Value="1"/>
+                                                        <Setter TargetName="Step" Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                                                        <Setter TargetName="Step" Property="FontWeight" Value="SemiBold"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding Progress.Line}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,10,0,6"/>
+                                    <ProgressBar Value="{Binding Progress.Share, Mode=OneWay}" Style="{StaticResource ThinProgress}" AutomationProperties.Name="{Binding Progress.AccessibleName}"/>
+                                    <TextBlock Text="{Binding Progress.Elapsed}" Style="{StaticResource TextCaption}" Margin="0,6,0,0"/>
+                                    <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,12,0,12"
+                                            Visibility="{Binding HasMetrics, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding Metrics}" AlternationCount="100" Visibility="{Binding HasMetrics, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="Cell" BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1,0,0,0" Padding="16,0,8,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource TextCaption}"/>
+                                                    <TextBlock Text="{Binding Value}" Style="{StaticResource ToneBadgeText}" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <Trigger Property="ItemsControl.AlternationIndex" Value="0">
+                                                    <Setter TargetName="Cell" Property="BorderThickness" Value="0"/>
+                                                    <Setter TargetName="Cell" Property="Padding" Value="0,0,8,0"/>
+                                                </Trigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+                    <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding CanRun}" Value="True">
+                            <Setter TargetName="Run" Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Muted}" Value="True">
+                            <Setter TargetName="Name" Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
+                            <Setter TargetName="Card" Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
+                            <Setter TargetName="Reason" Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+
+        <Style x:Key="CardHost" TargetType="ContentControl">
+            <Setter Property="ContentTemplate" Value="{StaticResource TaskCardTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Content" Value="{x:Null}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate x:Key="TileTemplate">
+            <Border Style="{StaticResource ToneBadge}" CornerRadius="{StaticResource RadiusCard}" Padding="14,10" Margin="0,0,8,8" MinWidth="170">
+                <StackPanel>
+                    <TextBlock Text="{Binding Label}" Style="{StaticResource TextCaption}" Visibility="{Binding HasLabel, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBlock Text="{Binding Value}" Style="{StaticResource ToneBadgeText}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <Style x:Key="TilesRow" TargetType="ItemsControl">
+            <Setter Property="ItemTemplate" Value="{StaticResource TileTemplate}"/>
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ContentPanel" TargetType="StackPanel">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SettingsPanel" TargetType="StackPanel">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="PageHost" TargetType="Grid">
             <Setter Property="Visibility" Value="Collapsed"/>
         </Style>
     </Window.Resources>
 
-    <Border Style="{StaticResource WindowChrome}">
+    <Border x:Name="Frame" CornerRadius="{StaticResource RadiusSystemWindow}">
+        <Border.Style>
+            <Style TargetType="Border" BasedOn="{StaticResource WindowChrome}">
+                <Style.Triggers>
+                    <!-- Развёрнутое окно упирается в края экрана: рамка заметнее и без скруглений, чтобы было видно, где оно кончается -->
+                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                        <Setter Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                        <Setter Property="CornerRadius" Value="0"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Grid x:Name="TitleBar" Grid.Row="0" Margin="24,16,16,8" Background="Transparent" MouseLeftButtonDown="TitleBar_OnDrag">
+            <Grid x:Name="TitleBar" Grid.Row="0" Margin="24,16,16,8" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="Steward" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                    <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" Margin="0,2,0,0"/>
+                <StackPanel Orientation="Horizontal">
+                    <ctl:ActivityOrb Width="52" Height="52" Kind="Alive" Foreground="{StaticResource AccentTextBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="S.T.E.W.A.R.D" Style="{StaticResource TextDisplay}" VerticalAlignment="Center">
+                        <TextBlock.Foreground>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="{StaticResource TextColor}" Offset="0.25"/>
+                                <GradientStop Color="{StaticResource AccentTextColor}" Offset="1"/>
+                            </LinearGradientBrush>
+                        </TextBlock.Foreground>
+                    </TextBlock>
                 </StackPanel>
-                <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="16,8" VerticalAlignment="Center" Margin="0,0,12,0">
-                    <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource ToneBadgeText}"/>
-                </Border>
                 <Button Grid.Column="2" Content="—" Style="{StaticResource GhostButton}" Click="Minimize_OnClick" ToolTip="Свернуть"/>
-                <Button Grid.Column="3" Content="✕" Style="{StaticResource GhostButton}" Click="Close_OnClick" ToolTip="Скрыть в трей"/>
+                <Button x:Name="MaximizeButton" Grid.Column="3" Content="☐" Style="{StaticResource GhostButton}" Click="Maximize_OnClick" ToolTip="Развернуть"/>
+                <Button Grid.Column="4" Content="✕" Style="{StaticResource GhostButton}" Click="Close_OnClick" ToolTip="Скрыть в трей"/>
             </Grid>
 
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="210"/>
+                    <ColumnDefinition Width="312"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <Grid Margin="16,8,8,16">
-                    <StackPanel>
-                        <RadioButton GroupName="Nav" Content="Статус" Style="{StaticResource NavButton}" IsChecked="{Binding IsStatusPage, Mode=TwoWay}"/>
-                        <RadioButton GroupName="Nav" Content="Идеи" Style="{StaticResource NavButton}" IsChecked="{Binding IsIdeasPage, Mode=TwoWay}"/>
-                        <RadioButton GroupName="Nav" Content="ДЗ" Style="{StaticResource NavButton}" IsChecked="{Binding IsHomeworkPage, Mode=TwoWay}"/>
-                        <RadioButton GroupName="Nav" Content="Журнал" Style="{StaticResource NavButton}" IsChecked="{Binding IsJournalPage, Mode=TwoWay}"/>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding NavGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <Border BorderBrush="{StaticResource AccentTextBrush}" BorderThickness="2,0,0,0" Padding="8,0,0,0" Margin="10,14,0,6">
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource TextCaption}"/>
+                                        </Border>
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <RadioButton GroupName="Nav" Style="{StaticResource NavButton}" IsChecked="{Binding IsSelected, Mode=TwoWay}">
+                                                        <views:NavTabContent/>
+                                                    </RadioButton>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="1">
+                        <Border Height="1" Background="{StaticResource LineBrush}" Margin="8,8,8,8"/>
+                        <ItemsControl ItemsSource="{Binding SystemItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <RadioButton GroupName="Nav" Style="{StaticResource NavButton}" IsChecked="{Binding IsSelected, Mode=TwoWay}">
+                                        <views:NavTabContent/>
+                                    </RadioButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
-                    <Button Content="Выход" Style="{StaticResource GhostButton}" VerticalAlignment="Bottom" HorizontalAlignment="Left" Command="{Binding ExitCommand}"/>
                 </Grid>
 
                 <Grid Grid.Column="1" Margin="8,4,24,24">
@@ -84,7 +350,6 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
                                 <TextBlock Text="Задачи" Style="{StaticResource PageTitle}"/>
-                                <TextBlock Text="Всё, что приложение запускает или за чем следит. Статус обновляется сам." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
                                 <Border Style="{StaticResource Card}" Background="{StaticResource AttentionSurfaceBrush}"
                                         Visibility="{Binding HasRegistryErrors, Converter={StaticResource BoolToVisibility}}">
                                     <StackPanel>
@@ -92,42 +357,7 @@
                                         <TextBlock Text="{Binding RegistryErrors}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                                     </StackPanel>
                                 </Border>
-                                <ItemsControl ItemsSource="{Binding Tasks}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border x:Name="Card" Style="{StaticResource Card}">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <Control Width="16" Height="16" Style="{StaticResource ToneDot}" VerticalAlignment="Top" Margin="0,4,16,0"/>
-                                                    <StackPanel Grid.Column="1">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock x:Name="Name" Text="{Binding Name}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="{Binding Headline}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBodyLarge}" Margin="12,2,0,0"/>
-                                                        </StackPanel>
-                                                        <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-                                                    </StackPanel>
-                                                    <Button x:Name="Run" Grid.Column="2" Content="Запустить" Style="{StaticResource ActionButton}" Margin="12,0,0,0"
-                                                            VerticalAlignment="Top" Command="{Binding RunCommand}" Visibility="Collapsed"/>
-                                                </Grid>
-                                            </Border>
-                                            <DataTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding CanRun}" Value="True">
-                                                    <Setter TargetName="Run" Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Muted}" Value="True">
-                                                    <Setter TargetName="Name" Property="Foreground" Value="{StaticResource MutedBrush}"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
-                                                    <Setter TargetName="Card" Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
-                                                </DataTrigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <ItemsControl ItemsSource="{Binding Tasks}" ItemTemplate="{StaticResource TaskCardTemplate}"/>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -143,41 +373,281 @@
                                 </Style.Triggers>
                             </Style>
                         </Grid.Style>
-                        <StackPanel>
-                            <TextBlock Text="Идеи" Style="{StaticResource PageTitle}"/>
-                            <TextBlock Text="Разобранные идеи из сохранённых рилсов, которые ждут твоего решения." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="Идей пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                                    <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
-                                               Text="Сюда попадут идеи из рилсов, которыми ты поделишься с ботом. У каждой будет подробное описание и кнопки «Делаем» и «Отклонить». Если принять идею, приложение запустит Claude Code, и он реализует её в отдельной ветке git, а ты проверишь результат."/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <views:PageHeaderView Title="Рилсы"/>
+                                <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <views:JsonSettingsView DataContext="{Binding ReelsSettings}"/>
                                 </StackPanel>
-                            </Border>
-                        </StackPanel>
+                                <StackPanel Style="{StaticResource ContentPanel}">
+                                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding IsReelsBusy, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ctl:ActivityOrb Width="26" Height="26" Kind="Composing" Foreground="{StaticResource WorkingBrush}" Margin="-4,-2,12,-2"/>
+                                        <TextBlock Text="Бот разбирает рилс, идея появится здесь через пару минут" Style="{StaticResource PageHint}" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Visibility="{Binding IsIdeasEmpty, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Text="Идей пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
+                                        <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
+                                                   Text="Пришли боту в Telegram ссылку на рилс. Через пару минут здесь появится идея с названием и разбором. «Делаем» открывает Claude Code с готовой просьбой, которую ты отправляешь сам. Идея остаётся в списке, пока ты её не удалишь."/>
+                                    </StackPanel>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding Ideas}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                                <StackPanel Orientation="Horizontal" Visibility="{Binding HasAuthor, Converter={StaticResource BoolToVisibility}}">
+                                                                    <TextBlock Text="{Binding Author}" Style="{StaticResource PageHint}"/>
+                                                                    <Border Style="{StaticResource VBar}"/>
+                                                                </StackPanel>
+                                                                <TextBlock Text="{Binding When}" Style="{StaticResource PageHint}" Margin="12,0,0,0"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                        <Border Grid.Column="1" Style="{StaticResource ToneBadge}" Padding="10,5,14,5" Margin="12,0,0,0" VerticalAlignment="Top">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <ctl:ActivityOrb Width="18" Height="18" Style="{StaticResource ActivityOrb}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Status}" Style="{StaticResource ToneBadgeText}" VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
+                                                    <ItemsControl ItemsSource="{Binding Sections}" Margin="0,12,0,0" Visibility="{Binding HasSections, Converter={StaticResource BoolToVisibility}}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border x:Name="Section" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,10">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="{Binding Label}" Style="{StaticResource TextBody}" Foreground="{StaticResource AccentTextBrush}" FontWeight="SemiBold"/>
+                                                                        <TextBlock Text="{Binding Text}" Style="{StaticResource TextBody}" TextWrapping="Wrap" TextAlignment="Justify" LineHeight="21" Margin="0,3,0,0"/>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <TextBlock Text="{Binding Preview}" Style="{StaticResource PageHint}" Margin="0,8,0,0" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"
+                                                               Visibility="{Binding HasPreview, Converter={StaticResource BoolToVisibility}}"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                                        <Button Content="Делаем" Command="{Binding ApproveCommand}" Style="{StaticResource PrimaryButton}"/>
+                                                        <Button Content="Удалить" Command="{Binding RejectCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                                        <Button Content="Открыть рилс" Command="{Binding OpenSourceCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
                     </Grid>
 
-                    <!-- ДЗ -->
+                    <!-- Почта -->
                     <Grid>
                         <Grid.Style>
                             <Style TargetType="Grid" BasedOn="{StaticResource PageHost}">
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsHomeworkPage}" Value="True">
+                                    <DataTrigger Binding="{Binding IsMailPage}" Value="True">
                                         <Setter Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Grid.Style>
-                        <StackPanel>
-                            <TextBlock Text="Домашние задания" Style="{StaticResource PageTitle}"/>
-                            <TextBlock Text="Черновики, которые подготовил агент. Сдаёшь работу всегда ты сам." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
-                            <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <TextBlock Text="Черновиков пока нет" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeTitle}" FontWeight="SemiBold"/>
-                                    <TextBlock Style="{StaticResource PageHint}" Margin="0,8,0,0"
-                                               Text="После занятий здесь появятся записи «Подготовлено ДЗ». Кнопка «Просмотреть» откроет черновик в VS Code, а «Сформировать Word» соберёт документ по методическим указаниям."/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,12,0">
+                                <views:PageHeaderView Title="Почта"/>
+                                <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <views:JsonSettingsView DataContext="{Binding MailSettings}"/>
                                 </StackPanel>
-                            </Border>
-                        </StackPanel>
+                                <StackPanel Style="{StaticResource ContentPanel}">
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="2*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Проверок за неделю" Style="{StaticResource TextCaption}"/>
+                                            <TextBlock Text="{Binding MailChecksCount}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeHeadline}" FontWeight="SemiBold" Margin="0,6,0,24"/>
+                                            <TextBlock Text="Последняя" Style="{StaticResource TextCaption}"/>
+                                            <TextBlock Text="{Binding MailLastCheck}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,8,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Разобрано писем по дням" Style="{StaticResource TextCaption}"/>
+                                            <ItemsControl ItemsSource="{Binding MailDays}" Margin="0,8,0,0">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Rows="1"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Height="92">
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="*"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center">
+                                                                <TextBlock Text="{Binding Value}" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                                                <Border Width="22" Height="{Binding Height}" Background="{StaticResource AccentBrush}" CornerRadius="3,3,0,0" Margin="0,2,0,0"/>
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Row="1" Text="{Binding Label}" Style="{StaticResource TextCaption}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0">
+                                        <StackPanel>
+                                            <TextBlock Text="По видам" Style="{StaticResource TextCaption}"/>
+                                            <ItemsControl ItemsSource="{Binding MailKinds}" Margin="0,8,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="0,0,0,10">
+                                                            <Grid>
+                                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}"/>
+                                                                <TextBlock Text="{Binding Value}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" HorizontalAlignment="Right"/>
+                                                            </Grid>
+                                                            <ProgressBar Value="{Binding Share, Mode=OneWay}" Margin="0,4,0,0">
+                                                                <ProgressBar.Style>
+                                                                    <Style TargetType="ProgressBar" BasedOn="{StaticResource ThinProgress}">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                                                                                <Setter Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Idle}">
+                                                                                <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </ProgressBar.Style>
+                                                            </ProgressBar>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                <TextBlock Text="Важные письма" Style="{StaticResource TextTitle}" Margin="4,16,0,8"/>
+                                <TextBlock Style="{StaticResource PageHint}" TextWrapping="Wrap" Margin="4,0,0,8"
+                                           Text="Каждое письмо от человека или с отзывом превращается в задачу в Singularity и сохраняется здесь: тема, отправитель, когда пришло и начало текста. Письма остаются в списке после проверки."/>
+                                <ItemsControl ItemsSource="{Binding MailLetters}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource Card}" Padding="0" Margin="0,0,0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="12"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border x:Name="Stripe" Background="{StaticResource LineStrongBrush}" CornerRadius="2" Margin="8,10,0,10"/>
+                                                    <StackPanel Grid.Column="1" Margin="14,10,14,10">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Subject}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                                            <Border Style="{StaticResource ToneBadge}" Padding="8,1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Kind}" Style="{StaticResource ToneBadgeText}" FontSize="{StaticResource FontSizeCaption}"/>
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" LineHeight="20" Margin="0,6,0,0"
+                                                                   Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibility}}"/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Content="Открыть письмо" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" VerticalAlignment="Center" Margin="0,0,14,0"
+                                                            Visibility="{Binding HasLink, Converter={StaticResource BoolToVisibility}}"/>
+                                                </Grid>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Attention}">
+                                                    <Setter TargetName="Stripe" Property="Background" Value="{StaticResource AttentionBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Running}">
+                                                    <Setter TargetName="Stripe" Property="Background" Value="{StaticResource OkBrush}"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- Расписание -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid" BasedOn="{StaticResource PageHost}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSchedulePage}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,12,0">
+                                <views:PageHeaderView Title="Расписание"/>
+                                <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <views:ScheduleSettingsView DataContext="{Binding Settings}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- Расшифровки -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid" BasedOn="{StaticResource PageHost}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTranscriptsPage}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Margin="0,0,12,0">
+                                <views:PageHeaderView Title="Автоматизация образования"/>
+                                <StackPanel Style="{StaticResource SettingsPanel}">
+                                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="Методические указания и образцы" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                                <TextBlock Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,4,12,0"
+                                                           Text="Общие для всех предметов: требования к оформлению и образцы работ. Какие из них относятся к предмету, выбирается кнопкой «Уточнить» на вкладке «Домашние задания» предмета."/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                    <TextBlock Text="{Binding Formats.GuideCountText}" Style="{StaticResource TextCaption}" Foreground="{StaticResource TextBrush}"/>
+                                                    <TextBlock Text="  ·  " Style="{StaticResource TextCaption}"/>
+                                                    <TextBlock Text="{Binding Formats.ExampleCountText}" Style="{StaticResource TextCaption}" Foreground="{StaticResource TextBrush}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="Открыть" Command="{Binding Formats.ManageGuidesCommand}" Style="{StaticResource OutlineButton}" VerticalAlignment="Center"
+                                                    BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}" AutomationProperties.Name="Открыть методические указания и образцы"/>
+                                        </Grid>
+                                    </Border>
+                                    <views:JsonSettingsView DataContext="{Binding LmsSettings}"/>
+                                </StackPanel>
+                                <StackPanel Style="{StaticResource ContentPanel}">
+                                    <views:HomeworkFormatsView DataContext="{Binding Formats}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
                     </Grid>
 
                     <!-- Журнал -->
@@ -193,74 +663,220 @@
                         </Grid.Style>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="0,0,12,0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="Журнал запусков" Style="{StaticResource PageTitle}"/>
-                                        <TextBlock Text="Что приложение запускало и чем это закончилось. Последние сто записей." Style="{StaticResource PageHint}" Margin="4,0,0,16"/>
-                                    </StackPanel>
-                                    <Button Grid.Column="1" Content="Очистить журнал" Style="{StaticResource ActionButton}" VerticalAlignment="Top" Margin="16,0,0,0"
+                                <Grid Margin="0,0,0,20">
+                                    <TextBlock Text="Журнал" Style="{StaticResource PageTitle}" VerticalAlignment="Center"/>
+                                    <Button Content="Очистить журнал" Style="{StaticResource OutlineButton}" HorizontalAlignment="Right"
                                             Command="{Binding ClearJournalCommand}" Visibility="{Binding HasRecords, Converter={StaticResource BoolToVisibility}}"/>
                                 </Grid>
-                                <TextBlock Text="Запусков пока не было" Style="{StaticResource PageHint}" Margin="4,0,0,0"
+                                <TextBlock Text="Записей пока нет" Style="{StaticResource PageHint}" Margin="4,0,0,0"
                                            Visibility="{Binding IsJournalEmpty, Converter={StaticResource BoolToVisibility}}"/>
-                                <ItemsControl ItemsSource="{Binding Records}">
+                                <ItemsControl ItemsSource="{Binding Groups}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border x:Name="Row" Style="{StaticResource Card}" Padding="16,12" Margin="0,0,0,8">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <Control Width="16" Height="16" Style="{StaticResource ToneDot}" VerticalAlignment="Top" Margin="0,4,16,0"/>
-                                                    <StackPanel Grid.Column="1">
+                                            <Border Style="{StaticResource Card}" Padding="8,6,8,8" Margin="0,0,0,12">
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <ToggleButton IsChecked="{Binding IsOpen, Mode=TwoWay}" Style="{StaticResource SectionToggle}">
                                                         <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding Title}" Style="{StaticResource TextBodyLarge}" FontWeight="SemiBold"/>
-                                                            <TextBlock Text="{Binding Outcome}" Style="{StaticResource TextSecondary}" Margin="12,2,0,0"/>
+                                                            <ctl:ActivityOrb Width="26" Height="26" Style="{StaticResource StatusOrb}" Margin="0,0,12,0"/>
+                                                            <StackPanel VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Title}" Style="{StaticResource TextTitle}"/>
+                                                                <TextBlock Text="{Binding Summary}" Style="{StaticResource TextCaption}" Margin="0,2,0,0"/>
+                                                            </StackPanel>
                                                         </StackPanel>
-                                                        <TextBlock Text="{Binding Facts}" Style="{StaticResource TextCaption}" Margin="0,4,0,0"/>
-                                                        <TextBlock Text="{Binding Summary}" Style="{StaticResource TextSecondary}" Margin="0,8,0,0"
-                                                                   Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}"/>
-                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource TextBody}" Margin="0,8,0,0"
-                                                                   Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}"/>
-                                                        <ItemsControl ItemsSource="{Binding OutputLines}" Margin="0,8,0,0"
-                                                                      Visibility="{Binding HasOutput, Converter={StaticResource BoolToVisibility}}">
-                                                            <ItemsControl.ItemTemplate>
-                                                                <DataTemplate>
-                                                                    <Border Style="{StaticResource LogLine}">
-                                                                        <Grid>
-                                                                            <Grid.ColumnDefinitions>
-                                                                                <ColumnDefinition Width="Auto"/>
-                                                                                <ColumnDefinition Width="*"/>
-                                                                            </Grid.ColumnDefinitions>
-                                                                            <TextBlock Text="{Binding Time}" Style="{StaticResource TextMono}" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0"/>
-                                                                            <TextBox Grid.Column="1" Text="{Binding Text, Mode=OneWay}" Style="{StaticResource LogView}"/>
-                                                                        </Grid>
-                                                                    </Border>
-                                                                </DataTemplate>
-                                                            </ItemsControl.ItemTemplate>
-                                                        </ItemsControl>
-                                                    </StackPanel>
-                                                    <Button Grid.Column="2" Content="Починить с Claude" Style="{StaticResource ActionButton}" VerticalAlignment="Top" Margin="16,0,0,0"
-                                                            Command="{Binding FixCommand}" Visibility="{Binding CanFix, Converter={StaticResource BoolToVisibility}}"/>
-                                                </Grid>
+                                                    </ToggleButton>
+                                                        <Button Content="Очистить вкладку" Style="{StaticResource OutlineButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,48,0" Padding="12,5" Command="{Binding ClearCommand}"/>
+                                                    </Grid>
+                                                    <ctl:CollapsibleBody Style="{StaticResource CollapsibleBody}" IsOpen="{Binding IsOpen}">
+                                                        <StackPanel Margin="4,0,4,0">
+                                                            <ItemsControl ItemsSource="{Binding Runs}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Border Style="{StaticResource Card}" Background="Transparent" Padding="16,12" Margin="0,8,0,0">
+                                                                            <StackPanel>
+                                                                                <Grid>
+                                                                                    <Grid.ColumnDefinitions>
+                                                                                        <ColumnDefinition Width="*"/>
+                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                    </Grid.ColumnDefinitions>
+                                                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                                        <TextBlock Text="{Binding When}" Style="{StaticResource TextBodyLarge}" FontWeight="SemiBold"/>
+                                                                                        <StackPanel Orientation="Horizontal" Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVisibility}}">
+                                                                                            <Border Style="{StaticResource VBar}"/>
+                                                                                            <TextBlock Text="{Binding Repeats}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                                                        </StackPanel>
+                                                                                        <Border Style="{StaticResource VBar}"/>
+                                                                                        <Border x:Name="ReasonChip" Style="{StaticResource Chip}" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                                                            <TextBlock x:Name="ReasonText" Text="{Binding Reason}" Style="{StaticResource TextCaption}"/>
+                                                                                        </Border>
+                                                                                        <StackPanel Orientation="Horizontal" Visibility="{Binding HasFacts, Converter={StaticResource BoolToVisibility}}">
+                                                                                            <Border Style="{StaticResource VBar}"/>
+                                                                                            <TextBlock Text="{Binding Facts}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                                                        </StackPanel>
+                                                                                    </StackPanel>
+                                                                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                                                        <Border Style="{StaticResource ToneBadge}" Padding="14,8" VerticalAlignment="Center">
+                                                                                            <TextBlock Text="{Binding Outcome}" Style="{StaticResource ToneBadgeText}"/>
+                                                                                        </Border>
+                                                                                        <Button Content="Починить с Claude" Style="{StaticResource OutlineButton}" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                                                                Command="{Binding FixCommand}" Visibility="{Binding CanFix, Converter={StaticResource BoolToVisibility}}"/>
+                                                                                        <Button Style="{StaticResource RemoveButton}" Command="{Binding RemoveCommand}"/>
+                                                                                    </StackPanel>
+                                                                                </Grid>
+                                                                                <ItemsControl ItemsSource="{Binding SummaryLines}" Margin="0,10,0,0" Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibility}}">
+                                                                                    <ItemsControl.ItemTemplate>
+                                                                                        <DataTemplate>
+                                                                                            <Border Style="{StaticResource LogLine}">
+                                                                                                <Grid>
+                                                                                                    <Grid.ColumnDefinitions>
+                                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                                        <ColumnDefinition Width="*"/>
+                                                                                                    </Grid.ColumnDefinitions>
+                                                                                                    <TextBlock Text="{Binding Time}" Style="{StaticResource TextMono}" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0"/>
+                                                                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource TextMono}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                                                                                                </Grid>
+                                                                                            </Border>
+                                                                                        </DataTemplate>
+                                                                                    </ItemsControl.ItemTemplate>
+                                                                                </ItemsControl>
+                                                                                <Border Style="{StaticResource ReasonBlock}" Margin="0,10,0,0" Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibility}}">
+                                                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource TextBody}" TextWrapping="Wrap"/>
+                                                                                </Border>
+                                                                                <ItemsControl ItemsSource="{Binding OutputLines}" Margin="0,10,0,0"
+                                                                                              Visibility="{Binding HasOutput, Converter={StaticResource BoolToVisibility}}">
+                                                                                    <ItemsControl.ItemTemplate>
+                                                                                        <DataTemplate>
+                                                                                            <Border Style="{StaticResource LogLine}">
+                                                                                                <Grid>
+                                                                                                    <Grid.ColumnDefinitions>
+                                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                                        <ColumnDefinition Width="*"/>
+                                                                                                    </Grid.ColumnDefinitions>
+                                                                                                    <TextBlock Text="{Binding Time}" Style="{StaticResource TextMono}" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0"/>
+                                                                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource TextMono}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                                                                                                </Grid>
+                                                                                            </Border>
+                                                                                        </DataTemplate>
+                                                                                    </ItemsControl.ItemTemplate>
+                                                                                </ItemsControl>
+                                                                            </StackPanel>
+                                                                        </Border>
+                                                                        <DataTemplate.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsManual}" Value="True">
+                                                                                <Setter TargetName="ReasonChip" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                                                                <Setter TargetName="ReasonText" Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                                                                            </DataTrigger>
+                                                                        </DataTemplate.Triggers>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                            <ItemsControl ItemsSource="{Binding Checks}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <Border Style="{StaticResource Card}" Background="Transparent" Padding="16,12" Margin="0,8,0,0">
+                                                                            <StackPanel>
+                                                                                <Grid>
+                                                                                    <Grid.ColumnDefinitions>
+                                                                                        <ColumnDefinition Width="*"/>
+                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                    </Grid.ColumnDefinitions>
+                                                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                                        <TextBlock Text="{Binding When}" Style="{StaticResource TextBodyLarge}" FontWeight="SemiBold"/>
+                                                                                        <StackPanel Orientation="Horizontal" Visibility="{Binding HasRepeats, Converter={StaticResource BoolToVisibility}}">
+                                                                                            <Border Style="{StaticResource VBar}"/>
+                                                                                            <TextBlock Text="{Binding Repeats}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                                                        </StackPanel>
+                                                                                        <Border Style="{StaticResource VBar}"/>
+                                                                                        <Border Style="{StaticResource Chip}" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                                                            <TextBlock Text="{Binding Reason}" Style="{StaticResource TextCaption}"/>
+                                                                                        </Border>
+                                                                                        <StackPanel Orientation="Horizontal" Visibility="{Binding HasFacts, Converter={StaticResource BoolToVisibility}}">
+                                                                                            <Border Style="{StaticResource VBar}"/>
+                                                                                            <TextBlock Text="{Binding Facts}" Style="{StaticResource TextCaption}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                                                                        </StackPanel>
+                                                                                    </StackPanel>
+                                                                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                                                        <Border Style="{StaticResource ToneBadge}" Padding="14,6" VerticalAlignment="Center">
+                                                                                            <TextBlock Text="{Binding Outcome}" Style="{StaticResource ToneBadgeText}"/>
+                                                                                        </Border>
+                                                                                        <Button Style="{StaticResource RemoveButton}" Command="{Binding RemoveCommand}"/>
+                                                                                    </StackPanel>
+                                                                                </Grid>
+                                                                                <ItemsControl ItemsSource="{Binding OutputLines}" Margin="0,10,0,0">
+                                                                                    <ItemsControl.ItemTemplate>
+                                                                                        <DataTemplate>
+                                                                                            <Border Style="{StaticResource LogLine}">
+                                                                                                <Grid>
+                                                                                                    <Grid.ColumnDefinitions>
+                                                                                                        <ColumnDefinition Width="Auto"/>
+                                                                                                        <ColumnDefinition Width="*"/>
+                                                                                                    </Grid.ColumnDefinitions>
+                                                                                                    <TextBlock Text="{Binding Time}" Style="{StaticResource TextMono}" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0"/>
+                                                                                                    <TextBlock Grid.Column="1" Text="{Binding Text}" Style="{StaticResource TextMono}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                                                                                                </Grid>
+                                                                                            </Border>
+                                                                                        </DataTemplate>
+                                                                                    </ItemsControl.ItemTemplate>
+                                                                                </ItemsControl>
+                                                                            </StackPanel>
+                                                                        </Border>
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                            <Grid Margin="0,12,0,4" Visibility="{Binding HasPaging, Converter={StaticResource BoolToVisibility}}">
+                                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                                    <TextBlock Text="Показывать по" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="4,0,8,0"/>
+                                                                    <ComboBox Style="{StaticResource FieldChoice}" Width="76" Margin="0" ItemsSource="{x:Static vm:JournalGroupViewModel.PageSizes}"
+                                                                              SelectedItem="{Binding PageSize, Mode=TwoWay}"/>
+                                                                </StackPanel>
+                                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                                    <Button Style="{StaticResource OutlineButton}" Padding="12,6" Command="{Binding PreviousCommand}" ToolTip="Назад"
+                                                                            FontFamily="Segoe MDL2 Assets" Content="&#xE76B;"/>
+                                                                    <TextBlock Text="{Binding PageLabel}" Style="{StaticResource TextBody}" VerticalAlignment="Center" Margin="14,0"/>
+                                                                    <Button Style="{StaticResource OutlineButton}" Padding="12,6" Command="{Binding NextCommand}" ToolTip="Вперёд"
+                                                                            FontFamily="Segoe MDL2 Assets" Content="&#xE76C;"/>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </ctl:CollapsibleBody>
+                                                </StackPanel>
                                             </Border>
-                                            <DataTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding Tone}" Value="{x:Static ui:PanelToneEnum.Problem}">
-                                                    <Setter TargetName="Row" Property="Background" Value="{StaticResource DangerSurfaceBrush}"/>
-                                                </DataTrigger>
-                                            </DataTemplate.Triggers>                                        </DataTemplate>
+                                        </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
                 </Grid>
+
+                <!-- Пока окошко внизу висит, остальной интерфейс приглушён; клики сквозь затемнение проходят -->
+                <Border Grid.ColumnSpan="2" Background="{StaticResource ScrimBrush}" IsHitTestVisible="False" Opacity="0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Toast.IsVisible}" Value="True">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.18"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.12"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                </Border>
+
+                <!-- Всплывающее окошко внизу: что сделано и как это откатить -->
+                <views:ToastView Grid.Column="1" DataContext="{Binding Toast}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="8,0,24,40"/>
             </Grid>
         </Grid>
     </Border>

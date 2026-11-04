@@ -1,3 +1,6 @@
+using System.IO;
+using Steward.Status.Common;
+using Steward.ViewModels;
 using Steward.Shell;
 
 namespace Steward;
@@ -13,11 +16,6 @@ public partial class App : System.Windows.Application
     private const string SINGLE_INSTANCE_NAME = "Steward";
 
     /// <summary>
-    /// Ключ запуска, который рисует окно в PNG и завершается
-    /// </summary>
-    private const string SNAPSHOT_ARGUMENT = "--snapshot";
-
-    /// <summary>
     /// Удерживает единственный экземпляр
     /// </summary>
     private Mutex? _instance;
@@ -26,6 +24,11 @@ public partial class App : System.Windows.Application
     /// Иконка и опрос контейнера
     /// </summary>
     private TrayHost? _host;
+
+    /// <summary>
+    /// Ключ запуска: сразу открыть главное окно на странице, например <c>--open Homework</c>
+    /// </summary>
+    private const string OPEN_ARGUMENT = "--open";
 
     #region Lifetime
 
@@ -38,16 +41,16 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
 
-        // Рисование в PNG идёт до проверки мьютекса: рядом уже работает настоящая иконка, и она не должна мешать
-        var snapshot = Array.IndexOf(e.Args, SNAPSHOT_ARGUMENT);
-        if (snapshot >= 0 && snapshot + 1 < e.Args.Length)
+        DispatcherUnhandledException += (_, args) =>
         {
-            var which = snapshot + 2 < e.Args.Length ? e.Args[snapshot + 2] : "main";
-            SnapshotRenderer.Render(e.Args[snapshot + 1], which);
-            Shutdown();
-
-            return;
-        }
+            LogUnhandled(args.Exception);
+            args.Handled = true;
+        };
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            LogUnhandled(args.Exception);
+            args.SetObserved();
+        };
 
         _instance = new Mutex(true, SINGLE_INSTANCE_NAME, out var created);
         if (!created)
@@ -57,6 +60,32 @@ public partial class App : System.Windows.Application
         }
 
         _host = new TrayHost();
+
+        var open = Array.IndexOf(e.Args, OPEN_ARGUMENT);
+        if (open >= 0 && open + 1 < e.Args.Length && Enum.TryParse<AppPageEnum>(e.Args[open + 1], ignoreCase: true, out var page))
+            _host.ShowMain(page);
+    }
+
+    /// <summary>
+    /// Записывает необработанную ошибку в <c>data/steward-errors.log</c>: иконка в трее не должна исчезать из-за одного сбоя, а причину потом можно найти в файле
+    /// </summary>
+    /// <param name="exception">Ошибка</param>
+    private static void LogUnhandled(Exception exception)
+    {
+        try
+        {
+            var file = Path.Combine(DataLocation.DataDirectory(), "steward-errors.log");
+
+            // Журнал не растёт без предела: большой файл уходит в .old, а прежний .old стирается
+            if (File.Exists(file) && new FileInfo(file).Length > 512 * 1024)
+                File.Move(file, file + ".old", overwrite: true);
+
+            File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {exception}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch (Exception logging) when (logging is IOException or UnauthorizedAccessException)
+        {
+            // Журнал недоступен: ошибку уже погасили, дальше работаем
+        }
     }
 
     /// <summary>

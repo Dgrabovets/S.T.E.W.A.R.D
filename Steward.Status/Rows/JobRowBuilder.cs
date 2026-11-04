@@ -38,7 +38,7 @@ public static class JobRowBuilder
         JobRow Row(RowToneEnum tone, string headline, string detail) => new(job.Id, job.DisplayTitle, headline, detail, tone, status?.Awaiting ?? 0, job.Enabled);
 
         if (!job.Enabled)
-            return Row(RowToneEnum.Idle, "Отключена", "Включается полем enabled в config/jobs.json");
+            return Row(RowToneEnum.Idle, "Отключена", "Чтобы включить, поставь enabled: true в config/jobs.json");
 
         if (status is null)
             return Row(RowToneEnum.Idle, "Ещё не запускалась", next);
@@ -48,7 +48,7 @@ public static class JobRowBuilder
             case ProcessStateEnum.Failed:
                 return Row(RowToneEnum.Problem, "Не удалось", $"{Short(status.Error)} ({TimeWording.Moment(status.UpdatedAt, now)})");
             case ProcessStateEnum.Running when now - status.UpdatedAt > job.Timeout + HangGrace:
-                return Row(RowToneEnum.Problem, "Завис?", $"Запущена {TimeWording.Moment(status.UpdatedAt, now)} и не отвечает");
+                return Row(RowToneEnum.Problem, "Не отвечает", $"Запущена {TimeWording.Moment(status.UpdatedAt, now)}, ответа нет");
             case ProcessStateEnum.Running:
                 return Row(RowToneEnum.Working, "Выполняется", $"Запущена {TimeWording.Moment(status.UpdatedAt, now)}");
         }
@@ -58,7 +58,7 @@ public static class JobRowBuilder
             return Row(RowToneEnum.Problem, "Давно не запускалась", $"Последний успех {TimeWording.Moment(lastSuccess, now)}");
 
         if (status.State == ProcessStateEnum.NeedsAttention || status.Awaiting > 0)
-            return Row(RowToneEnum.Attention, "Ждёт тебя", Join(status.Summary, status.Awaiting > 0 ? $"Ждут решения: {status.Awaiting}" : null));
+            return Row(RowToneEnum.Attention, "Ждёт тебя", Join(status.Summary, status.Awaiting > 0 ? $"Без решения: {status.Awaiting}" : null));
 
         return status.State switch
         {
@@ -71,12 +71,12 @@ public static class JobRowBuilder
     #region Wording
 
     /// <summary>
-    /// Склеивает непустые части через точку
+    /// Складывает непустые части в строки: каждая часть с новой строки
     /// </summary>
     /// <param name="parts">Фразы, часть из которых может быть пустой</param>
     /// <returns>Одна строка</returns>
     private static string Join(params string?[] parts) =>
-        string.Join(". ", parts.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim().TrimEnd('.')));
+        string.Join('\n', parts.Where(part => !string.IsNullOrWhiteSpace(part)).Select(part => part!.Trim().TrimEnd('.')));
 
     /// <summary>
     /// Обрезает текст ошибки до читаемой длины

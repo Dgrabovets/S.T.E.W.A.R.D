@@ -106,4 +106,19 @@ public class RegistryAndLocationTests
             Environment.SetEnvironmentVariable(DataLocation.DATA_ENVIRONMENT_VARIABLE, saved);
         }
     }
+
+    /// <summary>
+    /// Настоящий config/jobs.json читается без ошибок и содержит все задачи: одна опечатка в нём прячет из приложения все процессы
+    /// </summary>
+    [Fact]
+    public void The_real_jobs_file_loads_without_errors()
+    {
+        var root = DataLocation.FindRepoRoot(AppContext.BaseDirectory);
+        Assert.NotNull(root);
+
+        var result = JobRegistry.Load(Path.Combine(root, "config", "jobs.json"), root);
+
+        Assert.Empty(result.Errors);
+        Assert.Equal(["lms", "mail", "reels"], result.Jobs.Select(job => job.Id).Order(StringComparer.Ordinal).ToArray());
+    }
 }

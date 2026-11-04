@@ -1,0 +1,21 @@
+<UserControl x:Class="Steward.Views.PageHeaderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="Root">
+    <UserControl.Resources>
+        <Style x:Key="SettingsToggle" TargetType="Button" BasedOn="{StaticResource OutlineButton}">
+            <Setter Property="Content" Value="Настройки"/>
+            <Setter Property="Command" Value="{Binding ToggleSettingsCommand}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSettingsOpen}" Value="True">
+                    <Setter Property="Content" Value="Закрыть настройки"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <DockPanel Margin="4,0,0,8" LastChildFill="False">
+        <Button DockPanel.Dock="Right" Style="{StaticResource SettingsToggle}" VerticalAlignment="Center"
+                Visibility="{Binding CanToggleSettings, Converter={StaticResource BoolToVisibility}}"/>
+        <TextBlock DockPanel.Dock="Left" Text="{Binding Title, ElementName=Root}" Style="{StaticResource TextHeadline}" VerticalAlignment="Center"/>
+    </DockPanel>
+</UserControl>

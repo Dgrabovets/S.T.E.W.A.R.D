@@ -1,0 +1,8 @@
+{
+  "BaseUrl": "https://lms.ranepa.ru",
+  "Login": "<логин или почта для входа в LMS>",
+  "Password": "<пароль от LMS>",
+  "MaxPreparePerRun": 2,
+  "PrepareBudgetMinutes": 20,
+  "PrepareMaxAgeDays": 21
+}

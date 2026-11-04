@@ -52,7 +52,7 @@ public class JobRowTests
 
         Assert.Equal(RowToneEnum.Ok, row.Tone);
         Assert.Equal("Выполнено сегодня в 09:00", row.Headline);
-        Assert.Equal("Новых важных писем нет. Следующий запуск завтра в 09:00", row.Detail);
+        Assert.Equal("Новых важных писем нет\nСледующий запуск завтра в 09:00", row.Detail);
     }
 
     /// <summary>
@@ -82,7 +82,7 @@ public class JobRowTests
         var hung = JobRowBuilder.Build(job, Samples.Status("mail", ProcessStateEnum.Running, Now.AddMinutes(-30)), null, Now);
 
         Assert.Equal((RowToneEnum.Working, "Выполняется"), (fresh.Tone, fresh.Headline));
-        Assert.Equal((RowToneEnum.Problem, "Завис?"), (hung.Tone, hung.Headline));
+        Assert.Equal((RowToneEnum.Problem, "Не отвечает"), (hung.Tone, hung.Headline));
     }
 
     /// <summary>
@@ -112,7 +112,7 @@ public class JobRowTests
 
         Assert.Equal(RowToneEnum.Attention, row.Tone);
         Assert.Equal(3, row.Awaiting);
-        Assert.Equal("Разобрано 3 рилса. Ждут решения: 3", row.Detail);
+        Assert.Equal("Разобрано 3 рилса\nБез решения: 3", row.Detail);
     }
 
     /// <summary>

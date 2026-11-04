@@ -27,7 +27,7 @@ public static class TaskRows
             new(SCHEDULE_ID, "Расписание", panel.Label, $"{panel.Subtitle}. {panel.Summary}", panel.Tone),
         };
 
-        rows.AddRange(jobs.Select(job => new TaskStatusRow(job.Id, job.Title, job.Headline, job.Detail, ToneOf(job.Tone), Muted: !job.Enabled, CanRun: job.Tone != RowToneEnum.Working)));
+        rows.AddRange(jobs.Select(job => new TaskStatusRow(job.Id, job.Title, job.Headline, job.Detail, ToneOf(job.Tone), Muted: !job.Enabled, CanRun: job.Tone != RowToneEnum.Working, Working: job.Tone == RowToneEnum.Working)));
         return rows;
     }
 

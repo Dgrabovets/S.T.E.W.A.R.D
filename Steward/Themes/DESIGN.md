@@ -2,7 +2,7 @@
 
 Тёмная тема «slate»: нейтральные сине-серые поверхности, синий акцент, зелёный, жёлтый и красный для состояний задач. Все значения лежат в `Steward/Themes`, остальной код берёт их по имени.
 
-Посмотреть всё сразу: `Steward.exe --snapshot design.png design`.
+Посмотреть всё сразу: `dotnet run --project Steward.DevTools -- snapshot design.png design`.
 
 ## Файлы
 
@@ -51,6 +51,7 @@
 | 14 | `FontSizeBody` | `TextBody`, `TextSecondary` | Основной текст, подробности, кнопки |
 | 16 | `FontSizeBodyLarge` | `TextBodyLarge` | Название задачи |
 | 18 | `FontSizeTitle` | `TextTitle` | Заголовок карточки |
+| 34 | `FontSizeDisplay` | `TextDisplay` | Название приложения в шапке главного окна |
 | 24 | `FontSizeHeadline` | `TextHeadline` | Заголовок страницы |
 
 Числом размер не пишется: `FontSize="{StaticResource FontSizeBody}"`.
@@ -62,7 +63,8 @@
 | `RadiusField` | 8 | Поля, кнопки |
 | `RadiusBadge` | 12 | Плашки, пункты меню |
 | `RadiusCard` | 16 | Карточки |
-| `RadiusWindow` | 22 | Окно |
+| `RadiusWindow` | 22 | Окно с прозрачным фоном (меню трея) |
+| `RadiusSystemWindow` | 8 | Окно без прозрачности: углы скругляет Windows 11, значение совпадает с её скруглением |
 | `RadiusSmall` | 4 | Полоса прокрутки |
 | `RadiusFocus` | 10 | Кольцо фокуса вокруг кнопки |
 
@@ -98,4 +100,4 @@
 
 1. Нужен новый цвет: сначала `Colors.xaml` (цвет и кисть), потом использование. Подумай, нет ли подходящего.
 2. Нужен новый стиль, который повторяется дважды, идёт в `Controls.xaml`, а не в окно.
-3. Новый экран проверь снимком: `Steward.exe --snapshot экран.png main:страница`.
+3. Новый экран проверь снимком: `dotnet run --project Steward.DevTools -- snapshot экран.png main:страница`.

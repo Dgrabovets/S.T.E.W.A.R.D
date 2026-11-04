@@ -24,6 +24,21 @@ public class FixPromptTests
         "строка вывода 1\nстрока вывода 2");
 
     /// <summary>
+    /// Если запуск удался, но в выводе есть ошибка, она попадает в просьбу, а исход назван частичным
+    /// </summary>
+    [Fact]
+    public void A_partly_failed_run_puts_the_error_lines_into_the_prompt()
+    {
+        var record = Failed with { Outcome = RunOutcomeEnum.Ok, ExitCode = 0, Detail = null, Output = "27.10.2026 07:27:31  Не получилось: https://instagram.com/p/x: yt-dlp: ERROR: нужен вход\n27.10.2026 07:27:32  Принято: 1" };
+
+        var prompt = FixPrompt.Build(record, @"D:\repo", @"D:\repo\data\tmp\fix\mail.md");
+
+        Assert.Contains("yt-dlp: ERROR: нужен вход", prompt, StringComparison.Ordinal);
+        Assert.Contains("часть работы не получилась", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Принято: 1", prompt, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// В просьбе есть задача, ошибка, путь к отчёту, ветка исправления и запрет читать секреты, а сам вывод программы остаётся в файле
     /// </summary>
     [Fact]
@@ -60,7 +75,7 @@ public class FixPromptTests
     [Fact]
     public void The_url_opens_a_new_code_session_with_an_encoded_folder_and_prompt()
     {
-        var url = ClaudeFixLauncher.BuildUrl("Почини & проверь", @"D:\My Repo");
+        var url = ClaudeLauncher.BuildUrl("Почини & проверь", @"D:\My Repo");
 
         Assert.StartsWith("claude://code/new?folder=", url, StringComparison.Ordinal);
         Assert.Contains("folder=D%3A%5CMy%20Repo", url, StringComparison.Ordinal);

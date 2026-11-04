@@ -1,0 +1,233 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using Steward.Homework.Models;
+using Steward.Homework.Storage;
+
+namespace Steward.Homework.Services;
+
+/// <summary>
+/// Запускает Claude Code в фоне одним заходом, без чата: сессия не сохраняется, в списке чатов ничего не появляется. Подходит для чётких задач, где диалог не нужен
+/// </summary>
+public static class ClaudeAgent
+{
+    /// <summary>
+    /// Модель по умолчанию: для поиска заданий в тексте хватает лёгкой
+    /// </summary>
+    public const string MODEL = "sonnet";
+
+    /// <summary>
+    /// Сколько минут ждать ответа, потом запуск прерывается
+    /// </summary>
+    private const int TIMEOUT_MINUTES = 10;
+
+    /// <summary>
+    /// Потолок расхода на один запуск, в долларах API. Для подписки это только защитный предел
+    /// </summary>
+    private const string MAX_BUDGET_USD = "1";
+
+    /// <summary>
+    /// Сколько символов вывода ошибок оставлять в сообщении
+    /// </summary>
+    private const int ERROR_LIMIT = 400;
+
+    /// <summary>
+    /// Сколько секунд ждать выхода остановленного процесса
+    /// </summary>
+    private const int EXIT_WAIT_SECONDS = 10;
+
+    /// <summary>
+    /// Собирает аргументы запуска: только чтение и запись файлов, правки без вопросов внутри рабочей папки, без сохранения сессии
+    /// </summary>
+    /// <param name="prompt">Просьба</param>
+    /// <param name="workDirectory">Папка, где агенту разрешено читать и писать</param>
+    /// <param name="extraDirectories">Другие папки, к которым агенту нужен доступ: методические указания и образцы по ссылкам на диск</param>
+    /// <param name="access">Что агенту можно писать: подготовка и проверка работы или разбор занятия и поиск заданий</param>
+    /// <returns>Аргументы командной строки по одному</returns>
+    public static IReadOnlyList<string> Arguments(string prompt, string workDirectory, IReadOnlyList<string>? extraDirectories = null, AgentAccessEnum access = AgentAccessEnum.Draft) =>
+    [
+        "-p", prompt,
+        "--model", MODEL,
+        "--tools", "Read,Write",
+        "--permission-mode", "acceptEdits",
+        "--add-dir", workDirectory,
+        .. (extraDirectories ?? []).SelectMany(directory => new[] { "--add-dir", directory }),
+        .. ReadOnlyRules(workDirectory, extraDirectories ?? [], access),
+        "--no-session-persistence",
+        "--max-budget-usd", MAX_BUDGET_USD,
+    ];
+
+    /// <summary>
+    /// Запрещает агенту запись в дополнительные папки (указания, образцы, условия заданий), в файлы состояния Steward, в папки замечаний, образцов, указаний и условий из LMS и в расшифровки. Подготовке и проверке работы закрыты ещё найденные задания и разборы, а в папках работ занятий — прежние версии (<c>.previous</c>), отложенные файлы неудачных попыток (<c>.failed</c>) и отметка прикреплённых работ (<c>.owner</c>). Разбору и поиску заданий закрыты все папки работ. Читать всё это можно по-прежнему.
+    /// Папки работ лежат ровно на один уровень ниже <c>drafts</c>, поэтому правило вида <c>drafts/*/.previous/**</c> однозначно
+    /// </summary>
+    /// <param name="workDirectory">Рабочая папка агента</param>
+    /// <param name="extraDirectories">Дополнительные папки только для чтения</param>
+    /// <param name="access">Что агенту можно писать</param>
+    /// <returns>Аргументы <c>--disallowedTools</c> с правилами запрета правки</returns>
+    private static IReadOnlyList<string> ReadOnlyRules(string workDirectory, IReadOnlyList<string> extraDirectories, AgentAccessEnum access)
+    {
+        string[] stateFiles = ["lesson-states.json", "item-states.json", "item-confirmed.json", "item-overrides.json", "created.json", "prepare-attempts.json", "sample-registered.json", "formats.json", "subject-formats.json", "subject-states.json", "subject-options.json", "lessons.json", "activities.json"];
+        string[] ownerFolders = ["remarks", "samples", "guides", "assignments", "transcripts"];
+        string[] lessonFolders = access == AgentAccessEnum.Draft ? ["items", "analysis"] : ["drafts"];
+        string[] draftFolders = access == AgentAccessEnum.Draft ? [HomeworkStore.PREVIOUS_FOLDER, HomeworkStore.FAILED_FOLDER, HomeworkStore.OWNER_FOLDER] : [];
+        var rules = extraDirectories.Select(directory => DenyEdit(directory, true))
+            .Concat(stateFiles.Select(file => DenyEdit(Path.Combine(workDirectory, file), false)))
+            .Concat(ownerFolders.Concat(lessonFolders).Select(folder => DenyEdit(Path.Combine(workDirectory, folder), true)))
+            .Concat(draftFolders.Select(folder => DenyEdit(Path.Combine(workDirectory, "drafts", "*", folder), true)));
+
+        return ["--disallowedTools", .. rules];
+    }
+
+    /// <summary>
+    /// Собирает правило запрета правки в записи Claude Code: путь от корня диска с косыми чертами и строчной буквой диска
+    /// </summary>
+    /// <param name="path">Папка или файл</param>
+    /// <param name="folder">Это папка: правило покрывает всё внутри</param>
+    /// <returns>Правило вида <c>Edit(//d/dir/**)</c></returns>
+    private static string DenyEdit(string path, bool folder)
+    {
+        var full = Path.GetFullPath(path).Replace(Path.DirectorySeparatorChar, '/').TrimEnd('/');
+        var rooted = full.Length > 1 && full[1] == ':' ? char.ToLowerInvariant(full[0]) + full[2..] : full;
+
+        return $"Edit(//{rooted.TrimStart('/')}{(folder ? "/**" : string.Empty)})";
+    }
+
+    /// <summary>
+    /// Ищет программу Claude Code: сначала в PATH, потом среди версий, которые ставит приложение Claude
+    /// </summary>
+    /// <returns>Путь к <c>claude.exe</c> или <see langword="null"/>, если не найдено</returns>
+    public static string? FindExecutable()
+    {
+        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(directory.Trim(), "claude.exe");
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        var bundled = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Claude-Data");
+
+        return Directory.Exists(bundled)
+            ? Directory.EnumerateFiles(bundled, "claude.exe", SearchOption.AllDirectories)
+                .Where(path => path.Contains($"{Path.DirectorySeparatorChar}claude-code{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(path => File.GetLastWriteTimeUtc(path))
+                .FirstOrDefault()
+            : null;
+    }
+
+    /// <summary>
+    /// Запускает Claude с просьбой и ждёт конца
+    /// </summary>
+    /// <param name="prompt">Просьба</param>
+    /// <param name="workDirectory">Рабочая папка агента</param>
+    /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <returns>Пустая строка, если Claude отработал без ошибки, иначе причина</returns>
+    public static Task<string> RunAsync(string prompt, string workDirectory, CancellationToken cancellationToken) => RunAsync(prompt, workDirectory, [], cancellationToken);
+
+    /// <summary>
+    /// Запускает Claude для подготовки или проверки работы: писать можно только в папки работ занятий. Совпадает с <see cref="DraftBuilder.AgentRun"/>
+    /// </summary>
+    /// <param name="prompt">Просьба</param>
+    /// <param name="workDirectory">Рабочая папка агента</param>
+    /// <param name="extraDirectories">Другие папки, к которым агенту нужен доступ</param>
+    /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <returns>Пустая строка, если Claude отработал без ошибки, иначе причина</returns>
+    public static Task<string> RunAsync(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, CancellationToken cancellationToken) =>
+        RunCoreAsync(prompt, workDirectory, extraDirectories, AgentAccessEnum.Draft, cancellationToken);
+
+    /// <summary>
+    /// Запускает Claude для разбора занятия или поиска заданий: писать можно в <c>items</c> и <c>analysis</c>, папки работ закрыты
+    /// </summary>
+    /// <param name="prompt">Просьба</param>
+    /// <param name="workDirectory">Рабочая папка агента</param>
+    /// <param name="extraDirectories">Другие папки, к которым агенту нужен доступ</param>
+    /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <returns>Пустая строка, если Claude отработал без ошибки, иначе причина</returns>
+    public static Task<string> RunLessonAsync(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, CancellationToken cancellationToken) =>
+        RunCoreAsync(prompt, workDirectory, extraDirectories, AgentAccessEnum.Lesson, cancellationToken);
+
+    /// <summary>
+    /// Запускает Claude с просьбой, дополнительными папками для чтения и правилами записи
+    /// </summary>
+    /// <param name="prompt">Просьба</param>
+    /// <param name="workDirectory">Рабочая папка агента</param>
+    /// <param name="extraDirectories">Другие папки, к которым агенту нужен доступ</param>
+    /// <param name="access">Что агенту можно писать</param>
+    /// <param name="cancellationToken">Отменяет запуск</param>
+    /// <returns>Пустая строка, если Claude отработал без ошибки, иначе причина</returns>
+    private static async Task<string> RunCoreAsync(string prompt, string workDirectory, IReadOnlyList<string> extraDirectories, AgentAccessEnum access, CancellationToken cancellationToken)
+    {
+        var executable = FindExecutable();
+        if (executable is null)
+            return "Не найден claude.exe: установи приложение Claude или добавь его в PATH";
+
+        Directory.CreateDirectory(workDirectory);
+
+        var start = new ProcessStartInfo(executable)
+        {
+            WorkingDirectory = workDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in Arguments(prompt, workDirectory, extraDirectories, access))
+            start.ArgumentList.Add(argument);
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(TIMEOUT_MINUTES));
+
+        try
+        {
+            using var process = Process.Start(start) ?? throw new InvalidOperationException("Процесс не запустился");
+            process.StandardInput.Close();
+            var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
+            var errors = process.StandardError.ReadToEndAsync(CancellationToken.None);
+
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                process.Kill(entireProcessTree: true);
+
+                // Ждём, пока процесс действительно завершится и отпустит файлы, но не бесконечно
+                using var exit = new CancellationTokenSource(TimeSpan.FromSeconds(EXIT_WAIT_SECONDS));
+                try
+                {
+                    await process.WaitForExitAsync(exit.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Процесс не вышел за отведённое время: файлы удалит повтор очистки или следующий запуск
+                }
+
+                return cancellationToken.IsCancellationRequested ? "Запуск отменён" : $"Claude не ответил за {TIMEOUT_MINUTES} минут";
+            }
+
+            await Task.WhenAll(output, errors);
+
+            return process.ExitCode == 0 ? string.Empty : Tail(errors.Result.Length > 0 ? errors.Result : output.Result, process.ExitCode);
+        }
+        catch (Exception exception) when (exception is Win32Exception or InvalidOperationException or IOException)
+        {
+            return $"Не удалось запустить Claude: {exception.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Формирует короткое сообщение об ошибке из хвоста вывода
+    /// </summary>
+    /// <param name="text">Вывод Claude</param>
+    /// <param name="exitCode">Код завершения</param>
+    /// <returns>Текст ошибки не длиннее лимита</returns>
+    private static string Tail(string text, int exitCode)
+    {
+        var trimmed = text.Trim();
+
+        return $"Claude завершился с кодом {exitCode}: {(trimmed.Length > ERROR_LIMIT ? trimmed[^ERROR_LIMIT..] : trimmed)}";
+    }
+}

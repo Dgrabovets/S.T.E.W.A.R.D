@@ -63,6 +63,42 @@ public class MailCheckerTests
     }
 
     /// <summary>
+    /// Все разобранные письма помечаются прочитанными, а пробный запуск ящик не трогает
+    /// </summary>
+    [Fact]
+    public async Task Processed_mails_are_marked_read_but_a_dry_run_leaves_the_mailbox_alone()
+    {
+        var mails = new[] { Samples.Mail("reply", hour: 9), Samples.Mail("info", fromAddress: "bot@example.com", hour: 10) };
+        var trialBox = new FakeMailReader(mails);
+        var box = new FakeMailReader(mails);
+
+        await Checker(mails, new RecordingSingularity(), new RecordingNotifier(), out _, reader: trialBox).RunAsync(dryRun: true, CancellationToken.None);
+        await Checker(mails, new RecordingSingularity(), new RecordingNotifier(), out _, reader: box).RunAsync(dryRun: false, CancellationToken.None);
+
+        Assert.Empty(trialBox.Marked);
+        Assert.Equal(["reply", "info"], box.Marked.Select(mail => mail.MessageId).ToArray());
+    }
+
+    /// <summary>
+    /// Информационное письмо без задачи разбирается один раз: повторная проверка его уже не показывает, а пробный запуск его не запоминает
+    /// </summary>
+    [Fact]
+    public async Task An_info_mail_is_reported_once_and_a_dry_run_does_not_remember_it()
+    {
+        var handled = new FakeHandledMail();
+        var mails = new[] { Samples.Mail("info", fromAddress: "bot@example.com", hour: 10) };
+
+        var trial = await Checker(mails, new RecordingSingularity(), new RecordingNotifier(), out _, handled).RunAsync(dryRun: true, CancellationToken.None);
+        var first = await Checker(mails, new RecordingSingularity(), new RecordingNotifier(), out _, handled).RunAsync(dryRun: false, CancellationToken.None);
+        var second = await Checker(mails, new RecordingSingularity(), new RecordingNotifier(), out _, handled).RunAsync(dryRun: false, CancellationToken.None);
+
+        Assert.Single(trial.Info);
+        Assert.Single(first.Info);
+        Assert.Empty(second.Info);
+        Assert.Equal(["info"], handled.Ids.ToArray());
+    }
+
+    /// <summary>
     /// Письмо остаётся непрочитанным, и повторная проверка не создаёт дублей
     /// </summary>
     [Fact]
@@ -90,6 +126,23 @@ public class MailCheckerTests
 
         Assert.Empty(singularity.Created);
         Assert.Contains(log, line => line.StartsWith("[тест] Ответить:", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Строка про письмо в логе заканчивается ссылкой на письмо и коротким описанием, их читает окно приложения
+    /// </summary>
+    [Fact]
+    public async Task A_log_line_carries_the_letter_link_and_a_short_description()
+    {
+        var checker = Checker([Samples.Mail("reply")], new RecordingSingularity(), new RecordingNotifier(), out var log);
+
+        await checker.RunAsync(dryRun: true, CancellationToken.None);
+
+        var line = Assert.Single(log, entry => entry.StartsWith("[тест] Ответить:", StringComparison.Ordinal));
+        var parts = line.Split(" ‖ ");
+        Assert.Equal(3, parts.Length);
+        Assert.StartsWith("http", parts[1], StringComparison.Ordinal);
+        Assert.True(parts[2].Length > 0 && parts[2].Length <= 221);
     }
 
     /// <summary>
@@ -152,16 +205,19 @@ public class MailCheckerTests
     /// <param name="singularity">Подделка SingularityApp</param>
     /// <param name="notifier">Подделка уведомлений</param>
     /// <param name="log">Строки лога, которые запишет проверка</param>
+    /// <param name="handled">Память о разобранных письмах. Без неё каждый вызов начинает с пустой</param>
+    /// <param name="reader">Почтовый ящик. Без него берётся ящик с переданными письмами</param>
     /// <returns>Проверка почты</returns>
-    private static MailChecker Checker(MailItem[] mails, RecordingSingularity singularity, RecordingNotifier notifier, out List<string> log)
+    private static MailChecker Checker(MailItem[] mails, RecordingSingularity singularity, RecordingNotifier notifier, out List<string> log, FakeHandledMail? handled = null, FakeMailReader? reader = null)
     {
         var lines = new List<string>();
         log = lines;
 
         return new MailChecker(
-            new FakeMailReader(mails),
+            reader ?? new FakeMailReader(mails),
             new MailClassifier(Settings.Mail, Settings.Classifier),
             singularity,
+            handled ?? new FakeHandledMail(),
             notifier,
             Settings,
             new FixedTime(new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero)),

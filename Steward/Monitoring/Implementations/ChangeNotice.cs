@@ -10,7 +10,7 @@ public static class ChangeNotice
     /// <summary>
     /// Начала строк журнала, которые говорят об отмене, переносе или правке. Добавление новых занятий сюда не входит
     /// </summary>
-    private static readonly string[] Prefixes = ["Убрано из таблицы", "Удал", "Обновлено"];
+    private static readonly string[] Prefixes = ["Убрано из таблицы", "Удал", "Обновлено", "•"];
 
     /// <summary>
     /// Собирает текст уведомления из записей, появившихся после <paramref name="after"/>

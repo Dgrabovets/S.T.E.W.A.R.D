@@ -1,0 +1,870 @@
+<UserControl x:Class="Steward.Views.HomeworkFormatsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="clr-namespace:Steward.Controls"
+             xmlns:hw="clr-namespace:Steward.Homework.Models;assembly=Steward.Homework">
+    <UserControl.Resources>
+        <Style x:Key="RowButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource WindowBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Frame" Background="{TemplateBinding Background}" CornerRadius="{StaticResource RadiusField}" Padding="10,6">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Frame" Property="Background" Value="{StaticResource RaisedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource RaisedBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+
+        <Style x:Key="ReaderViewer" TargetType="FlowDocumentScrollViewer">
+            <Setter Property="IsToolBarVisible" Value="False"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Border Style="{StaticResource Card}" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap"
+                       Text="Занятий пока нет. Они появятся после первой выгрузки из LMS."/>
+        </Border>
+
+        <!-- Плитки предметов -->
+        <ItemsControl ItemsSource="{Binding Subjects}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="3"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border x:Name="Tile" Style="{StaticResource Card}" Padding="14,12" Margin="0,0,10,10" Cursor="Hand" ClipToBounds="True">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCommand}"/>
+                        </Border.InputBindings>
+                        <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <!-- Лента «Завершён» в правом верхнем углу: счётчики под ней остаются живыми -->
+                        <Border x:Name="Ribbon" Visibility="Collapsed" Background="{StaticResource AccentBrush}" Width="132" Height="22" Panel.ZIndex="2"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,-46,0" RenderTransformOrigin="0.5,0.5" IsHitTestVisible="False">
+                            <Border.RenderTransform>
+                                <RotateTransform Angle="38"/>
+                            </Border.RenderTransform>
+                            <TextBlock Text="Завершён" Foreground="{StaticResource OnAccentBrush}" FontSize="{StaticResource FontSizeCaption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel x:Name="Stats">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TitleText" Text="{Binding Title}" Style="{StaticResource TextTitle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"/>
+                                <StackPanel x:Name="Marks" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                                    <Border Background="{StaticResource AttentionSurfaceBrush}" CornerRadius="{StaticResource RadiusBadge}" Padding="8,1" VerticalAlignment="Center" Margin="8,0,0,0"
+                                            Visibility="{Binding HasOpenAssignments, Converter={StaticResource BoolToVisibility}}" ToolTip="Задания из расшифровок, на которые ты ещё не отреагировал">
+                                        <TextBlock Text="{Binding OpenAssignmentsText}" Foreground="{StaticResource AttentionBrush}" FontSize="{StaticResource FontSizeCaption}"/>
+                                    </Border>
+                                    <Ellipse x:Name="Orb" Width="12" Height="12" Fill="{StaticResource AttentionBrush}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="{Binding TranscribedText}" Style="{StaticResource TextCaption}" Margin="0,10,0,0"/>
+                            <ProgressBar x:Name="Bar" Value="{Binding Progress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding AssignmentsText}" Style="{StaticResource TextCaption}" Margin="0,8,0,0"/>
+                            <ProgressBar Value="{Binding AssignmentsProgress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding QuizzesText}" Style="{StaticResource TextCaption}" Margin="0,8,0,0"/>
+                            <ProgressBar Value="{Binding QuizzesProgress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                            <!-- Два списка в ряд, а в узкой плитке (маленький экран или крупный масштаб) второй переносится вниз, а не обрезается -->
+                            <WrapPanel x:Name="Pickers" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,8,0,0">
+                                <ComboBox Style="{StaticResource FieldChoice}" Width="172" Margin="4,4,4,0"
+                                          ItemsSource="{Binding StateOptions}" SelectedItem="{Binding SelectedStateOption, Mode=TwoWay}"
+                                          Visibility="{Binding HasStates, Converter={StaticResource BoolToVisibility}}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Title}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <ComboBox Style="{StaticResource FieldChoice}" Width="172" Margin="4,4,4,0"
+                                          ItemsSource="{Binding FormatOptions}" SelectedItem="{Binding SelectedFormatOption, Mode=TwoWay}"
+                                          Visibility="{Binding ShowFormat, Converter={StaticResource BoolToVisibility}}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Title}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </WrapPanel>
+                        </Grid>
+                    </Border>
+                    <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                            <Setter TargetName="Tile" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding State}" Value="{x:Static hw:LessonStateEnum.Fetch}">
+                            <Setter TargetName="Orb" Property="Fill" Value="{StaticResource OkBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding State}" Value="{x:Static hw:LessonStateEnum.LmsOnly}">
+                            <Setter TargetName="Orb" Property="Fill" Value="{StaticResource OkBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding State}" Value="{x:Static hw:LessonStateEnum.Skip}">
+                            <Setter TargetName="Orb" Property="Fill" Value="{StaticResource IdleBrush}"/>
+                            <Setter TargetName="Bar" Property="Foreground" Value="{StaticResource IdleBrush}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding State}" Value="{x:Static hw:LessonStateEnum.Done}">
+                            <Setter TargetName="Bar" Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                            <Setter TargetName="Ribbon" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="Tile" Property="Background" Value="{StaticResource WindowBrush}"/>
+                            <Setter TargetName="Stats" Property="Opacity" Value="0.55"/>
+                            <Setter TargetName="Pickers" Property="Opacity" Value="0.75"/>
+                            <Setter TargetName="Marks" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="TitleText" Property="Margin" Value="0,0,30,0"/>
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Вкладки выбранного предмета -->
+        <StackPanel Margin="0,0,10,0">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding SelectedSubject}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+
+            <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Margin="0,0,0,12">
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Расшифровки" Command="{Binding ShowTranscriptsCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource TabButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTranscriptsTab}" Value="True">
+                                        <Setter Property="Tag" Value="Active"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Content="Домашние задания" Command="{Binding ShowHomeworkCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource TabButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsHomeworkTab}" Value="True">
+                                        <Setter Property="Tag" Value="Active"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- Расшифровки -->
+            <StackPanel Visibility="{Binding IsTranscriptsTab, Converter={StaticResource BoolToVisibility}}">
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="340" MinWidth="240" MaxWidth="520"/>
+                        <ColumnDefinition Width="12"/>
+                        <ColumnDefinition Width="*" MinWidth="360"/>
+                    </Grid.ColumnDefinitions>
+
+                    <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
+                                  Cursor="SizeWE" Focusable="False" ToolTip="Потяни, чтобы изменить ширину списка занятий" AutomationProperties.Name="Граница между списком занятий и расшифровкой">
+                        <GridSplitter.Template>
+                            <ControlTemplate TargetType="GridSplitter">
+                                <Border Background="Transparent">
+                                    <Border x:Name="Line" Width="2" HorizontalAlignment="Center" Background="{StaticResource LineBrush}" CornerRadius="1"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Line" Property="Background" Value="{StaticResource AccentOutlineBrush}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsDragging" Value="True">
+                                        <Setter TargetName="Line" Property="Background" Value="{StaticResource AccentTextBrush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </GridSplitter.Template>
+                    </GridSplitter>
+
+                    <ItemsControl ItemsSource="{Binding SelectedSubject.Lessons}" Margin="0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border x:Name="Row" Style="{StaticResource Card}" Margin="0,0,0,8" Padding="12,8">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <!-- Свежее занятие не выделяется цветом, прошедшие приглушены и подписаны возрастом -->
+                                                <TextBlock Text="{Binding Headline}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Headline}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource TextBody}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPast}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Duration}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" Visibility="{Binding HasDuration, Converter={StaticResource BoolToVisibility}}"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                    <StackPanel.Style>
+                                                        <Style TargetType="StackPanel">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPast}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding HasOpenAssignments}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </StackPanel.Style>
+                                                    <TextBlock Text="{Binding Age}" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding IsPast, Converter={StaticResource BoolToVisibility}}"/>
+                                                    <Border Background="{StaticResource AttentionSurfaceBrush}" CornerRadius="{StaticResource RadiusBadge}" Padding="8,1" VerticalAlignment="Center"
+                                                            Visibility="{Binding HasOpenAssignments, Converter={StaticResource BoolToVisibility}}" ToolTip="В расшифровке есть задания, на которые ты ещё не отреагировал">
+                                                        <TextBlock Text="{Binding OpenAssignmentsText}" Foreground="{StaticResource AttentionBrush}" FontSize="{StaticResource FontSizeCaption}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" Padding="7" Margin="8,0,0,0" ToolTip="Посмотреть расшифровку"
+                                                    Visibility="{Binding HasTranscript, Converter={StaticResource BoolToVisibility}}">
+                                                <Canvas Width="18" Height="18">
+                                                    <Path Stroke="{StaticResource TextBrush}" StrokeThickness="1.5" StrokeLineJoin="Round" Data="M1.5,9 C4,4.5 6.5,3 9,3 C11.5,3 14,4.5 16.5,9 C14,13.5 11.5,15 9,15 C6.5,15 4,13.5 1.5,9 Z"/>
+                                                    <Ellipse Canvas.Left="6.5" Canvas.Top="6.5" Width="5" Height="5" Stroke="{StaticResource TextBrush}" StrokeThickness="1.5"/>
+                                                </Canvas>
+                                            </Button>
+                                            <Button Grid.Column="1" Content="Расшифровать" Command="{Binding FetchCommand}" Style="{StaticResource ActionButton}" Margin="8,0,0,0"
+                                                    Visibility="{Binding CanFetch, Converter={StaticResource BoolToVisibility}}"/>
+                                        </Grid>
+                                        <TextBlock Text="{Binding Status}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                   Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}"/>
+                                    </StackPanel>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                                        <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding AllSubmitted}" Value="True">
+                                        <Setter TargetName="Row" Property="Opacity" Value="{StaticResource OpacityDone}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0,0,0,8" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" Text="Выбери занятие и нажми «Посмотреть расшифровку»: здесь появятся резюме встречи и полный текст.">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource TextSecondary}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasOpenLesson}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <Grid Visibility="{Binding HasOpenLesson, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                    <Border Padding="10,4" Margin="0,0,6,0" VerticalAlignment="Center" BorderThickness="1" CornerRadius="{StaticResource RadiusBadge}"
+                                            BorderBrush="{StaticResource OkBrush}" Background="{StaticResource OkSurfaceBrush}" IsHitTestVisible="False" AutomationProperties.LiveSetting="Polite">
+                                        <TextBlock Text="Скопировано!" Style="{StaticResource TextCaption}" Foreground="{StaticResource OkBrush}"/>
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Opacity" Value="0"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding CopiedNotice}" Value="True">
+                                                        <DataTrigger.EnterActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.18"/>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </DataTrigger.EnterActions>
+                                                        <DataTrigger.ExitActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.45"/>
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </DataTrigger.ExitActions>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
+                                    <Button Command="{Binding CopyBriefCommand}" Style="{StaticResource IconButton}" Margin="0"
+                                            ToolTip="Скопировать конспект к практике" AutomationProperties.Name="Скопировать конспект к практике"
+                                            Visibility="{Binding HasReadingTopics, Converter={StaticResource BoolToVisibility}}">
+                                        <Path Data="{StaticResource IconCopy}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                                    </Button>
+                                    <Button Command="{Binding CloseLessonCommand}" Style="{StaticResource IconButton}" ToolTip="Закрыть" AutomationProperties.Name="Закрыть расшифровку">
+                                        <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                                    </Button>
+                                </StackPanel>
+                            <StackPanel TextElement.FontSize="{StaticResource FontSizeBodyLarge}">
+                                <ItemsControl ItemsSource="{Binding ReadingStats}" Margin="0,0,84,0" AlternationCount="100">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Rows="1"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="Cell" BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1,0,0,0" Padding="14,0,6,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource TextCaption}"/>
+                                                    <TextBlock Text="{Binding Value}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <Trigger Property="ItemsControl.AlternationIndex" Value="0">
+                                                    <Setter TargetName="Cell" Property="BorderThickness" Value="0"/>
+                                                    <Setter TargetName="Cell" Property="Padding" Value="0,0,6,0"/>
+                                                </Trigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding ReadingTopic}" Foreground="{StaticResource AccentTextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap" Margin="0,10,0,0"
+                                           Visibility="{Binding HasReadingTopic, Converter={StaticResource BoolToVisibility}}"/>
+                                <TextBlock Text="Подробный разбор ещё готовится: он появится после ближайшей выгрузки. Пока показано короткое резюме." Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                           Visibility="{Binding ReadingBrief, Converter={StaticResource BoolToVisibility}}"/>
+                                <TextBlock Text="В файле расшифровки нет резюме: заново запроси расшифровку занятия." Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,10,0,0"
+                                           Visibility="{Binding ReadingEmpty, Converter={StaticResource BoolToVisibility}}"/>
+                                <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Margin="0,14,0,10"
+                                        Visibility="{Binding HasReaderTabs, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl ItemsSource="{Binding ReaderTabs}" Focusable="False" AutomationProperties.Name="Разделы расшифровки">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Content="{Binding Title}" Command="{Binding SelectCommand}" AutomationProperties.Name="{Binding AccessibleName}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource TabButton}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                                    <Setter Property="Tag" Value="Active"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
+                                <StackPanel Visibility="{Binding IsAssignmentsTab, Converter={StaticResource BoolToVisibility}}" Margin="0,4,0,0">
+                                    <ItemsControl ItemsSource="{Binding Assignments}" Focusable="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Margin="0,0,0,16">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Heading}" Style="{StaticResource TextCaption}" Margin="0,0,0,4"/>
+                                                            <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                            <TextBlock Style="{StaticResource TextSecondary}" Margin="0,2,0,0" Visibility="{Binding HasDue, Converter={StaticResource BoolToVisibility}}">
+                                                                <Run Text="Срок: "/><Run Text="{Binding Due, Mode=OneWay}"/>
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+                                                        <!-- Три значка: задача в Singularity без списка, добавить в задания, убрать как ошибочно найденное -->
+                                                        <Button Command="{Binding SingularityCommand}" Style="{StaticResource IconButton}" ToolTip="{Binding SingularityText}" AutomationProperties.Name="Только в Singularity">
+                                                            <Path Data="{StaticResource IconTask}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="18" Height="18"/>
+                                                        </Button>
+                                                        <Button Command="{Binding AddCommand}" Style="{StaticResource IconButton}" ToolTip="{Binding ButtonText}" AutomationProperties.Name="Добавить в задание">
+                                                            <Path Data="{StaticResource IconPlus}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                                                        </Button>
+                                                        <Button Command="{Binding DismissCommand}" Style="{StaticResource IconButton}" ToolTip="Убрать: задание найдено ошибочно или уже не нужно" AutomationProperties.Name="Убрать задание">
+                                                            <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                                                        </Button>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Note}" Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
+                                                    <ItemsControl ItemsSource="{Binding Lines}" Focusable="False" Margin="0,8,0,0" Visibility="{Binding HasLines, Converter={StaticResource BoolToVisibility}}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border x:Name="Row" Padding="12,4" Margin="0,0,0,4" BorderThickness="2,0,0,0" BorderBrush="Transparent" CornerRadius="{StaticResource RadiusField}">
+                                                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="24" Foreground="{StaticResource MutedBrush}"/>
+                                                                </Border>
+                                                                <DataTemplate.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsHit}" Value="True">
+                                                                        <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                                                        <Setter TargetName="Row" Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
+                                                                        <Setter TargetName="Row" Property="TextElement.Foreground" Value="{StaticResource TextBrush}"/>
+                                                                    </DataTrigger>
+                                                                </DataTemplate.Triggers>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <TextBlock Text="{Binding Warning}" Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibility}}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding IsQuoteTab, Converter={StaticResource BoolToVisibility}}" Margin="0,4,0,0">
+                                <StackPanel DataContext="{Binding Quote}">
+                                    <TextBlock Text="Задание" Style="{StaticResource TextCaption}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Сказано на занятии" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasLines, Converter={StaticResource BoolToVisibility}}"/>
+                                    <ItemsControl ItemsSource="{Binding Lines}" Focusable="False" Visibility="{Binding HasLines, Converter={StaticResource BoolToVisibility}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border x:Name="Row" Padding="12,4" Margin="0,0,0,4" BorderThickness="2,0,0,0" BorderBrush="Transparent" CornerRadius="{StaticResource RadiusField}">
+                                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" LineHeight="24" Foreground="{StaticResource MutedBrush}"/>
+                                                </Border>
+                                                <DataTemplate.Triggers>
+                                                    <DataTrigger Binding="{Binding IsHit}" Value="True">
+                                                        <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                                        <Setter TargetName="Row" Property="Background" Value="{StaticResource AttentionSurfaceBrush}"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding Note}" Style="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,12,0,0" Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
+                                </StackPanel>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding IsCoveredTab, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Пройдено" Style="{StaticResource TextCaption}" Margin="0,14,0,6"
+                                           Visibility="{Binding HasReadingPoints, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingPoints}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="18"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="•" Foreground="{StaticResource AccentTextBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="0,12,0,0"
+                                        Visibility="{Binding HasReadingOverview, Converter={StaticResource BoolToVisibility}}">
+                                    <StackPanel>
+                                        <TextBlock Text="Что было на занятии" Style="{StaticResource TextCaption}" Margin="0,0,0,6"/>
+                                        <TextBlock Text="{Binding ReadingOverview}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
+                                    </StackPanel>
+                                </Border>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding IsTopicsTab, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Темы" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingTopics, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingTopics}" Visibility="{Binding HasReadingTopics, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,0,10">
+                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding Details}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" LineHeight="22" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Формулировки" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingFormulations, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingFormulations}" Visibility="{Binding HasReadingFormulations, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource AccentOutlineBrush}" BorderThickness="2,0,0,0" Padding="10,2,0,2" Margin="0,0,0,8">
+                                                <TextBlock Text="{Binding}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22" FontStyle="Italic"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding IsActionsTab, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Принятые решения" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingDecisions, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingDecisions}" Visibility="{Binding HasReadingDecisions, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="18"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="•" Foreground="{StaticResource AccentTextBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Задачи с занятия" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingTasks, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingTasks}" Visibility="{Binding HasReadingTasks, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="18"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="•" Foreground="{StaticResource AccentTextBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" LineHeight="22"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding IsSpeakersTab, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="Кто говорил" Style="{StaticResource TextCaption}" Margin="0,14,0,6" Visibility="{Binding HasReadingSpeakers, Converter={StaticResource BoolToVisibility}}"/>
+                                <ItemsControl ItemsSource="{Binding ReadingSpeakers}" Visibility="{Binding HasReadingSpeakers, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,0,0,8">
+                                                <Grid>
+                                                    <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextTrimming="CharacterEllipsis" Margin="0,0,48,0"/>
+                                                    <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}">
+                                                        <Run Text="{Binding Value, Mode=OneWay}"/><Run Text="%"/>
+                                                    </TextBlock>
+                                                </Grid>
+                                                <ProgressBar Value="{Binding Share, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                </StackPanel>
+                            </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </StackPanel>
+
+            <!-- Домашние задания -->
+            <StackPanel Visibility="{Binding IsHomeworkTab, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock TextWrapping="Wrap" Margin="4,0,0,8"
+                           Text="Для этого предмета домашние задания не готовятся. Выбери «Расшифровывать» в списке на плитке, и здесь появятся задания и готовые работы.">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource TextSecondary}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedSubject.ShowFormat}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <Border Style="{StaticResource Card}" Padding="14,8" Margin="0,0,0,8" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusBadge}" Padding="10,2" Margin="0,0,8,0">
+                                <TextBlock Text="{Binding GuideCountText}" Style="{StaticResource TextCaption}" Foreground="{StaticResource TextBrush}"/>
+                            </Border>
+                            <Border BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusBadge}" Padding="10,2">
+                                <TextBlock Text="{Binding ExampleCountText}" Style="{StaticResource TextCaption}" Foreground="{StaticResource TextBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Уточнить" Command="{Binding SelectedSubject.RefineCommand}" ToolTip="Какие из общих методических указаний и образцов относятся к этому предмету" AutomationProperties.Name="Уточнить указания и образцы предмета" Style="{StaticResource OutlineButton}" BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"/>
+                    </Grid>
+                </Border>
+                <Border Padding="14,10" Margin="0,0,0,8" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource Card}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedSubject.Options}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel DataContext="{Binding SelectedSubject.Options}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="Готовить задания автоматически" IsChecked="{Binding AutoPrepare, Mode=TwoWay}" VerticalAlignment="Center"
+                                      ToolTip="Фоновый процесс сам готовит работы по заданиям этого предмета. Кнопка «Подготовить задание» работает всегда"
+                                      AutomationProperties.Name="Готовить задания автоматически"/>
+                        </Grid>
+                        <TextBlock Text="Задания из LMS добавляются сами, если там написано условие или приложен файл. Из расшифровки задание появляется только по кнопке «Добавить в задание» на вкладке «Задания» в расшифровке занятия." Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        <TextBlock Text="{Binding Error}" Style="{StaticResource HintError}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}"/>
+                    </StackPanel>
+                </Border>
+                <StackPanel Margin="0,8,0,0" Visibility="{Binding SelectedSubject.ShowFormat, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl ItemsSource="{Binding SelectedSubject.HomeworkLessons}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Card}" Margin="0,0,10,10" Padding="14,12">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Headline}" Style="{StaticResource TextBody}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Headline}"/>
+                                            <TextBlock Text="{Binding Duration}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" Visibility="{Binding HasDuration, Converter={StaticResource BoolToVisibility}}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <Button Content="Подготовить задание" Command="{Binding PrepareCommand}" Style="{StaticResource PrimaryButton}"
+                                                    Visibility="{Binding CanPrepare, Converter={StaticResource BoolToVisibility}}"/>
+                                            <ItemsControl ItemsSource="{Binding OtherDrafts}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="{Binding ButtonTitle}" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" Margin="0,2,0,2" ToolTip="{Binding Name}"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,2,0,0"
+                                                        Visibility="{Binding HasDraftsWithoutItems, Converter={StaticResource BoolToVisibility}}">
+                                                <Button Content="Проверить" Command="{Binding CheckCommand}" Style="{StaticResource GhostButton}" ToolTip="Сверить работу с условием и методичкой и найти факты без опоры. Работа не меняется"/>
+                                                <Button Content="Результат проверки" Command="{Binding OpenCheckCommand}" Style="{StaticResource GhostButton}" ToolTip="Открыть отчёт о проверке"
+                                                        Visibility="{Binding HasCheck, Converter={StaticResource BoolToVisibility}}"/>
+                                                <Button Command="{Binding RedoCommand}" Style="{StaticResource IconButton}" ToolTip="Переделать: написать, что не понравилось">
+                                                    <Path Data="{StaticResource IconRedo}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="18" Height="18"/>
+                                                </Button>
+                                                <Button Command="{Binding DeleteCommand}" Style="{StaticResource IconButton}" ToolTip="Удалить готовое задание">
+                                                    <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0">
+                                            <TextBlock Text="{Binding ItemsHint}" Style="{StaticResource TextCaption}" TextWrapping="Wrap"
+                                                       Visibility="{Binding HasItemsHint, Converter={StaticResource BoolToVisibility}}"/>
+                                            <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,6">
+                                                            <StackPanel>
+                                                                <!-- Название, срок и меню «…» -->
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                                        <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                                                    </StackPanel>
+                                                                    <Button Grid.Column="1" Content="•••" Click="ItemMenu_OnClick" Style="{StaticResource GhostButton}" Padding="10,4" Margin="8,-4,0,0" VerticalAlignment="Top"
+                                                                            ToolTip="Ещё действия с заданием" AutomationProperties.Name="Ещё действия с заданием">
+                                                                        <Button.ContextMenu>
+                                                                            <ContextMenu Style="{StaticResource CardMenu}">
+                                                                                <MenuItem Header="Открыть работу" Command="{Binding OpenWorkCommand}" AutomationProperties.Name="Открыть работу"/>
+                                                                                <MenuItem Header="{Binding SubmitLabel}" Command="{Binding ToggleSubmittedCommand}" AutomationProperties.Name="{Binding SubmitLabel}"/>
+                                                                                <Separator Style="{StaticResource CardMenuSeparator}"/>
+                                                                                <MenuItem Header="Открыть в LMS" Command="{Binding OpenInLmsCommand}" AutomationProperties.Name="Открыть в LMS"/>
+                                                                                <MenuItem Header="Скопировать условие" Command="{Binding CopyConditionCommand}" AutomationProperties.Name="Скопировать условие"/>
+                                                                                <Separator Style="{StaticResource CardMenuSeparator}"/>
+                                                                                <MenuItem Header="Проверить заново" Command="{Binding RecheckCommand}" AutomationProperties.Name="Проверить заново"/>
+                                                                                <MenuItem Header="Результат проверки" Command="{Binding OpenCheckCommand}" AutomationProperties.Name="Результат проверки"/>
+                                                                                <MenuItem Header="Переделать" Command="{Binding RedoCommand}" AutomationProperties.Name="Переделать"/>
+                                                                                <Separator Style="{StaticResource CardMenuSeparator}"/>
+                                                                                <MenuItem Header="Прикрепить готовую работу" Command="{Binding AttachWorkCommand}" AutomationProperties.Name="Прикрепить готовую работу"/>
+                                                                                <MenuItem Header="Указать файл сданной работы" Command="{Binding SubmittedFileCommand}" AutomationProperties.Name="Указать файл сданной работы"/>
+                                                                                <Separator Style="{StaticResource CardMenuSeparator}"/>
+                                                                                <MenuItem Header="В Singularity" Command="{Binding AddToSingularityCommand}" AutomationProperties.Name="В Singularity"/>
+                                                                                <MenuItem Header="В архив" Command="{Binding ArchiveCommand}" AutomationProperties.Name="В архив"/>
+                                                                                <MenuItem Header="Удалить готовое" Command="{Binding DeleteDraftsCommand}" AutomationProperties.Name="Удалить готовое"/>
+                                                                            </ContextMenu>
+                                                                        </Button.ContextMenu>
+                                                                    </Button>
+                                                                </Grid>
+                                                                <TextBlock Text="{Binding Requirements}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                                           Visibility="{Binding HasRequirements, Converter={StaticResource BoolToVisibility}}"/>
+
+                                                                <!-- Строка шагов и одна главная кнопка -->
+                                                                <Grid Margin="0,8,0,0">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <ItemsControl ItemsSource="{Binding Steps}" VerticalAlignment="Center" Focusable="False" AutomationProperties.Name="Шаги задания">
+                                                                        <ItemsControl.ItemsPanel>
+                                                                            <ItemsPanelTemplate>
+                                                                                <WrapPanel/>
+                                                                            </ItemsPanelTemplate>
+                                                                        </ItemsControl.ItemsPanel>
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate>
+                                                                                <StackPanel Orientation="Horizontal" AutomationProperties.Name="{Binding AccessibleName}">
+                                                                                    <TextBlock x:Name="Arrow" Text="›" Style="{StaticResource TextCaption}" Margin="6,0,6,0"/>
+                                                                                    <TextBlock x:Name="Step" Text="{Binding Title}" Style="{StaticResource TextCaption}"/>
+                                                                                </StackPanel>
+                                                                                <DataTemplate.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsFirst}" Value="True">
+                                                                                        <Setter TargetName="Arrow" Property="Visibility" Value="Collapsed"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                                                        <Setter TargetName="Step" Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                                                        <Setter TargetName="Step" Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                                                                                        <Setter TargetName="Step" Property="FontWeight" Value="SemiBold"/>
+                                                                                    </DataTrigger>
+                                                                                </DataTemplate.Triggers>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                                    <Button Grid.Column="1" Content="{Binding MainLabel}" Command="{Binding MainCommand}" Margin="8,0,0,0"
+                                                                            AutomationProperties.Name="{Binding MainLabel}"
+                                                                            Visibility="{Binding HasMain, Converter={StaticResource BoolToVisibility}}">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource OutlineButton}">
+                                                                                <Setter Property="BorderBrush" Value="{StaticResource AccentOutlineBrush}"/>
+                                                                                <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding MainIsQuiet}" Value="True">
+                                                                                        <Setter Property="BorderBrush" Value="{StaticResource LineBrush}"/>
+                                                                                        <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                    </Button>
+                                                                </Grid>
+                                                                <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibility}}">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock" BasedOn="{StaticResource TextCaption}">
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding HintIsProblem}" Value="True">
+                                                                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding Note}" Style="{StaticResource TextCaption}" Foreground="{StaticResource AttentionBrush}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                                           Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}"/>
+
+                                                                <!-- Вопрос «Нужно подтвердить» -->
+                                                                <Border Style="{StaticResource ReasonBlock}" Background="{StaticResource AttentionSurfaceBrush}" BorderBrush="{StaticResource AttentionBrush}" Margin="0,8,0,0"
+                                                                        Visibility="{Binding NeedsConfirmation, Converter={StaticResource BoolToVisibility}}">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="Нужно подтвердить" Style="{StaticResource TextCaption}" Foreground="{StaticResource AttentionBrush}" FontWeight="SemiBold"/>
+                                                                        <TextBlock Text="{Binding Question}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                                        <WrapPanel Margin="0,6,0,0">
+                                                                            <Button Content="Подтвердить" Command="{Binding ConfirmCommand}" Style="{StaticResource OutlineButton}" Margin="0,0,6,0" Padding="12,5"
+                                                                                    BorderBrush="{StaticResource AccentOutlineBrush}" Foreground="{StaticResource AccentTextBrush}"
+                                                                                    ToolTip="Задание верное: работа подготовится при ближайшей выгрузке" AutomationProperties.Name="Подтвердить задание"/>
+                                                                            <Button Content="Поправить условие" Command="{Binding FixConditionCommand}" Style="{StaticResource GhostButton}" Margin="0,0,6,0" Padding="12,5"
+                                                                                    ToolTip="Ввести верную формулировку задания" AutomationProperties.Name="Поправить условие"/>
+                                                                            <Button Content="В архив" Command="{Binding ArchiveCommand}" Style="{StaticResource GhostButton}" Padding="12,5"
+                                                                                    ToolTip="Это не задание: убрать из списка" AutomationProperties.Name="Убрать задание в архив"/>
+                                                                        </WrapPanel>
+                                                                    </StackPanel>
+                                                                </Border>
+
+                                                                <!-- Откуда это задание -->
+                                                                <Border BorderBrush="{StaticResource LineStrongBrush}" BorderThickness="2,0,0,0" Padding="10,2,0,2" Margin="0,8,0,0">
+                                                                    <StackPanel>
+                                                                        <WrapPanel>
+                                                                            <TextBlock Text="Откуда это задание" Style="{StaticResource TextCaption}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                                            <Border x:Name="Badge" Style="{StaticResource Chip}" VerticalAlignment="Center"
+                                                                                    Visibility="{Binding HasReliability, Converter={StaticResource BoolToVisibility}}">
+                                                                                <TextBlock x:Name="BadgeText" Text="{Binding Reliability}" Style="{StaticResource TextCaption}"/>
+                                                                            </Border>
+                                                                        </WrapPanel>
+                                                                        <TextBlock Text="{Binding Quote}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBody}" FontStyle="Italic" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                                                   Visibility="{Binding HasEvidence, Converter={StaticResource BoolToVisibility}}"/>
+                                                                        <WrapPanel Margin="0,6,0,0">
+                                                                            <Button Content="Открыть в расшифровке" Command="{Binding OpenTranscriptCommand}" Style="{StaticResource OutlineButton}" Padding="10,3" Margin="0,0,6,0" FontSize="{StaticResource FontSizeCaption}"
+                                                                                    ToolTip="Открыть расшифровку этого занятия" AutomationProperties.Name="Открыть в расшифровке"/>
+                                                                            <Button Content="Открыть в LMS" Command="{Binding OpenInLmsCommand}" Style="{StaticResource OutlineButton}" Padding="10,3" FontSize="{StaticResource FontSizeCaption}"
+                                                                                    ToolTip="Открыть страницу работы в LMS" AutomationProperties.Name="Открыть в LMS"
+                                                                                    Visibility="{Binding HasLmsPage, Converter={StaticResource BoolToVisibility}}"/>
+                                                                        </WrapPanel>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <DataTemplate.Triggers>
+                                                            <DataTrigger Binding="{Binding IsConfirmedSource}" Value="True">
+                                                                <Setter TargetName="Badge" Property="BorderBrush" Value="{StaticResource OkBrush}"/>
+                                                                <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource OkBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding ReliabilityWarning}" Value="True">
+                                                                <Setter TargetName="Badge" Property="BorderBrush" Value="{StaticResource AttentionBrush}"/>
+                                                                <Setter TargetName="BadgeText" Property="Foreground" Value="{StaticResource AttentionBrush}"/>
+                                                            </DataTrigger>
+                                                        </DataTemplate.Triggers>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0"
+                                                    Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibility}}">
+                                            <ctl:ActivityOrb Width="28" Height="28" Style="{StaticResource ActivityOrb}" Margin="-6,-4,8,-4"/>
+                                            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextWrapping="Wrap">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource TextSecondary}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Failed}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource DangerBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

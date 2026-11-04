@@ -23,6 +23,19 @@ public class RunRowViewModelTests
     }
 
     /// <summary>
+    /// Запуск закончился удачно, но в выводе есть ошибка (одна ссылка не разобралась): кнопка починки есть, а чистый удачный запуск её не получает
+    /// </summary>
+    [Fact]
+    public void A_successful_run_with_an_error_in_the_output_can_still_be_fixed()
+    {
+        var start = new DateTimeOffset(2026, 10, 27, 7, 27, 28, TimeSpan.FromHours(1));
+        RunRowViewModel Make(string output) => new(new RunRecord("reels", "Рилсы", "interval", start, start.AddSeconds(3), 0, RunOutcomeEnum.Ok, null, "не получилось 1", output), _ => { });
+
+        Assert.True(Make("27.10.2026 07:27:31  Не получилось: https://instagram.com/p/x: yt-dlp: ERROR: нужен вход").CanFix);
+        Assert.False(Make("27.10.2026 07:27:31  Принято: 1").CanFix);
+    }
+
+    /// <summary>
     /// Ошибка, которая уже есть в выводе (с типом исключения или без), над плашками не повторяется
     /// </summary>
     [Fact]
