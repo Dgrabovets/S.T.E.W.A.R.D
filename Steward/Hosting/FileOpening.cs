@@ -9,9 +9,9 @@ namespace Steward.Hosting;
 public static class FileOpening
 {
     /// <summary>
-    /// Документы и картинки: их открывает программа, которую Windows связала с типом, и они ничего не запускают
+    /// Документы и картинки: их открывает программа, которую Windows связала с типом, и они ничего не запускают. Старые форматы .doc, .xls и .ppt сюда не входят: в них бывают макросы
     /// </summary>
-    private static readonly HashSet<string> Documents = [".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".pdf", ".md", ".txt", ".csv", ".png", ".jpg", ".jpeg"];
+    private static readonly HashSet<string> Documents = [".docx", ".pptx", ".xlsx", ".pdf", ".md", ".txt", ".csv", ".png", ".jpg", ".jpeg"];
 
     /// <summary>
     /// Текст кода и данных: показывается в Блокноте, который ничего не выполняет, даже если Windows связала тип с интерпретатором
@@ -29,12 +29,9 @@ public static class FileOpening
         if (Directory.Exists(path) || Documents.Contains(Path.GetExtension(path).ToLowerInvariant()))
             return new ProcessStartInfo(path) { UseShellExecute = true, ErrorDialog = true };
 
-        var start = new ProcessStartInfo(Code.Contains(Path.GetExtension(path).ToLowerInvariant()) ? "notepad.exe" : "explorer.exe") { UseShellExecute = false };
-        if (start.FileName == "notepad.exe")
-            start.ArgumentList.Add(path);
-        else
-            start.ArgumentList.Add($"/select,{path}");
-
-        return start;
+        // Кавычки нужны вокруг пути, а не вокруг всего ключа: ArgumentList обернул бы «/select,путь» целиком, и проводник не нашёл бы файл с пробелом в пути
+        return Code.Contains(Path.GetExtension(path).ToLowerInvariant())
+            ? new ProcessStartInfo("notepad.exe") { UseShellExecute = false, Arguments = $"\"{path}\"" }
+            : new ProcessStartInfo("explorer.exe") { UseShellExecute = false, Arguments = $"/select,\"{path}\"" };
     }
 }

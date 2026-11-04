@@ -357,4 +357,28 @@ public class OpenAssignmentsTests
             directory.Delete(recursive: true);
         }
     }
+
+    /// <summary>
+    /// Файл отметок на миг занят другим процессом: чтение повторяется и возвращает убранные задания, а не пустой список
+    /// </summary>
+    [Fact]
+    public void Reading_marks_retries_once_when_the_file_is_briefly_locked()
+    {
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var path = Path.Combine(directory.FullName, "task-dismissed.json");
+            File.WriteAllText(path, "{\"a\":[\"Отчёт\"]}");
+            var store = new Steward.Homework.Storage.HomeworkStore(directory.FullName);
+
+            using var held = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+            _ = Task.Delay(20).ContinueWith(_ => held.Dispose(), TaskScheduler.Default);
+
+            Assert.Equal("Отчёт", store.DismissedTasks("a").Single().Title);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
 }

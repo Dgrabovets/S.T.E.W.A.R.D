@@ -16,11 +16,22 @@ public class FileOpeningTests
     [InlineData(@"C:\work\Задание 1.bat", false, "explorer.exe")]
     [InlineData(@"C:\work\Задание 1.LNK", false, "explorer.exe")]
     [InlineData(@"C:\work\Задание 1.cmd", false, "explorer.exe")]
+    [InlineData(@"C:\work\Задание 1.doc", false, "explorer.exe")]
     public void Only_documents_go_to_the_shell(string path, bool shell, string program)
     {
         var start = FileOpening.Plan(path);
 
         Assert.Equal(shell, start.UseShellExecute);
         Assert.Equal(program, start.FileName);
+    }
+
+    /// <summary>
+    /// Путь с пробелами идёт в кавычках: проводник получает «/select,"путь"», а Блокнот путь в кавычках
+    /// </summary>
+    [Fact]
+    public void A_path_with_spaces_is_quoted_around_the_path_only()
+    {
+        Assert.Equal(@"/select,""C:\my work\Задание 1.bat""", FileOpening.Plan(@"C:\my work\Задание 1.bat").Arguments);
+        Assert.Equal(@"""C:\my work\Задание 1.py""", FileOpening.Plan(@"C:\my work\Задание 1.py").Arguments);
     }
 }
