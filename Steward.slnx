@@ -37,7 +37,6 @@
   <Project Path="Steward.Schedule.Shared/Steward.Schedule.Shared.csproj" />
   <Project Path="Steward.Mail/Steward.Mail.csproj" />
   <Project Path="Steward.Homework/Steward.Homework.csproj" />
-  <Project Path="Steward.Homework.Tasks/Steward.Homework.Tasks.csproj" />
   <Project Path="Steward.Lms/Steward.Lms.csproj" />
   <Project Path="Steward.Reels/Steward.Reels.csproj" />
   <Project Path="Steward.Ideas/Steward.Ideas.csproj" />

@@ -58,7 +58,7 @@ public sealed class RunHistory
                 Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
                 File.AppendAllText(_path, JsonSerializer.Serialize(record, Json) + Environment.NewLine);
                 if (new FileInfo(_path).Length > TRIM_BYTES)
-                    File.WriteAllLines(_path, File.ReadLines(_path).TakeLast(KEEP));
+                    File.WriteAllLines(_path, File.ReadLines(_path).TakeLast(KEEP).ToList());
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {

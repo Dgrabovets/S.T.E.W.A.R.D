@@ -75,6 +75,11 @@ public partial class App : System.Windows.Application
         try
         {
             var file = Path.Combine(DataLocation.DataDirectory(), "steward-errors.log");
+
+            // Журнал не растёт без предела: большой файл уходит в .old, а прежний .old стирается
+            if (File.Exists(file) && new FileInfo(file).Length > 512 * 1024)
+                File.Move(file, file + ".old", overwrite: true);
+
             File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {exception}{Environment.NewLine}{Environment.NewLine}");
         }
         catch (Exception logging) when (logging is IOException or UnauthorizedAccessException)

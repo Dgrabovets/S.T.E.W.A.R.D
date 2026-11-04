@@ -83,7 +83,23 @@ internal static class Program
     #region Helpers
 
     /// <summary>
-    /// Читает appsettings.json рядом с exe и проверяет, что пароль и токен не остались заглушками
+    /// Собирает секреты из переменных окружения пользователя: так их не нужно держать в файле открытым текстом
+    /// </summary>
+    /// <returns>Настройки, заданные в окружении: <c>STEWARD_MAIL_APPPASSWORD</c> и <c>STEWARD_SINGULARITY_TOKEN</c></returns>
+    private static Dictionary<string, string?> SecretsFromEnvironment()
+    {
+        var secrets = new Dictionary<string, string?>();
+        if (Environment.GetEnvironmentVariable("STEWARD_MAIL_APPPASSWORD") is { Length: > 0 } password)
+            secrets["Mail:AppPassword"] = password;
+
+        if (Environment.GetEnvironmentVariable("STEWARD_SINGULARITY_TOKEN") is { Length: > 0 } token)
+            secrets["Singularity:Token"] = token;
+
+        return secrets;
+    }
+
+    /// <summary>
+    /// Читает appsettings.json рядом с exe и проверяет, что пароль и токен не остались заглушками. Секреты из окружения важнее файла
     /// </summary>
     /// <returns>Настройки приложения</returns>
     /// <exception cref="InvalidOperationException">
@@ -94,6 +110,7 @@ internal static class Program
         var config = new ConfigurationBuilder()
             .SetBasePath(BaseDir)
             .AddJsonFile("appsettings.json", optional: false)
+            .AddInMemoryCollection(SecretsFromEnvironment())
             .Build();
 
         var settings = config.Get<AppSettings>() ?? throw new InvalidOperationException("Не удалось прочитать appsettings.json");

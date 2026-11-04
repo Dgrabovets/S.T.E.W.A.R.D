@@ -1251,13 +1251,21 @@ public sealed partial class HomeworkStore(string directory)
     /// <returns>Содержимое или <see langword="null"/>, если файла нет или он испорчен</returns>
     private static T? Read<T>(string path) where T : class
     {
-        try
+        // Другой процесс заменяет файл целиком: на миг он может быть занят. Одна повторная попытка не даёт отметкам на секунду «пропасть»
+        for (var attempt = 0; ; attempt++)
         {
-            return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) : null;
-        }
-        catch (Exception exception) when (exception is JsonException or IOException)
-        {
-            return null;
+            try
+            {
+                return File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) : null;
+            }
+            catch (IOException) when (attempt == 0)
+            {
+                Thread.Sleep(50);
+            }
+            catch (Exception exception) when (exception is JsonException or IOException)
+            {
+                return null;
+            }
         }
     }
 }

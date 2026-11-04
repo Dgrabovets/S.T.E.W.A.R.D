@@ -321,8 +321,7 @@ public sealed class JobHost : IDisposable
     {
         try
         {
-            // ErrorDialog снимает с вызова флаг «без окон»: без него .NET не даёт Windows показать выбор программы для файла без связи и сразу бросает исключение
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true, ErrorDialog = true });
+            System.Diagnostics.Process.Start(FileOpening.Plan(path));
 
             return string.Empty;
         }

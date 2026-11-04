@@ -268,4 +268,20 @@ public class JobRunnerTests
         Assert.Equal("manual", (await manual).Reason);
         Assert.Null(scheduler.RunNow("missing"));
     }
+
+    /// <summary>
+    /// Задача, которая печатает очень много, не раздувает память: от вывода остаётся конец, и последняя строка на месте
+    /// </summary>
+    [Fact]
+    public async Task A_very_chatty_job_keeps_only_the_end_of_its_output()
+    {
+        using var dir = new TempDir();
+        var (runner, _) = Create(dir);
+        var pad = new string('x', 100);
+
+        var record = await runner.RunAsync(Samples.Job("chatty") with { Arguments = $"/c \"for /L %i in (1,1,4000) do @echo {pad}%i& echo the-end\"" }, "manual");
+
+        Assert.Equal(RunOutcomeEnum.Ok, record.Outcome);
+        Assert.EndsWith("the-end", record.Output);
+    }
 }
