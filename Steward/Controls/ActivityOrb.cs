@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
 using Steward.Models;
@@ -25,14 +26,9 @@ public sealed class ActivityOrb : FrameworkElement
     private const int DEPTH_LEVELS = 6;
 
     /// <summary>
-    /// Занятая сфера перерисовывается каждый второй кадр: вращение остаётся плавным, а процессор не греется
+    /// Монотонные часы анимации: в отличие от времени суток не прыгают при переводе часов и не обнуляются в полночь
     /// </summary>
-    private const int BUSY_FRAME_STEP = 2;
-
-    /// <summary>
-    /// Сфера покоя перерисовывается каждый четвёртый кадр: она почти неподвижна
-    /// </summary>
-    private const int CALM_FRAME_STEP = 4;
+    private static readonly Stopwatch Clock = Stopwatch.StartNew();
 
     /// <summary>
     /// Сколько кистей держать про запас, прежде чем очистить кэш
@@ -159,11 +155,6 @@ public sealed class ActivityOrb : FrameworkElement
     private bool _looping;
 
     /// <summary>
-    /// Счётчик кадров: спокойные сферы обновляются через кадр
-    /// </summary>
-    private int _frame;
-
-    /// <summary>
     /// Создаёт индикатор и подписывается на показ и скрытие, чтобы не рисовать кадры невидимому окну
     /// </summary>
     public ActivityOrb()
@@ -259,7 +250,7 @@ public sealed class ActivityOrb : FrameworkElement
 
         var center = new Point(ActualWidth / 2, ActualHeight / 2);
         var radius = size / 2 - 1.5;
-        var seconds = DateTimeOffset.UtcNow.TimeOfDay.TotalSeconds;
+        var seconds = Clock.Elapsed.TotalSeconds;
         var age = (DateTimeOffset.UtcNow - Since).TotalSeconds;
 
         if (State == ActivityStateEnum.Done && age is >= 0 and < DONE_SECONDS)
@@ -297,18 +288,11 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
-    /// Перерисовывает кадр. Сферы покоя обновляются через кадр: им плавности хватает, а процессор остаётся свободным
+    /// Перерисовывает сферу каждый кадр: пропуск кадров у спокойных сфер давал заметные рывки, например у сферы в шапке
     /// </summary>
     /// <param name="sender">Источник события</param>
     /// <param name="e">Аргументы события</param>
-    private void OnFrame(object? sender, EventArgs e)
-    {
-        var busy = State != ActivityStateEnum.None || Kind is ActivityKindEnum.Working or ActivityKindEnum.Searching or ActivityKindEnum.Connecting or ActivityKindEnum.Composing or ActivityKindEnum.Breathing or ActivityKindEnum.Beacon or ActivityKindEnum.Sweep or ActivityKindEnum.Attention or ActivityKindEnum.Failed;
-        if (++_frame % (busy ? BUSY_FRAME_STEP : CALM_FRAME_STEP) != 0)
-            return;
-
-        InvalidateVisual();
-    }
+    private void OnFrame(object? sender, EventArgs e) => InvalidateVisual();
 
     /// <summary>
     /// Цвет кисти
@@ -355,7 +339,10 @@ public sealed class ActivityOrb : FrameworkElement
     /// <param name="dotScale">Во сколько раз крупнее рисуются точки</param>
     private static void DrawSphere(DrawingContext context, Point center, double radius, double seconds, ActivityKindEnum kind, Color color, double strength, int stride = 1, double dotScale = 1)
     {
-        var brushes = Enumerable.Range(0, DEPTH_LEVELS).Select(level => MakeBrush(level, color, strength)).ToArray();
+        var brushes = new Brush[DEPTH_LEVELS];
+        for (var level = 0; level < DEPTH_LEVELS; level++)
+            brushes[level] = MakeBrush(level, color, strength);
+
         var (sinTilt, cosTilt) = Math.SinCos(TILT);
 
         for (var index = 0; index < Points.Length; index++)

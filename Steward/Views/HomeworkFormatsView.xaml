@@ -37,23 +37,7 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
         </Style>
-    </UserControl.Resources>
-
-    <StackPanel>
-        <Border Style="{StaticResource Card}" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap"
-                       Text="Занятий пока нет. Они появятся после первой выгрузки из LMS."/>
-        </Border>
-
-        <!-- Плитки предметов -->
-        <ItemsControl ItemsSource="{Binding Subjects}">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <UniformGrid Columns="3"/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
+                <DataTemplate x:Key="SubjectTile">
                     <Border x:Name="Tile" Style="{StaticResource Card}" Padding="14,12" Margin="0,0,10,10" Cursor="Hand" ClipToBounds="True">
                         <Border.InputBindings>
                             <MouseBinding MouseAction="LeftClick" Command="{Binding SelectCommand}"/>
@@ -141,8 +125,46 @@
                         </DataTrigger>
                     </DataTemplate.Triggers>
                 </DataTemplate>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Border Style="{StaticResource Card}" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap"
+                       Text="Занятий пока нет. Они появятся после первой выгрузки из LMS."/>
+        </Border>
+
+        <CheckBox Content="{Binding ShowCompletedText}" IsChecked="{Binding ShowCompleted}" HorizontalAlignment="Left" Margin="0,0,0,10"/>
+        <Border Style="{StaticResource Card}" Visibility="{Binding AllHidden, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Style="{StaticResource TextSecondary}" TextWrapping="Wrap"
+                       Text="Все предметы завершены. Включите «Показывать завершённые», чтобы увидеть их."/>
+        </Border>
+
+        <!-- Плитки предметов -->
+        <ItemsControl ItemsSource="{Binding Subjects}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Columns="3"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <StaticResource ResourceKey="SubjectTile"/>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- Завершённые предметы: отдельный блок под основными плитками -->
+        <StackPanel Visibility="{Binding HasCompletedSection, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding CompletedHeader}" Style="{StaticResource TextCaption}" Margin="0,4,0,8"/>
+            <ItemsControl ItemsSource="{Binding CompletedSubjects}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="3"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <StaticResource ResourceKey="SubjectTile"/>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
 
         <!-- Вкладки выбранного предмета -->
         <StackPanel Margin="0,0,10,0">

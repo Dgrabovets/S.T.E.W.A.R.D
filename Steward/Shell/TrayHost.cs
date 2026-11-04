@@ -630,6 +630,10 @@ public sealed class TrayHost : IDisposable
         _formats.SubmittedFileSetter = _jobs.SetSubmittedFile;
         _formats.SubjectOptionsReader = _jobs.SubjectOptions;
         _formats.SubjectOptionsSaver = _jobs.SaveSubjectOptions;
+
+        // Сначала читается сохранённая галочка, потом подключается запись: чтение не должно писать то же значение обратно
+        _formats.ShowCompleted = _jobs.ShowCompleted();
+        _formats.ShowCompletedSaver = _jobs.SaveShowCompleted;
         _formats.RemarkSaver = _jobs.SaveRedoRemark;
         _formats.RemarkLister = _jobs.AllRemarks;
         _formats.RemarkUpdater = _jobs.UpdateRemark;

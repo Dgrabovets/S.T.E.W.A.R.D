@@ -904,6 +904,32 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
+    /// Файл-флаг галочки «Показывать завершённые»: есть файл, значит галочка стоит
+    /// </summary>
+    private string ShowCompletedFlag => Path.Combine(_homework.Root, "ui-show-completed.flag");
+
+    /// <summary>
+    /// Читает галочку «Показывать завершённые»
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/>, если галочка стояла при прошлом запуске
+    /// </returns>
+    public bool ShowCompleted() => File.Exists(ShowCompletedFlag);
+
+    /// <summary>
+    /// Запоминает галочку «Показывать завершённые»
+    /// </summary>
+    /// <param name="show">Показывать ли завершённые предметы</param>
+    /// <exception cref="IOException">Файл-флаг не записался</exception>
+    public void SaveShowCompleted(bool show)
+    {
+        if (show)
+            File.WriteAllText(ShowCompletedFlag, string.Empty);
+        else
+            File.Delete(ShowCompletedFlag);
+    }
+
+    /// <summary>
     /// Запоминает формат заданий по умолчанию для предмета
     /// </summary>
     /// <param name="subject">Название предмета</param>

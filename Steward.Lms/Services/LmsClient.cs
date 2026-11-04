@@ -13,6 +13,11 @@ namespace Steward.Lms.Services;
 public sealed partial class LmsClient : IDisposable
 {
     /// <summary>
+    /// Сколько страниц тестов читается одновременно: LMS не заваливается запросами
+    /// </summary>
+    private const int QUIZ_PAGE_PARALLEL = 4;
+
+    /// <summary>
     /// Настройки: адрес сайта, логин и пароль
     /// </summary>
     private readonly LmsSettings _settings;
@@ -130,7 +135,39 @@ public sealed partial class LmsClient : IDisposable
         var assignments = await _http.GetStringAsync(Url($"/mod/assign/index.php?id={course.Id}"), cancellationToken);
         var quizzes = await _http.GetStringAsync(Url($"/mod/quiz/index.php?id={course.Id}"), cancellationToken);
 
-        return [.. ActivityParser.ParseAssignments(assignments, course.Id, course.Subject), .. ActivityParser.ParseQuizzes(quizzes, course.Id, course.Subject, Url("/mod/quiz/"))];
+        // Страницы несданных тестов читаются по несколько сразу, порядок тестов сохраняется
+        using var gate = new SemaphoreSlim(QUIZ_PAGE_PARALLEL);
+        var checkedQuizzes = await Task.WhenAll(ActivityParser.ParseQuizzes(quizzes, course.Id, course.Subject, Url("/mod/quiz/")).Select(quiz => CheckQuizAsync(quiz, gate, cancellationToken)));
+
+        return [.. ActivityParser.ParseAssignments(assignments, course.Id, course.Subject), .. checkedQuizzes];
+    }
+
+    /// <summary>
+    /// Уточняет несданный тест по его странице. Сданный тест страницы не читает
+    /// </summary>
+    /// <param name="quiz">Тест, разобранный по списку</param>
+    /// <param name="gate">Ограничитель числа одновременных запросов</param>
+    /// <param name="cancellationToken">Токен отмены</param>
+    /// <returns>Тест с уточнённым состоянием, а если страница недоступна, тест из списка</returns>
+    private async Task<LmsActivity> CheckQuizAsync(LmsActivity quiz, SemaphoreSlim gate, CancellationToken cancellationToken)
+    {
+        if (quiz.Done)
+            return quiz;
+
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            return ActivityParser.WithAttempts(quiz, await _http.GetStringAsync(quiz.Url, cancellationToken));
+        }
+        catch (HttpRequestException)
+        {
+            // Страница одного теста недоступна: остаётся результат из списка, остальные работы курса читаются дальше
+            return quiz;
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     /// <summary>
