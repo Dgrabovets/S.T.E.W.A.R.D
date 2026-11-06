@@ -1,4 +1,4 @@
-<UserControl x:Class="Steward.Views.HomeworkFormatsView"
+﻿<UserControl x:Class="Steward.Views.HomeworkFormatsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="clr-namespace:Steward.Controls"
@@ -44,6 +44,8 @@
                         </Border.InputBindings>
                         <Grid>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
@@ -55,8 +57,7 @@
                             </Border.RenderTransform>
                             <TextBlock Text="Завершён" Foreground="{StaticResource OnAccentBrush}" FontSize="{StaticResource FontSizeCaption}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel x:Name="Stats">
-                            <Grid>
+                        <Grid x:Name="Header">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
@@ -69,16 +70,21 @@
                                     </Border>
                                     <Ellipse x:Name="Orb" Width="12" Height="12" Fill="{StaticResource AttentionBrush}" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                 </StackPanel>
-                            </Grid>
+                        </Grid>
+                        <!-- Горизонтальный разделитель: название и орба сверху, счётчики прижаты вниз к спискам -->
+                        <Border Grid.Row="1" Height="1" Background="{StaticResource LineBrush}" Margin="0,10,0,0"/>
+                        <StackPanel x:Name="Stats" Grid.Row="2" VerticalAlignment="Bottom">
                             <TextBlock Text="{Binding TranscribedText}" Style="{StaticResource TextCaption}" Margin="0,10,0,0"/>
                             <ProgressBar x:Name="Bar" Value="{Binding Progress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
                             <TextBlock Text="{Binding AssignmentsText}" Style="{StaticResource TextCaption}" Margin="0,8,0,0"/>
                             <ProgressBar Value="{Binding AssignmentsProgress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
                             <TextBlock Text="{Binding QuizzesText}" Style="{StaticResource TextCaption}" Margin="0,8,0,0"/>
                             <ProgressBar Value="{Binding QuizzesProgress, Mode=OneWay}" Style="{StaticResource ThinProgress}" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding ProjectText}" Style="{StaticResource TextCaption}" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding ProjectFolder}"
+                                       Visibility="{Binding HasProject, Converter={StaticResource BoolToVisibility}}"/>
                         </StackPanel>
                             <!-- Два списка в ряд, а в узкой плитке (маленький экран или крупный масштаб) второй переносится вниз, а не обрезается -->
-                            <WrapPanel x:Name="Pickers" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,8,0,0">
+                            <WrapPanel x:Name="Pickers" Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,8,0,0">
                                 <ComboBox Style="{StaticResource FieldChoice}" Width="172" Margin="4,4,4,0"
                                           ItemsSource="{Binding StateOptions}" SelectedItem="{Binding SelectedStateOption, Mode=TwoWay}"
                                           Visibility="{Binding HasStates, Converter={StaticResource BoolToVisibility}}">
@@ -119,6 +125,7 @@
                             <Setter TargetName="Ribbon" Property="Visibility" Value="Visible"/>
                             <Setter TargetName="Tile" Property="Background" Value="{StaticResource WindowBrush}"/>
                             <Setter TargetName="Stats" Property="Opacity" Value="0.55"/>
+                            <Setter TargetName="Header" Property="Opacity" Value="0.55"/>
                             <Setter TargetName="Pickers" Property="Opacity" Value="0.75"/>
                             <Setter TargetName="Marks" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="TitleText" Property="Margin" Value="0,0,30,0"/>
@@ -233,6 +240,82 @@
                         </GridSplitter.Template>
                     </GridSplitter>
 
+                    <StackPanel>
+                        <!-- Календарь занятий предмета: точка на дне занятия, нажатие открывает расшифровку -->
+                        <Border Style="{StaticResource Card}" Padding="10" Margin="0,0,0,8" DataContext="{Binding SelectedSubject.Calendar}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Content="‹" Command="{Binding PreviousCommand}" Style="{StaticResource OutlineButton}" Padding="9,0" ToolTip="Предыдущий месяц" AutomationProperties.Name="Предыдущий месяц"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Title}" Style="{StaticResource TextBody}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="2" Content="›" Command="{Binding NextCommand}" Style="{StaticResource OutlineButton}" Padding="9,0" ToolTip="Следующий месяц" AutomationProperties.Name="Следующий месяц"/>
+                                </Grid>
+                                <UniformGrid Columns="7" Margin="0,0,0,2">
+                                    <TextBlock Text="Пн" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Вт" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Ср" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Чт" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Пт" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Сб" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Вс" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                </UniformGrid>
+                                <ItemsControl ItemsSource="{Binding Days}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="7"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="Day" Height="32" Margin="1" CornerRadius="{StaticResource RadiusField}" BorderThickness="1.5" BorderBrush="Transparent" Background="Transparent" ToolTip="{Binding ToolTip}">
+                                                <Border.InputBindings>
+                                                    <MouseBinding MouseAction="LeftClick" Command="{Binding ClickCommand}"/>
+                                                </Border.InputBindings>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock x:Name="Number" Text="{Binding Number}" Style="{StaticResource TextCaption}" HorizontalAlignment="Center"/>
+                                                    <Ellipse x:Name="Dot" Width="6" Height="6" Margin="0,2,0,0" Visibility="Hidden" StrokeThickness="1" Stroke="{StaticResource MutedBrush}"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding InMonth}" Value="False">
+                                                    <Setter TargetName="Day" Property="Opacity" Value="0.4"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasLesson}" Value="True">
+                                                    <Setter TargetName="Dot" Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasTranscript}" Value="True">
+                                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AccentTextBrush}"/>
+                                                    <Setter TargetName="Dot" Property="Stroke" Value="{StaticResource AccentTextBrush}"/>
+                                                    <Setter TargetName="Day" Property="Cursor" Value="Hand"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasOpenAssignments}" Value="True">
+                                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource AttentionBrush}"/>
+                                                    <Setter TargetName="Dot" Property="Stroke" Value="{StaticResource AttentionBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                    <Setter TargetName="Number" Property="FontWeight" Value="Bold"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                                                    <Setter TargetName="Day" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                    <Ellipse Width="6" Height="6" Fill="{StaticResource AccentTextBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="расшифровано" Style="{StaticResource TextCaption}" Margin="4,0,10,0"/>
+                                    <Ellipse Width="6" Height="6" Fill="{StaticResource AttentionBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="не разобрано" Style="{StaticResource TextCaption}" Margin="4,0,10,0"/>
+                                    <Ellipse Width="6" Height="6" Stroke="{StaticResource MutedBrush}" StrokeThickness="1" VerticalAlignment="Center"/>
+                                    <TextBlock Text="ждёт" Style="{StaticResource TextCaption}" Margin="4,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
                     <ItemsControl ItemsSource="{Binding SelectedSubject.Lessons}" Margin="0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -303,6 +386,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    </StackPanel>
 
                     <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0,0,0,8" VerticalAlignment="Top">
                         <StackPanel>

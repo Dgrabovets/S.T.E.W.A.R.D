@@ -235,6 +235,17 @@ public class LmsTests
         Assert.Equal("10,00 / 10,00", passed.Grade);
         Assert.False(ActivityParser.WithAttempts(quiz, none).Done);
         Assert.True(ActivityParser.WithAttempts(quiz, "<table><tr><td>1</td><td>Завершено</td></tr></table>").Done);
+
+        // Так страница теста выглядит у теста, где оценка скрыта: состояние «Завершены», а даты в заголовках
+        const string hidden = """
+            <div class="generaltable quizattemptsummary"><table><tr><th>Состояние</th><td class="cell c1">Завершены</td></tr>
+            <tr><th>Тест начат</th><td>среда, 16 сентября 2026, 18:55</td></tr><tr><th>Завершен</th><td>среда, 16 сентября 2026, 18:59</td></tr></table></div>
+            """;
+        var done = ActivityParser.WithAttempts(quiz, hidden);
+        Assert.True(done.Done);
+        Assert.Equal("Попытка завершена, оценка скрыта", done.Status);
+        Assert.Empty(done.Grade);
+        Assert.False(ActivityParser.WithAttempts(quiz, "<table><tr><th>Состояние</th><td>Выполняется</td></tr><tr><th>Завершен</th><td>-</td></tr></table>").Done);
     }
 
     /// <summary>

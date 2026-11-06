@@ -54,6 +54,22 @@ public sealed partial class HomeworkStore
     public void SetSubjectExcludedGuides(string subject, IEnumerable<string> excluded) => ChangeSubjectOptions(subject, options => options with { ExcludedGuides = [.. excluded.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)] });
 
     /// <summary>
+    /// Запоминает папку единого проекта предмета: агент читает её при подготовке работ, а плитка показывает состояние проекта
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="folder">Путь к папке проекта. Пусто: проект снят</param>
+    /// <exception cref="IOException">Файл настроек занят дольше ожидания или не читается: прежнее содержимое цело</exception>
+    public void SetSubjectProjectFolder(string subject, string folder) => ChangeSubjectOptions(subject, options => options with { ProjectFolder = folder.Trim().Length > 0 ? folder.Trim() : null });
+
+    /// <summary>
+    /// Запоминает язык, на котором пишутся работы по предмету
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="language">Язык словами, например «английском». Пусто: по-русски</param>
+    /// <exception cref="IOException">Файл настроек занят дольше ожидания или не читается: прежнее содержимое цело</exception>
+    public void SetSubjectLanguage(string subject, string language) => ChangeSubjectOptions(subject, options => options with { Language = language.Trim().Length > 0 ? language.Trim() : null });
+
+    /// <summary>
     /// Меняет настройки одного предмета под общей блокировкой, не затирая настройки остальных
     /// </summary>
     /// <param name="subject">Название предмета</param>

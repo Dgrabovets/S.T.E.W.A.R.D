@@ -23,6 +23,11 @@ internal static class Program
     private const string STATUS_ID = "lms";
 
     /// <summary>
+    /// Код выхода команды <c>sync-tasks</c>, когда какие-то задачи забыты и окну нужно обновить кнопки
+    /// </summary>
+    private const int SYNC_CHANGED_EXIT_CODE = 10;
+
+    /// <summary>
     /// Шаги обычного запуска по порядку: их видно на странице «Статус», пока процесс работает
     /// </summary>
     private static readonly string[] Stages = ["Занятия", "Расшифровки", "Разбор", "Задания", "Работы", "Заметки"];
@@ -106,6 +111,12 @@ internal static class Program
                     Log(await AddQuoteTaskAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")), args[1], int.Parse(args[2], CultureInfo.InvariantCulture)));
 
                     return 0;
+                case "sync-tasks":
+                    var (syncMessage, changed) = await SyncTasksAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework")));
+                    Log(syncMessage);
+
+                    // Код 10 говорит приложению, что кнопки в окне нужно обновить
+                    return changed ? SYNC_CHANGED_EXIT_CODE : 0;
                 case "analyze":
                     Log(await AnalyzeAsync(settings, new HomeworkStore(Path.Combine(DataLocation.DataDirectory(), "homework"))));
 
@@ -465,15 +476,15 @@ internal static class Program
         var externalId = HomeworkTaskBuilder.ExternalId(lesson, number);
         using var singularity = new Steward.Mail.Services.SingularityClient(configured);
         var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
-        var known = await singularity.ListExternalIdsAsync(new DateTimeOffset(lesson.Date.AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), CancellationToken.None);
+        var live = await LiveKeysAsync(singularity, lesson, offset);
 
-        // Задача могла быть заведена кнопкой «Только в Singularity» по тому же заданию: тогда вторая не создаётся
-        var remembered = store.LoadCreated();
-        var exists = store.SingularityKeysForItem(lesson, number).Any(key => known.Contains(key) || remembered.Contains(key));
+        // Задача могла быть заведена кнопкой «Только в Singularity» по тому же заданию: тогда вторая не создаётся. Удалённая в Singularity задача не считается: её можно завести заново
+        var exists = store.SingularityKeysForItem(lesson, number).Any(live.Contains);
         if (!exists)
         {
             var drafts = Directory.Exists(store.DraftsDirectory(lessonId)) ? Directory.EnumerateFiles(store.DraftsDirectory(lessonId), $"Задание {number}.*").Order(StringComparer.Ordinal).ToArray() : [];
-            await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, items[number - 1], number, store.FormatFor(lessonId), configured.ProjectId, offset, drafts), CancellationToken.None);
+            var nextLesson = await HomeworkDeadline.NextLessonAsync(singularity, lesson.Title, lesson.Date, CancellationToken.None);
+            await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, items[number - 1], number, store.FormatFor(lessonId), configured.ProjectId, offset, drafts, nextLesson), CancellationToken.None);
         }
 
         try
@@ -487,6 +498,34 @@ internal static class Program
         }
 
         return exists ? $"Задача по заданию уже была в Singularity: {items[number - 1].Title}" : $"Задача заведена в Singularity: {items[number - 1].Title}";
+    }
+
+    /// <summary>
+    /// Ключи задач ДЗ, которые сейчас живы в SingularityApp: без удалённых
+    /// </summary>
+    /// <param name="singularity">Клиент SingularityApp</param>
+    /// <param name="lesson">Занятие, от дня которого ищутся задачи</param>
+    /// <param name="offset">Часовой пояс начала дня</param>
+    /// <returns>Внешние ключи живых задач</returns>
+    private static async Task<IReadOnlySet<string>> LiveKeysAsync(Steward.Mail.Services.SingularityClient singularity, Lesson lesson, TimeSpan offset) =>
+        (await singularity.ListTasksAsync(new DateTimeOffset(lesson.Date.AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), "hw", CancellationToken.None))
+            .Where(task => !task.Removed).Select(task => task.ExternalId).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Сверяет заведённые задачи ДЗ с SingularityApp: удалённые там забываются, и кнопка «Добавить в Singularity» снова доступна. Команда <c>sync-tasks</c>
+    /// </summary>
+    /// <param name="settings">Настройки: подключение к SingularityApp</param>
+    /// <param name="store">Папка домашних заданий</param>
+    /// <returns>Строка итога и признак, что что-то забыто</returns>
+    private static async Task<(string Message, bool Changed)> SyncTasksAsync(LmsSettings settings, HomeworkStore store)
+    {
+        if (settings.Singularity is not { Token.Length: > 0 } configured || configured.Token.StartsWith('<'))
+            return ("Singularity не настроен", false);
+
+        using var singularity = new Steward.Mail.Services.SingularityClient(configured);
+        var forgotten = await HomeworkSingularitySync.ReconcileAsync(store, singularity, CancellationToken.None);
+
+        return (forgotten.Count > 0 ? $"Singularity: задач удалено {forgotten.Count}, кнопка добавления снова доступна" : "Singularity: задачи на месте", forgotten.Count > 0);
     }
 
     /// <summary>
@@ -512,14 +551,18 @@ internal static class Program
         var externalId = HomeworkTaskBuilder.QuoteExternalId(lesson, index);
         using var singularity = new Steward.Mail.Services.SingularityClient(configured);
         var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
-        var known = await singularity.ListExternalIdsAsync(new DateTimeOffset(lesson.Date.AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), CancellationToken.None);
+        var live = await LiveKeysAsync(singularity, lesson, offset);
 
-        // Задача могла быть заведена и из списка заданий (кнопкой карточки или фоновым шагом): тогда вторая не создаётся
-        var remembered = store.LoadCreated();
-        if (store.SingularityKeysForQuote(lesson, index).Any(key => known.Contains(key) || remembered.Contains(key)))
+        // Задача могла быть заведена и из списка заданий (кнопкой карточки или фоновым шагом): тогда вторая не создаётся. Удалённая в Singularity задача не считается
+        if (store.SingularityKeysForQuote(lesson, index).Any(live.Contains))
+        {
+            store.MarkCreated([externalId]);
+
             return $"Задача по заданию уже была в Singularity: {task.Title}";
+        }
 
-        await singularity.CreateTaskAsync(HomeworkTaskBuilder.BuildFromQuote(lesson, task, index, configured.ProjectId, offset), CancellationToken.None);
+        var nextLesson = await HomeworkDeadline.NextLessonAsync(singularity, lesson.Title, lesson.Date, CancellationToken.None);
+        await singularity.CreateTaskAsync(HomeworkTaskBuilder.BuildFromQuote(lesson, task, index, configured.ProjectId, offset, nextLesson), CancellationToken.None);
         try
         {
             store.MarkCreated([externalId]);

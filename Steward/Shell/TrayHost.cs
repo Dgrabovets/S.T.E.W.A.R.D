@@ -254,6 +254,10 @@ public sealed class TrayHost : IDisposable
 
             ApplyAll();
 
+            // Сверка с Singularity идёт, пока окно открыто: удалённая там задача возвращает кнопку добавления
+            if (_main is { IsVisible: true })
+                _ = SyncSingularityAsync();
+
             if (_snapshot.CurrentError is null)
             {
                 _notifiedError = null;
@@ -651,6 +655,26 @@ public sealed class TrayHost : IDisposable
         _formats.ApplyHomework(_jobs.HomeworkRows());
 
         return _formats;
+    }
+
+    /// <summary>
+    /// Сверяет задачи ДЗ с Singularity и, если какие-то удалены, обновляет карточки и кнопки в окне
+    /// </summary>
+    /// <returns>Задача, которая завершается, когда сверка и обновление закончились; ошибок не выбрасывает</returns>
+    private async Task SyncSingularityAsync()
+    {
+        try
+        {
+            if (!await _jobs.SyncSingularityAsync() || _exiting)
+                return;
+
+            _formats.ApplyHomework(_jobs.HomeworkRows());
+            await _formats.RefreshSingularityAsync();
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or InvalidOperationException)
+        {
+            System.Diagnostics.Trace.TraceError($"Сверка задач с Singularity не обновила окно: {exception}");
+        }
     }
 
     /// <summary>

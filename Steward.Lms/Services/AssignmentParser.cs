@@ -56,7 +56,8 @@ public static partial class AssignmentParser
     /// <returns>Текст с переводами строк</returns>
     public static string Text(string html)
     {
-        var broken = BlockEnd().Replace(html, "\n");
+        // Блок описания обрезается по границе страницы и может кончаться недописанным тегом («<div»): он не должен попасть в условие
+        var broken = BlockEnd().Replace(UnfinishedTag().Replace(html, string.Empty), "\n");
         var plain = WebUtility.HtmlDecode(Tags().Replace(broken, string.Empty));
         var lines = plain.Replace(' ', ' ').Split('\n').Select(line => Spaces().Replace(line, " ").Trim()).Where(line => line.Length > 0);
 
@@ -69,6 +70,13 @@ public static partial class AssignmentParser
     /// <param name="html">Строка HTML</param>
     /// <returns>Чистый текст в одну строку</returns>
     private static string Clean(string html) => Spaces().Replace(WebUtility.HtmlDecode(Tags().Replace(html, " ")), " ").Trim();
+
+    /// <summary>
+    /// Недописанный тег в самом конце фрагмента
+    /// </summary>
+    /// <returns>Регулярное выражение незакрытого тега</returns>
+    [GeneratedRegex(@"<[^>]*$")]
+    private static partial Regex UnfinishedTag();
 
     [GeneratedRegex(@"<strong>([^<:]+):</strong>\s*([^<]+)")]
     private static partial Regex DateRow();

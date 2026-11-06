@@ -182,6 +182,7 @@ public partial class HomeworkFormatsView : UserControl
             ".docx" => Steward.Homework.Models.HomeworkFormatEnum.Word,
             ".pptx" => Steward.Homework.Models.HomeworkFormatEnum.Presentation,
             ".txt" or ".md" => Steward.Homework.Models.HomeworkFormatEnum.Text,
+            ".zip" => Steward.Homework.Models.HomeworkFormatEnum.Project,
             { Length: > 0 } => Steward.Homework.Models.HomeworkFormatEnum.Code,
             _ => lesson.Format,
         };

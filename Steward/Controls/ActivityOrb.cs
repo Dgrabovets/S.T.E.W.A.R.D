@@ -26,6 +26,28 @@ public sealed class ActivityOrb : FrameworkElement
     private const int DEPTH_LEVELS = 6;
 
     /// <summary>
+    /// Сфера меньше этого размера, в пикселях, рисуется половиной точек
+    /// </summary>
+    private const double SMALL_ORB_SIZE = 30;
+
+    /// <summary>
+    /// С какого размера сфера считается крупной и рисуется на каждый кадр, в пикселях
+    /// </summary>
+    private const double LARGE_ORB_SIZE = 40;
+
+    /// <summary>
+    /// Угол каждой точки вокруг вертикальной оси: считается один раз, а не на каждый кадр
+    /// </summary>
+    private static readonly double[] Azimuths = [.. Enumerable.Range(0, POINT_COUNT).Select(index =>
+    {
+        var y = 1 - (index + 0.5) * 2 / POINT_COUNT;
+        var ring = Math.Sqrt(1 - y * y);
+        var angle = index * Math.PI * (3 - Math.Sqrt(5));
+
+        return Math.Atan2(Math.Sin(angle) * ring, Math.Cos(angle) * ring);
+    })];
+
+    /// <summary>
     /// Монотонные часы анимации: в отличие от времени суток не прыгают при переводе часов и не обнуляются в полночь
     /// </summary>
     private static readonly Stopwatch Clock = Stopwatch.StartNew();
@@ -256,7 +278,11 @@ public sealed class ActivityOrb : FrameworkElement
         if (State == ActivityStateEnum.Done && age is >= 0 and < DONE_SECONDS)
             DrawDone(drawingContext, center, radius, seconds, age);
         else
-            DrawSphere(drawingContext, center, radius, seconds, Kind, ColorOf(Foreground), 1, Math.Max(1, Stride), DotScale);
+        {
+            // У мелкой сферы точки и так сливаются в пятно: вдвое меньше точек, чуть крупнее каждая, вид тот же, а работы вдвое меньше
+            var small = size < SMALL_ORB_SIZE;
+            DrawSphere(drawingContext, center, radius, seconds, Kind, ColorOf(Foreground), 1, Math.Max(1, Stride) * (small ? 2 : 1), small ? DotScale * 1.25 : DotScale);
+        }
     }
 
     /// <summary>
@@ -288,11 +314,22 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
-    /// Перерисовывает сферу каждый кадр: пропуск кадров у спокойных сфер давал заметные рывки, например у сферы в шапке
+    /// Перерисовывает сферу: крупная, как в шапке, каждый кадр, мелкие через кадр. Мелких на странице много, и на полной частоте они грузили процессор почти целым ядром, а на глаз разницы между 30 и 60 кадрами у сферы в 20 пикселей нет
     /// </summary>
     /// <param name="sender">Источник события</param>
     /// <param name="e">Аргументы события</param>
-    private void OnFrame(object? sender, EventArgs e) => InvalidateVisual();
+    private void OnFrame(object? sender, EventArgs e)
+    {
+        if (ActualWidth < LARGE_ORB_SIZE && (++_frame & 1) != 0)
+            return;
+
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Счётчик кадров: мелкие сферы обновляются через кадр
+    /// </summary>
+    private int _frame;
 
     /// <summary>
     /// Цвет кисти
@@ -347,7 +384,7 @@ public sealed class ActivityOrb : FrameworkElement
 
         for (var index = 0; index < Points.Length; index++)
         {
-            var motion = Motion(kind, seconds, Points[index].Y, Math.Atan2(Points[index].Z, Points[index].X), Scatter[index], index);
+            var motion = Motion(kind, seconds, Points[index].Y, Azimuths[index], Scatter[index], index);
             if (!motion.Show || index % stride != 0)
                 continue;
 

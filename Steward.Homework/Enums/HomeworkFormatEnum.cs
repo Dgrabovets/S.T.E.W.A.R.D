@@ -29,4 +29,9 @@ public enum HomeworkFormatEnum
     /// Не готовить: задание сделаю сам
     /// </summary>
     Skip,
+
+    /// <summary>
+    /// Проект из нескольких файлов с кодом и описанием, упакованный в zip: домашние по C# и Unity
+    /// </summary>
+    Project,
 }

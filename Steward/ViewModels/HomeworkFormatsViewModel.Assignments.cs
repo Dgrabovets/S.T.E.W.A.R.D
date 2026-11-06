@@ -126,6 +126,21 @@ public sealed partial class HomeworkFormatsViewModel
     }
 
     /// <summary>
+    /// Перечитывает, какие задания заведены в Singularity: после сверки там могли удалить задачи, и кнопка «Добавить в Singularity» снова должна быть доступна
+    /// </summary>
+    /// <returns>Задача, которая завершается, когда состояние заново прочитано</returns>
+    public Task RefreshSingularityAsync()
+    {
+        if (OpenLesson is not { } lesson)
+            return Task.CompletedTask;
+
+        _assignments = BuildAssignments(lesson);
+        RaiseReaderTabs();
+
+        return RefreshItemsAsync(lesson);
+    }
+
+    /// <summary>
     /// Откатывает «Убрать»: задание снова на вкладке, файл не менялся
     /// </summary>
     /// <param name="lesson">Занятие</param>

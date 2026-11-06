@@ -128,7 +128,9 @@ public sealed class SingularityClient : ISingularityClient, ISingularityNotes, I
                         value,
                         task.TryGetProperty("checked", out var state) && state.ValueKind == JsonValueKind.Number ? state.GetInt32() : 0,
                         task.TryGetProperty("removed", out var removed) && removed.ValueKind == JsonValueKind.True,
-                        task.TryGetProperty("archive", out var archived) && archived.ValueKind == JsonValueKind.True));
+                        task.TryGetProperty("archive", out var archived) && archived.ValueKind == JsonValueKind.True,
+                        task.TryGetProperty("title", out var title) ? title.GetString() ?? string.Empty : string.Empty,
+                        task.TryGetProperty("start", out var begin) && begin.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(begin.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) ? parsed : null));
                 }
             }
 

@@ -1515,6 +1515,12 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
         if (!completed.SequenceEqual(CompletedSubjects))
             CompletedSubjects = completed;
 
+        foreach (var subject in VisibleSubjects)
+        {
+            subject.ProjectFolder = SubjectOptionsReader?.Invoke(subject.Title).ProjectFolder ?? string.Empty;
+            subject.RefreshProject();
+        }
+
         Raise(nameof(ShowCompletedText));
         Raise(nameof(AllHidden));
         Raise(nameof(HasCompletedSection));

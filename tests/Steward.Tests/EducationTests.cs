@@ -370,7 +370,7 @@ public class EducationTests
         };
         var model = new PrepareDialogViewModel("25.10.2026 · Лекция 3", HomeworkFormatEnum.Skip, materials, @"D:\g");
 
-        Assert.Equal(["Word", "Презентация", "MD", "Код"], model.Formats.Select(choice => choice.Title).ToArray());
+        Assert.Equal(["Word", "Презентация", "MD", "Код", "Проект (zip)"], model.Formats.Select(choice => choice.Title).ToArray());
         Assert.Equal(HomeworkFormatEnum.Word, model.Format);
         Assert.True(model.Formats[0].IsSelected);
         Assert.False(model.NoMaterials);
@@ -418,6 +418,56 @@ public class EducationTests
             Assert.Equal(2, calls);
             Assert.Equal(2, files.Count);
             Assert.DoesNotContain(files, file => Path.GetFileName(file).StartsWith("Задание 1.", StringComparison.Ordinal));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Формат «Проект»: агент пишет файлы в папку, программа собирает из них zip без bin и obj, а задание считается готовым по этому архиву
+    /// </summary>
+    [Fact]
+    public async Task The_project_format_packs_the_folder_into_a_zip_without_build_output()
+    {
+        var items = HomeworkItemParser.Parse("""[{"title":"Типы данных"}]""");
+        var lesson = new Lesson("e1", "Основы программирования на C#", new DateOnly(2026, 10, 29));
+        var directory = Directory.CreateTempSubdirectory("steward-project-");
+        try
+        {
+            string? asked = null;
+            DraftBuilder.AgentRun agent = (request, _, _, _) =>
+            {
+                var folder = request.Split('\n').Last(line => line.Trim().Length > 0 && !line.StartsWith("Другие файлы", StringComparison.Ordinal)).Trim();
+                asked = folder;
+                Directory.CreateDirectory(Path.Combine(folder, "SubTasks"));
+                Directory.CreateDirectory(Path.Combine(folder, "bin", "Debug"));
+                File.WriteAllText(Path.Combine(folder, "Program.cs"), "// точка входа");
+                File.WriteAllText(Path.Combine(folder, "SubTasks", "Types.cs"), "// подзадача");
+                File.WriteAllText(Path.Combine(folder, "README.md"), "# Проект");
+                File.WriteAllText(Path.Combine(folder, "bin", "Debug", "app.dll"), "мусор");
+
+                return Task.FromResult(string.Empty);
+            };
+
+            var store = new HomeworkStore(directory.FullName);
+            var (files, error) = await DraftBuilder.BuildAsync(store, lesson, items, HomeworkFormatEnum.Project, agent, CancellationToken.None);
+
+            Assert.Empty(error);
+            Assert.NotNull(asked);
+            var zip = Assert.Single(files);
+            Assert.EndsWith(".zip", zip, StringComparison.Ordinal);
+            using (var archive = System.IO.Compression.ZipFile.OpenRead(zip))
+                Assert.Equal(["Program.cs", "README.md", "SubTasks/Types.cs"], archive.Entries.Select(entry => entry.FullName).Order(StringComparer.Ordinal).ToArray());
+
+            Assert.Equal(zip, store.SampleCandidate("e1", 1));
+            Assert.Equal("Проект (zip)", HomeworkFormats.Title(HomeworkFormatEnum.Project));
+
+            Assert.Equal("Задание 1. Типы данных", DraftBuilder.TaskFileName(1, "Типы данных"));
+            Assert.Equal("Задание 1", DraftBuilder.TaskFileName(1, "Задание 1."));
+            Assert.Equal("Задание 1. Задание 12. Что-то", DraftBuilder.TaskFileName(1, "Задание 12. Что-то"));
+            Assert.Equal("Задание 3. Задание по теме 2", DraftBuilder.TaskFileName(3, "Задание по теме 2."));
         }
         finally
         {

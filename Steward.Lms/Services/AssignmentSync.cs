@@ -105,7 +105,8 @@ public static class AssignmentSync
                 var fingerprintFile = Path.Combine(folder, "fingerprint.txt");
                 var fingerprint = Fingerprint(details);
                 var previous = File.Exists(fingerprintFile) ? File.ReadAllText(fingerprintFile).Trim() : string.Empty;
-                if (File.Exists(described) && (previous.Length == 0 || previous == fingerprint))
+                // Файл без отпечатка (записан до появления отпечатков) тоже перечитывается: по нему нельзя сказать, что страница не менялась, и срок в нём мог устареть
+                if (File.Exists(described) && previous == fingerprint)
                 {
                     File.WriteAllText(fingerprintFile, fingerprint);
                     File.WriteAllText(checkedFile, DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));

@@ -85,12 +85,13 @@ public static partial class ActivityParser
         if (quiz.Done)
             return quiz;
 
-        var finished = Rows(viewHtml).Any(row => row.Cells.Any(cell => cell.StartsWith("Завершено", StringComparison.OrdinalIgnoreCase) || cell.StartsWith("Finished", StringComparison.OrdinalIgnoreCase)));
+        // LMS пишет состояние попытки по-разному: «Завершены» (так в сводке попытки), «Завершено», «Завершён»; ячейки дат «Завершен» с датой в таблицу состояния не попадают, там это заголовок
+        var finished = Rows(viewHtml).Any(row => row.Cells.Any(cell => cell.StartsWith("Завершен", StringComparison.OrdinalIgnoreCase) || cell.StartsWith("Завершён", StringComparison.OrdinalIgnoreCase) || cell.StartsWith("Finished", StringComparison.OrdinalIgnoreCase)));
         var grade = FinalGrade().Match(Text(viewHtml)) is { Success: true } match ? match.Groups[1].Value.Trim() : string.Empty;
         if (!finished && grade.Length == 0)
             return quiz;
 
-        return quiz with { Done = true, Grade = grade, Status = grade.Length > 0 ? $"Оценка {grade}" : "Пройден" };
+        return quiz with { Done = true, Grade = grade, Status = grade.Length > 0 ? $"Оценка {grade}" : "Попытка завершена, оценка скрыта" };
     }
 
     /// <summary>
