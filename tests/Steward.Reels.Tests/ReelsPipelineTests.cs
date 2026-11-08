@@ -34,6 +34,21 @@ public class ReelsPipelineTests
     }
 
     /// <summary>
+    /// Обрыв сети при отправке ответа не роняет проход: идея сохранена, сообщение отмечено прочитанным
+    /// </summary>
+    [Fact]
+    public async Task A_failed_reply_does_not_fail_the_run()
+    {
+        using var directory = new TempDirectory();
+        var telegram = new FakeTelegram(Message(1, 7, "https://www.instagram.com/reel/Abc/")) { FailSends = true };
+
+        var result = await Pipeline(directory, telegram, new FakeDownloader(), 7, out var ideas).RunAsync(CancellationToken.None);
+
+        Assert.Single(ideas.LoadAll());
+        Assert.Equal(new ReelsResult(1, 0, 0, 1), result);
+    }
+
+    /// <summary>
     /// Пока в настройках нет id, бот сообщает отправителю его номер и идей не создаёт
     /// </summary>
     [Fact]

@@ -15,6 +15,11 @@ public sealed class FakeTelegram(params TelegramMessage[] messages) : ITelegramC
     public List<string> Sent { get; } = [];
 
     /// <summary>
+    /// Обрывать ли каждую отправку ответа сетевой ошибкой
+    /// </summary>
+    public bool FailSends { get; set; }
+
+    /// <summary>
     /// Данные кнопок, которые бот показал под вопросами
     /// </summary>
     public List<string> Buttons { get; } = [];
@@ -101,6 +106,9 @@ public sealed class FakeTelegram(params TelegramMessage[] messages) : ITelegramC
     /// <returns>Завершённая задача</returns>
     public Task<long> SendAsync(long chatId, string text, CancellationToken cancellationToken)
     {
+        if (FailSends)
+            throw new HttpRequestException("Удалённый хост разорвал подключение");
+
         Sent.Add(text);
 
         return Task.FromResult(NextId());

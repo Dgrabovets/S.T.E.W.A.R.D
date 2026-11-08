@@ -116,8 +116,19 @@ public sealed class ReelsPipeline(
     /// <param name="chatId">Чат</param>
     /// <param name="text">Текст ответа</param>
     /// <param name="cancellationToken">Токен отмены</param>
-    /// <returns>Задача, которая завершается, когда ответ отправлен</returns>
-    private async Task ReplyAsync(long chatId, string text, CancellationToken cancellationToken) => chat.Add(chatId, await telegram.SendAsync(chatId, text, cancellationToken), timeProvider.GetUtcNow());
+    /// <returns>Задача, которая завершается, когда ответ отправлен или отправка не удалась</returns>
+    private async Task ReplyAsync(long chatId, string text, CancellationToken cancellationToken)
+    {
+        try
+        {
+            chat.Add(chatId, await telegram.SendAsync(chatId, text, cancellationToken), timeProvider.GetUtcNow());
+        }
+        catch (HttpRequestException exception)
+        {
+            // Ответ в чате не важнее самой работы: идея уже сохранена, и сбой сети не должен ронять проход и оставлять сообщение непрочитанным
+            log($"Ответ в чат не отправлен: {exception.GetBaseException().Message}");
+        }
+    }
 
     /// <summary>
     /// Разбирает одно сообщение

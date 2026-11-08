@@ -20,7 +20,7 @@ public sealed class TelegramClient : ITelegramClient, IDisposable
     /// </summary>
     /// <param name="token">Токен из BotFather</param>
     public TelegramClient(string token)
-        : this(new HttpClient { BaseAddress = new Uri($"https://api.telegram.org/bot{token}/") })
+        : this(new HttpClient(new SocketsHttpHandler { PooledConnectionIdleTimeout = TimeSpan.FromSeconds(20) }) { BaseAddress = new Uri($"https://api.telegram.org/bot{token}/") })
     {
     }
 
