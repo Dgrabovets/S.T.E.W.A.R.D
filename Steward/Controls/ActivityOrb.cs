@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
 using Steward.Models;
@@ -25,14 +26,31 @@ public sealed class ActivityOrb : FrameworkElement
     private const int DEPTH_LEVELS = 6;
 
     /// <summary>
-    /// Занятая сфера перерисовывается каждый второй кадр: вращение остаётся плавным, а процессор не греется
+    /// Сфера меньше этого размера, в пикселях, рисуется половиной точек
     /// </summary>
-    private const int BUSY_FRAME_STEP = 2;
+    private const double SMALL_ORB_SIZE = 30;
 
     /// <summary>
-    /// Сфера покоя перерисовывается каждый четвёртый кадр: она почти неподвижна
+    /// С какого размера сфера считается крупной и рисуется на каждый кадр, в пикселях
     /// </summary>
-    private const int CALM_FRAME_STEP = 4;
+    private const double LARGE_ORB_SIZE = 40;
+
+    /// <summary>
+    /// Угол каждой точки вокруг вертикальной оси: считается один раз, а не на каждый кадр
+    /// </summary>
+    private static readonly double[] Azimuths = [.. Enumerable.Range(0, POINT_COUNT).Select(index =>
+    {
+        var y = 1 - (index + 0.5) * 2 / POINT_COUNT;
+        var ring = Math.Sqrt(1 - y * y);
+        var angle = index * Math.PI * (3 - Math.Sqrt(5));
+
+        return Math.Atan2(Math.Sin(angle) * ring, Math.Cos(angle) * ring);
+    })];
+
+    /// <summary>
+    /// Монотонные часы анимации: в отличие от времени суток не прыгают при переводе часов и не обнуляются в полночь
+    /// </summary>
+    private static readonly Stopwatch Clock = Stopwatch.StartNew();
 
     /// <summary>
     /// Сколько кистей держать про запас, прежде чем очистить кэш
@@ -159,11 +177,6 @@ public sealed class ActivityOrb : FrameworkElement
     private bool _looping;
 
     /// <summary>
-    /// Счётчик кадров: спокойные сферы обновляются через кадр
-    /// </summary>
-    private int _frame;
-
-    /// <summary>
     /// Создаёт индикатор и подписывается на показ и скрытие, чтобы не рисовать кадры невидимому окну
     /// </summary>
     public ActivityOrb()
@@ -259,13 +272,17 @@ public sealed class ActivityOrb : FrameworkElement
 
         var center = new Point(ActualWidth / 2, ActualHeight / 2);
         var radius = size / 2 - 1.5;
-        var seconds = DateTimeOffset.UtcNow.TimeOfDay.TotalSeconds;
+        var seconds = Clock.Elapsed.TotalSeconds;
         var age = (DateTimeOffset.UtcNow - Since).TotalSeconds;
 
         if (State == ActivityStateEnum.Done && age is >= 0 and < DONE_SECONDS)
             DrawDone(drawingContext, center, radius, seconds, age);
         else
-            DrawSphere(drawingContext, center, radius, seconds, Kind, ColorOf(Foreground), 1, Math.Max(1, Stride), DotScale);
+        {
+            // У мелкой сферы точки и так сливаются в пятно: вдвое меньше точек, чуть крупнее каждая, вид тот же, а работы вдвое меньше
+            var small = size < SMALL_ORB_SIZE;
+            DrawSphere(drawingContext, center, radius, seconds, Kind, ColorOf(Foreground), 1, Math.Max(1, Stride) * (small ? 2 : 1), small ? DotScale * 1.25 : DotScale);
+        }
     }
 
     /// <summary>
@@ -297,18 +314,22 @@ public sealed class ActivityOrb : FrameworkElement
     }
 
     /// <summary>
-    /// Перерисовывает кадр. Сферы покоя обновляются через кадр: им плавности хватает, а процессор остаётся свободным
+    /// Перерисовывает сферу: крупная, как в шапке, каждый кадр, мелкие через кадр. Мелких на странице много, и на полной частоте они грузили процессор почти целым ядром, а на глаз разницы между 30 и 60 кадрами у сферы в 20 пикселей нет
     /// </summary>
     /// <param name="sender">Источник события</param>
     /// <param name="e">Аргументы события</param>
     private void OnFrame(object? sender, EventArgs e)
     {
-        var busy = State != ActivityStateEnum.None || Kind is ActivityKindEnum.Working or ActivityKindEnum.Searching or ActivityKindEnum.Connecting or ActivityKindEnum.Composing or ActivityKindEnum.Breathing or ActivityKindEnum.Beacon or ActivityKindEnum.Sweep or ActivityKindEnum.Attention or ActivityKindEnum.Failed;
-        if (++_frame % (busy ? BUSY_FRAME_STEP : CALM_FRAME_STEP) != 0)
+        if (ActualWidth < LARGE_ORB_SIZE && (++_frame & 1) != 0)
             return;
 
         InvalidateVisual();
     }
+
+    /// <summary>
+    /// Счётчик кадров: мелкие сферы обновляются через кадр
+    /// </summary>
+    private int _frame;
 
     /// <summary>
     /// Цвет кисти
@@ -355,12 +376,15 @@ public sealed class ActivityOrb : FrameworkElement
     /// <param name="dotScale">Во сколько раз крупнее рисуются точки</param>
     private static void DrawSphere(DrawingContext context, Point center, double radius, double seconds, ActivityKindEnum kind, Color color, double strength, int stride = 1, double dotScale = 1)
     {
-        var brushes = Enumerable.Range(0, DEPTH_LEVELS).Select(level => MakeBrush(level, color, strength)).ToArray();
+        var brushes = new Brush[DEPTH_LEVELS];
+        for (var level = 0; level < DEPTH_LEVELS; level++)
+            brushes[level] = MakeBrush(level, color, strength);
+
         var (sinTilt, cosTilt) = Math.SinCos(TILT);
 
         for (var index = 0; index < Points.Length; index++)
         {
-            var motion = Motion(kind, seconds, Points[index].Y, Math.Atan2(Points[index].Z, Points[index].X), Scatter[index], index);
+            var motion = Motion(kind, seconds, Points[index].Y, Azimuths[index], Scatter[index], index);
             if (!motion.Show || index % stride != 0)
                 continue;
 

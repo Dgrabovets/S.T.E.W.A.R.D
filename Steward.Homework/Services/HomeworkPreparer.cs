@@ -178,7 +178,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         if (hold is null)
             return "Работы уже готовятся в фоне: попробуй через несколько минут";
 
-        var (files, error) = await DraftBuilder.BuildAsync(store, lesson, items, format, agent, cancellationToken, guides.Materials(lesson.Title, guideIds), extra(), store.AssignmentFiles(lesson.Title), remarks.ForPrepare(lesson.Title));
+        var (files, error) = await DraftBuilder.BuildAsync(store, lesson, items, format, agent, cancellationToken, guides.Materials(lesson.Title, guideIds, store.SubjectOptionsFor(lesson.Title).Excluded.ToHashSet(StringComparer.Ordinal)), extra(), store.AssignmentFiles(lesson.Title), remarks.ForPrepare(lesson.Title), ProjectFolderOf(lesson.Title), store.SubjectOptionsFor(lesson.Title).Language ?? string.Empty);
         if (error.Length > 0)
             return error;
 
@@ -610,7 +610,7 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
             return "учёт попыток недоступен, задание пропущено: " + exception.Message;
         }
 
-        var (_, error) = await DraftBuilder.BuildAsync(store, lesson, single, format, agent, cancellationToken, materials, string.Empty, assignments, owner);
+        var (_, error) = await DraftBuilder.BuildAsync(store, lesson, single, format, agent, cancellationToken, materials, string.Empty, assignments, owner, ProjectFolderOf(lesson.Title), store.SubjectOptionsFor(lesson.Title).Language ?? string.Empty);
         if (cancellationToken.IsCancellationRequested)
         {
             await SetAsideNewAsync(folder, number, before);
@@ -787,4 +787,11 @@ public sealed partial class HomeworkPreparer(HomeworkStore store, GuideStore gui
         /// </summary>
         public List<string> Failed { get; } = [];
     }
+
+    /// <summary>
+    /// Папка единого проекта предмета, если она задана и есть на диске. Агент получает её только на чтение
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <returns>Путь к папке или пустая строка</returns>
+    private string ProjectFolderOf(string subject) => store.SubjectOptionsFor(subject).ProjectFolder is { Length: > 0 } folder && Directory.Exists(folder) ? folder : string.Empty;
 }

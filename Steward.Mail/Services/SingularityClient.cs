@@ -105,14 +105,32 @@ public sealed class SingularityClient : ISingularityClient, ISingularityNotes, I
     /// <exception cref="HttpRequestException">
     /// SingularityApp ответил ошибкой. В тексте код ответа и тело
     /// </exception>
-    public async Task<IReadOnlyList<SingularityTaskInfo>> ListTasksAsync(DateTimeOffset startsAfter, string keyPrefix, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<SingularityTaskInfo>> ListTasksAsync(DateTimeOffset startsAfter, string keyPrefix, CancellationToken cancellationToken) =>
+        ListCoreAsync("&start.gt=" + Uri.EscapeDataString(startsAfter.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture)), keyPrefix, cancellationToken);
+
+    /// <summary>
+    /// Читает задачи с внешним ключом без фильтра по началу: так находятся заметки, у которых даты нет и фильтр по началу их не вернул бы. Читает весь список по страницам, поэтому вызывать только там, где без этого не обойтись
+    /// </summary>
+    /// <param name="keyPrefix">Берутся только задачи, ключ которых начинается с этого текста</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Задачи с ключом, в том числе удалённые и архивные</returns>
+    /// <exception cref="HttpRequestException">SingularityApp ответил ошибкой. В тексте код ответа и тело</exception>
+    public Task<IReadOnlyList<SingularityTaskInfo>> ListAllTasksAsync(string keyPrefix, CancellationToken cancellationToken) => ListCoreAsync(string.Empty, keyPrefix, cancellationToken);
+
+    /// <summary>
+    /// Читает страницы задач и оставляет те, чей ключ начинается с заданного текста
+    /// </summary>
+    /// <param name="filter">Добавка к запросу: фильтр по началу или пусто</param>
+    /// <param name="keyPrefix">Начало внешнего ключа</param>
+    /// <param name="cancellationToken">Токен отмены запроса</param>
+    /// <returns>Найденные задачи</returns>
+    private async Task<IReadOnlyList<SingularityTaskInfo>> ListCoreAsync(string filter, string keyPrefix, CancellationToken cancellationToken)
     {
         var found = new List<SingularityTaskInfo>();
-        var after = Uri.EscapeDataString(startsAfter.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture));
 
         for (var offset = 0; ; offset += PAGE_SIZE)
         {
-            using var response = await _http.GetAsync($"v2/task?maxCount={PAGE_SIZE}&offset={offset}&includeRemoved=true&includeArchived=true&start.gt={after}", cancellationToken);
+            using var response = await _http.GetAsync($"v2/task?maxCount={PAGE_SIZE}&offset={offset}&includeRemoved=true&includeArchived=true{filter}", cancellationToken);
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
                 throw new HttpRequestException($"SingularityApp ответил {(int)response.StatusCode}: {body}");
@@ -128,7 +146,9 @@ public sealed class SingularityClient : ISingularityClient, ISingularityNotes, I
                         value,
                         task.TryGetProperty("checked", out var state) && state.ValueKind == JsonValueKind.Number ? state.GetInt32() : 0,
                         task.TryGetProperty("removed", out var removed) && removed.ValueKind == JsonValueKind.True,
-                        task.TryGetProperty("archive", out var archived) && archived.ValueKind == JsonValueKind.True));
+                        task.TryGetProperty("archive", out var archived) && archived.ValueKind == JsonValueKind.True,
+                        task.TryGetProperty("title", out var title) ? title.GetString() ?? string.Empty : string.Empty,
+                        task.TryGetProperty("start", out var begin) && begin.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(begin.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) ? parsed : null));
                 }
             }
 

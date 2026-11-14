@@ -823,9 +823,64 @@ public sealed class JobHost : IDisposable
     /// <returns>Итог одной строкой и признак ошибки</returns>
     private static async Task<(string Message, bool Failed)> RunLmsTaskAsync(string command, string lessonId, int number)
     {
+        var (message, failed, _) = await RunLmsAsync([command, lessonId, number.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
+
+        return (message, failed);
+    }
+
+    /// <summary>
+    /// Минимальный промежуток между сверками задач с Singularity, пока окно открыто
+    /// </summary>
+    private static readonly TimeSpan SYNC_INTERVAL = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Когда последний раз начиналась сверка задач с Singularity
+    /// </summary>
+    private DateTimeOffset _lastSync = DateTimeOffset.MinValue;
+
+    /// <summary>
+    /// Идёт ли сейчас сверка
+    /// </summary>
+    private bool _syncing;
+
+    /// <summary>
+    /// Сверяет заведённые задачи ДЗ с Singularity: запускает <c>Steward.Lms.exe sync-tasks</c>. Чаще раза в минуту не запускается, а пока идёт одна сверка, вторая не начинается
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/>, если какие-то задачи оказались удалены и кнопки в окне нужно обновить
+    /// </returns>
+    public async Task<bool> SyncSingularityAsync()
+    {
+        if (_syncing || DateTimeOffset.UtcNow - _lastSync < SYNC_INTERVAL)
+            return false;
+
+        _syncing = true;
+        _lastSync = DateTimeOffset.UtcNow;
+        try
+        {
+            return (await RunLmsAsync(["sync-tasks"])).ExitCode == SYNC_CHANGED_EXIT_CODE;
+        }
+        finally
+        {
+            _syncing = false;
+        }
+    }
+
+    /// <summary>
+    /// Код выхода <c>sync-tasks</c>: какие-то задачи забыты
+    /// </summary>
+    private const int SYNC_CHANGED_EXIT_CODE = 10;
+
+    /// <summary>
+    /// Запускает <c>Steward.Lms.exe</c> с командой и ждёт минуту
+    /// </summary>
+    /// <param name="arguments">Команда и её параметры</param>
+    /// <returns>Итог одной строкой, признак ошибки и код выхода (минус один, если процесс не запустился или не ответил)</returns>
+    private static async Task<(string Message, bool Failed, int ExitCode)> RunLmsAsync(IReadOnlyList<string> arguments)
+    {
         var program = Path.Combine(DataLocation.RepoRootOrStart(), "Steward.Lms", "publish", "Steward.Lms.exe");
         if (!File.Exists(program))
-            return ("Не найден Steward.Lms.exe: собери проект Steward.Lms в publish", true);
+            return ("Не найден Steward.Lms.exe: собери проект Steward.Lms в publish", true, -1);
 
         var start = new System.Diagnostics.ProcessStartInfo(program)
         {
@@ -837,9 +892,8 @@ public sealed class JobHost : IDisposable
             StandardOutputEncoding = System.Text.Encoding.UTF8,
             StandardErrorEncoding = System.Text.Encoding.UTF8,
         };
-        start.ArgumentList.Add(command);
-        start.ArgumentList.Add(lessonId);
-        start.ArgumentList.Add(number.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        foreach (var argument in arguments)
+            start.ArgumentList.Add(argument);
 
         System.Diagnostics.Process process;
         try
@@ -848,7 +902,7 @@ public sealed class JobHost : IDisposable
         }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            return ("Не удалось запустить Steward.Lms: " + exception.Message, true);
+            return ("Не удалось запустить Steward.Lms: " + exception.Message, true, -1);
         }
 
         using var owned = process;
@@ -863,14 +917,15 @@ public sealed class JobHost : IDisposable
         {
             process.Kill(entireProcessTree: true);
 
-            return ("Singularity не ответил за минуту", true);
+            return ("Singularity не ответил за минуту", true, -1);
         }
 
         await Task.WhenAll(output, errors);
-        var text = (process.ExitCode == 0 ? output.Result : errors.Result + output.Result).Trim().Split('\n').LastOrDefault(line => line.Trim().Length > 0)?.Trim() ?? string.Empty;
+        var ok = process.ExitCode is 0 or SYNC_CHANGED_EXIT_CODE;
+        var text = (ok ? output.Result : errors.Result + output.Result).Trim().Split('\n').LastOrDefault(line => line.Trim().Length > 0)?.Trim() ?? string.Empty;
         text = text.Length > 12 && char.IsDigit(text[0]) && text.Contains("  ", StringComparison.Ordinal) ? text[(text.IndexOf("  ", StringComparison.Ordinal) + 2)..] : text;
 
-        return (text.Length > 0 ? text : process.ExitCode == 0 ? "Задача заведена" : "Не удалось завести задачу", process.ExitCode != 0);
+        return (text.Length > 0 ? text : ok ? "Задача заведена" : "Не удалось завести задачу", !ok, process.ExitCode);
     }
 
     /// <summary>
@@ -901,6 +956,55 @@ public sealed class JobHost : IDisposable
 
         if (!current.Excluded.Order(StringComparer.Ordinal).SequenceEqual(options.Excluded.Order(StringComparer.Ordinal), StringComparer.Ordinal))
             _homework.SetSubjectExcludedGuides(subject, options.Excluded);
+    }
+
+    /// <summary>
+    /// Файл-флаг галочки «Показывать завершённые»: есть файл, значит галочка стоит
+    /// </summary>
+    private string ShowCompletedFlag => Path.Combine(_homework.Root, "ui-show-completed.flag");
+
+    /// <summary>
+    /// Читает галочку «Показывать завершённые»
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/>, если галочка стояла при прошлом запуске
+    /// </returns>
+    public bool ShowCompleted() => File.Exists(ShowCompletedFlag);
+
+    /// <summary>
+    /// Запоминает галочку «Показывать завершённые»
+    /// </summary>
+    /// <param name="show">Показывать ли завершённые предметы</param>
+    /// <exception cref="IOException">Файл-флаг не записался</exception>
+    public void SaveShowCompleted(bool show)
+    {
+        if (show)
+            File.WriteAllText(ShowCompletedFlag, string.Empty);
+        else
+            File.Delete(ShowCompletedFlag);
+    }
+
+    /// <summary>
+    /// Читает, показывать ли автоматическую подготовку заданий: есть файл <c>ui-show-prep.flag</c> в папке homework. По умолчанию скрыта
+    /// </summary>
+    /// <returns><see langword="true"/>, если файл-флаг лежит рядом с данными</returns>
+    public bool ShowPrep() => File.Exists(Path.Combine(_homework.Root, "ui-show-prep.flag"));
+
+    /// <summary>
+    /// Собирает просьбу для чата «Подготовка домашнего задания» и создаёт файл памяти чата, если его ещё нет
+    /// </summary>
+    /// <param name="lesson">Занятие, по которому готовится задание</param>
+    /// <returns>Текст просьбы</returns>
+    /// <exception cref="IOException">Файл памяти не создался</exception>
+    public string HomeworkChatText(Lesson lesson)
+    {
+        var memory = Path.Combine(_homework.Root, "memory.md");
+        if (!File.Exists(memory))
+            File.WriteAllText(memory, "# Память чата «Подготовка домашнего задания»\n\nЧто подготовлено и о чём договорились. Чат дописывает сюда сам.\n");
+
+        var transcript = _homework.HasTranscript(lesson.Id) ? _homework.TranscriptPath(lesson.Id) : string.Empty;
+
+        return HomeworkChatPrompt.Build($"{lesson.Title}{(lesson.Label.Length > 0 ? $" ({lesson.Label})" : string.Empty)}, {lesson.Date:dd.MM.yyyy}", transcript, _homework.SubjectOptionsFor(lesson.Title).ProjectFolder ?? string.Empty, memory);
     }
 
     /// <summary>

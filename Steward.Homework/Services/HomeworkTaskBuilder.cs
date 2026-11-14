@@ -86,14 +86,18 @@ public static class HomeworkTaskBuilder
     /// <param name="projectId">Проект SingularityApp или <see langword="null"/></param>
     /// <param name="offset">Часовой пояс начала дня</param>
     /// <returns>Запрос на создание задачи</returns>
-    public static SingularityTaskRequest BuildFromQuote(Lesson lesson, AnalysisTask task, int index, string? projectId, TimeSpan offset)
+    public static SingularityTaskRequest BuildFromQuote(Lesson lesson, AnalysisTask task, int index, string? projectId, TimeSpan offset, DateOnly? nextLesson = null, DateOnly? today = null)
     {
         var due = DueParser.Parse(task.Due, lesson.Date);
+        var (start, deadline) = HomeworkDeadline.Window(lesson.Date, due, nextLesson, today ?? DateOnly.FromDateTime(DateTime.Today));
         var note = new QuillDelta().Text($"Занятие: {lesson.Title}, {lesson.Date:dd.MM.yyyy}\n");
         if (due is { } day)
             note.Text($"Срок: {day:dd.MM.yyyy}\n");
         else if (task.Due.Length > 0)
             note.Text($"Срок: {task.Due}\n");
+
+        if (due is null && nextLesson is { } next)
+            note.Text($"Сдать на следующем занятии: {next:dd.MM.yyyy}\n");
 
         string[] lines = task.HasExcerpt ? [.. task.Before ?? [], .. task.Said!, .. task.After ?? []] : task.Quote.Length > 0 ? [task.Quote] : [];
         if (lines.Length > 0)
@@ -108,7 +112,8 @@ public static class HomeworkTaskBuilder
             Title = $"ДЗ: {task.Title}",
             Note = note.ToString(),
             Priority = 1,
-            Start = new DateTimeOffset((due ?? lesson.Date).ToDateTime(TimeOnly.MinValue), offset).ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture),
+            Start = Iso(start, offset),
+            Deadline = deadline is { } end ? Iso(end, offset) : null,
             ExternalId = QuoteExternalId(lesson, index),
             ProjectId = projectId,
         };
@@ -125,12 +130,14 @@ public static class HomeworkTaskBuilder
     /// <param name="offset">Часовой пояс начала дня</param>
     /// <param name="drafts">Пути к готовым файлам по этому заданию. Singularity не принимает вложения, поэтому в заметку идут ссылки на файлы на диске</param>
     /// <returns>Запрос на создание задачи</returns>
-    public static SingularityTaskRequest Build(Lesson lesson, HomeworkItem item, int number, HomeworkFormatEnum format, string? projectId, TimeSpan offset, IReadOnlyList<string>? drafts = null)
+    public static SingularityTaskRequest Build(Lesson lesson, HomeworkItem item, int number, HomeworkFormatEnum format, string? projectId, TimeSpan offset, IReadOnlyList<string>? drafts = null, DateOnly? nextLesson = null, DateOnly? today = null)
     {
-        var day = item.Due ?? lesson.Date;
+        var (start, deadline) = HomeworkDeadline.Window(lesson.Date, item.Due, nextLesson, today ?? DateOnly.FromDateTime(DateTime.Today));
         var note = new QuillDelta().Text($"Занятие: {lesson.Title}, {lesson.Date:dd.MM.yyyy}\nФормат: {HomeworkFormats.Title(format)}\n");
         if (item.Due is { } due)
             note.Text($"Срок: {due:dd.MM.yyyy}\n");
+        else if (nextLesson is { } next)
+            note.Text($"Сдать на следующем занятии: {next:dd.MM.yyyy}\n");
 
         if (item.Requirements.Length > 0)
             note.Text($"\n{item.Requirements}\n");
@@ -150,9 +157,18 @@ public static class HomeworkTaskBuilder
             Title = $"ДЗ: {item.Title}",
             Note = note.ToString(),
             Priority = 1,
-            Start = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), offset).ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture),
+            Start = Iso(start, offset),
+            Deadline = deadline is { } end ? Iso(end, offset) : null,
             ExternalId = ExternalId(lesson, number),
             ProjectId = projectId,
         };
     }
+
+    /// <summary>
+    /// Начало дня в формате, который принимает SingularityApp: с часовым поясом
+    /// </summary>
+    /// <param name="day">День</param>
+    /// <param name="offset">Часовой пояс</param>
+    /// <returns>Строка ISO 8601</returns>
+    private static string Iso(DateOnly day, TimeSpan offset) => new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), offset).ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture);
 }

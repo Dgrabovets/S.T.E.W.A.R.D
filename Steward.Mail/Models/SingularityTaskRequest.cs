@@ -32,6 +32,13 @@ public sealed class SingularityTaskRequest
     public string? Start { get; init; }
 
     /// <summary>
+    /// Срок в формате ISO 8601 со смещением часового пояса. Пусто: срока нет, поле не отправляется
+    /// </summary>
+    [JsonPropertyName("deadline")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Deadline { get; init; }
+
+    /// <summary>
     /// Есть ли у задачи время. Задача из письма привязана ко дню, поэтому <see langword="false"/>
     /// </summary>
     [JsonPropertyName("useTime")]

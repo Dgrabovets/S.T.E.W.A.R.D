@@ -35,6 +35,19 @@ public class AssignmentTests
     }
 
     /// <summary>
+    /// Описание, которое обрывается границей страницы, не оставляет в условии хвост «&lt;div»: у пустого описания условие пустое, у написанного только текст
+    /// </summary>
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("<div class=\"no-overflow\"><p>Заданы три кластера.</p></div>", "Заданы три кластера.")]
+    public void The_condition_never_ends_with_a_cut_off_tag(string inner, string expected)
+    {
+        var page = "<div class=\"activity-description\" id=\"intro\">\n<div class=\"box py-3 generalbox boxaligncenter\">" + inner + "</div>\n</div>\n</div>\n<div role=\"main\"><div class=\"container-fluid\"></div></div>";
+
+        Assert.Equal(expected, AssignmentParser.Parse(page).Text);
+    }
+
+    /// <summary>
     /// Страница без блока описания даёт пустой результат, а не ошибку
     /// </summary>
     [Fact]

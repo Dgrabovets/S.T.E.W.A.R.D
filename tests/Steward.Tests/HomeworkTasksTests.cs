@@ -50,15 +50,16 @@ public class HomeworkTasksTests
     public void The_parser_returns_nothing_for_unusable_text(string text) => Assert.Empty(HomeworkItemParser.Parse(text));
 
     /// <summary>
-    /// Задача начинается в день срока, держит внешний ключ и показывает формат и требования
+    /// Крайний срок задачи в день сдачи, а сама задача встаёт за день до него, ключ устойчивый, формат и требования видны
     /// </summary>
     [Fact]
-    public void The_task_starts_on_the_due_day_with_a_stable_key()
+    public void The_task_starts_the_day_before_the_due_day_with_a_stable_key()
     {
-        var task = HomeworkTaskBuilder.Build(Sample, new HomeworkItem("Схема до 3НФ", new DateOnly(2026, 10, 29), "Диаграмма", "https://lms.example/1"), 2, HomeworkFormatEnum.Presentation, "proj", TimeSpan.FromHours(3));
+        var task = HomeworkTaskBuilder.Build(Sample, new HomeworkItem("Схема до 3НФ", new DateOnly(2026, 10, 29), "Диаграмма", "https://lms.example/1"), 2, HomeworkFormatEnum.Presentation, "proj", TimeSpan.FromHours(3), today: Sample.Date);
 
         Assert.Equal("ДЗ: Схема до 3НФ", task.Title);
-        Assert.Equal("2026-10-29T00:00:00+03:00", task.Start);
+        Assert.Equal("2026-10-28T00:00:00+03:00", task.Start);
+        Assert.Equal("2026-10-29T00:00:00+03:00", task.Deadline);
         Assert.Equal("hw:db-1022:2", task.ExternalId);
         Assert.Equal("proj", task.ProjectId);
         Assert.Contains("Презентация", task.Note, StringComparison.Ordinal);
@@ -67,11 +68,168 @@ public class HomeworkTasksTests
     }
 
     /// <summary>
-    /// Без срока задача начинается в день занятия
+    /// Без срока и без следующего занятия задача начинается в день занятия, а срока у неё нет
     /// </summary>
     [Fact]
     public void Without_a_due_date_the_task_starts_on_the_lesson_day() =>
         Assert.StartsWith("2026-10-22", HomeworkTaskBuilder.Build(Sample, new HomeworkItem("А", null, "", ""), 1, HomeworkFormatEnum.Word, null, TimeSpan.Zero).Start, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Домашнее с понедельника сдаётся на следующем понедельнике: крайний срок понедельник, задача встаёт в воскресенье. Если занятие сегодня, задача встаёт сегодня
+    /// </summary>
+    [Fact]
+    public void The_task_is_planned_before_the_next_lesson_of_the_subject()
+    {
+        var monday = new DateOnly(2026, 11, 2);
+        var lesson = new Lesson("gd-1102", "Гейм-дизайн", monday);
+        var item = new HomeworkItem("Отчёт", null, "", "");
+
+        var weekAhead = HomeworkTaskBuilder.Build(lesson, item, 1, HomeworkFormatEnum.Word, null, TimeSpan.Zero, nextLesson: new DateOnly(2026, 11, 9), today: monday);
+        var lastMinute = HomeworkTaskBuilder.Build(lesson, item, 1, HomeworkFormatEnum.Word, null, TimeSpan.Zero, nextLesson: new DateOnly(2026, 11, 9), today: new DateOnly(2026, 11, 8));
+
+        Assert.StartsWith("2026-11-08", weekAhead.Start, StringComparison.Ordinal);
+        Assert.StartsWith("2026-11-09", weekAhead.Deadline, StringComparison.Ordinal);
+        Assert.StartsWith("2026-11-08", lastMinute.Start, StringComparison.Ordinal);
+        Assert.StartsWith("2026-11-09", lastMinute.Deadline, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Следующее занятие берётся из расписания: тот же предмет, любой тип занятия, позже заданного дня, удалённые и чужие предметы пропускаются
+    /// </summary>
+    [Fact]
+    public void The_next_lesson_comes_from_the_schedule_of_the_same_subject()
+    {
+        static SingularityTaskInfo Entry(string id, string title, string start, bool removed = false) =>
+            new(id, "up:g:" + id, 0, removed, false, title, DateTimeOffset.Parse(start, System.Globalization.CultureInfo.InvariantCulture));
+
+        var schedule = new[]
+        {
+            Entry("1", "Гейм-дизайн (Практика)", "2026-11-02T10:00:00+00:00"),
+            Entry("2", "Философия", "2026-11-04T10:00:00+00:00"),
+            Entry("3", "Гейм-дизайн (Лекция)", "2026-11-16T10:00:00+00:00"),
+            Entry("4", "Гейм-дизайн (Практика)", "2026-11-09T10:00:00+00:00", removed: true),
+            Entry("5", "Гейм-дизайн (Практика)", "2026-11-12T10:00:00+00:00"),
+        };
+
+        Assert.Equal(new DateOnly(2026, 11, 12), HomeworkDeadline.NextLesson("Гейм-дизайн", new DateOnly(2026, 11, 2), schedule));
+        Assert.Null(HomeworkDeadline.NextLesson("Математика", new DateOnly(2026, 11, 2), schedule));
+    }
+
+    /// <summary>
+    /// Задача, удалённая в Singularity или пропавшая оттуда, забывается, и кнопка добавления снова доступна; живая и выполненная остаются, а удалённая попадает в список «не заводить само»
+    /// </summary>
+    [Fact]
+    public void A_task_deleted_in_singularity_is_forgotten_so_the_button_returns()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-homework-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            store.MarkCreated(["hw:db-1022:1", "hw:db-1022:2", "hwq:db-1022:3", "hw:db-1022:4"]);
+            SingularityTaskInfo[] tasks =
+            [
+                new("T-1", "hw:db-1022:1", 0),
+                new("T-2", "hw:db-1022:2", 0, Removed: true),
+                new("T-4", "hw:db-1022:4", 1),
+            ];
+
+            var gone = HomeworkSingularitySync.Forget(store, [.. store.LoadCreated()], tasks);
+
+            Assert.Equal(["hw:db-1022:2", "hwq:db-1022:3"], gone.Order(StringComparer.Ordinal).ToArray());
+            Assert.Equal(["hw:db-1022:1", "hw:db-1022:4"], store.LoadCreated().Order(StringComparer.Ordinal).ToArray());
+            Assert.Equal(["hw:db-1022:2"], HomeworkSingularitySync.DeletedKeys(tasks).ToArray());
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Папка единого проекта предмета записывается в настройки, читается как строка состояния проекта (скрипты и время правки, вложенная папка Unity находится) и попадает в просьбу агенту как папка только для чтения
+    /// </summary>
+    [Fact]
+    public void The_subject_project_folder_is_stored_shown_and_given_to_the_agent()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-project-folder-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            var repo = Path.Combine(directory.FullName, "Игра");
+            var assets = Path.Combine(repo, "Игра", "Assets", "Scripts");
+            Directory.CreateDirectory(assets);
+            File.WriteAllText(Path.Combine(assets, "Hero.cs"), "// герой");
+            File.WriteAllText(Path.Combine(assets, "Hero.cs.meta"), "meta");
+            File.WriteAllText(Path.Combine(assets, "Menu.cs"), "// меню");
+
+            store.SetSubjectProjectFolder("Unity", repo);
+            store.SetSubjectAutoPrepare("Unity", true);
+
+            var options = store.SubjectOptionsFor("Unity");
+            Assert.Equal(repo, options.ProjectFolder);
+            Assert.True(options.AutoPrepare);
+
+            var status = ProjectStatus.Read(repo);
+            Assert.True(status.Exists);
+            Assert.Equal("Игра", status.Name);
+            Assert.Equal(2, status.Scripts);
+            Assert.StartsWith("Проект Игра: скриптов 2 · изменён ", status.Text, StringComparison.Ordinal);
+            Assert.StartsWith("Папка проекта не найдена", ProjectStatus.Read(Path.Combine(directory.FullName, "нет")).Text, StringComparison.Ordinal);
+
+            var prompt = DraftBuilder.Prompt(Sample, new HomeworkItem("Меню", null, "", ""), 1, HomeworkFormatEnum.Project, string.Empty, @"D:\result", projectFolder: repo);
+            Assert.Contains(repo, prompt, StringComparison.Ordinal);
+            Assert.Contains("только на чтение", prompt, StringComparison.Ordinal);
+            Assert.DoesNotContain("Единый проект", DraftBuilder.Prompt(Sample, new HomeworkItem("Меню", null, "", ""), 1, HomeworkFormatEnum.Project, string.Empty, @"D:\result"), StringComparison.Ordinal);
+
+            store.SetSubjectSingularityProject("Unity", "P-unity");
+            Assert.Equal("P-unity", store.SingularityProjectFor("Unity", "P-common"));
+            Assert.Equal("P-common", store.SingularityProjectFor("Физика", "P-common"));
+            Assert.Null(store.SingularityProjectFor("Физика", null));
+
+            store.SetSubjectProjectFolder("Unity", string.Empty);
+            Assert.Null(store.SubjectOptionsFor("Unity").ProjectFolder);
+            Assert.True(store.SubjectOptionsFor("Unity").AutoPrepare);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// В просьбу идут файлы условия только этого задания, а не всех заданий предмета, а язык работы берётся из настроек предмета: английский предмет пишется по-английски, остальные по-русски
+    /// </summary>
+    [Fact]
+    public async Task The_prompt_carries_only_the_item_assignment_files_and_the_subject_language()
+    {
+        var directory = Directory.CreateTempSubdirectory("steward-prompt-");
+        try
+        {
+            var store = new HomeworkStore(directory.FullName);
+            var own = Path.Combine(directory.FullName, "assignments", "111", "assignment.md");
+            var other = Path.Combine(directory.FullName, "assignments", "222", "assignment.md");
+            var prompts = new List<string>();
+            DraftBuilder.AgentRun agent = (prompt, _, _, _) =>
+            {
+                prompts.Add(prompt);
+
+                return Task.FromResult("стоп");
+            };
+
+            await DraftBuilder.BuildAsync(store, Sample, [new HomeworkItem("Эссе", null, "", "", ActivityId: "111")], HomeworkFormatEnum.Text, agent, CancellationToken.None, assignments: [own, other], language: "английском");
+            await DraftBuilder.BuildAsync(store, Sample, [new HomeworkItem("Эссе", null, "", "")], HomeworkFormatEnum.Text, agent, CancellationToken.None, assignments: [own, other]);
+
+            Assert.Contains(own, prompts[0], StringComparison.Ordinal);
+            Assert.DoesNotContain(other, prompts[0], StringComparison.Ordinal);
+            Assert.Contains("на английском языке", prompts[0], StringComparison.Ordinal);
+            Assert.Contains(other, prompts[1], StringComparison.Ordinal);
+            Assert.Contains("на русском языке", prompts[1], StringComparison.Ordinal);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
 
     /// <summary>
     /// Создаются только новые задачи, занятия с форматом «Не готовить» и без файла заданий пропускаются, повторный запуск дублей не делает

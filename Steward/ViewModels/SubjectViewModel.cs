@@ -42,6 +42,7 @@ public sealed class SubjectViewModel : Bindable
     {
         Title = title;
         _lessons = lessons;
+        Calendar = new LessonCalendarViewModel(() => Lessons);
         Watch(lessons);
         _state = state;
         _format = format;
@@ -225,8 +226,50 @@ public sealed class SubjectViewModel : Bindable
             Watch(value);
             RaiseCounters();
             RaiseOpenAssignments();
+            Calendar.Rebuild();
         }
     }
+
+    /// <summary>
+    /// Папка единого проекта предмета (проект Unity, который растёт с каждым домашним заданием). Пусто: проекта нет
+    /// </summary>
+    public string ProjectFolder
+    {
+        get => _projectFolder;
+        set
+        {
+            if (!Set(ref _projectFolder, value))
+                return;
+
+            Raise(nameof(HasProject));
+            Raise(nameof(ProjectText));
+        }
+    }
+
+    /// <summary>
+    /// Папка единого проекта предмета
+    /// </summary>
+    private string _projectFolder = string.Empty;
+
+    /// <summary>
+    /// У предмета есть единый проект
+    /// </summary>
+    public bool HasProject => ProjectFolder.Length > 0;
+
+    /// <summary>
+    /// Строка состояния проекта на плитке: сколько скриптов и когда меняли; читается из папки не чаще раза в минуту
+    /// </summary>
+    public string ProjectText => HasProject ? Steward.Homework.Services.ProjectStatus.Read(ProjectFolder).Text : string.Empty;
+
+    /// <summary>
+    /// Обновляет строку состояния проекта: папку могли поменять в Unity
+    /// </summary>
+    public void RefreshProject() => Raise(nameof(ProjectText));
+
+    /// <summary>
+    /// Календарь занятий предмета слева от расшифровок
+    /// </summary>
+    public LessonCalendarViewModel Calendar { get; }
 
     /// <summary>
     /// Подписывается на изменения занятий и отмечает свежее. Вызывается и для занятий, с которыми создана плитка
@@ -238,10 +281,14 @@ public sealed class SubjectViewModel : Bindable
         foreach (var lesson in value.Where(_watched.Add))
             lesson.PropertyChanged += (_, args) =>
             {
-                if (args.PropertyName is nameof(LessonFormatViewModel.HasItems) or nameof(LessonFormatViewModel.HasTranscript))
-                    Raise(nameof(HomeworkLessons));
+                if (args.PropertyName is nameof(LessonFormatViewModel.HasItems) or nameof(LessonFormatViewModel.HasTranscript) or nameof(LessonFormatViewModel.Drafts))
+                    RaiseHomeworkLessons();
                 else if (args.PropertyName == nameof(LessonFormatViewModel.OpenAssignments))
                     RaiseOpenAssignments();
+
+                // Точки и подсветка дня в календаре следуют за расшифровкой, заданиями и открытием занятия
+                if (args.PropertyName is nameof(LessonFormatViewModel.HasTranscript) or nameof(LessonFormatViewModel.OpenAssignments) or nameof(LessonFormatViewModel.IsOpen))
+                    Calendar.Rebuild();
             };
 
         // Свежее занятие одно, последнее по дате: остальные подписываются возрастом и приглушаются
@@ -335,7 +382,33 @@ public sealed class SubjectViewModel : Bindable
     /// <summary>
     /// Занятия для вкладки «Домашние задания»: с расшифровкой или с заданиями. Задания из LMS кладутся и к занятию без расшифровки, а когда расшифровка появится, она подтянется в ту же плашку
     /// </summary>
-    public IReadOnlyList<LessonFormatViewModel> HomeworkLessons => [.. Lessons.Where(lesson => lesson.HasTranscript || lesson.HasItems)];
+    public IReadOnlyList<LessonFormatViewModel> HomeworkLessons => [.. Lessons.Where(lesson => lesson.HasItems || lesson.HasDrafts)];
+
+    /// <summary>
+    /// Расшифрованные занятия, по которым заданий нет: на вкладке они сложены в свёрнутую группу, а не висят большими карточками
+    /// </summary>
+    public IReadOnlyList<LessonFormatViewModel> EmptyHomeworkLessons => [.. Lessons.Where(lesson => lesson.HasTranscript && !lesson.HasItems && !lesson.HasDrafts)];
+
+    /// <summary>
+    /// Есть занятия без заданий
+    /// </summary>
+    public bool HasEmptyLessons => EmptyHomeworkLessons.Count > 0;
+
+    /// <summary>
+    /// Заголовок группы: «Занятия без заданий (5)»
+    /// </summary>
+    public string EmptyLessonsText => $"Занятия без заданий ({EmptyHomeworkLessons.Count})";
+
+    /// <summary>
+    /// Сообщает окну, что состав карточек и группы занятий без заданий изменился
+    /// </summary>
+    private void RaiseHomeworkLessons()
+    {
+        Raise(nameof(HomeworkLessons));
+        Raise(nameof(EmptyHomeworkLessons));
+        Raise(nameof(HasEmptyLessons));
+        Raise(nameof(EmptyLessonsText));
+    }
 
     /// <summary>
     /// У скольких занятий уже есть расшифровка
@@ -414,7 +487,7 @@ public sealed class SubjectViewModel : Bindable
     private void RaiseCounters()
     {
         Raise(nameof(LessonsWithTranscript));
-        Raise(nameof(HomeworkLessons));
+        RaiseHomeworkLessons();
         Raise(nameof(TranscribedText));
         Raise(nameof(Transcribed));
         Raise(nameof(Total));

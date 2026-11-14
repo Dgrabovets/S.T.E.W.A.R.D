@@ -284,6 +284,21 @@ public sealed partial class HomeworkStore(string directory)
     }
 
     /// <summary>
+    /// Забывает ключи задач, которых больше нет в SingularityApp: после этого кнопка «Добавить в Singularity» по этим заданиям снова доступна
+    /// </summary>
+    /// <param name="externalIds">Ключи задач</param>
+    /// <exception cref="IOException">Файл занят дольше ожидания или не читается: прежние ключи целы, забытые остаются</exception>
+    public void UnmarkCreated(IEnumerable<string> externalIds)
+    {
+        var removed = externalIds.ToHashSet(StringComparer.Ordinal);
+        Locked(() =>
+        {
+            var all = (JsonFiles.ReadForWrite<List<string>>(CreatedFile, Json) ?? []).Where(key => !removed.Contains(key)).Order(StringComparer.Ordinal).ToList();
+            WriteAtomic(CreatedFile, all);
+        });
+    }
+
+    /// <summary>
     /// Собирает все найденные задания по занятиям от свежих к старым
     /// </summary>
     /// <returns>Задания с форматом и отметкой, создана ли задача. Занятия, по которым заданий ещё не искали, не попадают в список</returns>
@@ -708,7 +723,8 @@ public sealed partial class HomeworkStore(string directory)
             if (!Directory.Exists(folder))
                 continue;
 
-            files.AddRange(Directory.EnumerateFiles(folder).Where(file => !file.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) && !file.EndsWith(".pptx", StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal));
+            // Служебные файлы выгрузки (отметки проверки и отпечаток) агенту не нужны: в них нет условия
+            files.AddRange(Directory.EnumerateFiles(folder).Where(file => !file.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) && !file.EndsWith(".pptx", StringComparison.OrdinalIgnoreCase) && Path.GetFileName(file) is not ("checked.txt" or "fingerprint.txt" or "changed.txt")).Order(StringComparer.Ordinal));
         }
 
         return files;

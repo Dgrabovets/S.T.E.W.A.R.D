@@ -44,7 +44,6 @@ public static class TranscriptNote
             Title = $"Расшифровка: {lesson.Title}, {lesson.Date.ToString("dd.MM", CultureInfo.InvariantCulture)}{(lesson.Label.Length > 0 ? " " + lesson.Label : string.Empty)}",
             Note = note.ToString(),
             IsNote = true,
-            Start = new DateTimeOffset(lesson.Date.ToDateTime(TimeOnly.MinValue), offset).ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture),
             ExternalId = KEY_PREFIX + lesson.Id,
             ProjectId = projectId,
         };

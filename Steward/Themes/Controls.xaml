@@ -758,6 +758,105 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
+    <!-- Кнопка календаря: прозрачная, при наведении плавно подсвечивается, значок и подпись по центру -->
+    <Style x:Key="CalendarButton" TargetType="Button">
+        <Setter Property="Width" Value="30"/>
+        <Setter Property="Height" Value="30"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Frame" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{StaticResource RadiusField}" Padding="{TemplateBinding Padding}">
+                        <Border.Background>
+                            <SolidColorBrush Color="Transparent"/>
+                        </Border.Background>
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="Frame" Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)" To="{StaticResource RaisedColor}" Duration="0:0:0.15"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="Frame" Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)" To="Transparent" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Frame" Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Frame" Property="BorderBrush" Value="{StaticResource AccentTextBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Лист календаря, который переворачивается: старый сворачивается к кромке, новый разворачивается от противоположной. Фазу и направление отдаёт FlipState через Tag -->
+    <Style x:Key="FlipSheet" TargetType="Grid">
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <ScaleTransform ScaleY="1"/>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0"/>
+        <Style.Triggers>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding Tag.Phase, RelativeSource={RelativeSource Self}}" Value="2"/>
+                    <Condition Binding="{Binding Tag.Direction, RelativeSource={RelativeSource Self}}" Value="1"/>
+                </MultiDataTrigger.Conditions>
+                <Setter Property="RenderTransformOrigin" Value="0.5,1"/>
+            </MultiDataTrigger>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding Tag.Phase, RelativeSource={RelativeSource Self}}" Value="1"/>
+                    <Condition Binding="{Binding Tag.Direction, RelativeSource={RelativeSource Self}}" Value="-1"/>
+                </MultiDataTrigger.Conditions>
+                <Setter Property="RenderTransformOrigin" Value="0.5,1"/>
+            </MultiDataTrigger>
+            <DataTrigger Binding="{Binding Tag.Phase, RelativeSource={RelativeSource Self}}" Value="1">
+                <DataTrigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" To="0" Duration="0:0:0.14"><DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseIn"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14"><DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseIn"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </DataTrigger.EnterActions>
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Tag.Phase, RelativeSource={RelativeSource Self}}" Value="2">
+                <DataTrigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0" To="1" Duration="0:0:0.24"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.24"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </DataTrigger.EnterActions>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <PathGeometry x:Key="IconChevronLeft" Figures="M11,3.5 L5.5,9 L11,14.5"/>
+    <PathGeometry x:Key="IconChevronRight" Figures="M7,3.5 L12.5,9 L7,14.5"/>
+    <PathGeometry x:Key="IconChevronDown" Figures="M3.5,7 L9,12.5 L14.5,7"/>
+
     <!-- Значки в линиях толщиной 1,5 на сетке 18 на 18 -->
     <GeometryGroup x:Key="IconEye">
         <PathGeometry Figures="M1.5,9 C4,4.5 6.5,3 9,3 C11.5,3 14,4.5 16.5,9 C14,13.5 11.5,15 9,15 C6.5,15 4,13.5 1.5,9 Z"/>

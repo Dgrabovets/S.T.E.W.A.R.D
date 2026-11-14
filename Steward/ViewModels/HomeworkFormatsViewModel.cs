@@ -88,6 +88,21 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
     private IReadOnlyList<ActivityInfo> _activities = [];
 
     /// <summary>
+    /// Показывать ли завершённые предметы
+    /// </summary>
+    private bool _showCompleted;
+
+    /// <summary>
+    /// Завершённые предметы, которые сейчас показаны
+    /// </summary>
+    private IReadOnlyList<SubjectViewModel> _completedSubjects = [];
+
+    /// <summary>
+    /// Все карточки предметов, в том числе скрытые завершённые: карточка не пересоздаётся, когда её прячут и снова показывают
+    /// </summary>
+    private readonly Dictionary<string, SubjectViewModel> _subjectCache = new(StringComparer.Ordinal);
+
+    /// <summary>
     /// Задания, найденные в расшифровках
     /// </summary>
     private IReadOnlyList<HomeworkCardViewModel> _homeworkCards = [];
@@ -180,6 +195,78 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
         get => _subjects;
         private set => Set(ref _subjects, value);
     }
+
+    /// <summary>
+    /// Показывать ли предметы с отметкой «Завершён». Выключено: плитки завершённых предметов скрыты
+    /// </summary>
+    public bool ShowCompleted
+    {
+        get => _showCompleted;
+        set
+        {
+            if (!Set(ref _showCompleted, value))
+                return;
+
+            UpdateSubjects();
+            try
+            {
+                ShowCompletedSaver?.Invoke(value);
+            }
+            catch (IOException)
+            {
+                // Не записалась только привычка показа: на этот запуск галочка работает, при следующем вернётся прежняя
+            }
+        }
+    }
+
+    /// <summary>
+    /// Запоминает галочку «Показывать завершённые» между запусками. Пусто: галочка не запоминается
+    /// </summary>
+    public Action<bool>? ShowCompletedSaver { get; set; }
+
+    /// <summary>
+    /// Показывать ли автоматическую подготовку заданий: кнопки «Подготовить задание», «Уточнить», галочку автоподготовки и общие указания. Выключено: всё это скрыто, но не удалено
+    /// </summary>
+    public bool ShowPrep { get; set; }
+
+    /// <summary>
+    /// Открывает чат подготовки домашнего задания для занятия: копирует просьбу и запускает Claude
+    /// </summary>
+    public Action<Lesson>? ChatOpened { get; set; }
+
+    /// <summary>
+    /// Подпись галочки: сколько предметов отмечено «Завершён»
+    /// </summary>
+    public string ShowCompletedText => _subjectCache.Values.Count(subject => subject.IsCompleted) is var count and > 0 ? $"Показывать завершённые ({count})" : "Показывать завершённые";
+
+    /// <summary>
+    /// Все предметы завершены и скрыты галочкой: основных плиток нет, и нужна подсказка, почему
+    /// </summary>
+    public bool AllHidden => !IsEmpty && !ShowCompleted && Subjects.Count == 0 && _subjectCache.Values.Any(subject => subject.IsCompleted);
+
+    /// <summary>
+    /// Завершённые предметы: отдельный блок под основными плитками. Пусто, пока галочка снята
+    /// </summary>
+    public IReadOnlyList<SubjectViewModel> CompletedSubjects
+    {
+        get => _completedSubjects;
+        private set => Set(ref _completedSubjects, value);
+    }
+
+    /// <summary>
+    /// Блок «Завершённые» показывается: галочка стоит и есть что показать
+    /// </summary>
+    public bool HasCompletedSection => ShowCompleted && CompletedSubjects.Count > 0;
+
+    /// <summary>
+    /// Заголовок блока завершённых предметов
+    /// </summary>
+    public string CompletedHeader => $"Завершённые ({CompletedSubjects.Count})";
+
+    /// <summary>
+    /// Предметы обоих блоков: те, что сейчас на экране
+    /// </summary>
+    private IEnumerable<SubjectViewModel> VisibleSubjects => Subjects.Concat(CompletedSubjects);
 
     /// <summary>
     /// Предмет, панель которого открыта под плитками
@@ -1305,7 +1392,7 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
     public void ApplyActivities(IReadOnlyList<ActivityInfo> activities)
     {
         _activities = activities;
-        foreach (var subject in Subjects)
+        foreach (var subject in VisibleSubjects)
             subject.SetActivities([.. activities.Where(item => string.Equals(item.Subject, subject.Title, StringComparison.OrdinalIgnoreCase))]);
     }
 
@@ -1316,7 +1403,7 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
     public void ApplyHomework(IReadOnlyList<HomeworkRow> rows)
     {
         _homeworkCards = [.. rows.Select(row => new HomeworkCardViewModel(row))];
-        foreach (var subject in Subjects)
+        foreach (var subject in VisibleSubjects)
             subject.Homework = [.. _homeworkCards.Where(card => card.Subject == subject.Title)];
     }
 
@@ -1365,7 +1452,7 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
         {
             if (!known.TryGetValue(item.Lesson.Id, out var row))
             {
-                row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => Forget(CheckAndRefreshAsync(lesson), lesson), CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
+                row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, FindTasksRequested = FindTasks, ChatRequested = lesson => ChatOpened?.Invoke(lesson.Lesson), FindableProbe = lesson => BuildAssignments(lesson).Count > 0, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => Forget(CheckAndRefreshAsync(lesson), lesson), CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
                 RefreshDrafts(row);
                 loads.Add(RefreshItemsAsync(row));
 
@@ -1397,7 +1484,7 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
     /// </summary>
     private void UpdateSubjects()
     {
-        var known = Subjects.ToDictionary(subject => subject.Title, StringComparer.Ordinal);
+        var known = _subjectCache;
         var lessonsByTitle = _formatByTitle;
         var subjects = Lessons
             .GroupBy(row => row.Title, StringComparer.Ordinal)
@@ -1420,7 +1507,7 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
                 var rows = group.ToArray();
                 var format = lessonsByTitle.TryGetValue(group.Key, out var found) ? found : HomeworkFormats.DEFAULT;
 
-                return new SubjectViewModel(group.Key, rows, _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen, format, _subjectFormatChosen, Select)
+                return known[group.Key] = new SubjectViewModel(group.Key, rows, _stateOf?.Invoke(group.Key) ?? LessonStateEnum.Undecided, _stateChosen, format, _subjectFormatChosen, Select)
                 {
                     Options = SubjectOptionsSaver is { } saver ? new SubjectOptionsViewModel(group.Key, SubjectOptionsReader?.Invoke(group.Key) ?? new SubjectOptions(), saver) : null,
                     RefineRequested = refine => SubjectGuidesRequested?.Invoke(refine),
@@ -1428,15 +1515,33 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
             })
             .ToList();
 
+        // Открытый предмет, который только что отметили завершённым, остаётся среди основных, пока блок завершённых скрыт: панель под плитками не должна потерять свою плитку
+        var completed = ShowCompleted ? subjects.Where(subject => subject.IsCompleted).ToList() : [];
+        subjects = [.. subjects.Where(subject => !subject.IsCompleted || (!ShowCompleted && subject.Title == SelectedSubject?.Title))];
+
         if (!subjects.SequenceEqual(Subjects))
             Subjects = subjects;
 
+        if (!completed.SequenceEqual(CompletedSubjects))
+            CompletedSubjects = completed;
+
+        foreach (var subject in VisibleSubjects)
+        {
+            subject.ProjectFolder = SubjectOptionsReader?.Invoke(subject.Title).ProjectFolder ?? string.Empty;
+            subject.RefreshProject();
+        }
+
+        Raise(nameof(ShowCompletedText));
+        Raise(nameof(AllHidden));
+        Raise(nameof(HasCompletedSection));
+        Raise(nameof(CompletedHeader));
+
         ApplyActivities(_activities);
-        foreach (var subject in subjects)
+        foreach (var subject in VisibleSubjects)
             subject.Homework = [.. _homeworkCards.Where(card => card.Subject == subject.Title)];
 
         // Выбранный предмет остаётся выбранным после обновления, а если выбора ещё не было, открывается первый
-        Select(subjects.FirstOrDefault(subject => subject.Title == SelectedSubject?.Title) ?? subjects.FirstOrDefault());
+        Select(VisibleSubjects.FirstOrDefault(subject => subject.Title == SelectedSubject?.Title) ?? VisibleSubjects.FirstOrDefault());
     }
 
     /// <summary>
@@ -1445,7 +1550,7 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
     /// <param name="subject">Предмет или <see langword="null"/>, если предметов нет</param>
     private void Select(SubjectViewModel? subject)
     {
-        foreach (var other in Subjects)
+        foreach (var other in VisibleSubjects)
             other.IsSelected = other == subject;
 
         // Читалка показывает занятие прежнего предмета, пока не закрыта: при смене предмета она закрывается

@@ -80,6 +80,8 @@ public sealed class LessonFormatViewModel : Bindable
         CheckCommand = new RelayCommand(() => CheckRequested?.Invoke(this), () => Activity != ActivityStateEnum.Working);
         OpenCheckCommand = new RelayCommand(() => CheckOpened?.Invoke(this), () => HasCheck);
         OpenCommand = new RelayCommand(() => Opened?.Invoke(this), () => HasTranscript);
+        FindTasksCommand = new RelayCommand(() => FindTasksRequested?.Invoke(this), () => CanFindTasks);
+        ChatCommand = new RelayCommand(() => ChatRequested?.Invoke(this));
         FetchCommand = new RelayCommand(
             () =>
             {
@@ -125,6 +127,36 @@ public sealed class LessonFormatViewModel : Bindable
     /// Вызывается, когда нужно показать расшифровку этого занятия
     /// </summary>
     public Action<LessonFormatViewModel>? Opened { get; set; }
+
+    /// <summary>
+    /// Вызывается по кнопке «Найти задания»: нужно открыть расшифровку занятия на вкладке «Задания»
+    /// </summary>
+    public Action<LessonFormatViewModel>? FindTasksRequested { get; set; }
+
+    /// <summary>
+    /// Вызывается по кнопке «В чат подготовки»: нужно скопировать просьбу и открыть Claude
+    /// </summary>
+    public Action<LessonFormatViewModel>? ChatRequested { get; set; }
+
+    /// <summary>
+    /// Отправляет занятие в общий чат подготовки домашнего задания
+    /// </summary>
+    public RelayCommand ChatCommand { get; }
+
+    /// <summary>
+    /// Проверяет, есть ли у занятия вкладка «Задания» в читалке: нашлись ли в разборе задания, которые ещё не убраны. Пока проверка не задана, заданий нет
+    /// </summary>
+    public Func<LessonFormatViewModel, bool>? FindableProbe { get; set; }
+
+    /// <summary>
+    /// Кнопка «Найти задания» нужна: занятие расшифровано и в его разборе есть задания, которые можно добавить. Если заданий на занятии не было, кнопки нет
+    /// </summary>
+    public bool CanFindTasks => HasTranscript && (FindableProbe?.Invoke(this) ?? false);
+
+    /// <summary>
+    /// Открывает расшифровку занятия на вкладке «Задания», где задание добавляют из слов преподавателя
+    /// </summary>
+    public RelayCommand FindTasksCommand { get; }
 
     /// <summary>
     /// Открывает расшифровку занятия на странице

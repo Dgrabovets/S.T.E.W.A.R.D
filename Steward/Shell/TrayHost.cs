@@ -93,6 +93,11 @@ public sealed class TrayHost : IDisposable
     private string? _notifiedError;
 
     /// <summary>
+    /// Текст ошибки, которая пришла в прошлом опросе и ещё не показана: показывается, если повторится
+    /// </summary>
+    private string? _seenError;
+
+    /// <summary>
     /// Запускает задачи из реестра и отдаёт их статусы
     /// </summary>
     private readonly JobHost _jobs = new();
@@ -254,15 +259,28 @@ public sealed class TrayHost : IDisposable
 
             ApplyAll();
 
+            // Сверка с Singularity идёт, пока окно открыто: удалённая там задача возвращает кнопку добавления
+            if (_main is { IsVisible: true })
+                _ = SyncSingularityAsync();
+
             if (_snapshot.CurrentError is null)
             {
                 _notifiedError = null;
+                _seenError = null;
                 NotifyChanges(_snapshot);
                 return;
             }
 
             if (string.Equals(_notifiedError, _snapshot.CurrentError, StringComparison.Ordinal))
                 return;
+
+            // Одиночный сбой опроса не показываем: уведомление только когда та же ошибка пришла второй раз подряд
+            if (!string.Equals(_seenError, _snapshot.CurrentError, StringComparison.Ordinal))
+            {
+                _seenError = _snapshot.CurrentError;
+
+                return;
+            }
 
             _notifiedError = _snapshot.CurrentError;
             var tip = _snapshot.CurrentError.Replace('\n', ' ');
@@ -305,7 +323,7 @@ public sealed class TrayHost : IDisposable
         _notifiedProblems.RemoveWhere(key => !current.ContainsKey(key));
         foreach (var (key, row) in current)
         {
-            if (!_notifiedProblems.Add(key))
+            if (_notifiedProblems.Contains(key) || FailedOnce(row) || !_notifiedProblems.Add(key))
                 continue;
 
             var tip = $"{row.Headline}. {row.Detail.Replace('\n', ' ')}";
@@ -313,6 +331,21 @@ public sealed class TrayHost : IDisposable
                 tip = tip[..BALLOON_TEXT_LIMIT];
             _icon.ShowBalloonTip(BALLOON_MS, row.Title, tip, ToolTipIcon.None);
         }
+    }
+
+    /// <summary>
+    /// Говорит, что задача не справилась только в последнем запуске: об одиночном сбое уведомление не нужно, он часто проходит сам. Остальные проблемы («не отвечает», «давно не запускалась») считаются сразу
+    /// </summary>
+    /// <param name="row">Строка задачи с проблемой</param>
+    /// <returns><see langword="true"/>, если неудачным был лишь один последний запуск</returns>
+    private bool FailedOnce(JobRow row)
+    {
+        if (row.Headline != "Не удалось")
+            return false;
+
+        var last = _jobs.Records().Where(record => record.JobId == row.Id).Take(2).ToList();
+
+        return last.Count < 2 || last[1].Outcome == RunOutcomeEnum.Ok;
     }
 
     /// <summary>
@@ -556,6 +589,24 @@ public sealed class TrayHost : IDisposable
     }
 
     /// <summary>
+    /// Копирует просьбу для чата «Подготовка домашнего задания» в буфер и открывает Claude: чат выбирает и вставляет просьбу человек
+    /// </summary>
+    /// <param name="lesson">Занятие, по которому готовится задание</param>
+    private void OpenHomeworkChat(Lesson lesson)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(_jobs.HomeworkChatText(lesson));
+            Process.Start(new ProcessStartInfo("claude://") { UseShellExecute = true });
+            _icon.ShowBalloonTip(BALLOON_MS, "Чат подготовки", "Просьба скопирована: вставьте её в чат «Подготовка домашнего задания»", ToolTipIcon.None);
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or System.ComponentModel.Win32Exception or System.Runtime.InteropServices.ExternalException)
+        {
+            _icon.ShowBalloonTip(BALLOON_MS, "Чат подготовки", "Не получилось: " + exception.Message, ToolTipIcon.None);
+        }
+    }
+
+    /// <summary>
     /// Открывает Claude с просьбой разобрать идею. Идея считается принятой, только если приложение открылось
     /// </summary>
     /// <param name="idea">Идея, которую решено делать</param>
@@ -630,6 +681,12 @@ public sealed class TrayHost : IDisposable
         _formats.SubmittedFileSetter = _jobs.SetSubmittedFile;
         _formats.SubjectOptionsReader = _jobs.SubjectOptions;
         _formats.SubjectOptionsSaver = _jobs.SaveSubjectOptions;
+
+        // Сначала читается сохранённая галочка, потом подключается запись: чтение не должно писать то же значение обратно
+        _formats.ShowCompleted = _jobs.ShowCompleted();
+        _formats.ShowCompletedSaver = _jobs.SaveShowCompleted;
+        _formats.ShowPrep = _jobs.ShowPrep();
+        _formats.ChatOpened = OpenHomeworkChat;
         _formats.RemarkSaver = _jobs.SaveRedoRemark;
         _formats.RemarkLister = _jobs.AllRemarks;
         _formats.RemarkUpdater = _jobs.UpdateRemark;
@@ -647,6 +704,26 @@ public sealed class TrayHost : IDisposable
         _formats.ApplyHomework(_jobs.HomeworkRows());
 
         return _formats;
+    }
+
+    /// <summary>
+    /// Сверяет задачи ДЗ с Singularity и, если какие-то удалены, обновляет карточки и кнопки в окне
+    /// </summary>
+    /// <returns>Задача, которая завершается, когда сверка и обновление закончились; ошибок не выбрасывает</returns>
+    private async Task SyncSingularityAsync()
+    {
+        try
+        {
+            if (!await _jobs.SyncSingularityAsync() || _exiting)
+                return;
+
+            _formats.ApplyHomework(_jobs.HomeworkRows());
+            await _formats.RefreshSingularityAsync();
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or InvalidOperationException)
+        {
+            System.Diagnostics.Trace.TraceError($"Сверка задач с Singularity не обновила окно: {exception}");
+        }
     }
 
     /// <summary>

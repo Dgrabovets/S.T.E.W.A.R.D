@@ -75,6 +75,26 @@ public static partial class ActivityParser
     }
 
     /// <summary>
+    /// Уточняет тест по его странице: в списке тестов оценка у части тестов пустая, хотя попытка завершена, и тогда решает таблица попыток и строка итоговой оценки на странице самого теста
+    /// </summary>
+    /// <param name="quiz">Тест, разобранный по списку</param>
+    /// <param name="viewHtml">Код страницы <c>/mod/quiz/view.php</c> этого теста</param>
+    /// <returns>Тест как есть, если он уже сдан или попыток нет, иначе сданный тест с оценкой, если она написана</returns>
+    public static LmsActivity WithAttempts(LmsActivity quiz, string viewHtml)
+    {
+        if (quiz.Done)
+            return quiz;
+
+        // LMS пишет состояние попытки по-разному: «Завершены» (так в сводке попытки), «Завершено», «Завершён»; ячейки дат «Завершен» с датой в таблицу состояния не попадают, там это заголовок
+        var finished = Rows(viewHtml).Any(row => row.Cells.Any(cell => cell.StartsWith("Завершен", StringComparison.OrdinalIgnoreCase) || cell.StartsWith("Завершён", StringComparison.OrdinalIgnoreCase) || cell.StartsWith("Finished", StringComparison.OrdinalIgnoreCase)));
+        var grade = FinalGrade().Match(Text(viewHtml)) is { Success: true } match ? match.Groups[1].Value.Trim() : string.Empty;
+        if (!finished && grade.Length == 0)
+            return quiz;
+
+        return quiz with { Done = true, Grade = grade, Status = grade.Length > 0 ? $"Оценка {grade}" : "Попытка завершена, оценка скрыта" };
+    }
+
+    /// <summary>
     /// Разбирает срок вида «пятница, 23 октября 2026, 00:00»
     /// </summary>
     /// <param name="text">Текст ячейки со сроком</param>
@@ -171,6 +191,13 @@ public static partial class ActivityParser
     /// <returns>Регулярное выражение с пятью группами</returns>
     [GeneratedRegex("(\\d{1,2})\\s+([А-Яа-я]+)\\s+(\\d{4}),\\s*(\\d{1,2}):(\\d{2})", RegexOptions.CultureInvariant)]
     private static partial Regex DuePattern();
+
+    /// <summary>
+    /// Строка итоговой оценки на странице теста: «Итоговая оценка за этот тест: 10,00 / 10,00» или «Лучшая оценка: 95,00/100,00»
+    /// </summary>
+    /// <returns>Регулярное выражение с оценкой в первой группе</returns>
+    [GeneratedRegex("(?:итоговая оценка|лучшая оценка|your final grade|highest grade)[^\\d]{0,60}(\\d+(?:[.,]\\d+)?\\s*(?:/\\s*\\d+(?:[.,]\\d+)?|%))", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex FinalGrade();
 
     /// <summary>
     /// Любой тег

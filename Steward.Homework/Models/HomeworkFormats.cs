@@ -26,6 +26,7 @@ public static class HomeworkFormats
         HomeworkFormatEnum.Presentation => "Презентация",
         HomeworkFormatEnum.Text => "MD",
         HomeworkFormatEnum.Code => "Код",
+        HomeworkFormatEnum.Project => "Проект (zip)",
         _ => "Не готовить",
     };
 }

@@ -213,6 +213,42 @@ public class LmsTests
     }
 
     /// <summary>
+    /// Тест с пустой оценкой в списке считается сданным, если на его странице есть завершённая попытка или итоговая оценка, и остаётся несданным, если попыток нет
+    /// </summary>
+    [Fact]
+    public void A_quiz_with_an_empty_list_grade_is_done_when_its_page_shows_a_finished_attempt()
+    {
+        const string list = """
+            <table><tr><td>Тема 1</td><td><a href="view.php?id=1334923">Тест 1</a></td><td>суббота, 31 октября 2026, 20:34</td><td class="cell c3"></td></tr></table>
+            """;
+        const string attempts = """
+            <table class="quizattemptsummary"><tr><th>Попытка</th><th>Состояние</th></tr>
+            <tr><td class="cell c0">1</td><td class="cell c1">Завершено<span>Отправлено суббота, 24 октября 2026</span></td></tr></table>
+            <h3>Итоговая оценка за этот тест: 10,00 / 10,00.</h3>
+            """;
+        const string none = "<p>Попыток нет</p><table><tr><td>Попытка</td><td>Состояние</td></tr></table>";
+
+        var quiz = ActivityParser.ParseQuizzes(list, 5, "C#", "https://lms.ranepa.ru/mod/quiz/").Single();
+
+        var passed = ActivityParser.WithAttempts(quiz, attempts);
+        Assert.True(passed.Done);
+        Assert.Equal("10,00 / 10,00", passed.Grade);
+        Assert.False(ActivityParser.WithAttempts(quiz, none).Done);
+        Assert.True(ActivityParser.WithAttempts(quiz, "<table><tr><td>1</td><td>Завершено</td></tr></table>").Done);
+
+        // Так страница теста выглядит у теста, где оценка скрыта: состояние «Завершены», а даты в заголовках
+        const string hidden = """
+            <div class="generaltable quizattemptsummary"><table><tr><th>Состояние</th><td class="cell c1">Завершены</td></tr>
+            <tr><th>Тест начат</th><td>среда, 16 сентября 2026, 18:55</td></tr><tr><th>Завершен</th><td>среда, 16 сентября 2026, 18:59</td></tr></table></div>
+            """;
+        var done = ActivityParser.WithAttempts(quiz, hidden);
+        Assert.True(done.Done);
+        Assert.Equal("Попытка завершена, оценка скрыта", done.Status);
+        Assert.Empty(done.Grade);
+        Assert.False(ActivityParser.WithAttempts(quiz, "<table><tr><th>Состояние</th><td>Выполняется</td></tr><tr><th>Завершен</th><td>-</td></tr></table>").Done);
+    }
+
+    /// <summary>
     /// Работа с оценкой считается сданной, даже если состояние написано непривычными словами, а тест в строке без столбца оценки читается и считается непройденным
     /// </summary>
     [Fact]

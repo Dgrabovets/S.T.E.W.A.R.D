@@ -34,6 +34,20 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
             ? new HashSet<string>(StringComparer.Ordinal)
             : await singularity.ListExternalIdsAsync(new DateTimeOffset(ready.Min(lesson => lesson.Date).AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), cancellationToken);
 
+        // Удалённую в Singularity задачу сам создатель заново не заводит и не записывает как заведённую: вернуть её можно кнопкой в окне
+        IReadOnlySet<string> deleted = new HashSet<string>(StringComparer.Ordinal);
+        if (!dryRun && singularity is ISingularityNotes reader)
+        {
+            try
+            {
+                deleted = HomeworkSingularitySync.DeletedKeys(await reader.ListTasksAsync(new DateTimeOffset(ready.Min(lesson => lesson.Date).AddDays(-1).ToDateTime(TimeOnly.MinValue), offset), "hw", cancellationToken));
+            }
+            catch (HttpRequestException)
+            {
+                // Без списка удалённых всё идёт по прежнему правилу
+            }
+        }
+
         var doneWorks = store.DoneWorkIds();
         var created = 0;
         var existing = 0;
@@ -49,10 +63,12 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
                 var item = items[number - 1];
                 var externalId = HomeworkTaskBuilder.ExternalId(lesson, number);
                 // Задача могла быть заведена и кнопкой «Только в Singularity» по тому же заданию из отрывка расшифровки
-                if (HomeworkTaskBuilder.KeysForItem(lesson, number, items, tasks).Any(key => known.Contains(key) || remembered.Contains(key)))
+                var keys = HomeworkTaskBuilder.KeysForItem(lesson, number, items, tasks);
+                if (keys.Any(key => known.Contains(key) || remembered.Contains(key)))
                 {
                     existing++;
-                    handled.Add(externalId);
+                    if (!keys.Any(deleted.Contains))
+                        handled.Add(externalId);
 
                     continue;
                 }
@@ -66,7 +82,9 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
 
                 try
                 {
-                    await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, item, number, store.FormatFor(lesson.Id), projectId, offset), cancellationToken);
+                    // Расписание читается тем же клиентом, если он это умеет: без него задача встаёт по старому правилу
+                    var nextLesson = singularity is ISingularityNotes notes ? await HomeworkDeadline.NextLessonAsync(notes, lesson.Title, lesson.Date, cancellationToken) : null;
+                    await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, item, number, store.FormatFor(lesson.Id), store.SingularityProjectFor(lesson.Title, projectId), offset, nextLesson: nextLesson), cancellationToken);
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
