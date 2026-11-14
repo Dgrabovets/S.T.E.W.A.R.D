@@ -257,7 +257,7 @@ internal static class Program
         {
             Log($"{(dryRun ? "Завёл бы" : "Завожу")} задачу: {activity.Name} ({activity.Subject}), срок {activity.Due:dd.MM.yyyy}");
             if (!dryRun)
-                await singularity.CreateTaskAsync(ActivityTaskSync.Build(activity, settings.Singularity.ProjectId, DateOnly.FromDateTime(DateTime.Now), offset), CancellationToken.None);
+                await singularity.CreateTaskAsync(ActivityTaskSync.Build(activity, store.SingularityProjectFor(activity.Subject, settings.Singularity.ProjectId), DateOnly.FromDateTime(DateTime.Now), offset), CancellationToken.None);
         }
 
         foreach (var (task, activity) in plan.ToClose)
@@ -296,7 +296,7 @@ internal static class Program
         {
             var noted = singularity is null
                 ? new HashSet<string>(StringComparer.Ordinal)
-                : (await singularity.ListTasksAsync(DateTimeOffset.Now.AddYears(-2), TranscriptNote.KEY_PREFIX, CancellationToken.None)).Select(task => task.ExternalId).ToHashSet(StringComparer.Ordinal);
+                : (await singularity.ListAllTasksAsync(TranscriptNote.KEY_PREFIX, CancellationToken.None)).Select(task => task.ExternalId).ToHashSet(StringComparer.Ordinal);
             var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
 
             var received = await browser.FetchAsync(
@@ -315,7 +315,7 @@ internal static class Program
 
                     Log($"{(settings.CreateTasks ? "Записываю" : "Записал бы")} заметку с расшифровкой в Singularity");
                     if (settings.CreateTasks)
-                        await singularity.CreateTaskAsync(TranscriptNote.Build(lesson, transcript, path, settings.Singularity!.ProjectId, offset), CancellationToken.None);
+                        await singularity.CreateTaskAsync(TranscriptNote.Build(lesson, transcript, path, store.SingularityProjectFor(lesson.Title, settings.Singularity!.ProjectId), offset), CancellationToken.None);
                 },
                 CancellationToken.None);
 
@@ -484,7 +484,7 @@ internal static class Program
         {
             var drafts = Directory.Exists(store.DraftsDirectory(lessonId)) ? Directory.EnumerateFiles(store.DraftsDirectory(lessonId), $"Задание {number}.*").Order(StringComparer.Ordinal).ToArray() : [];
             var nextLesson = await HomeworkDeadline.NextLessonAsync(singularity, lesson.Title, lesson.Date, CancellationToken.None);
-            await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, items[number - 1], number, store.FormatFor(lessonId), configured.ProjectId, offset, drafts, nextLesson), CancellationToken.None);
+            await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, items[number - 1], number, store.FormatFor(lessonId), store.SingularityProjectFor(lesson.Title, configured.ProjectId), offset, drafts, nextLesson), CancellationToken.None);
         }
 
         try
@@ -562,7 +562,7 @@ internal static class Program
         }
 
         var nextLesson = await HomeworkDeadline.NextLessonAsync(singularity, lesson.Title, lesson.Date, CancellationToken.None);
-        await singularity.CreateTaskAsync(HomeworkTaskBuilder.BuildFromQuote(lesson, task, index, configured.ProjectId, offset, nextLesson), CancellationToken.None);
+        await singularity.CreateTaskAsync(HomeworkTaskBuilder.BuildFromQuote(lesson, task, index, store.SingularityProjectFor(lesson.Title, configured.ProjectId), offset, nextLesson), CancellationToken.None);
         try
         {
             store.MarkCreated([externalId]);
@@ -593,11 +593,10 @@ internal static class Program
 
         using var singularity = new Steward.Mail.Services.SingularityClient(configured);
         var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.Now);
-        var from = new DateTimeOffset(lessons.Min(lesson => lesson.Date).AddDays(-1).ToDateTime(TimeOnly.MinValue), offset);
         var published = store.LoadCreated().ToHashSet(StringComparer.Ordinal);
         var written = 0;
 
-        var notes = (await singularity.ListTasksAsync(from, AnalysisNote.KEY_PREFIX, CancellationToken.None)).GroupBy(task => task.ExternalId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var notes = (await singularity.ListAllTasksAsync(AnalysisNote.KEY_PREFIX, CancellationToken.None)).GroupBy(task => task.ExternalId).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         foreach (var lesson in lessons.Where(lesson => !published.Contains("note:" + lesson.Id)))
         {
             if (store.ReadAnalysis(lesson.Id) is not { } analysis)
@@ -611,7 +610,7 @@ internal static class Program
             if (notes.TryGetValue(key, out var existing))
                 await singularity.UpdateNoteAsync(existing.Id, AnalysisNote.Text(lesson, analysis), CancellationToken.None);
             else
-                await singularity.CreateTaskAsync(AnalysisNote.Build(lesson, analysis, configured.ProjectId, offset), CancellationToken.None);
+                await singularity.CreateTaskAsync(AnalysisNote.Build(lesson, analysis, store.SingularityProjectFor(lesson.Title, configured.ProjectId), offset), CancellationToken.None);
 
             try
             {

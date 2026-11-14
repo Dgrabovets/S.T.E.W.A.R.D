@@ -50,16 +50,16 @@ public class HomeworkTasksTests
     public void The_parser_returns_nothing_for_unusable_text(string text) => Assert.Empty(HomeworkItemParser.Parse(text));
 
     /// <summary>
-    /// Задача встаёт за два дня до срока, срок за день до него, ключ устойчивый, формат и требования видны
+    /// Крайний срок задачи в день сдачи, а сама задача встаёт за день до него, ключ устойчивый, формат и требования видны
     /// </summary>
     [Fact]
-    public void The_task_starts_two_days_before_the_due_day_with_a_stable_key()
+    public void The_task_starts_the_day_before_the_due_day_with_a_stable_key()
     {
         var task = HomeworkTaskBuilder.Build(Sample, new HomeworkItem("Схема до 3НФ", new DateOnly(2026, 10, 29), "Диаграмма", "https://lms.example/1"), 2, HomeworkFormatEnum.Presentation, "proj", TimeSpan.FromHours(3), today: Sample.Date);
 
         Assert.Equal("ДЗ: Схема до 3НФ", task.Title);
-        Assert.Equal("2026-10-27T00:00:00+03:00", task.Start);
-        Assert.Equal("2026-10-28T00:00:00+03:00", task.Deadline);
+        Assert.Equal("2026-10-28T00:00:00+03:00", task.Start);
+        Assert.Equal("2026-10-29T00:00:00+03:00", task.Deadline);
         Assert.Equal("hw:db-1022:2", task.ExternalId);
         Assert.Equal("proj", task.ProjectId);
         Assert.Contains("Презентация", task.Note, StringComparison.Ordinal);
@@ -75,7 +75,7 @@ public class HomeworkTasksTests
         Assert.StartsWith("2026-10-22", HomeworkTaskBuilder.Build(Sample, new HomeworkItem("А", null, "", ""), 1, HomeworkFormatEnum.Word, null, TimeSpan.Zero).Start, StringComparison.Ordinal);
 
     /// <summary>
-    /// Домашнее с понедельника сдаётся на следующем понедельнике: задача встаёт в субботу, срок воскресенье. Если до занятия меньше двух дней, задача встаёт сегодня
+    /// Домашнее с понедельника сдаётся на следующем понедельнике: крайний срок понедельник, задача встаёт в воскресенье. Если занятие сегодня, задача встаёт сегодня
     /// </summary>
     [Fact]
     public void The_task_is_planned_before_the_next_lesson_of_the_subject()
@@ -87,10 +87,10 @@ public class HomeworkTasksTests
         var weekAhead = HomeworkTaskBuilder.Build(lesson, item, 1, HomeworkFormatEnum.Word, null, TimeSpan.Zero, nextLesson: new DateOnly(2026, 11, 9), today: monday);
         var lastMinute = HomeworkTaskBuilder.Build(lesson, item, 1, HomeworkFormatEnum.Word, null, TimeSpan.Zero, nextLesson: new DateOnly(2026, 11, 9), today: new DateOnly(2026, 11, 8));
 
-        Assert.StartsWith("2026-11-07", weekAhead.Start, StringComparison.Ordinal);
-        Assert.StartsWith("2026-11-08", weekAhead.Deadline, StringComparison.Ordinal);
+        Assert.StartsWith("2026-11-08", weekAhead.Start, StringComparison.Ordinal);
+        Assert.StartsWith("2026-11-09", weekAhead.Deadline, StringComparison.Ordinal);
         Assert.StartsWith("2026-11-08", lastMinute.Start, StringComparison.Ordinal);
-        Assert.StartsWith("2026-11-08", lastMinute.Deadline, StringComparison.Ordinal);
+        Assert.StartsWith("2026-11-09", lastMinute.Deadline, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -180,6 +180,11 @@ public class HomeworkTasksTests
             Assert.Contains(repo, prompt, StringComparison.Ordinal);
             Assert.Contains("только на чтение", prompt, StringComparison.Ordinal);
             Assert.DoesNotContain("Единый проект", DraftBuilder.Prompt(Sample, new HomeworkItem("Меню", null, "", ""), 1, HomeworkFormatEnum.Project, string.Empty, @"D:\result"), StringComparison.Ordinal);
+
+            store.SetSubjectSingularityProject("Unity", "P-unity");
+            Assert.Equal("P-unity", store.SingularityProjectFor("Unity", "P-common"));
+            Assert.Equal("P-common", store.SingularityProjectFor("Физика", "P-common"));
+            Assert.Null(store.SingularityProjectFor("Физика", null));
 
             store.SetSubjectProjectFolder("Unity", string.Empty);
             Assert.Null(store.SubjectOptionsFor("Unity").ProjectFolder);

@@ -84,7 +84,7 @@ public sealed class HomeworkTaskCreator(HomeworkStore store, ISingularityClient 
                 {
                     // Расписание читается тем же клиентом, если он это умеет: без него задача встаёт по старому правилу
                     var nextLesson = singularity is ISingularityNotes notes ? await HomeworkDeadline.NextLessonAsync(notes, lesson.Title, lesson.Date, cancellationToken) : null;
-                    await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, item, number, store.FormatFor(lesson.Id), projectId, offset, nextLesson: nextLesson), cancellationToken);
+                    await singularity.CreateTaskAsync(HomeworkTaskBuilder.Build(lesson, item, number, store.FormatFor(lesson.Id), store.SingularityProjectFor(lesson.Title, projectId), offset, nextLesson: nextLesson), cancellationToken);
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {

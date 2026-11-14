@@ -46,7 +46,7 @@ public sealed partial class HomeworkFormatsViewModel
         // Номер задания остаётся номером в разборе, даже если соседнее убрано: по нему заводится задача в Singularity
         return [.. tasks
             .Select((task, index) => (Task: task, Index: index, State: index < states.Count ? states[index] : default))
-            .Where(row => !row.State.Dismissed && !IsPendingDismiss(lesson.Id, row.Task.Title))
+            .Where(row => !row.State.Dismissed && !row.State.InSingularity && !IsPendingDismiss(lesson.Id, row.Task.Title))
             .Select(row => new AssignmentExcerptViewModel(
                 row.Index + 1,
                 row.Task,
@@ -200,9 +200,17 @@ public sealed partial class HomeworkFormatsViewModel
     /// <returns>Задача, которая завершается, когда Singularity ответил и итог показан</returns>
     private async Task AssignmentToSingularityAsync(LessonFormatViewModel lesson, AssignmentExcerptViewModel row)
     {
-        row.ReportSingularity("Завожу задачу в Singularity…", created: false);
         var (message, failed) = await AssignmentToSingularity!(lesson.Id, row.Number);
-        row.ReportSingularity(message, created: !failed);
+        if (failed)
+        {
+            row.ReportSingularity(message, created: false);
+
+            return;
+        }
+
+        // Заведённое задание уходит с вкладки без окошек и отметок. Если задачу удалят в Singularity, сверка вернёт его
+        _assignments = BuildAssignments(lesson);
+        RaiseReaderTabs();
         await RefreshItemsAsync(lesson);
     }
 

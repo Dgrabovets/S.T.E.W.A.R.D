@@ -225,6 +225,16 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
     public Action<bool>? ShowCompletedSaver { get; set; }
 
     /// <summary>
+    /// Показывать ли автоматическую подготовку заданий: кнопки «Подготовить задание», «Уточнить», галочку автоподготовки и общие указания. Выключено: всё это скрыто, но не удалено
+    /// </summary>
+    public bool ShowPrep { get; set; }
+
+    /// <summary>
+    /// Открывает чат подготовки домашнего задания для занятия: копирует просьбу и запускает Claude
+    /// </summary>
+    public Action<Lesson>? ChatOpened { get; set; }
+
+    /// <summary>
     /// Подпись галочки: сколько предметов отмечено «Завершён»
     /// </summary>
     public string ShowCompletedText => _subjectCache.Values.Count(subject => subject.IsCompleted) is var count and > 0 ? $"Показывать завершённые ({count})" : "Показывать завершённые";
@@ -1442,7 +1452,7 @@ public sealed partial class HomeworkFormatsViewModel : Bindable
         {
             if (!known.TryGetValue(item.Lesson.Id, out var row))
             {
-                row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => Forget(CheckAndRefreshAsync(lesson), lesson), CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
+                row = new LessonFormatViewModel(item.Lesson, item.Format, _chosen, _hasTranscript(item.Lesson), _prepare, _fetchRequested) { Opened = OpenTranscript, FindTasksRequested = FindTasks, ChatRequested = lesson => ChatOpened?.Invoke(lesson.Lesson), FindableProbe = lesson => BuildAssignments(lesson).Count > 0, PrepareRequested = lesson => PrepareDialogRequested?.Invoke(lesson), CheckRequested = lesson => Forget(CheckAndRefreshAsync(lesson), lesson), CheckOpened = lesson => PathOpened?.Invoke(CheckReader?.Invoke(lesson.Id) ?? string.Empty), RedoRequested = lesson => RedoDialogRequested?.Invoke(lesson), DeleteRequested = lesson => DeleteConfirmRequested?.Invoke(lesson) };
                 RefreshDrafts(row);
                 loads.Add(RefreshItemsAsync(row));
 

@@ -540,9 +540,28 @@
                                         </StackPanel>
                                     </Border>
                                 </Grid>
-                                <TextBlock Text="Важные письма" Style="{StaticResource TextTitle}" Margin="4,16,0,8"/>
+                                <TextBlock Text="Ящики" Style="{StaticResource TextTitle}" Margin="4,16,0,8"/>
+                                <ItemsControl ItemsSource="{Binding MailBoxes}" Margin="0,0,0,4">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource Card}" Width="260" Margin="0,0,8,8">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource TextCaption}"/>
+                                                    <TextBlock Text="{Binding Headline}" Foreground="{StaticResource TextBrush}" FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource TextCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Что требует внимания" Style="{StaticResource TextTitle}" Margin="4,8,0,8"/>
                                 <TextBlock Style="{StaticResource PageHint}" TextWrapping="Wrap" Margin="4,0,0,8"
-                                           Text="Каждое письмо от человека или с отзывом превращается в задачу в Singularity и сохраняется здесь: тема, отправитель, когда пришло и начало текста. Письма остаются в списке после проверки."/>
+                                           Text="Письма от людей и отзывы уже лежат задачами в Singularity. Здесь только суть и кнопка, чтобы открыть письмо."/>
                                 <ItemsControl ItemsSource="{Binding MailLetters}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -562,11 +581,14 @@
                                                             </Border>
                                                         </StackPanel>
                                                         <TextBlock Text="{Binding Meta}" Style="{StaticResource TextCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                                        <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" LineHeight="20" Margin="0,6,0,0"
-                                                                   Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibility}}"/>
                                                     </StackPanel>
-                                                    <Button Grid.Column="2" Content="Открыть письмо" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" VerticalAlignment="Center" Margin="0,0,14,0"
-                                                            Visibility="{Binding HasLink, Converter={StaticResource BoolToVisibility}}"/>
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                        <Button Content="Открыть письмо" Command="{Binding OpenCommand}" Style="{StaticResource OutlineButton}" Margin="0,0,6,0"
+                                                                Visibility="{Binding HasLink, Converter={StaticResource BoolToVisibility}}"/>
+                                                        <Button Command="{Binding CloseCommand}" Style="{StaticResource IconButton}" ToolTip="Закрыть: письмо больше не показывать" AutomationProperties.Name="Закрыть письмо">
+                                                            <Path Data="{StaticResource IconClose}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
+                                                        </Button>
+                                                    </StackPanel>
                                                 </Grid>
                                             </Border>
                                             <DataTemplate.Triggers>
@@ -621,7 +643,7 @@
                             <StackPanel Margin="0,0,12,0">
                                 <views:PageHeaderView Title="Автоматизация образования"/>
                                 <StackPanel Style="{StaticResource SettingsPanel}">
-                                    <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                                    <Border Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding Formats.ShowPrep, Converter={StaticResource BoolToVisibility}}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>

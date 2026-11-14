@@ -14,7 +14,8 @@ public sealed class CalendarDayViewModel
     /// <param name="inMonth">День относится к показанному месяцу, а не к соседнему</param>
     /// <param name="isToday">Сегодня</param>
     /// <param name="lessons">Занятия этого дня; пусто, если занятий нет</param>
-    public CalendarDayViewModel(DateOnly date, bool inMonth, bool isToday, IReadOnlyList<LessonFormatViewModel> lessons)
+    /// <param name="goTo">Показывает месяц этой даты: вызывается по нажатию на день соседнего месяца. Пусто: день только открывает расшифровку</param>
+    public CalendarDayViewModel(DateOnly date, bool inMonth, bool isToday, IReadOnlyList<LessonFormatViewModel> lessons, Action<DateOnly>? goTo = null)
     {
         Number = date.Day;
         InMonth = inMonth;
@@ -23,11 +24,17 @@ public sealed class CalendarDayViewModel
         HasTranscript = lessons.Any(lesson => lesson.HasTranscript);
         HasOpenAssignments = lessons.Any(lesson => lesson.HasOpenAssignments);
         IsOpen = lessons.Any(lesson => lesson.IsOpen);
-        ToolTip = string.Join("\n", lessons.Select(lesson => lesson.Headline));
 
-        // День с расшифровкой открывает её, а без расшифровки нажатие ничего не делает: открывать нечего
+        // День соседнего месяца сначала переключает календарь на его месяц; день с расшифровкой затем открывает её, а без расшифровки больше ничего не делает
         var target = lessons.FirstOrDefault(lesson => lesson.HasTranscript);
-        ClickCommand = new RelayCommand(() => target?.OpenCommand.Execute(null), () => target is not null);
+        var switches = !inMonth && goTo is not null;
+        ClickCommand = new RelayCommand(() =>
+        {
+            if (switches)
+                goTo!(date);
+
+            target?.OpenCommand.Execute(null);
+        }, () => target is not null || switches);
     }
 
     /// <summary>
@@ -64,11 +71,6 @@ public sealed class CalendarDayViewModel
     /// Расшифровка одного из занятий дня сейчас открыта
     /// </summary>
     public bool IsOpen { get; }
-
-    /// <summary>
-    /// Подсказка: названия занятий дня
-    /// </summary>
-    public string ToolTip { get; }
 
     /// <summary>
     /// Открывает расшифровку занятия дня

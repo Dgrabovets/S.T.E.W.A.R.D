@@ -4,7 +4,7 @@ using Steward.Mail.Models;
 namespace Steward.Homework.Services;
 
 /// <summary>
-/// Срок задачи по домашнему заданию: задание сдают на следующем занятии предмета, поэтому задача встаёт за два дня до него, а срок за день
+/// Срок задачи по домашнему заданию: задание сдают на следующем занятии предмета, поэтому крайний срок стоит на день занятия, а задача встаёт в плане за день до него
 /// </summary>
 public static class HomeworkDeadline
 {
@@ -16,12 +16,7 @@ public static class HomeworkDeadline
     /// <summary>
     /// За сколько дней до сдачи задача встаёт в план
     /// </summary>
-    private const int START_DAYS_BEFORE = 2;
-
-    /// <summary>
-    /// За сколько дней до сдачи срок задачи
-    /// </summary>
-    private const int DEADLINE_DAYS_BEFORE = 1;
+    private const int START_DAYS_BEFORE = 1;
 
     /// <summary>
     /// Считает день начала и срок задачи. Без дня сдачи задача встаёт в день занятия и срока не имеет
@@ -41,9 +36,8 @@ public static class HomeworkDeadline
         if (start < earliest)
             start = earliest;
 
-        var deadline = handIn.AddDays(-DEADLINE_DAYS_BEFORE);
-
-        return (start, deadline < start ? start : deadline);
+        // Крайний срок это сам день сдачи; он не бывает раньше начала
+        return (start, handIn < start ? start : handIn);
     }
 
     /// <summary>

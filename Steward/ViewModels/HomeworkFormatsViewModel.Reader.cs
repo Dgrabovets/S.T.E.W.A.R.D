@@ -223,7 +223,7 @@ public sealed partial class HomeworkFormatsViewModel
     /// </summary>
     public IReadOnlyList<StatusTileViewModel> ReadingStats => OpenLesson is null ? [] :
     [
-        new StatusTileViewModel("Дата", OpenLesson.Date, PanelToneEnum.Idle),
+        new StatusTileViewModel("Дата", OpenLesson.Date, PanelToneEnum.Idle, OpenLesson.Age),
         new StatusTileViewModel("Длительность", OpenLesson.HasDuration ? OpenLesson.Duration : "не указана", PanelToneEnum.Idle),
         new StatusTileViewModel("Пройдено", _reading.Points.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
         new StatusTileViewModel("Участников", _reading.Speakers.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), PanelToneEnum.Idle),
@@ -239,6 +239,7 @@ public sealed partial class HomeworkFormatsViewModel
     /// У встречи есть тема
     /// </summary>
     public bool HasReadingTopic => _reading.Topic.Length > 0;
+
 
     /// <summary>
     /// Есть ключевые моменты
@@ -270,6 +271,18 @@ public sealed partial class HomeworkFormatsViewModel
         _readerTab = ReaderTabEnum.Covered;
         OpenLesson = lesson;
         RaiseReading();
+    }
+
+    /// <summary>
+    /// Переходит из вкладки «Домашние задания» к расшифровке занятия, на её вкладку «Задания», если она есть
+    /// </summary>
+    /// <param name="lesson">Занятие</param>
+    private void FindTasks(LessonFormatViewModel lesson)
+    {
+        HomeworkTab = false;
+        OpenTranscript(lesson);
+        if (AvailableReaderTabs().Any(tab => tab.Tab == ReaderTabEnum.Assignments))
+            SelectReaderTab(ReaderTabEnum.Assignments);
     }
 
     /// <summary>

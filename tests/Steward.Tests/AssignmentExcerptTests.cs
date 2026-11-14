@@ -80,7 +80,7 @@ public class AssignmentExcerptTests
     }
 
     /// <summary>
-    /// Кнопка «Только в Singularity» заводит задачу по номеру задания в разборе и не трогает список заданий
+    /// Кнопка «Только в Singularity» заводит задачу по номеру задания в разборе, не трогает список заданий и убирает задание с вкладки
     /// </summary>
     [Fact]
     public async Task The_singularity_button_creates_only_a_task_and_never_touches_the_list()
@@ -96,6 +96,7 @@ public class AssignmentExcerptTests
         model.AssignmentToSingularity = (id, index) =>
         {
             created.Add((id, index));
+            model.AssignmentStateReader = _ => [new AssignmentState(false, true, false)];
 
             return Task.FromResult(("Задача заведена в Singularity: Отчёт по игре", false));
         };
@@ -107,13 +108,11 @@ public class AssignmentExcerptTests
 
         Assert.Equal([("a", 1)], created);
         Assert.Empty(added);
-        Assert.Equal("Заведено в Singularity", row.SingularityText);
-        Assert.False(row.SingularityCommand.CanExecute(null));
-        Assert.True(row.AddCommand.CanExecute(null));
+        Assert.Empty(model.Assignments);
     }
 
     /// <summary>
-    /// Задача для Singularity собирается из отрывка: слова преподавателя в заметке, а срок из разбора даёт начало за два дня и срок за день до сдачи
+    /// Задача для Singularity собирается из отрывка: слова преподавателя в заметке, а срок из разбора даёт крайний срок в день сдачи и начало за день до него
     /// </summary>
     [Fact]
     public void The_singularity_task_carries_the_excerpt_and_the_due_date()
@@ -125,8 +124,8 @@ public class AssignmentExcerptTests
 
         Assert.Equal("ДЗ: Отчёт по игре", request.Title);
         Assert.Equal("hwq:a:1", request.ExternalId);
-        Assert.StartsWith("2026-10-31T00:00:00", request.Start);
-        Assert.StartsWith("2026-11-01T00:00:00", request.Deadline);
+        Assert.StartsWith("2026-11-01T00:00:00", request.Start);
+        Assert.StartsWith("2026-11-02T00:00:00", request.Deadline);
         Assert.Contains("Сделайте отчёт по игре до пятницы.", request.Note);
     }
 

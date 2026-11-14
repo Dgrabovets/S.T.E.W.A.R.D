@@ -281,8 +281,8 @@ public sealed class SubjectViewModel : Bindable
         foreach (var lesson in value.Where(_watched.Add))
             lesson.PropertyChanged += (_, args) =>
             {
-                if (args.PropertyName is nameof(LessonFormatViewModel.HasItems) or nameof(LessonFormatViewModel.HasTranscript))
-                    Raise(nameof(HomeworkLessons));
+                if (args.PropertyName is nameof(LessonFormatViewModel.HasItems) or nameof(LessonFormatViewModel.HasTranscript) or nameof(LessonFormatViewModel.Drafts))
+                    RaiseHomeworkLessons();
                 else if (args.PropertyName == nameof(LessonFormatViewModel.OpenAssignments))
                     RaiseOpenAssignments();
 
@@ -382,7 +382,33 @@ public sealed class SubjectViewModel : Bindable
     /// <summary>
     /// Занятия для вкладки «Домашние задания»: с расшифровкой или с заданиями. Задания из LMS кладутся и к занятию без расшифровки, а когда расшифровка появится, она подтянется в ту же плашку
     /// </summary>
-    public IReadOnlyList<LessonFormatViewModel> HomeworkLessons => [.. Lessons.Where(lesson => lesson.HasTranscript || lesson.HasItems)];
+    public IReadOnlyList<LessonFormatViewModel> HomeworkLessons => [.. Lessons.Where(lesson => lesson.HasItems || lesson.HasDrafts)];
+
+    /// <summary>
+    /// Расшифрованные занятия, по которым заданий нет: на вкладке они сложены в свёрнутую группу, а не висят большими карточками
+    /// </summary>
+    public IReadOnlyList<LessonFormatViewModel> EmptyHomeworkLessons => [.. Lessons.Where(lesson => lesson.HasTranscript && !lesson.HasItems && !lesson.HasDrafts)];
+
+    /// <summary>
+    /// Есть занятия без заданий
+    /// </summary>
+    public bool HasEmptyLessons => EmptyHomeworkLessons.Count > 0;
+
+    /// <summary>
+    /// Заголовок группы: «Занятия без заданий (5)»
+    /// </summary>
+    public string EmptyLessonsText => $"Занятия без заданий ({EmptyHomeworkLessons.Count})";
+
+    /// <summary>
+    /// Сообщает окну, что состав карточек и группы занятий без заданий изменился
+    /// </summary>
+    private void RaiseHomeworkLessons()
+    {
+        Raise(nameof(HomeworkLessons));
+        Raise(nameof(EmptyHomeworkLessons));
+        Raise(nameof(HasEmptyLessons));
+        Raise(nameof(EmptyLessonsText));
+    }
 
     /// <summary>
     /// У скольких занятий уже есть расшифровка
@@ -461,7 +487,7 @@ public sealed class SubjectViewModel : Bindable
     private void RaiseCounters()
     {
         Raise(nameof(LessonsWithTranscript));
-        Raise(nameof(HomeworkLessons));
+        RaiseHomeworkLessons();
         Raise(nameof(TranscribedText));
         Raise(nameof(Transcribed));
         Raise(nameof(Total));

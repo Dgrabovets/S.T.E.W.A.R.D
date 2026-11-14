@@ -985,6 +985,29 @@ public sealed class JobHost : IDisposable
     }
 
     /// <summary>
+    /// Читает, показывать ли автоматическую подготовку заданий: есть файл <c>ui-show-prep.flag</c> в папке homework. По умолчанию скрыта
+    /// </summary>
+    /// <returns><see langword="true"/>, если файл-флаг лежит рядом с данными</returns>
+    public bool ShowPrep() => File.Exists(Path.Combine(_homework.Root, "ui-show-prep.flag"));
+
+    /// <summary>
+    /// Собирает просьбу для чата «Подготовка домашнего задания» и создаёт файл памяти чата, если его ещё нет
+    /// </summary>
+    /// <param name="lesson">Занятие, по которому готовится задание</param>
+    /// <returns>Текст просьбы</returns>
+    /// <exception cref="IOException">Файл памяти не создался</exception>
+    public string HomeworkChatText(Lesson lesson)
+    {
+        var memory = Path.Combine(_homework.Root, "memory.md");
+        if (!File.Exists(memory))
+            File.WriteAllText(memory, "# Память чата «Подготовка домашнего задания»\n\nЧто подготовлено и о чём договорились. Чат дописывает сюда сам.\n");
+
+        var transcript = _homework.HasTranscript(lesson.Id) ? _homework.TranscriptPath(lesson.Id) : string.Empty;
+
+        return HomeworkChatPrompt.Build($"{lesson.Title}{(lesson.Label.Length > 0 ? $" ({lesson.Label})" : string.Empty)}, {lesson.Date:dd.MM.yyyy}", transcript, _homework.SubjectOptionsFor(lesson.Title).ProjectFolder ?? string.Empty, memory);
+    }
+
+    /// <summary>
     /// Запоминает формат заданий по умолчанию для предмета
     /// </summary>
     /// <param name="subject">Название предмета</param>

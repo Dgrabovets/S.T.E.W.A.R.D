@@ -60,7 +60,6 @@ public static class AnalysisNote
         Title = $"Расшифровка: {lesson.Title}, {lesson.Date.ToString("dd.MM", CultureInfo.InvariantCulture)}{(lesson.Label.Length > 0 ? " " + lesson.Label : string.Empty)}",
         Note = Text(lesson, analysis),
         IsNote = true,
-        Start = new DateTimeOffset(lesson.Date.ToDateTime(TimeOnly.MinValue), offset).ToString("yyyy-MM-dd'T'HH:mm:sszzz", CultureInfo.InvariantCulture),
         ExternalId = KEY_PREFIX + lesson.Id,
         ProjectId = projectId,
     };

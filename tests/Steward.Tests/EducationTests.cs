@@ -107,6 +107,7 @@ public class EducationTests
         Assert.Contains("срок: к пятнице", note);
         Assert.Contains("Запись занятия", note);
         Assert.Equal("lms:transcript:e1", AnalysisNote.Build(lesson, analysis, null, TimeSpan.Zero).ExternalId);
+        Assert.Null(AnalysisNote.Build(lesson, analysis, null, TimeSpan.Zero).Start);
     }
 
     /// <summary>
@@ -423,6 +424,57 @@ public class EducationTests
         {
             directory.Delete(recursive: true);
         }
+    }
+
+    /// <summary>
+    /// Нажатие на день соседнего месяца в сетке календаря переключает его на этот месяц, а выбор месяца в окошке и стрелки листают как обычно
+    /// </summary>
+    [Fact]
+    public void A_click_on_a_neighbouring_month_day_switches_the_calendar_to_that_month()
+    {
+        var model = new HomeworkFormatsViewModel(
+            [(new Lesson("a", "Физика", new DateOnly(2026, 9, 28)), HomeworkFormatEnum.Word), (new Lesson("b", "Физика", new DateOnly(2026, 10, 5)), HomeworkFormatEnum.Word)],
+            (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)));
+        var calendar = model.Subjects[0].Calendar;
+
+        Assert.Equal("Октябрь 2026", calendar.Title);
+        Assert.Equal(42, calendar.Days.Count);
+        var edge = calendar.Days.First(day => !day.InMonth && day.HasLesson);
+        Assert.Equal(28, edge.Number);
+
+        edge.ClickCommand.Execute(null);
+
+        Assert.Equal("Сентябрь 2026", calendar.Title);
+        Assert.Contains(calendar.Days, day => day.InMonth && day.Number == 28 && day.HasLesson);
+
+        calendar.NextCommand.Execute(null);
+        Assert.Equal("Октябрь 2026", calendar.Title);
+    }
+
+    /// <summary>
+    /// Расшифрованные занятия без заданий складываются в группу, а не в карточки; «Найти задания» уводит с вкладки «Домашние задания» к расшифровке занятия
+    /// </summary>
+    [Fact]
+    public void Lessons_without_tasks_form_a_group_and_find_tasks_opens_the_transcript()
+    {
+        var model = new HomeworkFormatsViewModel(
+            [(new Lesson("a", "Физика", new DateOnly(2026, 10, 5)), HomeworkFormatEnum.Word)],
+            (_, _) => { }, _ => true, (_, _) => Task.FromResult((0, string.Empty)));
+        var subject = model.Subjects[0];
+
+        Assert.Empty(subject.HomeworkLessons);
+        var lesson = Assert.Single(subject.EmptyHomeworkLessons);
+        Assert.True(subject.HasEmptyLessons);
+        Assert.False(lesson.CanFindTasks);
+        Assert.Equal("Занятия без заданий (1)", subject.EmptyLessonsText);
+
+        model.ShowHomeworkCommand.Execute(null);
+        Assert.True(model.IsHomeworkTab);
+
+        lesson.FindTasksCommand.Execute(null);
+
+        Assert.False(model.IsHomeworkTab);
+        Assert.True(model.HasOpenLesson);
     }
 
     /// <summary>

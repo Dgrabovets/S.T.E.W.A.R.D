@@ -18,6 +18,16 @@ namespace Steward.ViewModels;
 public sealed record MailLetterViewModel(string Kind, string Subject, string Sender, string Meta, PanelToneEnum Tone, string Description, string Link, RelayCommand OpenCommand)
 {
     /// <summary>
+    /// Ключ письма для списка закрытых: ссылка, а если её нет, тема с отправителем
+    /// </summary>
+    public string Key => Link.Length > 0 ? Link : Subject + "|" + Sender;
+
+    /// <summary>
+    /// Закрывает плашку: письмо больше не показывается в списке
+    /// </summary>
+    public RelayCommand? CloseCommand { get; init; }
+
+    /// <summary>
     /// У письма есть описание
     /// </summary>
     public bool HasDescription => Description.Length > 0;
@@ -36,10 +46,11 @@ public sealed record MailLetterViewModel(string Kind, string Subject, string Sen
     public static MailLetterViewModel FromArchive(ArchivedLetter letter, Action<string>? open = null)
     {
         var link = Uri.TryCreate(letter.Link, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? letter.Link : string.Empty;
-        var sender = letter.FromName.Length > 0 && letter.FromAddress.Length > 0 ? $"{letter.FromName} <{letter.FromAddress}>" : letter.FromName.Length > 0 ? letter.FromName : letter.FromAddress;
-        var meta = string.Join(" · ", new[] { sender, $"пришло {letter.ReceivedAt.LocalDateTime.ToString("dd.MM HH:mm", CultureInfo.InvariantCulture)}", letter.TaskCreated ? "задача создана в Singularity" : string.Empty }.Where(part => part.Length > 0));
+        var name = letter.FromName.Contains(" (отправлено через", StringComparison.Ordinal) ? letter.FromName[..letter.FromName.IndexOf(" (отправлено через", StringComparison.Ordinal)] : letter.FromName;
+        var sender = name.Length > 0 ? name : letter.FromAddress;
+        var meta = string.Join(" · ", new[] { sender, $"пришло {letter.ReceivedAt.LocalDateTime.ToString("dd.MM HH:mm", CultureInfo.InvariantCulture)}", letter.TaskCreated ? "задача в Singularity" : string.Empty }.Where(part => part.Length > 0));
 
-        return new MailLetterViewModel(letter.Kind, letter.Subject, letter.FromName, meta, letter.Kind == "Отзыв" ? PanelToneEnum.Running : PanelToneEnum.Attention, letter.Preview, link, new RelayCommand(() => open?.Invoke(link), () => link.Length > 0));
+        return new MailLetterViewModel(letter.Kind, letter.Subject, name, meta, letter.Kind == "Отзыв" ? PanelToneEnum.Running : PanelToneEnum.Attention, letter.Preview, link, new RelayCommand(() => open?.Invoke(link), () => link.Length > 0));
     }
 
     /// <summary>

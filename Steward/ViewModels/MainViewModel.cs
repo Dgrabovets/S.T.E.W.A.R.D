@@ -176,6 +176,43 @@ public sealed class MainViewModel : PanelViewModel
     public IReadOnlyList<MailLetterViewModel> MailLetters { get; private set; } = [];
 
     /// <summary>
+    /// Плитки почтовых ящиков над списком писем. Пока ящик один: когда появятся другие, у каждого будет своя плитка
+    /// </summary>
+    public IReadOnlyList<MailBoxTileViewModel> MailBoxes { get; private set; } = [];
+
+    /// <summary>
+    /// Файл с ключами писем, плашки которых закрыты
+    /// </summary>
+    private static string ClosedLettersFile => System.IO.Path.Combine(Steward.Status.Common.DataLocation.DataDirectory(), "mail", "closed-letters.txt");
+
+    /// <summary>
+    /// Читает ключи закрытых писем. Нет файла: закрытых нет
+    /// </summary>
+    /// <returns>Набор ключей</returns>
+    private static HashSet<string> ClosedLetters() =>
+        System.IO.File.Exists(ClosedLettersFile) ? [.. System.IO.File.ReadAllLines(ClosedLettersFile)] : [];
+
+    /// <summary>
+    /// Прячет плашку письма и запоминает это в файле. Не записалось: плашка спрятана до перезапуска
+    /// </summary>
+    /// <param name="key">Ключ письма</param>
+    private void CloseLetter(string key)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(ClosedLettersFile)!);
+            System.IO.File.AppendAllLines(ClosedLettersFile, [key]);
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException)
+        {
+            System.Diagnostics.Trace.TraceError($"Закрытое письмо не записалось: {exception}");
+        }
+
+        MailLetters = [.. MailLetters.Where(letter => letter.Key != key)];
+        Raise(nameof(MailLetters));
+    }
+
+    /// <summary>
     /// Сколько писем разобрано в каждый из последних семи дней
     /// </summary>
     public IReadOnlyList<ChartBarViewModel> MailDays { get; private set; } = [];
@@ -732,8 +769,12 @@ public sealed class MainViewModel : PanelViewModel
             .SelectMany(record => LogLines.Parse(record.Output ?? string.Empty).Where(line => MailPrefixes.Any(prefix => line.Text.StartsWith(prefix, StringComparison.Ordinal))))
             .Take(12).Select(line => MailLetterViewModel.From(line, link => LinkRequested?.Invoke(link)))
             .Where(letter => !archived.Any(item => string.Equals(item.Subject, letter.Subject, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Sender, letter.Sender, StringComparison.OrdinalIgnoreCase)));
-        MailLetters = [.. archived.Take(MAIL_ARCHIVE_SHOWN), .. fromJournal];
+        var closed = ClosedLetters();
+        MailLetters = [.. archived.Take(MAIL_ARCHIVE_SHOWN).Concat(fromJournal).Where(letter => !closed.Contains(letter.Key)).Select(letter => letter with { CloseCommand = new RelayCommand(() => CloseLetter(letter.Key)) })];
         Raise(nameof(MailLetters));
+        var needReply = MailLetters.Count(letter => letter.Kind == "Ответить");
+        MailBoxes = [new MailBoxTileViewModel("Учёба", needReply, MailLetters.Count(letter => letter.Kind == "Отзыв"), MailLastCheck, MailLastTone == PanelToneEnum.Problem ? PanelToneEnum.Problem : needReply > 0 ? PanelToneEnum.Attention : PanelToneEnum.Running)];
+        Raise(nameof(MailBoxes));
         Raise(nameof(MailCard));
         Raise(nameof(ScheduleCard));
         Raise(nameof(LmsCard));

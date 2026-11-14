@@ -62,6 +62,22 @@ public sealed partial class HomeworkStore
     public void SetSubjectProjectFolder(string subject, string folder) => ChangeSubjectOptions(subject, options => options with { ProjectFolder = folder.Trim().Length > 0 ? folder.Trim() : null });
 
     /// <summary>
+    /// Запоминает проект SingularityApp предмета: в него идут задачи и заметки по этому предмету
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="projectId">Номер проекта вида <c>P-…</c>. Пусто: проект не задан</param>
+    /// <exception cref="IOException">Файл настроек занят дольше ожидания или не читается: прежнее содержимое цело</exception>
+    public void SetSubjectSingularityProject(string subject, string projectId) => ChangeSubjectOptions(subject, options => options with { SingularityProjectId = projectId.Trim().Length > 0 ? projectId.Trim() : null });
+
+    /// <summary>
+    /// Проект SingularityApp для задач предмета
+    /// </summary>
+    /// <param name="subject">Название предмета</param>
+    /// <param name="fallback">Проект из настроек, если у предмета свой не задан</param>
+    /// <returns>Проект предмета или запасной</returns>
+    public string? SingularityProjectFor(string subject, string? fallback) => SubjectOptionsFor(subject).SingularityProjectId is { Length: > 0 } id ? id : fallback;
+
+    /// <summary>
     /// Запоминает язык, на котором пишутся работы по предмету
     /// </summary>
     /// <param name="subject">Название предмета</param>
